@@ -430,7 +430,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 <div class="nav-link" onclick="navigate('settings',this)"><div class="nav-icon">⚙️</div><span class="nav-text">الإعدادات</span></div>
 </div>
 </nav>
-<div class="sidebar-foot"><div class="user-card" onclick="navigate('settings',null)"><div class="user-av" id="userAv">؟</div><div class="user-info"><div class="user-name" id="userName">المستخدم</div><div class="user-role" id="userRole">—</div></div></div></div>
+<div class="sidebar-foot"><div class="user-card" onclick="navigate('settings',null)"><div class="user-av" id="userAv">؟</div><div class="user-info"><div class="user-name" id="userName">المستخدم</div><div class="user-role" id="userRole">—</div></div></div><div class="user-card" onclick="forceLogout()" style="margin-top:8px;background:rgba(139,38,53,0.1)"><div class="user-av" style="background:linear-gradient(135deg,#A8324A,#8B2635)">🚪</div><div class="user-info"><div class="user-name" style="color:#FFB3B3">تسجيل الخروج</div><div class="user-role">اضغط للخروج</div></div></div></div>
 </aside>
 
 <main class="main">
@@ -859,8 +859,10 @@ async function handleSignup(){clearAuthMessages();const n=$('signupName').value.
 
 async function handleReset(){clearAuthMessages();const e=$('resetEmail').value.trim(),b=$('resetBtn');b.disabled=true;b.textContent='⏳ جاري الإرسال...';try{const r=await supa.auth.resetPasswordForEmail(e);if(r.error)throw r.error;showSuccess('📧 تم إرسال رابط الاستعادة');b.disabled=false;b.textContent='📧 إرسال رابط الاستعادة'}catch(err){showError(err.message);b.disabled=false;b.textContent='📧 إرسال رابط الاستعادة'}}
 
-async function logout(){confirmAction('تسجيل الخروج','هل تريد تسجيل الخروج؟','🚪',async function(){try{await supa.auth.signOut()}catch(e){}currentUser=null;currentProfile=null;currentCompany=null;allDeals=[];allClients=[];allProperties=[];allTasks=[];allMembers=[];allNotifications=[];$('appScreen').classList.remove('visible');$('authScreen').classList.remove('hidden');$('loginEmail').value='';$('loginPwd').value='';showAuthTab('login');showToast('👋 تم تسجيل الخروج','success')})}
-async function logoutAll(){confirmAction('خروج من جميع الأجهزة','سيتم تسجيل خروجك من كل الأجهزة المسجّلة.','🚪',async function(){try{await supa.auth.signOut({scope:'global'})}catch(e){}currentUser=null;currentProfile=null;currentCompany=null;$('appScreen').classList.remove('visible');$('authScreen').classList.remove('hidden');showAuthTab('login');showToast('🚪 تم','success')})}
+function forceLogout(){try{if(window.supa&&window.supa.auth)window.supa.auth.signOut()}catch(e){}try{localStorage.clear();sessionStorage.clear();// Clear any Supabase tokens
+Object.keys(localStorage).forEach(k=>{if(k.indexOf('supabase')>=0||k.indexOf('sb-')>=0)localStorage.removeItem(k)})}catch(e){}window.location.href=window.location.pathname}
+async function logout(){forceLogout()}
+async function logoutAll(){forceLogout()}
 async function changePassword(){const p=prompt('كلمة المرور الجديدة (8 أحرف على الأقل):');if(!p)return;if(p.length<8){showToast('⚠️ قصيرة جداً','error');return}const r=await supa.auth.updateUser({password:p});if(r.error)showToast('خطأ: '+r.error.message,'error');else showToast('✅ تم التغيير','success')}
 
 async function loadApp(){$('loaderScreen').style.display='flex';$('authScreen').classList.add('hidden');try{const u=await supa.auth.getUser();if(u.error||!u.data.user)throw new Error('لم يتم العثور على المستخدم');currentUser=u.data.user;const p=await supa.from('profiles').select('*').eq('id',currentUser.id).single();currentProfile=p.data||{id:currentUser.id,email:currentUser.email,full_name:currentUser.email.split('@')[0],role:'viewer'};if(currentProfile.is_active===false){throw new Error('حسابك معطّل. تواصل مع مدير الشركة.')}if(currentProfile.company_id){const c=await supa.from('companies').select('*').eq('id',currentProfile.company_id).single();currentCompany=c.data}updateUserUI();applyRoleVisibility();$('loaderScreen').style.display='none';$('appScreen').classList.add('visible');await loadDashboard();loadNotifications()}catch(err){console.error(err);showToast('خطأ: '+err.message,'error');$('loaderScreen').style.display='none';$('authScreen').classList.remove('hidden');await supa.auth.signOut()}}
