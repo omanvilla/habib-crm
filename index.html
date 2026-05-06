@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Habib Sons Real Estate — منصة CRM</title>
+<meta name="theme-color" content="#2A2118">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Habib Sons CRM">
+<meta name="mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -593,6 +598,14 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 <div style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:9px 22px" onclick="saveCompany()">💾 حفظ بيانات الشركة</button></div>
 </div></div>
 
+<div class="card" style="margin-top:18px"><div class="card-head"><div class="card-title">🔔 الإشعارات</div></div><div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+<div style="font-size:12px;color:var(--umber);line-height:1.6">فعّل إشعارات المتصفّح ليصلك تنبيه فوري على شاشة الكمبيوتر/الجوال عند وصول عميل جديد، حتى لو الموقع مفتوح في تبويب آخر.</div>
+<button class="btn-gold" onclick="enableNotifications()" style="width:auto;padding:10px 20px">🔔 تفعيل إشعارات المتصفّح</button>
+<div style="font-size:11px;color:var(--umber);background:rgba(196,150,58,0.06);padding:10px;border-radius:8px;line-height:1.6">
+💡 <strong>للجوال:</strong> افتح الموقع في متصفّح Safari (iPhone) أو Chrome (Android) → اضغط زر المشاركة → "أضف إلى الشاشة الرئيسية" — سيصير CRM كأنه تطبيق!
+</div>
+</div></div>
+
 <div class="card" style="margin-top:18px"><div class="card-head"><div class="card-title">🔒 الأمان</div></div><div class="card-body" style="display:flex;flex-direction:column;gap:10px">
 <button class="btn-secondary" onclick="changePassword()">🔑 تغيير كلمة المرور</button>
 <button class="btn-secondary" onclick="logoutAll()" style="color:var(--ruby);border-color:var(--ruby)">🚪 تسجيل خروج من جميع الأجهزة</button>
@@ -977,7 +990,10 @@ function deleteDeal(id){confirmAction('حذف الصفقة','هل تريد حذ�
 
 async function populateTaskSelects(){try{const c=await supa.from('clients').select('id,name');const d=await supa.from('deals').select('id, client:clients(name)');const cs=$('tClient');cs.innerHTML='<option value="">— لا شيء —</option>';(c.data||[]).forEach(function(i){cs.innerHTML+='<option value="'+i.id+'">'+escapeHtml(i.name)+'</option>'});const ds=$('tDeal');ds.innerHTML='<option value="">— لا شيء —</option>';(d.data||[]).forEach(function(i){ds.innerHTML+='<option value="'+i.id+'">صفقة: '+escapeHtml(i.client&&i.client.name||'—')+'</option>'})}catch(err){console.error(err)}}
 
-async function loadTasks(){const list=$('tasksList');list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';try{const r=await supa.from('tasks').select('*, client:clients(name), user:profiles(full_name)').order('due_date',{ascending:true,nullsFirst:false});if(r.error)throw r.error;allTasks=r.data||[];renderTasks()}catch(err){list.innerHTML='<div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(err.message)+'</div></div>'}}
+async function loadTasks(){const list=$('tasksList');list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';try{// Try with relations first
+let r=await supa.from('tasks').select('*, client:clients(name)').order('due_date',{ascending:true,nullsFirst:false});if(r.error){console.warn('[Tasks] Relation query failed, trying simple:',r.error.message);// Fallback: simple query without relations
+r=await supa.from('tasks').select('*').order('due_date',{ascending:true,nullsFirst:false});if(r.error)throw r.error}allTasks=r.data||[];// Manually attach user names from allMembers if available
+allTasks.forEach(t=>{if(t.user_id&&allMembers&&allMembers.length){const m=allMembers.find(x=>x.id===t.user_id);if(m)t.user={full_name:m.full_name}}});console.log('[Tasks] Loaded:',allTasks.length,'tasks');renderTasks()}catch(err){console.error('[Tasks] Error:',err);list.innerHTML='<div class="empty"><div class="empty-ico">⚠️</div><div class="empty-title">خطأ في تحميل المهام</div><div class="empty-desc">'+escapeHtml(err.message)+'</div><button class="btn-primary" style="margin-top:14px;width:auto;padding:9px 18px" onclick="loadTasks()">🔄 إعادة المحاولة</button></div>'}}
 
 function filterTasks(f,el){taskFilter=f;document.querySelectorAll('#page-daily .filter-chip').forEach(function(c){c.classList.remove('active')});el.classList.add('active');renderTasks()}
 
@@ -1073,8 +1089,20 @@ function shareLeadFormWA(){const url=getLeadFormUrl();const msg='مرحباً �
 // Show lead form card for owners (called separately from applyRoleVisibility)
 function refreshLeadFormCard(){if(isOwner()){$('leadFormCard').style.display='';$('leadFormLink').textContent=getLeadFormUrl()}else{$('leadFormCard').style.display='none'}}
 
+// ===== BROWSER PUSH NOTIFICATIONS =====
+let lastNotifIds=new Set();
+let notifPermissionAsked=false;
+
+async function requestNotifPermission(){if(!('Notification' in window))return false;if(Notification.permission==='granted')return true;if(Notification.permission==='denied')return false;try{const r=await Notification.requestPermission();return r==='granted'}catch(e){return false}}
+
+function sendBrowserNotif(title,body,icon){if(!('Notification' in window))return;if(Notification.permission!=='granted')return;try{const n=new Notification(title,{body:body,icon:icon||'⌘',badge:'⌘',tag:title,silent:false});setTimeout(()=>{try{n.close()}catch(e){}},10000);n.onclick=function(){window.focus();n.close()}}catch(e){console.warn('Notif failed:',e)}}
+
+async function checkAndNotifyNew(){if(!currentProfile||!currentProfile.company_id)return;if(Notification.permission!=='granted')return;try{const since=new Date(Date.now()-90000).toISOString();const r=await supa.from('clients').select('id,name,phone,source').gte('created_at',since).eq('source','website');(r.data||[]).forEach(c=>{const key='lead-'+c.id;if(!lastNotifIds.has(key)){lastNotifIds.add(key);sendBrowserNotif('🎉 عميل جديد من الموقع!',c.name+(c.phone?' · '+c.phone:''))}})}catch(e){console.warn(e)}}
+
+async function enableNotifications(){const granted=await requestNotifPermission();if(granted){showToast('🔔 تم تفعيل الإشعارات','success');sendBrowserNotif('Habib Sons CRM','✅ الإشعارات مفعّلة! ستصلك تنبيهات العملاء الجدد')}else{showToast('⚠️ لم تُمنح الإشعارات','error')}}
+
 // Auto-refresh notifications every 60 seconds
-setInterval(()=>{if(currentProfile&&currentProfile.company_id&&document.visibilityState==='visible'){loadNotifications()}},60000);
+setInterval(()=>{if(currentProfile&&currentProfile.company_id&&document.visibilityState==='visible'){loadNotifications();checkAndNotifyNew()}},60000);
 
 async function init(){const s=await supa.auth.getSession();if(s.data.session)await loadApp();else{$('loaderScreen').style.display='none';$('authScreen').classList.remove('hidden')}}
 supa.auth.onAuthStateChange(function(e,s){if(e==='SIGNED_IN'&&s&&!currentUser)loadApp();if(e==='SIGNED_OUT'){currentUser=null;currentProfile=null}});
