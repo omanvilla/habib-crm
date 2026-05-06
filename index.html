@@ -320,6 +320,53 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .listing-price{color:var(--gold);font-weight:700;font-size:13px}
 .smart-suggestion{background:linear-gradient(135deg,rgba(196,150,58,0.05),rgba(46,125,92,0.03));border:1.5px dashed var(--gold);border-radius:10px;padding:11px 14px;font-size:12px;color:var(--espresso);line-height:1.6;margin-bottom:10px}
 
+.bell-wrapper{position:relative;cursor:pointer;width:38px;height:38px;border-radius:10px;background:white;border:1.5px solid var(--cream-deeper);display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .15s}
+.bell-wrapper:hover{border-color:var(--gold);background:var(--cream)}
+.bell-dot{position:absolute;top:6px;left:6px;width:9px;height:9px;background:var(--ruby);border-radius:50%;border:2px solid white;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.2);opacity:0.8}}
+.notif-panel{position:absolute;top:100%;left:0;margin-top:8px;width:380px;max-width:calc(100vw - 30px);max-height:500px;background:white;border:1px solid var(--cream-deeper);border-radius:14px;box-shadow:0 16px 40px rgba(42,33,24,0.15);z-index:200;overflow:hidden;display:none;flex-direction:column;animation:slideDown .25s ease}
+.notif-panel.on{display:flex}
+@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}}
+.notif-head{padding:14px 18px;border-bottom:1px solid var(--cream-deeper);display:flex;justify-content:space-between;align-items:center}
+.notif-title{font-weight:700;font-size:14px;color:var(--espresso)}
+.notif-clear{font-size:11px;color:var(--gold);cursor:pointer;font-weight:600}
+.notif-clear:hover{text-decoration:underline}
+.notif-body{flex:1;overflow-y:auto;max-height:400px}
+.notif-item{padding:14px 18px;border-bottom:1px solid var(--cream-dark);display:flex;gap:12px;cursor:pointer;transition:background .15s}
+.notif-item:hover{background:var(--cream)}
+.notif-item.unread{background:rgba(196,150,58,0.04)}
+.notif-icon-wrap{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.notif-i-lead{background:rgba(46,125,92,0.15);color:var(--emerald)}
+.notif-i-task{background:rgba(196,150,58,0.15);color:#8B6514}
+.notif-i-deal{background:rgba(59,130,246,0.1);color:var(--sky)}
+.notif-i-followup{background:rgba(139,38,53,0.1);color:var(--ruby)}
+.notif-i-system{background:var(--cream-deeper);color:var(--umber)}
+.notif-content{flex:1;min-width:0}
+.notif-text{font-size:13px;color:var(--espresso);font-weight:500;line-height:1.4}
+.notif-text strong{color:var(--ink);font-weight:700}
+.notif-time{font-size:11px;color:var(--umber);margin-top:4px}
+.notif-empty{padding:40px 20px;text-align:center;color:var(--umber)}
+.tag-input-wrap{background:white;border:1.5px solid var(--cream-deeper);border-radius:9px;padding:6px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:42px}
+.tag-input-wrap:focus-within{border-color:var(--gold)}
+.tag-pill{background:var(--gold-pale);color:#6B4513;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;display:inline-flex;align-items:center;gap:5px;cursor:default}
+.tag-pill .tag-x{cursor:pointer;font-weight:900;font-size:13px;line-height:1;opacity:0.6;transition:opacity .15s}
+.tag-pill .tag-x:hover{opacity:1;color:var(--ruby)}
+.tag-input-field{border:none;outline:none;background:transparent;font-family:inherit;font-size:13px;color:var(--espresso);flex:1;min-width:120px;padding:5px;direction:rtl}
+.tag-list-display{display:inline-flex;gap:4px;flex-wrap:wrap}
+.tag-list-display .tag-pill{cursor:pointer;font-size:10px;padding:2px 8px}
+.lead-form-page{min-height:100vh;background:linear-gradient(135deg,var(--cream) 0%,var(--cream-dark) 100%);display:flex;align-items:center;justify-content:center;padding:20px}
+.lead-form-card{background:white;border-radius:20px;padding:36px 32px;width:480px;max-width:100%;box-shadow:0 20px 60px rgba(42,33,24,0.12);border:1px solid var(--cream-deeper)}
+.lead-form-card h1{font-family:'Playfair Display',serif;font-size:24px;font-weight:700;color:var(--ink);text-align:center;margin-bottom:6px}
+.lead-form-card .subtitle{text-align:center;color:var(--umber);font-size:13px;margin-bottom:24px}
+.wa-templates{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.wa-tmpl{background:white;border:1.5px solid var(--cream-deeper);border-radius:10px;padding:10px 12px;cursor:pointer;font-size:12px;text-align:right;transition:all .15s;font-family:inherit;color:var(--espresso);font-weight:600}
+.wa-tmpl:hover{border-color:#25D366;background:rgba(37,211,102,0.04)}
+.wa-tmpl-title{font-weight:700;font-size:12px;color:var(--espresso);margin-bottom:3px}
+.wa-tmpl-preview{font-size:10px;color:var(--umber);line-height:1.4;font-weight:400}
+.wa-msg-preview{background:#dcf8c6;border-radius:10px;padding:11px 14px;font-size:12px;line-height:1.6;color:#000;margin:10px 0;white-space:pre-wrap;border-right:3px solid #25D366}
+.share-link-card{background:linear-gradient(135deg,rgba(46,125,92,0.06),rgba(196,150,58,0.04));border:1.5px dashed var(--emerald);border-radius:12px;padding:16px;margin-bottom:14px}
+.share-link-input{background:white;border:1px solid var(--cream-deeper);border-radius:8px;padding:10px;font-size:11px;color:var(--espresso);font-family:monospace;direction:ltr;margin:8px 0;word-break:break-all;cursor:pointer;display:block}
+
 </style>
 </head>
 <body>
@@ -387,7 +434,15 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 </aside>
 
 <main class="main">
-<header class="topbar"><div class="ham" onclick="openMobile()">☰</div><div class="tb-title" id="tbTitle">لوحة <em>التحكم</em></div><button class="btn-secondary" onclick="logout()">🚪 خروج</button></header>
+<header class="topbar"><div class="ham" onclick="openMobile()">☰</div><div class="tb-title" id="tbTitle">لوحة <em>التحكم</em></div>
+<div style="position:relative">
+<div class="bell-wrapper" onclick="toggleNotifPanel(event)" title="الإشعارات">🔔<span class="bell-dot" id="bellDot" style="display:none"></span></div>
+<div class="notif-panel" id="notifPanel">
+<div class="notif-head"><div class="notif-title">🔔 الإشعارات</div><div class="notif-clear" onclick="markAllNotifsRead()">تعليم الكل كمقروء</div></div>
+<div class="notif-body" id="notifBody"><div class="notif-empty">لا توجد إشعارات</div></div>
+</div>
+</div>
+<button class="btn-secondary" onclick="logout()">🚪 خروج</button></header>
 <div class="content">
 
 <div class="page active" id="page-dash">
@@ -508,6 +563,25 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 <div style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:9px 22px" onclick="saveProfile()">💾 حفظ التغييرات</button></div>
 </div></div>
 
+<div class="card" style="margin-top:18px;display:none" id="leadFormCard"><div class="card-head"><div class="card-title">🌐 نموذج استقبال العملاء</div></div><div class="card-body">
+<div class="share-link-card">
+<div style="font-size:13px;font-weight:700;color:var(--espresso);margin-bottom:6px">📥 شارك هذا الرابط مع عملائك</div>
+<div style="font-size:12px;color:var(--umber);line-height:1.6">عندما يعبّيه أي عميل، يصير عميلاً جديداً في النظام تلقائياً!</div>
+<div class="share-link-input" id="leadFormLink" onclick="copyLeadFormLink()">—</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+<button class="btn-secondary" onclick="copyLeadFormLink()" style="flex:1">📋 نسخ الرابط</button>
+<button class="btn-secondary" onclick="shareLeadFormWA()" style="flex:1">💚 إرسال على واتساب</button>
+</div>
+</div>
+<div style="font-size:11px;color:var(--umber);line-height:1.6">
+💡 <strong>أين تستخدمه:</strong><br>
+• في وصف حسابك على إنستجرام<br>
+• في إعلانات جوجل وفيسبوك<br>
+• في توقيع الواتساب<br>
+• على بطاقة العمل (QR Code)
+</div>
+</div></div>
+
 <div class="card" style="margin-top:18px;display:none" id="companySettingsCard"><div class="card-head"><div class="card-title">🏢 معلومات الشركة</div></div><div class="card-body">
 <div class="fgrid">
 <div class="fg"><label class="fl">اسم الشركة</label><input class="fi" id="setCompanyName"></div>
@@ -585,6 +659,12 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 <span class="star" data-v="5" onclick="setStars(5)">★</span>
 </div></div>
 <div class="fg"><label class="fl">📊 جاهزية الشراء (0-100%)</label><input class="fi" type="number" id="cReadiness" min="0" max="100" placeholder="50"></div>
+<div class="fg full"><label class="fl">🏷 التاجات (اضغط Enter بعد كل تاج)</label>
+<div class="tag-input-wrap" id="cTagsWrap" onclick="document.getElementById('cTagInput').focus()">
+<input class="tag-input-field" id="cTagInput" placeholder="مثال: VIP, خليجي, عاجل..." onkeydown="addTagOnEnter(event)">
+</div>
+<div style="font-size:10px;color:var(--umber);margin-top:5px">💡 اقتراحات: VIP، عاجل، خليجي، إماراتي، استثمار، تمويل، نقد</div>
+</div>
 <div class="fg full"><label class="fl">ملاحظات</label><textarea class="fta" id="cNotes" rows="2"></textarea></div>
 </div>
 <div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mClient')">إلغاء</button><button class="btn-primary" style="width:auto;padding:9px 22px" onclick="saveClient()">💾 حفظ</button></div>
@@ -664,6 +744,21 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 <div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mEditMember')">إلغاء</button><button class="btn-primary" style="width:auto;padding:9px 22px" onclick="saveMemberChanges()">💾 حفظ</button></div>
 </div></div>
 
+<div class="modal-ov" id="mWATemplate"><div class="modal-box">
+<div class="modal-title">💚 إرسال رسالة واتساب</div>
+<div style="font-size:12px;color:var(--umber);margin-bottom:14px">اختر قالباً جاهزاً أو اكتب رسالتك:</div>
+<div class="wa-templates" id="waTemplatesGrid"></div>
+<div class="fg"><label class="fl">الرسالة</label><textarea class="fta" id="waMsgArea" rows="6" placeholder="رسالتك هنا..."></textarea></div>
+<div class="wa-msg-preview" id="waPreview" style="display:none"></div>
+<div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mWATemplate')">إلغاء</button><button class="btn-gold" onclick="sendWAMessage()" style="background:#25D366;border-color:#25D366">📲 إرسال على واتساب</button></div>
+</div></div>
+
+<div class="modal-ov" id="mTagFilter"><div class="modal-box">
+<div class="modal-title">🏷 فلترة بالتاجات</div>
+<div id="tagsListContainer" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px"></div>
+<div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mTagFilter')">إغلاق</button></div>
+</div></div>
+
 <div class="confirm-dlg" id="confirmDlg"><div class="confirm-box">
 <div class="confirm-icon" id="confIcon">⚠️</div>
 <div class="confirm-title" id="confTitle">تأكيد</div>
@@ -680,6 +775,17 @@ const SUPABASE_URL='https://dmsckqjkcnsfmnzfjczz.supabase.co';
 const SUPABASE_KEY='sb_publishable_cblz5giFrHdXSCYSG6j0Cw_oaxkmHi4';
 const supa=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
+// LEAD FORM PUBLIC PAGE DETECTION
+function checkLeadFormMode(){const params=new URLSearchParams(window.location.search);const formId=params.get('form');const companyId=params.get('c');if(formId==='lead'&&companyId){renderLeadForm(companyId);return true}return false}
+
+async function renderLeadForm(companyId){document.getElementById('loaderScreen').style.display='none';document.getElementById('authScreen').style.display='none';let companyName='Habib Sons Real Estate';try{const r=await supa.from('companies').select('name').eq('id',companyId).single();if(r.data)companyName=r.data.name}catch(e){}
+document.body.innerHTML='<div class="lead-form-page"><div class="lead-form-card"><div class="auth-mark" style="margin:0 auto 14px">⌘</div><h1>'+companyName+'</h1><div class="subtitle">📝 سجّل بياناتك ونحن نتواصل معك</div><div id="leadFormError" class="auth-error" style="display:none"></div><div id="leadFormSuccess" class="auth-success" style="display:none">✅ تم التسجيل بنجاح! سنتواصل معك قريباً 🎉</div><form id="leadForm" onsubmit="event.preventDefault();submitLead(\''+companyId+'\')"><div class="fg"><label class="fl">الاسم الكامل *</label><input class="fi" id="lfName" required></div><div class="fg"><label class="fl">رقم الهاتف *</label><input class="fi" id="lfPhone" type="tel" dir="ltr" required></div><div class="fg"><label class="fl">البريد الإلكتروني</label><input class="fi" id="lfEmail" type="email" dir="ltr"></div><div class="fg"><label class="fl">ما الذي تبحث عنه؟ *</label><select class="fs" id="lfType" required><option value="">اختر</option><option value="buyer">🛒 أبحث عن عقار للشراء</option><option value="seller">🏠 لدي عقار للبيع</option><option value="investor">💼 أبحث عن استثمار عقاري</option></select></div><div class="fg"><label class="fl">المنطقة المفضّلة</label><input class="fi" id="lfArea" placeholder="مثال: الموج، القرم، السيب"></div><div class="fg"><label class="fl">نوع العقار</label><select class="fs" id="lfPropType"><option value="">اختر</option><option value="villa">فيلا</option><option value="apartment">شقة</option><option value="land">أرض</option><option value="office">مكتب</option><option value="shop">محل تجاري</option></select></div><div class="fg"><label class="fl">الميزانية التقريبية (ر.ع)</label><input class="fi" id="lfBudget" type="number" placeholder="100000"></div><div class="fg"><label class="fl">ملاحظات إضافية</label><textarea class="fta" id="lfNotes" rows="2"></textarea></div><button type="submit" class="btn-gold" style="width:100%;margin-top:10px">📩 إرسال الطلب</button></form><div style="text-align:center;margin-top:18px;font-size:11px;color:var(--umber)">🔒 بياناتك محمية ولن تُشارك مع طرف ثالث</div></div></div>'}
+
+async function submitLead(companyId){const name=document.getElementById('lfName').value.trim();const phone=document.getElementById('lfPhone').value.trim();const type=document.getElementById('lfType').value;const errEl=document.getElementById('leadFormError');const sucEl=document.getElementById('leadFormSuccess');if(!name||!phone||!type){errEl.textContent='⚠️ الاسم والهاتف ونوع الطلب مطلوبة';errEl.style.display='flex';return}try{const data={company_id:companyId,name:name,phone:phone,email:document.getElementById('lfEmail').value.trim()||null,client_type:type,is_buyer:type==='buyer',is_seller:type==='seller',is_investor:type==='investor',preferred_area:document.getElementById('lfArea').value.trim()||null,property_type:document.getElementById('lfPropType').value||null,budget_max:parseFloat(document.getElementById('lfBudget').value)||null,notes:document.getElementById('lfNotes').value.trim()||null,status:'hot',source:'website'};const r=await supa.from('clients').insert(data);if(r.error)throw r.error;errEl.style.display='none';sucEl.style.display='flex';document.getElementById('leadForm').style.display='none'}catch(err){errEl.textContent='⚠️ '+err.message;errEl.style.display='flex'}}
+
+// Run lead form check before normal init
+if(checkLeadFormMode()){throw new Error('LEAD_FORM_MODE')}
+
 let currentUser=null,currentProfile=null,currentCompany=null;
 let allDeals=[],allClients=[],allProperties=[],allTasks=[],allMembers=[];
 let dealView='pipeline',taskFilter='all',searchType='all';
@@ -687,6 +793,10 @@ let viewingClient=null,editingClient=null,editingMember=null;
 let confirmCallback=null;
 let clientRoleFilter='all';
 let starRating=0;
+let currentTags=[];
+let allTags=[];
+let allNotifications=[];
+let waTemplateClient=null;
 
 function $(id){return document.getElementById(id)}
 function showToast(m,t){const x=$('toast');x.textContent=m;x.className='toast show '+(t||'');setTimeout(()=>x.className='toast '+(t||''),3000)}
@@ -717,6 +827,12 @@ function contactStatusHTML(c){if(!c.last_contact_at){return '<span class="contac
 function needsFollowup(c){if(!c.last_contact_at)return true;const days=Math.floor((new Date()-new Date(c.last_contact_at))/(1000*60*60*24));return days>=7&&c.status!=='cold'&&c.status!=='inactive'}
 function setStars(v){starRating=v;document.querySelectorAll('#cStarRating .star').forEach(s=>{s.classList.toggle('active',parseInt(s.dataset.v)<=v)})}
 function toggleRoleCB(cb,id){document.getElementById(id).classList.toggle('checked',cb.checked)}
+function renderTagsInput(){const wrap=$('cTagsWrap');const input=$('cTagInput');// remove existing pills
+wrap.querySelectorAll('.tag-pill').forEach(p=>p.remove());currentTags.forEach(t=>{const pill=document.createElement('span');pill.className='tag-pill';pill.innerHTML=escapeHtml(t)+'<span class="tag-x" onclick="removeTag(\''+t.replace(/[\x27]/g,'')+'\')">×</span>';wrap.insertBefore(pill,input)})}
+function addTag(t){t=(t||'').trim();if(!t)return;if(currentTags.indexOf(t)>=0)return;currentTags.push(t);renderTagsInput();$('cTagInput').value=''}
+function removeTag(t){currentTags=currentTags.filter(x=>x!==t);renderTagsInput()}
+function addTagOnEnter(e){if(e.key==='Enter'||e.key===','){e.preventDefault();addTag(e.target.value);}else if(e.key==='Backspace'&&!e.target.value&&currentTags.length){currentTags.pop();renderTagsInput()}}
+function tagsDisplayHTML(tags){if(!tags||!tags.length)return '';return '<div class="tag-list-display">'+tags.map(t=>'<span class="tag-pill">'+escapeHtml(t)+'</span>').join('')+'</div>'}
 
 // ROLES
 function isOwner(){return currentProfile&&currentProfile.role==='owner'}
@@ -747,11 +863,11 @@ async function logout(){confirmAction('تسجيل الخروج','هل تريد �
 async function logoutAll(){confirmAction('خروج من جميع الأجهزة','سيتم تسجيل خروجك من كل الأجهزة المسجّلة.','🚪',async function(){await supa.auth.signOut({scope:'global'});showToast('🚪 تم');$('appScreen').classList.remove('visible');$('authScreen').classList.remove('hidden')})}
 async function changePassword(){const p=prompt('كلمة المرور الجديدة (8 أحرف على الأقل):');if(!p)return;if(p.length<8){showToast('⚠️ قصيرة جداً','error');return}const r=await supa.auth.updateUser({password:p});if(r.error)showToast('خطأ: '+r.error.message,'error');else showToast('✅ تم التغيير','success')}
 
-async function loadApp(){$('loaderScreen').style.display='flex';$('authScreen').classList.add('hidden');try{const u=await supa.auth.getUser();if(u.error||!u.data.user)throw new Error('لم يتم العثور على المستخدم');currentUser=u.data.user;const p=await supa.from('profiles').select('*').eq('id',currentUser.id).single();currentProfile=p.data||{id:currentUser.id,email:currentUser.email,full_name:currentUser.email.split('@')[0],role:'viewer'};if(currentProfile.is_active===false){throw new Error('حسابك معطّل. تواصل مع مدير الشركة.')}if(currentProfile.company_id){const c=await supa.from('companies').select('*').eq('id',currentProfile.company_id).single();currentCompany=c.data}updateUserUI();applyRoleVisibility();$('loaderScreen').style.display='none';$('appScreen').classList.add('visible');await loadDashboard()}catch(err){console.error(err);showToast('خطأ: '+err.message,'error');$('loaderScreen').style.display='none';$('authScreen').classList.remove('hidden');await supa.auth.signOut()}}
+async function loadApp(){$('loaderScreen').style.display='flex';$('authScreen').classList.add('hidden');try{const u=await supa.auth.getUser();if(u.error||!u.data.user)throw new Error('لم يتم العثور على المستخدم');currentUser=u.data.user;const p=await supa.from('profiles').select('*').eq('id',currentUser.id).single();currentProfile=p.data||{id:currentUser.id,email:currentUser.email,full_name:currentUser.email.split('@')[0],role:'viewer'};if(currentProfile.is_active===false){throw new Error('حسابك معطّل. تواصل مع مدير الشركة.')}if(currentProfile.company_id){const c=await supa.from('companies').select('*').eq('id',currentProfile.company_id).single();currentCompany=c.data}updateUserUI();applyRoleVisibility();$('loaderScreen').style.display='none';$('appScreen').classList.add('visible');await loadDashboard();loadNotifications()}catch(err){console.error(err);showToast('خطأ: '+err.message,'error');$('loaderScreen').style.display='none';$('authScreen').classList.remove('hidden');await supa.auth.signOut()}}
 
 function updateUserUI(){if(!currentProfile)return;$('userAv').textContent=roleIcon(currentProfile.role);$('userName').textContent=currentProfile.full_name||currentProfile.email;$('userRole').textContent=roleAr(currentProfile.role);$('welcomeName').textContent=(currentProfile.full_name||'').split(' ')[0]||'بك';$('setName').value=currentProfile.full_name||'';$('setEmail').value=currentProfile.email||'';$('setPhone').value=currentProfile.phone||'';$('setRole').value=roleAr(currentProfile.role);if(currentCompany){$('setCompanyName').value=currentCompany.name||'';$('setCompanyCR').value=currentCompany.cr_number||'';$('setCompanyPhone').value=currentCompany.phone||'';$('setCompanyEmail').value=currentCompany.email||'';$('setCompanyAddress').value=currentCompany.address||''}}
 
-function applyRoleVisibility(){if(!currentProfile)return;$('navTeam').style.display=canManageTeam()?'':'none';$('companySettingsCard').style.display=isOwner()?'':'none';if(isAgent()){$('statClientsLbl').textContent='عملائي';$('welcomeSub').textContent='موظف مبيعات · '+(currentCompany?currentCompany.name:'')}else{$('welcomeSub').textContent=currentCompany?currentCompany.name:'سلطنة عُمان'}}
+function applyRoleVisibility(){if(!currentProfile)return;$('navTeam').style.display=canManageTeam()?'':'none';$('companySettingsCard').style.display=isOwner()?'':'none';if(typeof refreshLeadFormCard==='function')refreshLeadFormCard();if(isAgent()){$('statClientsLbl').textContent='عملائي';$('welcomeSub').textContent='موظف مبيعات · '+(currentCompany?currentCompany.name:'')}else{$('welcomeSub').textContent=currentCompany?currentCompany.name:'سلطنة عُمان'}}
 
 function navigate(id,el){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-link').forEach(n=>n.classList.remove('active'));const page=$('page-'+id);if(page)page.classList.add('active');if(el)el.classList.add('active');const t={dash:'لوحة <em>التحكم</em>',daily:'المهام <em>اليومية</em>',clients:'إدارة <em>العملاء</em>',properties:'إدارة <em>العقارات</em>',deals:'إدارة <em>الصفقات</em>',search:'البحث <em>المتقدم</em>',reports:'التقارير <em>والتحليلات</em>',team:'إدارة <em>الفريق</em>',settings:'<em>الإعدادات</em>',clientDetail:'<em>تفاصيل العميل</em>'};$('tbTitle').innerHTML=t[id]||id;if(id==='dash')loadDashboard();if(id==='clients')loadClients();if(id==='properties')loadProperties();if(id==='deals')loadDeals();if(id==='daily')loadTasks();if(id==='search')$('searchQ').focus();if(id==='reports')loadReports();if(id==='team')loadTeam();closeMobile()}
 function openMobile(){$('sidebar').classList.add('mob-open');$('mobBg').classList.add('on')}
@@ -781,7 +897,7 @@ function renderDashHot(clients){if(!clients.length){$('dashHotList').innerHTML='
 function renderDashActivities(acts){if(!acts.length){$('dashActivityList').innerHTML='<div class="empty" style="padding:30px"><div class="empty-ico" style="font-size:36px">📜</div><div class="empty-desc">لا توجد نشاطات بعد. ابدأ بالعمل!</div></div>';return}let h='';acts.forEach(function(a){h+='<div class="activity-item"><div class="activity-icon '+a.activity_type+'">'+activityIcon(a.activity_type)+'</div><div class="activity-content"><div class="activity-text">'+escapeHtml(a.activity_text||'')+'</div><div class="activity-meta">'+(a.user?'<span>👤 '+escapeHtml(a.user.full_name)+'</span>':'')+(a.client?'<span>· '+escapeHtml(a.client.name)+'</span>':'')+'<span>· '+timeAgo(a.created_at)+'</span></div></div></div>'});$('dashActivityList').innerHTML=h}
 
 function populateClientForm(){if($('cAssignedFG')){if(canManage()){$('cAssignedFG').style.display='';const sel=$('cAssignedTo');sel.innerHTML='<option value="">— تلقائي (أنت) —</option>';allMembers.forEach(function(m){if(m.is_active!==false)sel.innerHTML+='<option value="'+m.id+'">'+escapeHtml(m.full_name)+'</option>'})}else{$('cAssignedFG').style.display='none'}}
-if(!editingClient){['cRoleBuyer','cRoleSeller','cRoleInvestor'].forEach(id=>{$(id).checked=false;$(id).parentElement.classList.remove('checked')});$('cRoleBuyer').checked=true;$('cbBuyer').classList.add('checked');setStars(0);$('cReadiness').value=''}}
+if(!editingClient){['cRoleBuyer','cRoleSeller','cRoleInvestor'].forEach(id=>{$(id).checked=false;$(id).parentElement.classList.remove('checked')});$('cRoleBuyer').checked=true;$('cbBuyer').classList.add('checked');setStars(0);$('cReadiness').value='';currentTags=[];renderTagsInput()}}
 
 function filterClientRole(f,el){clientRoleFilter=f;document.querySelectorAll('#clientRoleTabs .role-tab').forEach(t=>{t.classList.remove('active','buyer','seller','investor')});el.classList.add('active');if(f==='buyer')el.classList.add('buyer');if(f==='seller')el.classList.add('seller');if(f==='investor')el.classList.add('investor');renderClients()}
 
@@ -791,14 +907,14 @@ async function loadClients(){const list=$('clientsList');list.innerHTML='<div cl
 
 function renderClients(){const list=$('clientsList');let filtered=allClients;if(clientRoleFilter==='buyer')filtered=allClients.filter(c=>getRoles(c).indexOf('buyer')>=0);else if(clientRoleFilter==='seller')filtered=allClients.filter(c=>getRoles(c).indexOf('seller')>=0);else if(clientRoleFilter==='investor')filtered=allClients.filter(c=>getRoles(c).indexOf('investor')>=0);else if(clientRoleFilter==='hot')filtered=allClients.filter(c=>c.status==='hot');else if(clientRoleFilter==='followup')filtered=allClients.filter(c=>needsFollowup(c));$('clientsSub').textContent=filtered.length+' عميل'+(isAgent()?' (عملائي)':'');if(!filtered.length){list.innerHTML='<div class="empty"><div class="empty-ico">👥</div><div class="empty-title">لا يوجد عملاء '+(clientRoleFilter==='all'?'بعد':'في هذا التصنيف')+'</div>'+(clientRoleFilter==='all'&&canEdit()?'<button class="btn-primary" style="margin-top:14px;width:auto;padding:10px 22px" onclick="openModal(\'mClient\')">+ إضافة عميل جديد</button>':'')+'</div>';return}let h='<table class="tbl"><thead><tr><th>الاسم</th><th>الأدوار</th><th>الهاتف</th><th>المنطقة</th><th>الميزانية</th><th>الأهمية</th><th>آخر تواصل</th><th>التصنيف</th>'+(canManage()?'<th>الموظف</th>':'')+'<th></th></tr></thead><tbody>';filtered.forEach(function(c){const b=(c.budget_min&&c.budget_max)?(fmtMoneyShort(c.budget_min)+'–'+fmtMoneyShort(c.budget_max)):'—';h+='<tr class="row-clickable" onclick="viewClient(\''+c.id+'\')"><td><strong style="color:var(--espresso)">'+escapeHtml(c.name)+'</strong></td><td>'+rolePillsHTML(c)+'</td><td dir="ltr">'+(c.phone||'—')+'</td><td>'+escapeHtml(c.preferred_area||'—')+'</td><td style="color:var(--gold);font-weight:600">'+b+'</td><td>'+starsHTML(c.importance)+'</td><td>'+contactStatusHTML(c)+'</td><td>'+statusBadge(c.status)+'</td>'+(canManage()?'<td>'+escapeHtml(c.agent&&c.agent.full_name||'—')+'</td>':'')+'<td onclick="event.stopPropagation()">'+(canDelete()||c.assigned_to===currentUser.id?'<span style="cursor:pointer" onclick="deleteClient(\''+c.id+'\',\''+escapeHtml(c.name).replace(/[\x27"]/g,'')+'\')">🗑</span>':'')+'</td></tr>'});list.innerHTML=h+'</tbody></table>'}
 
-async function saveClient(){const n=$('cName').value.trim();if(!n){showToast('⚠️ الاسم مطلوب','error');return}const isB=$('cRoleBuyer').checked,isS=$('cRoleSeller').checked,isI=$('cRoleInvestor').checked;if(!isB&&!isS&&!isI){showToast('⚠️ اختر دور واحد على الأقل','error');return}try{const cid=await ensureCompany();const primaryType=isB?'buyer':isS?'seller':'investor';const data={company_id:cid,name:n,phone:$('cPhone').value.trim()||null,email:$('cEmail').value.trim()||null,client_type:primaryType,is_buyer:isB,is_seller:isS,is_investor:isI,source:$('cSource').value,preferred_area:$('cArea').value.trim()||null,property_type:$('cPropType').value||null,status:$('cStatus').value,budget_min:parseFloat($('cBudgetMin').value)||null,budget_max:parseFloat($('cBudgetMax').value)||null,importance:starRating||null,readiness:parseInt($('cReadiness').value)||null,notes:$('cNotes').value.trim()||null};const assignedTo=canManage()&&$('cAssignedTo').value?$('cAssignedTo').value:currentUser.id;data.assigned_to=assignedTo;let r;if(editingClient){r=await supa.from('clients').update(data).eq('id',editingClient);if(!r.error)await logActivity('system','تم تعديل بيانات العميل',editingClient)}else{r=await supa.from('clients').insert(data).select().single();if(!r.error&&r.data)await logActivity('system','تم إضافة العميل',r.data.id)}if(r.error)throw r.error;closeModal('mClient');showToast('✅ تم الحفظ','success');['cName','cPhone','cEmail','cArea','cBudgetMin','cBudgetMax','cNotes','cReadiness'].forEach(i=>$(i).value='');setStars(0);loadClients();loadDashboard()}catch(err){showToast('خطأ: '+err.message,'error')}}
+async function saveClient(){const n=$('cName').value.trim();if(!n){showToast('⚠️ الاسم مطلوب','error');return}const isB=$('cRoleBuyer').checked,isS=$('cRoleSeller').checked,isI=$('cRoleInvestor').checked;if(!isB&&!isS&&!isI){showToast('⚠️ اختر دور واحد على الأقل','error');return}try{const cid=await ensureCompany();const primaryType=isB?'buyer':isS?'seller':'investor';const data={company_id:cid,name:n,phone:$('cPhone').value.trim()||null,email:$('cEmail').value.trim()||null,client_type:primaryType,is_buyer:isB,is_seller:isS,is_investor:isI,source:$('cSource').value,preferred_area:$('cArea').value.trim()||null,property_type:$('cPropType').value||null,status:$('cStatus').value,budget_min:parseFloat($('cBudgetMin').value)||null,budget_max:parseFloat($('cBudgetMax').value)||null,importance:starRating||null,readiness:parseInt($('cReadiness').value)||null,notes:$('cNotes').value.trim()||null};const assignedTo=canManage()&&$('cAssignedTo').value?$('cAssignedTo').value:currentUser.id;data.assigned_to=assignedTo;data.tags=currentTags.length?currentTags:null;let r;if(editingClient){r=await supa.from('clients').update(data).eq('id',editingClient);if(!r.error)await logActivity('system','تم تعديل بيانات العميل',editingClient)}else{r=await supa.from('clients').insert(data).select().single();if(!r.error&&r.data)await logActivity('system','تم إضافة العميل',r.data.id)}if(r.error)throw r.error;closeModal('mClient');showToast('✅ تم الحفظ','success');['cName','cPhone','cEmail','cArea','cBudgetMin','cBudgetMax','cNotes','cReadiness'].forEach(i=>$(i).value='');setStars(0);loadClients();loadDashboard()}catch(err){showToast('خطأ: '+err.message,'error')}}
 
 function deleteClient(id,n){confirmAction('حذف العميل','هل تريد حذف <strong>'+escapeHtml(n)+'</strong>؟ سيتم حذف كل البيانات المرتبطة.','🗑',async function(){const r=await supa.from('clients').delete().eq('id',id);if(r.error)showToast('خطأ: '+r.error.message,'error');else{showToast('🗑 تم الحذف','success');loadClients();loadDashboard()}})}
 
 // CLIENT DETAIL VIEW
 async function viewClient(id){try{const r=await supa.from('clients').select('*, agent:profiles!clients_assigned_to_fkey(full_name)').eq('id',id).single();if(r.error)throw r.error;viewingClient=r.data;navigate('clientDetail',null);renderClientDetail()}catch(err){showToast('خطأ: '+err.message,'error')}}
 
-function renderClientDetail(){if(!viewingClient)return;const c=viewingClient;$('cdName').innerHTML=escapeHtml(c.name)+' '+statusBadge(c.status)+' '+rolePillsHTML(c);$('cdSub').innerHTML=(c.preferred_area||'—')+' · '+contactStatusHTML(c)+(c.importance?' · '+starsHTML(c.importance):'');const isSeller=getRoles(c).indexOf('seller')>=0;$('cdListingsTab').style.display=isSeller?'':'none';const phone=c.phone?c.phone.replace(/[^0-9+]/g,''):'';let actions='';if(c.phone){actions+='<a class="qa-btn call" href="tel:'+phone+'">📞 اتصال</a>';actions+='<a class="qa-btn wa" href="https://wa.me/'+(phone.startsWith('+')?phone.substring(1):'968'+phone)+'" target="_blank">💚 واتساب</a>'}if(c.email)actions+='<a class="qa-btn" href="mailto:'+escapeHtml(c.email)+'">📧 بريد</a>';actions+='<button class="qa-btn" onclick="openAddActivity()">📝 إضافة نشاط</button>';actions+='<button class="qa-btn" onclick="addTaskForClient(\''+c.id+'\')">⏰ مهمة</button>';actions+='<button class="qa-btn" onclick="addDealForClient(\''+c.id+'\')">🤝 صفقة</button>';$('cdActions').innerHTML=actions;renderClientInfo();loadClientActivities();renderClientDealsTab();renderClientTasksTab();findSmartMatches();if(isSeller)loadClientListings()}
+function renderClientDetail(){if(!viewingClient)return;const c=viewingClient;$('cdName').innerHTML=escapeHtml(c.name)+' '+statusBadge(c.status)+' '+rolePillsHTML(c);$('cdSub').innerHTML=(c.preferred_area||'—')+' · '+contactStatusHTML(c)+(c.importance?' · '+starsHTML(c.importance):'')+(c.tags&&c.tags.length?'<br>'+tagsDisplayHTML(c.tags):'');const isSeller=getRoles(c).indexOf('seller')>=0;$('cdListingsTab').style.display=isSeller?'':'none';const phone=c.phone?c.phone.replace(/[^0-9+]/g,''):'';let actions='';if(c.phone){actions+='<a class="qa-btn call" href="tel:'+phone+'">📞 اتصال</a>';actions+='<button class="qa-btn wa" onclick="openWATemplates()">💚 واتساب</button>'}if(c.email)actions+='<a class="qa-btn" href="mailto:'+escapeHtml(c.email)+'">📧 بريد</a>';actions+='<button class="qa-btn" onclick="openAddActivity()">📝 إضافة نشاط</button>';actions+='<button class="qa-btn" onclick="addTaskForClient(\''+c.id+'\')">⏰ مهمة</button>';actions+='<button class="qa-btn" onclick="addDealForClient(\''+c.id+'\')">🤝 صفقة</button>';$('cdActions').innerHTML=actions;renderClientInfo();loadClientActivities();renderClientDealsTab();renderClientTasksTab();findSmartMatches();if(isSeller)loadClientListings()}
 
 function renderClientInfo(){const c=viewingClient;const b=(c.budget_min&&c.budget_max)?(fmtMoney(c.budget_min)+' — '+fmtMoney(c.budget_max)):'—';$('cdTabInfo').innerHTML='<div class="info-row"><span class="info-label">📞 الهاتف</span><span class="info-value" dir="ltr">'+(c.phone||'—')+'</span></div><div class="info-row"><span class="info-label">📧 البريد</span><span class="info-value" dir="ltr">'+(c.email||'—')+'</span></div><div class="info-row"><span class="info-label">👤 النوع</span><span class="info-value">'+(clientTypeAr(c.client_type)||'—')+'</span></div><div class="info-row"><span class="info-label">🏠 العقار المطلوب</span><span class="info-value">'+(propTypeAr(c.property_type)||'—')+'</span></div><div class="info-row"><span class="info-label">📍 المنطقة</span><span class="info-value">'+escapeHtml(c.preferred_area||'—')+'</span></div><div class="info-row"><span class="info-label">💰 الميزانية</span><span class="info-value">'+b+'</span></div><div class="info-row"><span class="info-label">📡 المصدر</span><span class="info-value">'+sourceAr(c.source)+'</span></div><div class="info-row"><span class="info-label">👨‍💼 الموظف المسؤول</span><span class="info-value">'+escapeHtml(c.agent&&c.agent.full_name||'—')+'</span></div><div class="info-row"><span class="info-label">📅 تاريخ التسجيل</span><span class="info-value">'+fmtDate(c.created_at)+'</span></div>'+(c.readiness?'<div class="info-row"><span class="info-label">📊 جاهزية الشراء</span><span class="info-value" style="flex:1;max-width:200px">'+readinessHTML(c.readiness)+'</span></div>':'')+(c.importance?'<div class="info-row"><span class="info-label">⭐ الأهمية</span><span class="info-value">'+starsHTML(c.importance)+'</span></div>':'')+(c.notes?'<div style="background:var(--cream);padding:14px;border-radius:10px;margin-top:14px;font-size:13px;line-height:1.6"><strong style="color:var(--umber)">📝 ملاحظات:</strong><br>'+escapeHtml(c.notes)+'</div>':'')}
 
@@ -815,7 +931,7 @@ function switchClientTab(tab,el){document.querySelectorAll('.detail-tab').forEac
 function openAddActivity(){if(!viewingClient){showToast('⚠️ افتح عميلاً أولاً','error');return}$('aText').value='';$('mActivity').classList.add('on')}
 async function saveActivity(){if(!viewingClient)return;const type=$('aType').value,text=$('aText').value.trim();if(!text){showToast('⚠️ التفاصيل مطلوبة','error');return}try{await logActivity(type,text,viewingClient.id);closeModal('mActivity');showToast('✅ تم إضافة النشاط','success');loadClientActivities();loadDashboard()}catch(err){showToast('خطأ: '+err.message,'error')}}
 
-function editClient(){if(!viewingClient)return;const c=viewingClient;editingClient=c.id;$('mClientTitle').textContent='✏️ تعديل بيانات العميل';$('cName').value=c.name||'';$('cPhone').value=c.phone||'';$('cEmail').value=c.email||'';$('cSource').value=c.source||'whatsapp';$('cArea').value=c.preferred_area||'';$('cPropType').value=c.property_type||'';$('cStatus').value=c.status||'warm';$('cBudgetMin').value=c.budget_min||'';$('cBudgetMax').value=c.budget_max||'';$('cNotes').value=c.notes||'';$('cReadiness').value=c.readiness||'';const isB=c.is_buyer||c.client_type==='buyer';const isS=c.is_seller||c.client_type==='seller';const isI=c.is_investor||c.client_type==='investor';$('cRoleBuyer').checked=isB;$('cbBuyer').classList.toggle('checked',isB);$('cRoleSeller').checked=isS;$('cbSeller').classList.toggle('checked',isS);$('cRoleInvestor').checked=isI;$('cbInvestor').classList.toggle('checked',isI);setStars(c.importance||0);openModal('mClient');if($('cAssignedTo'))$('cAssignedTo').value=c.assigned_to||''}
+function editClient(){if(!viewingClient)return;const c=viewingClient;editingClient=c.id;$('mClientTitle').textContent='✏️ تعديل بيانات العميل';$('cName').value=c.name||'';$('cPhone').value=c.phone||'';$('cEmail').value=c.email||'';$('cSource').value=c.source||'whatsapp';$('cArea').value=c.preferred_area||'';$('cPropType').value=c.property_type||'';$('cStatus').value=c.status||'warm';$('cBudgetMin').value=c.budget_min||'';$('cBudgetMax').value=c.budget_max||'';$('cNotes').value=c.notes||'';$('cReadiness').value=c.readiness||'';const isB=c.is_buyer||c.client_type==='buyer';const isS=c.is_seller||c.client_type==='seller';const isI=c.is_investor||c.client_type==='investor';$('cRoleBuyer').checked=isB;$('cbBuyer').classList.toggle('checked',isB);$('cRoleSeller').checked=isS;$('cbSeller').classList.toggle('checked',isS);$('cRoleInvestor').checked=isI;$('cbInvestor').classList.toggle('checked',isI);setStars(c.importance||0);currentTags=Array.isArray(c.tags)?c.tags.slice():[];renderTagsInput();openModal('mClient');if($('cAssignedTo'))$('cAssignedTo').value=c.assigned_to||''}
 
 function addTaskForClient(cid){populateTaskSelects().then(function(){$('tClient').value=cid;$('tTitle').value='';$('tDueDate').value='';$('tNotes').value='';$('mTask').classList.add('on')})}
 function addDealForClient(cid){populateDealSelects().then(function(){$('dClient').value=cid;$('dValue').value='';$('dNotes').value='';$('mDeal').classList.add('on')})}
@@ -911,6 +1027,52 @@ async function findSellersForBuyer(c){if(!c.preferred_area)return[];try{const r=
 async function findBuyersForSeller(c){if(!c.preferred_area)return[];try{const r=await supa.from('clients').select('*').eq('is_buyer',true).neq('id',c.id);const buyers=r.data||[];return buyers.map(b=>{let score=0;if(b.preferred_area&&b.preferred_area.indexOf(c.preferred_area)>=0)score+=50;if(c.property_type&&b.property_type===c.property_type)score+=30;if(c.budget_min&&b.budget_max&&b.budget_max>=c.budget_min)score+=20;return{...b,score}}).filter(b=>b.score>=30).sort((a,b)=>b.score-a.score)}catch(e){return[]}}
 
 async function loadClientListings(){if(!viewingClient)return;try{const r=await supa.from('properties').select('*').eq('owner_client_id',viewingClient.id);const props=r.data||[];if(!props.length){$('cdTabListings').innerHTML='<div class="empty" style="padding:30px"><div class="empty-ico" style="font-size:32px">🏠</div><div class="empty-desc">لا يوجد عقارات مسجّلة لهذا البائع.<br>يمكنك ربط عقاراته من صفحة العقارات.</div></div>';return}let h='';props.forEach(p=>{const sm={available:'✅ متوفر',reserved:'⏳ محجوز',sold:'🔴 بيع'};h+='<div class="listing-card"><div class="listing-icon">'+(p.type==='villa'?'🏡':p.type==='apartment'?'🏢':p.type==='land'?'🏞':'🏠')+'</div><div class="listing-info"><div class="listing-title">'+escapeHtml(p.title)+'</div><div class="listing-detail">'+propTypeAr(p.type)+' · '+escapeHtml(p.area)+' · '+(sm[p.status]||p.status)+'</div></div><div class="listing-price">'+fmtMoney(p.price)+'</div></div>'});$('cdTabListings').innerHTML=h}catch(e){console.error(e)}}
+
+// ===== WHATSAPP TEMPLATES =====
+const WA_TEMPLATES=[
+{id:'welcome',title:'👋 ترحيب أوّلي',template:'مرحباً {name}،\n\nأنا {agent} من {company}.\nشكراً على اهتمامك! 🌟\n\nبأي وقت يناسبك للتواصل معك أكثر عن متطلباتك؟'},
+{id:'followup',title:'📞 متابعة عميل',template:'مرحباً {name} 🌟\n\nأتمنى أن تكون بخير.\nأكتب لك للمتابعة بخصوص بحثك عن عقار.\n\nهل لازال الموضوع قائم؟ عندي عروض جديدة قد تناسبك.'},
+{id:'newprop',title:'🏠 عرض عقار جديد',template:'مرحباً {name}،\n\nوصلني عقار جديد قد يعجبك:\n\n📍 {area}\n💰 {price} ر.ع\n\nهل تحب أرسل لك التفاصيل والصور؟'},
+{id:'visit',title:'🗓 ترتيب زيارة',template:'مرحباً {name} 🌟\n\nبخصوص العقار اللي تكلّمنا عنه،\nمتى يناسبك زيارته؟\n\nمتاح لك:\n• الأحد ٤ عصراً\n• الإثنين ٦ مساءً\n• الثلاثاء ١٠ صباحاً'},
+{id:'price',title:'💰 إرسال السعر',template:'مرحباً {name}،\n\nبخصوص استفسارك عن السعر:\n\n💰 السعر: {price} ر.ع\n📍 الموقع: {area}\n\nالسعر قابل للتفاوض ضمن المعقول. هل تحب نتفق على زيارة؟'},
+{id:'thanks',title:'🙏 شكر بعد الصفقة',template:'{name} العزيز،\n\nشكراً جزيلاً على ثقتك بنا! 🌟\nسعدنا بالتعامل معك ونتمنى لك عقاراً مباركاً.\n\nنحن دائماً في خدمتك. 🤝'}
+];
+
+function openWATemplates(){if(!viewingClient){showToast('⚠️ افتح عميلاً أولاً','error');return}waTemplateClient=viewingClient;const grid=$('waTemplatesGrid');grid.innerHTML='';WA_TEMPLATES.forEach(t=>{const btn=document.createElement('button');btn.className='wa-tmpl';btn.onclick=function(){applyWATemplate(t.id)};btn.innerHTML='<div class="wa-tmpl-title">'+t.title+'</div><div class="wa-tmpl-preview">'+t.template.substring(0,60).replace(/\n/g,' ')+'...</div>';grid.appendChild(btn)});$('waMsgArea').value='';$('waPreview').style.display='none';$('mWATemplate').classList.add('on')}
+
+function applyWATemplate(id){const tmpl=WA_TEMPLATES.find(t=>t.id===id);if(!tmpl||!waTemplateClient)return;const c=waTemplateClient;let msg=tmpl.template;msg=msg.replace(/{name}/g,c.name||'').replace(/{agent}/g,currentProfile.full_name||'').replace(/{company}/g,(currentCompany&&currentCompany.name)||'Habib Sons').replace(/{area}/g,c.preferred_area||'—').replace(/{price}/g,c.budget_max?fmtMoney(c.budget_max):'—');$('waMsgArea').value=msg;$('waPreview').textContent=msg;$('waPreview').style.display='block'}
+
+function sendWAMessage(){if(!waTemplateClient)return;const msg=$('waMsgArea').value.trim();if(!msg){showToast('⚠️ اكتب رسالة','error');return}let phone=(waTemplateClient.phone||'').replace(/[^0-9+]/g,'');if(!phone){showToast('⚠️ لا يوجد رقم هاتف','error');return}if(phone.startsWith('+'))phone=phone.substring(1);else if(!phone.startsWith('968'))phone='968'+phone;const url='https://wa.me/'+phone+'?text='+encodeURIComponent(msg);window.open(url,'_blank');logActivity('whatsapp','إرسال رسالة واتساب: '+msg.substring(0,80)+(msg.length>80?'...':''),waTemplateClient.id);closeModal('mWATemplate');showToast('✅ تم فتح واتساب','success');setTimeout(()=>{loadClientActivities();renderClientDetail()},500)}
+
+// ===== NOTIFICATIONS =====
+function toggleNotifPanel(e){e&&e.stopPropagation();const p=$('notifPanel');p.classList.toggle('on');if(p.classList.contains('on'))loadNotifications()}
+document.addEventListener('click',function(e){if(!e.target.closest('.bell-wrapper')&&!e.target.closest('.notif-panel')){$('notifPanel').classList.remove('on')}});
+
+async function loadNotifications(){if(!currentProfile.company_id)return;const notifs=[];try{// Overdue tasks
+const tasksR=await supa.from('tasks').select('*, client:clients(name)').eq('done',false).limit(50);(tasksR.data||[]).forEach(t=>{if(t.due_date){const days=Math.floor((new Date()-new Date(t.due_date))/(1000*60*60*24));if(days>=0){notifs.push({id:'task-'+t.id,type:'task',icon:'⏰',text:'<strong>مهمة متأخّرة:</strong> '+escapeHtml(t.title)+(t.client?' ('+escapeHtml(t.client.name)+')':''),time:t.due_date,onclick:"navigate('daily',document.querySelector('[onclick*=daily]'))"})}}});
+// New leads (last 24h)
+const dayAgo=new Date(Date.now()-86400000).toISOString();const newLeadsR=await supa.from('clients').select('id,name,created_at,source').gte('created_at',dayAgo).order('created_at',{ascending:false}).limit(20);(newLeadsR.data||[]).forEach(c=>{notifs.push({id:'lead-'+c.id,type:'lead',icon:'🎉',text:'<strong>عميل جديد:</strong> '+escapeHtml(c.name)+(c.source==='website'?' (من الموقع 🌐)':''),time:c.created_at,onclick:'viewClient(\''+c.id+'\')'})});
+// Followups needed
+const weekAgo=new Date(Date.now()-7*86400000).toISOString();const stale=allClients.filter(c=>{return c.status!=='cold'&&c.status!=='inactive'&&(!c.last_contact_at||c.last_contact_at<weekAgo)});stale.slice(0,5).forEach(c=>{notifs.push({id:'fu-'+c.id,type:'followup',icon:'📞',text:'<strong>يحتاج متابعة:</strong> '+escapeHtml(c.name)+' (لم يتم التواصل منذ أسبوع)',time:c.last_contact_at||c.created_at,onclick:'viewClient(\''+c.id+'\')'})});
+}catch(e){console.error('Notif error:',e)}
+notifs.sort((a,b)=>new Date(b.time)-new Date(a.time));allNotifications=notifs;renderNotifications();updateBellDot()}
+
+function renderNotifications(){const body=$('notifBody');if(!allNotifications.length){body.innerHTML='<div class="notif-empty">🎉 لا توجد إشعارات جديدة</div>';return}let h='';allNotifications.slice(0,30).forEach(n=>{const cls='notif-i-'+n.type;h+='<div class="notif-item unread" onclick="'+(n.onclick||'')+';closeNotifPanel()"><div class="notif-icon-wrap '+cls+'">'+n.icon+'</div><div class="notif-content"><div class="notif-text">'+n.text+'</div><div class="notif-time">'+timeAgo(n.time)+'</div></div></div>'});body.innerHTML=h}
+
+function closeNotifPanel(){$('notifPanel').classList.remove('on')}
+function updateBellDot(){$('bellDot').style.display=allNotifications.length?'block':'none'}
+function markAllNotifsRead(){allNotifications=[];renderNotifications();updateBellDot();showToast('✅ تم','success')}
+
+// ===== LEAD FORM SHARE =====
+function getLeadFormUrl(){if(!currentProfile||!currentProfile.company_id)return '';const baseUrl=window.location.origin+window.location.pathname;return baseUrl+'?form=lead&c='+currentProfile.company_id}
+function copyLeadFormLink(){const url=getLeadFormUrl();navigator.clipboard.writeText(url).then(()=>showToast('✅ تم نسخ الرابط','success')).catch(()=>showToast('⚠️ خطأ','error'))}
+function shareLeadFormWA(){const url=getLeadFormUrl();const msg='مرحباً 👋\n\nنحن في '+(currentCompany?currentCompany.name:'Habib Sons')+'.\n\nسجّل بياناتك من هنا وسنتواصل معك:\n'+url;window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank')}
+
+// Show lead form card for owners (called separately from applyRoleVisibility)
+function refreshLeadFormCard(){if(isOwner()){$('leadFormCard').style.display='';$('leadFormLink').textContent=getLeadFormUrl()}else{$('leadFormCard').style.display='none'}}
+
+// Auto-refresh notifications every 60 seconds
+setInterval(()=>{if(currentProfile&&currentProfile.company_id&&document.visibilityState==='visible'){loadNotifications()}},60000);
 
 async function init(){const s=await supa.auth.getSession();if(s.data.session)await loadApp();else{$('loaderScreen').style.display='none';$('authScreen').classList.remove('hidden')}}
 supa.auth.onAuthStateChange(function(e,s){if(e==='SIGNED_IN'&&s&&!currentUser)loadApp();if(e==='SIGNED_OUT'){currentUser=null;currentProfile=null}});
