@@ -261,6 +261,65 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .confirm-title{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--ink);margin-bottom:8px}
 .confirm-msg{font-size:13px;color:var(--umber);line-height:1.6;margin-bottom:20px}
 .confirm-buttons{display:flex;gap:10px;justify-content:center}
+.role-tabs{display:flex;gap:8px;background:white;border:1px solid var(--cream-deeper);border-radius:14px;padding:6px;margin-bottom:14px;overflow-x:auto}
+.role-tab{padding:9px 16px;border-radius:10px;font-size:13px;font-weight:600;color:var(--umber);cursor:pointer;border:none;background:transparent;transition:all .2s;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.role-tab.active{background:var(--espresso);color:var(--cream)}
+.role-tab.active.buyer{background:var(--gold);color:white}
+.role-tab.active.seller{background:var(--emerald);color:white}
+.role-tab.active.investor{background:var(--ruby);color:white}
+.role-tab .count{font-size:10px;background:rgba(0,0,0,0.15);padding:1px 7px;border-radius:10px;font-weight:700}
+.role-tab.active .count{background:rgba(255,255,255,0.25)}
+.role-checkbox{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.role-cb{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:2px solid var(--cream-deeper);cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;background:white;flex:1;min-width:120px;justify-content:center}
+.role-cb input{width:18px;height:18px;cursor:pointer;accent-color:var(--gold)}
+.role-cb:hover{border-color:var(--gold)}
+.role-cb.checked{border-color:var(--gold);background:rgba(196,150,58,0.06)}
+.role-cb.buyer.checked{border-color:var(--gold);background:rgba(196,150,58,0.08)}
+.role-cb.seller.checked{border-color:var(--emerald);background:rgba(46,125,92,0.08);color:var(--emerald)}
+.role-cb.investor.checked{border-color:var(--ruby);background:rgba(139,38,53,0.08);color:var(--ruby)}
+.role-pills{display:inline-flex;gap:4px;flex-wrap:wrap}
+.role-pill{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px}
+.role-pill.buyer{background:rgba(196,150,58,0.15);color:#8B6514}
+.role-pill.seller{background:rgba(46,125,92,0.15);color:var(--emerald)}
+.role-pill.investor{background:rgba(139,38,53,0.1);color:var(--ruby)}
+.match-card{background:linear-gradient(135deg,rgba(196,150,58,0.08),rgba(46,125,92,0.04));border:1.5px solid var(--gold);border-radius:14px;padding:16px;margin-bottom:14px}
+.match-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;font-size:14px;font-weight:700;color:var(--espresso)}
+.match-icon{font-size:20px}
+.match-list{display:flex;flex-direction:column;gap:8px}
+.match-item{background:white;border:1px solid var(--cream-deeper);border-radius:10px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;transition:all .15s}
+.match-item:hover{border-color:var(--gold);transform:translateX(-3px)}
+.match-info{flex:1;min-width:0}
+.match-name{font-size:13px;font-weight:700;color:var(--espresso)}
+.match-detail{font-size:11px;color:var(--umber);margin-top:3px}
+.match-score{font-size:11px;font-weight:700;color:var(--emerald);background:rgba(46,125,92,0.1);padding:4px 10px;border-radius:20px;flex-shrink:0}
+.match-score.high{background:rgba(46,125,92,0.15);color:var(--emerald)}
+.match-score.medium{background:rgba(196,150,58,0.15);color:#8B6514}
+.readiness-meter{display:flex;align-items:center;gap:10px;margin-top:8px}
+.readiness-bar{flex:1;height:8px;background:var(--cream);border-radius:4px;overflow:hidden}
+.readiness-fill{height:100%;border-radius:4px;transition:width .4s ease}
+.readiness-fill.low{background:var(--ruby)}
+.readiness-fill.med{background:var(--gold)}
+.readiness-fill.high{background:var(--emerald-bright)}
+.readiness-pct{font-size:11px;font-weight:700;color:var(--umber);min-width:36px;text-align:left}
+.star-rating{display:inline-flex;gap:2px;cursor:pointer}
+.star{font-size:14px;color:var(--cream-deeper);cursor:pointer;transition:color .15s;user-select:none}
+.star.active{color:var(--gold)}
+.star:hover{color:var(--gold)}
+.contact-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
+.contact-fresh{background:rgba(46,125,92,0.1);color:var(--emerald)}
+.contact-warm{background:rgba(196,150,58,0.12);color:#8B6514}
+.contact-cold{background:rgba(139,38,53,0.1);color:var(--ruby)}
+.followup-alert{background:linear-gradient(135deg,rgba(139,38,53,0.06),rgba(196,150,58,0.04));border:1px solid rgba(139,38,53,0.2);border-radius:12px;padding:14px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.followup-text{font-size:13px;color:var(--espresso);font-weight:600}
+.followup-count{background:var(--ruby);color:white;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
+.listing-card{background:white;border:1px solid var(--cream-deeper);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;gap:12px;align-items:center}
+.listing-icon{width:36px;height:36px;border-radius:8px;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.listing-info{flex:1;min-width:0}
+.listing-title{font-size:13px;font-weight:700;color:var(--espresso)}
+.listing-detail{font-size:11px;color:var(--umber);margin-top:2px}
+.listing-price{color:var(--gold);font-weight:700;font-size:13px}
+.smart-suggestion{background:linear-gradient(135deg,rgba(196,150,58,0.05),rgba(46,125,92,0.03));border:1.5px dashed var(--gold);border-radius:10px;padding:11px 14px;font-size:12px;color:var(--espresso);line-height:1.6;margin-bottom:10px}
+
 </style>
 </head>
 <body>
@@ -364,6 +423,15 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 <button class="btn-secondary" onclick="exportClients()">📤 تصدير Excel</button>
 <button class="btn-primary" style="width:auto;padding:9px 18px" onclick="openModal('mClient')">+ عميل جديد</button>
 </div></div>
+<div class="role-tabs" id="clientRoleTabs">
+<button class="role-tab active" onclick="filterClientRole('all',this)">👥 الكل <span class="count" id="cntAll">0</span></button>
+<button class="role-tab" onclick="filterClientRole('buyer',this)">🛒 مشترين <span class="count" id="cntBuyers">0</span></button>
+<button class="role-tab" onclick="filterClientRole('seller',this)">🏠 بائعين <span class="count" id="cntSellers">0</span></button>
+<button class="role-tab" onclick="filterClientRole('investor',this)">💼 مستثمرين <span class="count" id="cntInvestors">0</span></button>
+<button class="role-tab" onclick="filterClientRole('hot',this)">🔥 حاريّن <span class="count" id="cntHot">0</span></button>
+<button class="role-tab" onclick="filterClientRole('followup',this)">⏰ يحتاج متابعة <span class="count" id="cntFollowup">0</span></button>
+</div>
+<div id="followupAlert"></div>
 <div class="card"><div id="clientsList"><div class="empty"><div class="loader-spinner"></div></div></div></div>
 </div>
 
@@ -466,14 +534,17 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 
 <div class="quick-actions" id="cdActions"></div>
 
+<div id="cdSmartMatches"></div>
 <div class="grid-2">
 <div class="card">
 <div class="detail-tabs">
 <button class="detail-tab active" onclick="switchClientTab('info',this)">📋 المعلومات</button>
+<button class="detail-tab" onclick="switchClientTab('listings',this)" id="cdListingsTab" style="display:none">🏠 عقاراته</button>
 <button class="detail-tab" onclick="switchClientTab('deals',this)">🤝 الصفقات</button>
 <button class="detail-tab" onclick="switchClientTab('tasks',this)">⏰ المهام</button>
 </div>
 <div class="detail-pane-content" id="cdTabInfo"></div>
+<div class="detail-pane-content" id="cdTabListings" style="display:none"></div>
 <div class="detail-pane-content" id="cdTabDeals" style="display:none"></div>
 <div class="detail-pane-content" id="cdTabTasks" style="display:none"></div>
 </div>
@@ -492,7 +563,13 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 <div class="fg full"><label class="fl">الاسم *</label><input class="fi" id="cName" required></div>
 <div class="fg"><label class="fl">رقم الهاتف</label><input class="fi" id="cPhone" dir="ltr"></div>
 <div class="fg"><label class="fl">البريد الإلكتروني</label><input class="fi" id="cEmail" dir="ltr"></div>
-<div class="fg"><label class="fl">نوع العميل</label><select class="fs" id="cType"><option value="buyer">مشتري</option><option value="seller">بائع</option><option value="investor">مستثمر</option></select></div>
+<div class="fg full"><label class="fl">أدوار العميل * (اختر أكثر من واحد إذا لزم)</label>
+<div class="role-checkbox">
+<label class="role-cb buyer" id="cbBuyer"><input type="checkbox" id="cRoleBuyer" onchange="toggleRoleCB(this,'cbBuyer')">🛒 مشتري</label>
+<label class="role-cb seller" id="cbSeller"><input type="checkbox" id="cRoleSeller" onchange="toggleRoleCB(this,'cbSeller')">🏠 بائع</label>
+<label class="role-cb investor" id="cbInvestor"><input type="checkbox" id="cRoleInvestor" onchange="toggleRoleCB(this,'cbInvestor')">💼 مستثمر</label>
+</div>
+</div>
 <div class="fg"><label class="fl">المصدر</label><select class="fs" id="cSource"><option value="whatsapp">واتساب</option><option value="instagram">إنستجرام</option><option value="facebook">فيسبوك</option><option value="google">جوجل</option><option value="referral">إحالة</option><option value="other">أخرى</option></select></div>
 <div class="fg"><label class="fl">المنطقة</label><input class="fi" id="cArea"></div>
 <div class="fg"><label class="fl">نوع العقار</label><select class="fs" id="cPropType"><option value="">اختر</option><option value="villa">فيلا</option><option value="apartment">شقة</option><option value="land">أرض</option><option value="office">مكتب</option><option value="shop">محل</option></select></div>
@@ -500,6 +577,14 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 <div class="fg"><label class="fl">الميزانية من (ر.ع)</label><input class="fi" type="number" id="cBudgetMin"></div>
 <div class="fg"><label class="fl">الميزانية إلى (ر.ع)</label><input class="fi" type="number" id="cBudgetMax"></div>
 <div class="fg full" id="cAssignedFG" style="display:none"><label class="fl">الموظف المسؤول</label><select class="fs" id="cAssignedTo"></select></div>
+<div class="fg"><label class="fl">⭐ الأهمية</label><div class="star-rating" id="cStarRating">
+<span class="star" data-v="1" onclick="setStars(1)">★</span>
+<span class="star" data-v="2" onclick="setStars(2)">★</span>
+<span class="star" data-v="3" onclick="setStars(3)">★</span>
+<span class="star" data-v="4" onclick="setStars(4)">★</span>
+<span class="star" data-v="5" onclick="setStars(5)">★</span>
+</div></div>
+<div class="fg"><label class="fl">📊 جاهزية الشراء (0-100%)</label><input class="fi" type="number" id="cReadiness" min="0" max="100" placeholder="50"></div>
 <div class="fg full"><label class="fl">ملاحظات</label><textarea class="fta" id="cNotes" rows="2"></textarea></div>
 </div>
 <div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mClient')">إلغاء</button><button class="btn-primary" style="width:auto;padding:9px 22px" onclick="saveClient()">💾 حفظ</button></div>
@@ -600,6 +685,8 @@ let allDeals=[],allClients=[],allProperties=[],allTasks=[],allMembers=[];
 let dealView='pipeline',taskFilter='all',searchType='all';
 let viewingClient=null,editingClient=null,editingMember=null;
 let confirmCallback=null;
+let clientRoleFilter='all';
+let starRating=0;
 
 function $(id){return document.getElementById(id)}
 function showToast(m,t){const x=$('toast');x.textContent=m;x.className='toast show '+(t||'');setTimeout(()=>x.className='toast '+(t||''),3000)}
@@ -622,6 +709,14 @@ function fmtDateTime(d){if(!d)return '—';const dt=new Date(d);return dt.toLoca
 function timeAgo(d){if(!d)return '—';const sec=Math.floor((new Date()-new Date(d))/1000);if(sec<60)return 'الآن';if(sec<3600)return Math.floor(sec/60)+' دقيقة';if(sec<86400)return Math.floor(sec/3600)+' ساعة';if(sec<604800)return Math.floor(sec/86400)+' يوم';return fmtDate(d)}
 function daysUntil(d){if(!d)return null;const today=new Date();today.setHours(0,0,0,0);const target=new Date(d);target.setHours(0,0,0,0);return Math.round((target-today)/(1000*60*60*24))}
 function escapeHtml(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function getRoles(c){const r=[];if(c.is_buyer)r.push('buyer');if(c.is_seller)r.push('seller');if(c.is_investor)r.push('investor');if(!r.length&&c.client_type)r.push(c.client_type);return r}
+function rolePillsHTML(c){const r=getRoles(c);if(!r.length)return '';const labels={buyer:'🛒 مشتري',seller:'🏠 بائع',investor:'💼 مستثمر'};return '<span class="role-pills">'+r.map(x=>'<span class="role-pill '+x+'">'+labels[x]+'</span>').join('')+'</span>'}
+function starsHTML(n){n=parseInt(n)||0;let h='';for(let i=1;i<=5;i++)h+='<span style="color:'+(i<=n?'var(--gold)':'var(--cream-deeper)')+';font-size:13px">★</span>';return h}
+function readinessHTML(n){n=parseInt(n)||0;const cls=n>=70?'high':n>=40?'med':'low';return '<div class="readiness-meter"><div class="readiness-bar"><div class="readiness-fill '+cls+'" style="width:'+n+'%"></div></div><div class="readiness-pct">'+n+'%</div></div>'}
+function contactStatusHTML(c){if(!c.last_contact_at){return '<span class="contact-status contact-cold">⏰ لم يتم التواصل</span>'}const days=Math.floor((new Date()-new Date(c.last_contact_at))/(1000*60*60*24));if(days===0)return '<span class="contact-status contact-fresh">✅ اليوم</span>';if(days<=3)return '<span class="contact-status contact-fresh">✅ قبل '+days+' يوم</span>';if(days<=7)return '<span class="contact-status contact-warm">📞 قبل '+days+' أيام</span>';return '<span class="contact-status contact-cold">⚠️ '+days+' يوم بدون تواصل</span>'}
+function needsFollowup(c){if(!c.last_contact_at)return true;const days=Math.floor((new Date()-new Date(c.last_contact_at))/(1000*60*60*24));return days>=7&&c.status!=='cold'&&c.status!=='inactive'}
+function setStars(v){starRating=v;document.querySelectorAll('#cStarRating .star').forEach(s=>{s.classList.toggle('active',parseInt(s.dataset.v)<=v)})}
+function toggleRoleCB(cb,id){document.getElementById(id).classList.toggle('checked',cb.checked)}
 
 // ROLES
 function isOwner(){return currentProfile&&currentProfile.role==='owner'}
@@ -668,7 +763,7 @@ document.querySelectorAll('.modal-ov').forEach(m=>m.addEventListener('click',e=>
 async function ensureCompany(){let id=currentProfile.company_id;if(!id){if(!isOwner()&&currentProfile.role!=='viewer'){throw new Error('لا تملك صلاحية إنشاء شركة')}const c=await supa.from('companies').insert({name:'Habib Sons Real Estate'}).select().single();if(c.error)throw c.error;id=c.data.id;await supa.from('profiles').update({company_id:id,role:'owner',is_active:true}).eq('id',currentUser.id);currentProfile.company_id=id;currentProfile.role='owner';currentCompany=c.data;updateUserUI();applyRoleVisibility()}return id}
 
 // ACTIVITY LOGGER
-async function logActivity(type,text,clientId,dealId){if(!currentProfile.company_id)return;try{await supa.from('activities').insert({company_id:currentProfile.company_id,user_id:currentUser.id,activity_type:type,activity_text:text,client_id:clientId||null,deal_id:dealId||null})}catch(e){console.warn('Activity log failed:',e)}}
+async function logActivity(type,text,clientId,dealId){if(!currentProfile.company_id)return;try{await supa.from('activities').insert({company_id:currentProfile.company_id,user_id:currentUser.id,activity_type:type,activity_text:text,client_id:clientId||null,deal_id:dealId||null});if(clientId&&type!=='system'){await supa.from('clients').update({last_contact_at:new Date().toISOString()}).eq('id',clientId)}}catch(e){console.warn('Activity log failed:',e)}}
 
 // COPY
 function copyInviteLink(){const l=$('inviteLink').textContent;navigator.clipboard.writeText(l).then(()=>showToast('✅ تم نسخ الرابط','success')).catch(()=>showToast('⚠️ لم يتم النسخ','error'))}
@@ -685,20 +780,27 @@ function renderDashHot(clients){if(!clients.length){$('dashHotList').innerHTML='
 
 function renderDashActivities(acts){if(!acts.length){$('dashActivityList').innerHTML='<div class="empty" style="padding:30px"><div class="empty-ico" style="font-size:36px">📜</div><div class="empty-desc">لا توجد نشاطات بعد. ابدأ بالعمل!</div></div>';return}let h='';acts.forEach(function(a){h+='<div class="activity-item"><div class="activity-icon '+a.activity_type+'">'+activityIcon(a.activity_type)+'</div><div class="activity-content"><div class="activity-text">'+escapeHtml(a.activity_text||'')+'</div><div class="activity-meta">'+(a.user?'<span>👤 '+escapeHtml(a.user.full_name)+'</span>':'')+(a.client?'<span>· '+escapeHtml(a.client.name)+'</span>':'')+'<span>· '+timeAgo(a.created_at)+'</span></div></div></div>'});$('dashActivityList').innerHTML=h}
 
-function populateClientForm(){if($('cAssignedFG')){if(canManage()){$('cAssignedFG').style.display='';const sel=$('cAssignedTo');sel.innerHTML='<option value="">— تلقائي (أنت) —</option>';allMembers.forEach(function(m){if(m.is_active!==false)sel.innerHTML+='<option value="'+m.id+'">'+escapeHtml(m.full_name)+'</option>'})}else{$('cAssignedFG').style.display='none'}}}
+function populateClientForm(){if($('cAssignedFG')){if(canManage()){$('cAssignedFG').style.display='';const sel=$('cAssignedTo');sel.innerHTML='<option value="">— تلقائي (أنت) —</option>';allMembers.forEach(function(m){if(m.is_active!==false)sel.innerHTML+='<option value="'+m.id+'">'+escapeHtml(m.full_name)+'</option>'})}else{$('cAssignedFG').style.display='none'}}
+if(!editingClient){['cRoleBuyer','cRoleSeller','cRoleInvestor'].forEach(id=>{$(id).checked=false;$(id).parentElement.classList.remove('checked')});$('cRoleBuyer').checked=true;$('cbBuyer').classList.add('checked');setStars(0);$('cReadiness').value=''}}
 
-async function loadClients(){const list=$('clientsList');list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';try{let q=supa.from('clients').select('*, agent:profiles!clients_assigned_to_fkey(full_name)').order('created_at',{ascending:false});const r=await q;if(r.error)throw r.error;allClients=r.data;$('clientsSub').textContent=r.data.length+' عميل'+(isAgent()?' (عملائي)':'');if(!r.data.length){list.innerHTML='<div class="empty"><div class="empty-ico">👥</div><div class="empty-title">لا يوجد عملاء بعد</div><div class="empty-desc">ابدأ بإضافة عميلك الأول</div>'+(canEdit()?'<button class="btn-primary" style="margin-top:14px;width:auto;padding:10px 22px" onclick="openModal(\'mClient\')">+ إضافة عميل جديد</button>':'')+'</div>';return}let h='<table class="tbl"><thead><tr><th>الاسم</th><th>الهاتف</th><th>النوع</th><th>المنطقة</th><th>الميزانية</th><th>التصنيف</th>'+(canManage()?'<th>الموظف</th>':'')+'<th></th></tr></thead><tbody>';r.data.forEach(function(c){const b=(c.budget_min&&c.budget_max)?(fmtMoneyShort(c.budget_min)+'–'+fmtMoneyShort(c.budget_max)):'—';h+='<tr class="row-clickable" onclick="viewClient(\''+c.id+'\')"><td><strong style="color:var(--espresso)">'+escapeHtml(c.name)+'</strong></td><td dir="ltr">'+(c.phone||'—')+'</td><td>'+(clientTypeAr(c.client_type)||'—')+'</td><td>'+escapeHtml(c.preferred_area||'—')+'</td><td style="color:var(--gold);font-weight:600">'+b+'</td><td>'+statusBadge(c.status)+'</td>'+(canManage()?'<td>'+escapeHtml(c.agent&&c.agent.full_name||'—')+'</td>':'')+'<td onclick="event.stopPropagation()">'+(canDelete()||c.assigned_to===currentUser.id?'<span style="cursor:pointer" onclick="deleteClient(\''+c.id+'\',\''+escapeHtml(c.name).replace(/[\x27"]/g,'')+'\')">🗑</span>':'')+'</td></tr>'});list.innerHTML=h+'</tbody></table>'}catch(err){list.innerHTML='<div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(err.message)+'</div></div>'}}
+function filterClientRole(f,el){clientRoleFilter=f;document.querySelectorAll('#clientRoleTabs .role-tab').forEach(t=>{t.classList.remove('active','buyer','seller','investor')});el.classList.add('active');if(f==='buyer')el.classList.add('buyer');if(f==='seller')el.classList.add('seller');if(f==='investor')el.classList.add('investor');renderClients()}
 
-async function saveClient(){const n=$('cName').value.trim();if(!n){showToast('⚠️ الاسم مطلوب','error');return}try{const cid=await ensureCompany();const data={company_id:cid,name:n,phone:$('cPhone').value.trim()||null,email:$('cEmail').value.trim()||null,client_type:$('cType').value,source:$('cSource').value,preferred_area:$('cArea').value.trim()||null,property_type:$('cPropType').value||null,status:$('cStatus').value,budget_min:parseFloat($('cBudgetMin').value)||null,budget_max:parseFloat($('cBudgetMax').value)||null,notes:$('cNotes').value.trim()||null};const assignedTo=canManage()&&$('cAssignedTo').value?$('cAssignedTo').value:currentUser.id;data.assigned_to=assignedTo;let r;if(editingClient){r=await supa.from('clients').update(data).eq('id',editingClient);if(!r.error)await logActivity('system','تم تعديل بيانات العميل',editingClient)}else{r=await supa.from('clients').insert(data).select().single();if(!r.error&&r.data)await logActivity('system','تم إضافة العميل',r.data.id)}if(r.error)throw r.error;closeModal('mClient');showToast('✅ تم الحفظ','success');['cName','cPhone','cEmail','cArea','cBudgetMin','cBudgetMax','cNotes'].forEach(i=>$(i).value='');loadClients();loadDashboard()}catch(err){showToast('خطأ: '+err.message,'error')}}
+function updateRoleCounts(){let buyers=0,sellers=0,investors=0,hot=0,followup=0;allClients.forEach(c=>{const r=getRoles(c);if(r.indexOf('buyer')>=0)buyers++;if(r.indexOf('seller')>=0)sellers++;if(r.indexOf('investor')>=0)investors++;if(c.status==='hot')hot++;if(needsFollowup(c))followup++});$('cntAll').textContent=allClients.length;$('cntBuyers').textContent=buyers;$('cntSellers').textContent=sellers;$('cntInvestors').textContent=investors;$('cntHot').textContent=hot;$('cntFollowup').textContent=followup;if(followup>0){$('followupAlert').innerHTML='<div class="followup-alert"><div class="followup-text">⏰ <strong>'+followup+' عميل</strong> يحتاج متابعة (أكثر من أسبوع بدون تواصل)</div><button class="btn-primary" style="width:auto;padding:7px 14px;font-size:12px" onclick="filterClientRole(\'followup\',document.querySelector(\'#clientRoleTabs .role-tab:nth-child(6)\'))">عرضهم</button></div>'}else{$('followupAlert').innerHTML=''}}
+
+async function loadClients(){const list=$('clientsList');list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';try{let q=supa.from('clients').select('*, agent:profiles!clients_assigned_to_fkey(full_name)').order('created_at',{ascending:false});const r=await q;if(r.error)throw r.error;allClients=r.data;updateRoleCounts();renderClients()}catch(err){list.innerHTML='<div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(err.message)+'</div></div>'}}
+
+function renderClients(){const list=$('clientsList');let filtered=allClients;if(clientRoleFilter==='buyer')filtered=allClients.filter(c=>getRoles(c).indexOf('buyer')>=0);else if(clientRoleFilter==='seller')filtered=allClients.filter(c=>getRoles(c).indexOf('seller')>=0);else if(clientRoleFilter==='investor')filtered=allClients.filter(c=>getRoles(c).indexOf('investor')>=0);else if(clientRoleFilter==='hot')filtered=allClients.filter(c=>c.status==='hot');else if(clientRoleFilter==='followup')filtered=allClients.filter(c=>needsFollowup(c));$('clientsSub').textContent=filtered.length+' عميل'+(isAgent()?' (عملائي)':'');if(!filtered.length){list.innerHTML='<div class="empty"><div class="empty-ico">👥</div><div class="empty-title">لا يوجد عملاء '+(clientRoleFilter==='all'?'بعد':'في هذا التصنيف')+'</div>'+(clientRoleFilter==='all'&&canEdit()?'<button class="btn-primary" style="margin-top:14px;width:auto;padding:10px 22px" onclick="openModal(\'mClient\')">+ إضافة عميل جديد</button>':'')+'</div>';return}let h='<table class="tbl"><thead><tr><th>الاسم</th><th>الأدوار</th><th>الهاتف</th><th>المنطقة</th><th>الميزانية</th><th>الأهمية</th><th>آخر تواصل</th><th>التصنيف</th>'+(canManage()?'<th>الموظف</th>':'')+'<th></th></tr></thead><tbody>';filtered.forEach(function(c){const b=(c.budget_min&&c.budget_max)?(fmtMoneyShort(c.budget_min)+'–'+fmtMoneyShort(c.budget_max)):'—';h+='<tr class="row-clickable" onclick="viewClient(\''+c.id+'\')"><td><strong style="color:var(--espresso)">'+escapeHtml(c.name)+'</strong></td><td>'+rolePillsHTML(c)+'</td><td dir="ltr">'+(c.phone||'—')+'</td><td>'+escapeHtml(c.preferred_area||'—')+'</td><td style="color:var(--gold);font-weight:600">'+b+'</td><td>'+starsHTML(c.importance)+'</td><td>'+contactStatusHTML(c)+'</td><td>'+statusBadge(c.status)+'</td>'+(canManage()?'<td>'+escapeHtml(c.agent&&c.agent.full_name||'—')+'</td>':'')+'<td onclick="event.stopPropagation()">'+(canDelete()||c.assigned_to===currentUser.id?'<span style="cursor:pointer" onclick="deleteClient(\''+c.id+'\',\''+escapeHtml(c.name).replace(/[\x27"]/g,'')+'\')">🗑</span>':'')+'</td></tr>'});list.innerHTML=h+'</tbody></table>'}
+
+async function saveClient(){const n=$('cName').value.trim();if(!n){showToast('⚠️ الاسم مطلوب','error');return}const isB=$('cRoleBuyer').checked,isS=$('cRoleSeller').checked,isI=$('cRoleInvestor').checked;if(!isB&&!isS&&!isI){showToast('⚠️ اختر دور واحد على الأقل','error');return}try{const cid=await ensureCompany();const primaryType=isB?'buyer':isS?'seller':'investor';const data={company_id:cid,name:n,phone:$('cPhone').value.trim()||null,email:$('cEmail').value.trim()||null,client_type:primaryType,is_buyer:isB,is_seller:isS,is_investor:isI,source:$('cSource').value,preferred_area:$('cArea').value.trim()||null,property_type:$('cPropType').value||null,status:$('cStatus').value,budget_min:parseFloat($('cBudgetMin').value)||null,budget_max:parseFloat($('cBudgetMax').value)||null,importance:starRating||null,readiness:parseInt($('cReadiness').value)||null,notes:$('cNotes').value.trim()||null};const assignedTo=canManage()&&$('cAssignedTo').value?$('cAssignedTo').value:currentUser.id;data.assigned_to=assignedTo;let r;if(editingClient){r=await supa.from('clients').update(data).eq('id',editingClient);if(!r.error)await logActivity('system','تم تعديل بيانات العميل',editingClient)}else{r=await supa.from('clients').insert(data).select().single();if(!r.error&&r.data)await logActivity('system','تم إضافة العميل',r.data.id)}if(r.error)throw r.error;closeModal('mClient');showToast('✅ تم الحفظ','success');['cName','cPhone','cEmail','cArea','cBudgetMin','cBudgetMax','cNotes','cReadiness'].forEach(i=>$(i).value='');setStars(0);loadClients();loadDashboard()}catch(err){showToast('خطأ: '+err.message,'error')}}
 
 function deleteClient(id,n){confirmAction('حذف العميل','هل تريد حذف <strong>'+escapeHtml(n)+'</strong>؟ سيتم حذف كل البيانات المرتبطة.','🗑',async function(){const r=await supa.from('clients').delete().eq('id',id);if(r.error)showToast('خطأ: '+r.error.message,'error');else{showToast('🗑 تم الحذف','success');loadClients();loadDashboard()}})}
 
 // CLIENT DETAIL VIEW
 async function viewClient(id){try{const r=await supa.from('clients').select('*, agent:profiles!clients_assigned_to_fkey(full_name)').eq('id',id).single();if(r.error)throw r.error;viewingClient=r.data;navigate('clientDetail',null);renderClientDetail()}catch(err){showToast('خطأ: '+err.message,'error')}}
 
-function renderClientDetail(){if(!viewingClient)return;const c=viewingClient;$('cdName').innerHTML=escapeHtml(c.name)+' '+statusBadge(c.status);$('cdSub').textContent=(clientTypeAr(c.client_type)||'')+' · '+(c.preferred_area||'—');const phone=c.phone?c.phone.replace(/[^0-9+]/g,''):'';let actions='';if(c.phone){actions+='<a class="qa-btn call" href="tel:'+phone+'">📞 اتصال</a>';actions+='<a class="qa-btn wa" href="https://wa.me/'+(phone.startsWith('+')?phone.substring(1):'968'+phone)+'" target="_blank">💚 واتساب</a>'}if(c.email)actions+='<a class="qa-btn" href="mailto:'+escapeHtml(c.email)+'">📧 بريد</a>';actions+='<button class="qa-btn" onclick="openAddActivity()">📝 إضافة نشاط</button>';actions+='<button class="qa-btn" onclick="addTaskForClient(\''+c.id+'\')">⏰ مهمة</button>';actions+='<button class="qa-btn" onclick="addDealForClient(\''+c.id+'\')">🤝 صفقة</button>';$('cdActions').innerHTML=actions;renderClientInfo();loadClientActivities();renderClientDealsTab();renderClientTasksTab()}
+function renderClientDetail(){if(!viewingClient)return;const c=viewingClient;$('cdName').innerHTML=escapeHtml(c.name)+' '+statusBadge(c.status)+' '+rolePillsHTML(c);$('cdSub').innerHTML=(c.preferred_area||'—')+' · '+contactStatusHTML(c)+(c.importance?' · '+starsHTML(c.importance):'');const isSeller=getRoles(c).indexOf('seller')>=0;$('cdListingsTab').style.display=isSeller?'':'none';const phone=c.phone?c.phone.replace(/[^0-9+]/g,''):'';let actions='';if(c.phone){actions+='<a class="qa-btn call" href="tel:'+phone+'">📞 اتصال</a>';actions+='<a class="qa-btn wa" href="https://wa.me/'+(phone.startsWith('+')?phone.substring(1):'968'+phone)+'" target="_blank">💚 واتساب</a>'}if(c.email)actions+='<a class="qa-btn" href="mailto:'+escapeHtml(c.email)+'">📧 بريد</a>';actions+='<button class="qa-btn" onclick="openAddActivity()">📝 إضافة نشاط</button>';actions+='<button class="qa-btn" onclick="addTaskForClient(\''+c.id+'\')">⏰ مهمة</button>';actions+='<button class="qa-btn" onclick="addDealForClient(\''+c.id+'\')">🤝 صفقة</button>';$('cdActions').innerHTML=actions;renderClientInfo();loadClientActivities();renderClientDealsTab();renderClientTasksTab();findSmartMatches();if(isSeller)loadClientListings()}
 
-function renderClientInfo(){const c=viewingClient;const b=(c.budget_min&&c.budget_max)?(fmtMoney(c.budget_min)+' — '+fmtMoney(c.budget_max)):'—';$('cdTabInfo').innerHTML='<div class="info-row"><span class="info-label">📞 الهاتف</span><span class="info-value" dir="ltr">'+(c.phone||'—')+'</span></div><div class="info-row"><span class="info-label">📧 البريد</span><span class="info-value" dir="ltr">'+(c.email||'—')+'</span></div><div class="info-row"><span class="info-label">👤 النوع</span><span class="info-value">'+(clientTypeAr(c.client_type)||'—')+'</span></div><div class="info-row"><span class="info-label">🏠 العقار المطلوب</span><span class="info-value">'+(propTypeAr(c.property_type)||'—')+'</span></div><div class="info-row"><span class="info-label">📍 المنطقة</span><span class="info-value">'+escapeHtml(c.preferred_area||'—')+'</span></div><div class="info-row"><span class="info-label">💰 الميزانية</span><span class="info-value">'+b+'</span></div><div class="info-row"><span class="info-label">📡 المصدر</span><span class="info-value">'+sourceAr(c.source)+'</span></div><div class="info-row"><span class="info-label">👨‍💼 الموظف المسؤول</span><span class="info-value">'+escapeHtml(c.agent&&c.agent.full_name||'—')+'</span></div><div class="info-row"><span class="info-label">📅 تاريخ التسجيل</span><span class="info-value">'+fmtDate(c.created_at)+'</span></div>'+(c.notes?'<div style="background:var(--cream);padding:14px;border-radius:10px;margin-top:14px;font-size:13px;line-height:1.6"><strong style="color:var(--umber)">📝 ملاحظات:</strong><br>'+escapeHtml(c.notes)+'</div>':'')}
+function renderClientInfo(){const c=viewingClient;const b=(c.budget_min&&c.budget_max)?(fmtMoney(c.budget_min)+' — '+fmtMoney(c.budget_max)):'—';$('cdTabInfo').innerHTML='<div class="info-row"><span class="info-label">📞 الهاتف</span><span class="info-value" dir="ltr">'+(c.phone||'—')+'</span></div><div class="info-row"><span class="info-label">📧 البريد</span><span class="info-value" dir="ltr">'+(c.email||'—')+'</span></div><div class="info-row"><span class="info-label">👤 النوع</span><span class="info-value">'+(clientTypeAr(c.client_type)||'—')+'</span></div><div class="info-row"><span class="info-label">🏠 العقار المطلوب</span><span class="info-value">'+(propTypeAr(c.property_type)||'—')+'</span></div><div class="info-row"><span class="info-label">📍 المنطقة</span><span class="info-value">'+escapeHtml(c.preferred_area||'—')+'</span></div><div class="info-row"><span class="info-label">💰 الميزانية</span><span class="info-value">'+b+'</span></div><div class="info-row"><span class="info-label">📡 المصدر</span><span class="info-value">'+sourceAr(c.source)+'</span></div><div class="info-row"><span class="info-label">👨‍💼 الموظف المسؤول</span><span class="info-value">'+escapeHtml(c.agent&&c.agent.full_name||'—')+'</span></div><div class="info-row"><span class="info-label">📅 تاريخ التسجيل</span><span class="info-value">'+fmtDate(c.created_at)+'</span></div>'+(c.readiness?'<div class="info-row"><span class="info-label">📊 جاهزية الشراء</span><span class="info-value" style="flex:1;max-width:200px">'+readinessHTML(c.readiness)+'</span></div>':'')+(c.importance?'<div class="info-row"><span class="info-label">⭐ الأهمية</span><span class="info-value">'+starsHTML(c.importance)+'</span></div>':'')+(c.notes?'<div style="background:var(--cream);padding:14px;border-radius:10px;margin-top:14px;font-size:13px;line-height:1.6"><strong style="color:var(--umber)">📝 ملاحظات:</strong><br>'+escapeHtml(c.notes)+'</div>':'')}
 
 async function loadClientActivities(){if(!viewingClient)return;try{const r=await supa.from('activities').select('*, user:profiles(full_name)').eq('client_id',viewingClient.id).order('created_at',{ascending:false});const acts=r.data||[];if(!acts.length){$('cdActivities').innerHTML='<div class="empty" style="padding:30px"><div class="empty-ico" style="font-size:32px">📜</div><div class="empty-desc">لا توجد نشاطات. ابدأ بإضافة نشاط جديد!</div></div>';return}let h='';acts.forEach(function(a){h+='<div class="activity-item"><div class="activity-icon '+a.activity_type+'">'+activityIcon(a.activity_type)+'</div><div class="activity-content"><div style="font-size:11px;font-weight:700;color:var(--umber);margin-bottom:3px">'+activityLabel(a.activity_type)+'</div><div class="activity-text">'+escapeHtml(a.activity_text||'')+'</div><div class="activity-meta">'+(a.user?'<span>👤 '+escapeHtml(a.user.full_name)+'</span>':'')+'<span>· '+timeAgo(a.created_at)+'</span></div></div></div>'});$('cdActivities').innerHTML=h}catch(err){console.error(err)}}
 
@@ -708,12 +810,12 @@ async function renderClientTasksTab(){if(!viewingClient)return;const r=await sup
 
 async function toggleTaskInDetail(id,done){await supa.from('tasks').update({done:done,completed_at:done?new Date().toISOString():null}).eq('id',id);renderClientTasksTab();loadDashboard()}
 
-function switchClientTab(tab,el){document.querySelectorAll('.detail-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['Info','Deals','Tasks'].forEach(function(t){$('cdTab'+t).style.display=tab===t.toLowerCase()?'':'none'})}
+function switchClientTab(tab,el){document.querySelectorAll('.detail-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['Info','Listings','Deals','Tasks'].forEach(function(t){const e=$('cdTab'+t);if(e)e.style.display=tab===t.toLowerCase()?'':'none'})}
 
 function openAddActivity(){if(!viewingClient){showToast('⚠️ افتح عميلاً أولاً','error');return}$('aText').value='';$('mActivity').classList.add('on')}
 async function saveActivity(){if(!viewingClient)return;const type=$('aType').value,text=$('aText').value.trim();if(!text){showToast('⚠️ التفاصيل مطلوبة','error');return}try{await logActivity(type,text,viewingClient.id);closeModal('mActivity');showToast('✅ تم إضافة النشاط','success');loadClientActivities();loadDashboard()}catch(err){showToast('خطأ: '+err.message,'error')}}
 
-function editClient(){if(!viewingClient)return;const c=viewingClient;editingClient=c.id;$('mClientTitle').textContent='✏️ تعديل بيانات العميل';$('cName').value=c.name||'';$('cPhone').value=c.phone||'';$('cEmail').value=c.email||'';$('cType').value=c.client_type||'buyer';$('cSource').value=c.source||'whatsapp';$('cArea').value=c.preferred_area||'';$('cPropType').value=c.property_type||'';$('cStatus').value=c.status||'warm';$('cBudgetMin').value=c.budget_min||'';$('cBudgetMax').value=c.budget_max||'';$('cNotes').value=c.notes||'';openModal('mClient');if($('cAssignedTo'))$('cAssignedTo').value=c.assigned_to||''}
+function editClient(){if(!viewingClient)return;const c=viewingClient;editingClient=c.id;$('mClientTitle').textContent='✏️ تعديل بيانات العميل';$('cName').value=c.name||'';$('cPhone').value=c.phone||'';$('cEmail').value=c.email||'';$('cSource').value=c.source||'whatsapp';$('cArea').value=c.preferred_area||'';$('cPropType').value=c.property_type||'';$('cStatus').value=c.status||'warm';$('cBudgetMin').value=c.budget_min||'';$('cBudgetMax').value=c.budget_max||'';$('cNotes').value=c.notes||'';$('cReadiness').value=c.readiness||'';const isB=c.is_buyer||c.client_type==='buyer';const isS=c.is_seller||c.client_type==='seller';const isI=c.is_investor||c.client_type==='investor';$('cRoleBuyer').checked=isB;$('cbBuyer').classList.toggle('checked',isB);$('cRoleSeller').checked=isS;$('cbSeller').classList.toggle('checked',isS);$('cRoleInvestor').checked=isI;$('cbInvestor').classList.toggle('checked',isI);setStars(c.importance||0);openModal('mClient');if($('cAssignedTo'))$('cAssignedTo').value=c.assigned_to||''}
 
 function addTaskForClient(cid){populateTaskSelects().then(function(){$('tClient').value=cid;$('tTitle').value='';$('tDueDate').value='';$('tNotes').value='';$('mTask').classList.add('on')})}
 function addDealForClient(cid){populateDealSelects().then(function(){$('dClient').value=cid;$('dValue').value='';$('dNotes').value='';$('mDeal').classList.add('on')})}
@@ -795,6 +897,20 @@ async function saveMemberChanges(){if(!editingMember)return;const newRole=$('emR
 function reassignMember(id,name){const others=allMembers.filter(function(m){return m.id!==id&&m.is_active!==false});if(!others.length){showToast('⚠️ لا يوجد موظفون آخرون','error');return}let opts=others.map(function(m){return m.full_name+' ('+m.email+')'}).join('\n');const choice=prompt('نقل عملاء وصفقات '+name+' إلى:\n\n'+opts+'\n\nاكتب اسم الموظف الجديد:');if(!choice)return;const target=others.find(function(m){return m.full_name.indexOf(choice)>=0||m.email.indexOf(choice)>=0});if(!target){showToast('⚠️ لم يتم العثور على الموظف','error');return}confirmAction('نقل البيانات','سيتم نقل كل عملاء وصفقات <strong>'+escapeHtml(name)+'</strong> إلى <strong>'+escapeHtml(target.full_name)+'</strong>.','🔄',async function(){try{await supa.from('clients').update({assigned_to:target.id}).eq('assigned_to',id);await supa.from('deals').update({agent_id:target.id}).eq('agent_id',id);await logActivity('system','تم نقل عملاء وصفقات '+name+' إلى '+target.full_name);showToast('✅ تم النقل','success');loadTeam()}catch(err){showToast('خطأ: '+err.message,'error')}})}
 
 function removeMember(id,name){confirmAction('إزالة الموظف','هل تريد إزالة <strong>'+escapeHtml(name)+'</strong> من الفريق؟<br><br>سيتم تعطيل حسابه وفقدانه الوصول للمنصة. لن يتم حذف بياناته (العملاء والصفقات تظل).','⚠️',async function(){try{const r=await supa.from('profiles').update({is_active:false,company_id:null}).eq('id',id);if(r.error)throw r.error;await logActivity('system','تم إزالة الموظف: '+name);showToast('✅ تم إزالة الموظف','success');loadTeam()}catch(err){showToast('خطأ: '+err.message,'error')}})}
+
+// ===== SMART MATCHING =====
+async function findSmartMatches(){if(!viewingClient)return;const c=viewingClient;const roles=getRoles(c);const container=$('cdSmartMatches');let html='';
+if(roles.indexOf('buyer')>=0){const matches=await findPropertiesForBuyer(c);const sellerMatches=await findSellersForBuyer(c);if(matches.length||sellerMatches.length){html+='<div class="match-card"><div class="match-header"><span class="match-icon">🎯</span><span>عقارات مطابقة لمتطلباته</span></div>';if(matches.length){html+='<div class="match-list">';matches.slice(0,5).forEach(m=>{const score=m.score>=80?'high':m.score>=50?'medium':'';html+='<div class="match-item"><div class="match-info"><div class="match-name">🏠 '+escapeHtml(m.title)+'</div><div class="match-detail">'+propTypeAr(m.type)+' · '+escapeHtml(m.area)+' · '+fmtMoney(m.price)+'</div></div><div class="match-score '+score+'">'+m.score+'% مطابقة</div></div>'});html+='</div>'}if(sellerMatches.length){html+='<div style="margin-top:12px;font-size:12px;font-weight:700;color:var(--umber);padding:8px 0">👥 بائعون عندهم ما يبحث عنه:</div><div class="match-list">';sellerMatches.slice(0,3).forEach(s=>{html+='<div class="match-item" onclick="viewClient(\''+s.id+'\')"><div class="match-info"><div class="match-name">👤 '+escapeHtml(s.name)+'</div><div class="match-detail">'+(s.phone||'')+' · '+escapeHtml(s.preferred_area||'')+'</div></div><div class="match-score">📞 تواصل</div></div>'});html+='</div>'}html+='</div>'}}
+if(roles.indexOf('seller')>=0){const buyers=await findBuyersForSeller(c);if(buyers.length){html+='<div class="match-card"><div class="match-header"><span class="match-icon">🔥</span><span>مشترون مهتمون بمنطقته</span></div><div class="match-list">';buyers.slice(0,5).forEach(b=>{const score=b.score>=80?'high':b.score>=50?'medium':'';html+='<div class="match-item" onclick="viewClient(\''+b.id+'\')"><div class="match-info"><div class="match-name">🛒 '+escapeHtml(b.name)+'</div><div class="match-detail">ميزانية: '+(b.budget_max?fmtMoney(b.budget_max):'—')+' · '+escapeHtml(b.preferred_area||'—')+'</div></div><div class="match-score '+score+'">'+b.score+'% مطابقة</div></div>'});html+='</div></div>'}}
+container.innerHTML=html}
+
+async function findPropertiesForBuyer(c){try{const r=await supa.from('properties').select('*').eq('status','available');const props=r.data||[];return props.map(p=>{let score=0;if(c.preferred_area&&p.area&&p.area.indexOf(c.preferred_area)>=0)score+=40;if(c.property_type&&p.type===c.property_type)score+=30;if(c.budget_max&&p.price&&p.price<=c.budget_max)score+=20;if(c.budget_min&&p.price&&p.price>=c.budget_min*0.8)score+=10;return{...p,score}}).filter(p=>p.score>=30).sort((a,b)=>b.score-a.score)}catch(e){return[]}}
+
+async function findSellersForBuyer(c){if(!c.preferred_area)return[];try{const r=await supa.from('clients').select('*').eq('is_seller',true).neq('id',c.id);return(r.data||[]).filter(s=>s.preferred_area&&c.preferred_area&&s.preferred_area.indexOf(c.preferred_area)>=0)}catch(e){return[]}}
+
+async function findBuyersForSeller(c){if(!c.preferred_area)return[];try{const r=await supa.from('clients').select('*').eq('is_buyer',true).neq('id',c.id);const buyers=r.data||[];return buyers.map(b=>{let score=0;if(b.preferred_area&&b.preferred_area.indexOf(c.preferred_area)>=0)score+=50;if(c.property_type&&b.property_type===c.property_type)score+=30;if(c.budget_min&&b.budget_max&&b.budget_max>=c.budget_min)score+=20;return{...b,score}}).filter(b=>b.score>=30).sort((a,b)=>b.score-a.score)}catch(e){return[]}}
+
+async function loadClientListings(){if(!viewingClient)return;try{const r=await supa.from('properties').select('*').eq('owner_client_id',viewingClient.id);const props=r.data||[];if(!props.length){$('cdTabListings').innerHTML='<div class="empty" style="padding:30px"><div class="empty-ico" style="font-size:32px">🏠</div><div class="empty-desc">لا يوجد عقارات مسجّلة لهذا البائع.<br>يمكنك ربط عقاراته من صفحة العقارات.</div></div>';return}let h='';props.forEach(p=>{const sm={available:'✅ متوفر',reserved:'⏳ محجوز',sold:'🔴 بيع'};h+='<div class="listing-card"><div class="listing-icon">'+(p.type==='villa'?'🏡':p.type==='apartment'?'🏢':p.type==='land'?'🏞':'🏠')+'</div><div class="listing-info"><div class="listing-title">'+escapeHtml(p.title)+'</div><div class="listing-detail">'+propTypeAr(p.type)+' · '+escapeHtml(p.area)+' · '+(sm[p.status]||p.status)+'</div></div><div class="listing-price">'+fmtMoney(p.price)+'</div></div>'});$('cdTabListings').innerHTML=h}catch(e){console.error(e)}}
 
 async function init(){const s=await supa.auth.getSession();if(s.data.session)await loadApp();else{$('loaderScreen').style.display='none';$('authScreen').classList.remove('hidden')}}
 supa.auth.onAuthStateChange(function(e,s){if(e==='SIGNED_IN'&&s&&!currentUser)loadApp();if(e==='SIGNED_OUT'){currentUser=null;currentProfile=null}});
