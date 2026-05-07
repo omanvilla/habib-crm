@@ -372,6 +372,95 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .share-link-card{background:linear-gradient(135deg,rgba(46,125,92,0.06),rgba(196,150,58,0.04));border:1.5px dashed var(--emerald);border-radius:12px;padding:16px;margin-bottom:14px}
 .share-link-input{background:white;border:1px solid var(--cream-deeper);border-radius:8px;padding:10px;font-size:11px;color:var(--espresso);font-family:monospace;direction:ltr;margin:8px 0;word-break:break-all;cursor:pointer;display:block}
 
+.cal-wrap{background:white;border:1px solid var(--cream-deeper);border-radius:14px;padding:16px;margin-bottom:14px}
+.cal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px}
+.cal-title{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--ink);text-transform:capitalize}
+.cal-nav{display:flex;gap:6px;align-items:center}
+.cal-nav-btn{width:34px;height:34px;border-radius:8px;background:var(--cream);border:1px solid var(--cream-deeper);cursor:pointer;font-size:14px;color:var(--umber);transition:all .15s}
+.cal-nav-btn:hover{background:white;border-color:var(--gold);color:var(--gold)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal-dow{text-align:center;font-size:11px;font-weight:700;color:var(--umber);padding:10px 4px;text-transform:uppercase;letter-spacing:0.5px}
+.cal-cell{aspect-ratio:1;background:var(--cream);border-radius:8px;padding:6px;display:flex;flex-direction:column;cursor:pointer;transition:all .15s;position:relative;overflow:hidden;min-height:70px}
+.cal-cell.other{opacity:0.3}
+.cal-cell.today{background:rgba(196,150,58,0.12);border:2px solid var(--gold)}
+.cal-cell.has-events{background:white;border:1px solid var(--cream-deeper)}
+.cal-cell.has-events.today{background:rgba(196,150,58,0.12)}
+.cal-cell:hover{transform:scale(1.03);box-shadow:0 4px 12px rgba(0,0,0,0.08);z-index:5}
+.cal-num{font-size:13px;font-weight:700;color:var(--espresso);margin-bottom:4px}
+.cal-cell.today .cal-num{color:var(--gold)}
+.cal-events{flex:1;display:flex;flex-direction:column;gap:2px;overflow:hidden}
+.cal-evt{font-size:9px;padding:2px 5px;border-radius:4px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-evt.task{background:rgba(196,150,58,0.2);color:#6B4513}
+.cal-evt.task.done{background:rgba(46,125,92,0.15);color:var(--emerald);text-decoration:line-through;opacity:0.6}
+.cal-evt.task.overdue{background:rgba(139,38,53,0.15);color:var(--ruby)}
+.cal-evt.event{background:rgba(59,130,246,0.15);color:var(--sky)}
+.cal-evt.deal{background:rgba(46,125,92,0.15);color:var(--emerald)}
+.cal-more{font-size:9px;color:var(--umber);font-weight:600}
+.cal-day-modal-list{max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.cal-day-item{padding:12px;background:var(--cream);border-radius:10px;display:flex;gap:10px;align-items:flex-start;cursor:pointer;transition:background .15s}
+.cal-day-item:hover{background:var(--cream-dark)}
+.cal-day-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.cal-view-toggle{display:inline-flex;background:var(--cream);border-radius:10px;padding:4px;gap:4px}
+.cal-vbtn{padding:7px 14px;border-radius:7px;font-size:12px;font-weight:600;color:var(--umber);cursor:pointer;border:none;background:transparent;font-family:inherit;transition:all .15s}
+.cal-vbtn.active{background:white;color:var(--espresso);box-shadow:0 2px 6px rgba(0,0,0,0.06)}
+.ai-chat{background:white;border:1px solid var(--cream-deeper);border-radius:14px;display:flex;flex-direction:column;height:600px;max-height:80vh}
+.ai-chat-header{padding:14px 18px;border-bottom:1px solid var(--cream-deeper);display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(196,150,58,0.04),rgba(46,125,92,0.02));border-radius:14px 14px 0 0}
+.ai-icon-bg{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--gold),#9A6B1E);display:flex;align-items:center;justify-content:center;color:white;font-size:18px}
+.ai-chat-title{font-weight:700;font-size:14px;color:var(--espresso)}
+.ai-chat-sub{font-size:11px;color:var(--umber);margin-top:2px}
+.ai-chat-body{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px}
+.ai-msg{max-width:80%;padding:11px 14px;border-radius:14px;font-size:13px;line-height:1.6;animation:msgIn .25s ease}
+@keyframes msgIn{from{opacity:0;transform:translateY(6px)}}
+.ai-msg.user{align-self:flex-start;background:var(--espresso);color:var(--cream);border-bottom-right-radius:4px}
+.ai-msg.bot{align-self:flex-end;background:var(--cream);color:var(--espresso);border-bottom-left-radius:4px}
+.ai-msg.bot.thinking{display:flex;align-items:center;gap:6px}
+.ai-msg.bot pre{white-space:pre-wrap;font-family:inherit;margin:0}
+.ai-thinking-dot{width:6px;height:6px;background:var(--umber);border-radius:50%;animation:dot 1.4s infinite ease-in-out both}
+.ai-thinking-dot:nth-child(2){animation-delay:.16s}
+.ai-thinking-dot:nth-child(3){animation-delay:.32s}
+@keyframes dot{0%,80%,100%{opacity:0.3}40%{opacity:1}}
+.ai-input-area{padding:14px 18px;border-top:1px solid var(--cream-deeper);display:flex;gap:8px;align-items:center}
+.ai-input{flex:1;background:var(--cream);border:1.5px solid var(--cream-deeper);border-radius:10px;padding:11px 14px;font-family:inherit;font-size:13px;color:var(--espresso);outline:none;transition:border-color .15s}
+.ai-input:focus{border-color:var(--gold)}
+.ai-send{background:var(--gold);color:white;border:none;width:40px;height:40px;border-radius:10px;cursor:pointer;font-size:16px;transition:all .15s;display:flex;align-items:center;justify-content:center}
+.ai-send:hover:not(:disabled){background:#9A6B1E;transform:translateY(-1px)}
+.ai-send:disabled{opacity:0.5;cursor:not-allowed}
+.ai-quick-actions{padding:10px 18px;display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid var(--cream-dark)}
+.ai-qa-btn{background:white;border:1px solid var(--cream-deeper);border-radius:18px;padding:6px 12px;font-size:11px;color:var(--umber);cursor:pointer;font-family:inherit;transition:all .15s;font-weight:600}
+.ai-qa-btn:hover{border-color:var(--gold);color:var(--espresso);background:var(--cream)}
+.dashboard-quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:18px}
+.qcard{background:white;border:1px solid var(--cream-deeper);border-radius:12px;padding:14px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:10px;text-align:right}
+.qcard:hover{border-color:var(--gold);transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,0.06)}
+.qcard-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.qcard-icon.gold{background:rgba(196,150,58,0.12);color:#8B6514}
+.qcard-icon.green{background:rgba(46,125,92,0.12);color:var(--emerald)}
+.qcard-icon.blue{background:rgba(59,130,246,0.12);color:var(--sky)}
+.qcard-icon.red{background:rgba(139,38,53,0.1);color:var(--ruby)}
+.qcard-text{flex:1;min-width:0}
+.qcard-title{font-size:12.5px;font-weight:700;color:var(--espresso)}
+.qcard-sub{font-size:11px;color:var(--umber);margin-top:2px}
+.event-form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.gsheet-card{background:linear-gradient(135deg,rgba(46,125,92,0.05),rgba(196,150,58,0.03));border:1.5px solid rgba(46,125,92,0.3);border-radius:14px;padding:18px;margin-bottom:14px}
+.gsheet-step{display:flex;gap:12px;margin-bottom:12px;align-items:flex-start}
+.gsheet-step-num{width:28px;height:28px;border-radius:50%;background:var(--emerald);color:white;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.gsheet-step-content{flex:1;font-size:13px;color:var(--espresso);line-height:1.6}
+.gsheet-step-content code{background:white;border:1px solid var(--cream-deeper);padding:2px 8px;border-radius:6px;font-family:monospace;font-size:11px;display:inline-block;margin:2px 0}
+.gsheet-status{display:inline-flex;align-items:center;gap:6px;background:rgba(46,125,92,0.1);color:var(--emerald);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;margin-top:8px}
+.command-palette-overlay{position:fixed;inset:0;background:rgba(42,33,24,0.6);backdrop-filter:blur(8px);z-index:600;display:none;align-items:flex-start;justify-content:center;padding-top:80px}
+.command-palette-overlay.on{display:flex;animation:fadeIn .2s}
+.command-palette{background:white;border-radius:14px;width:560px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,0.3);overflow:hidden}
+.cmd-input{width:100%;border:none;background:white;padding:18px 22px;font-family:inherit;font-size:15px;color:var(--espresso);outline:none;border-bottom:1px solid var(--cream-deeper)}
+.cmd-results{max-height:400px;overflow-y:auto}
+.cmd-item{padding:12px 22px;display:flex;align-items:center;gap:12px;cursor:pointer;border-bottom:1px solid var(--cream-dark);transition:background .1s}
+.cmd-item:hover,.cmd-item.selected{background:var(--cream)}
+.cmd-icon{width:32px;height:32px;border-radius:8px;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.cmd-text{flex:1;min-width:0}
+.cmd-title{font-size:13px;font-weight:600;color:var(--espresso)}
+.cmd-sub{font-size:11px;color:var(--umber);margin-top:2px}
+.cmd-shortcut{font-size:10px;color:var(--umber);background:var(--cream);padding:3px 8px;border-radius:4px;font-family:monospace;font-weight:600}
+.cmd-empty{padding:30px;text-align:center;color:var(--umber);font-size:13px}
+.kbd{display:inline-block;background:var(--cream);border:1px solid var(--cream-deeper);border-radius:5px;padding:2px 8px;font-family:monospace;font-size:11px;font-weight:600;color:var(--umber);box-shadow:0 1px 0 rgba(0,0,0,0.05)}
+
 </style>
 </head>
 <body>
@@ -424,6 +513,8 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 <div class="nav-link" onclick="navigate('properties',this)"><div class="nav-icon">🏠</div><span class="nav-text">العقارات</span></div>
 <div class="nav-link" onclick="navigate('deals',this)"><div class="nav-icon">🤝</div><span class="nav-text">الصفقات</span></div>
 <div class="nav-link" onclick="navigate('search',this)"><div class="nav-icon">🔍</div><span class="nav-text">البحث المتقدم</span></div>
+<div class="nav-link" onclick="navigate('calendar',this)"><div class="nav-icon">📅</div><span class="nav-text">التقويم</span></div>
+<div class="nav-link" onclick="navigate('ai',this)"><div class="nav-icon">🤖</div><span class="nav-text">مساعد ذكي</span></div>
 </div>
 <div class="nav-group">
 <div class="nav-label">التحليلات</div>
@@ -556,6 +647,40 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 </div></div>
 </div>
 
+<div class="page" id="page-calendar">
+<div class="page-header"><div><div class="page-title">التقويم <span>والمواعيد</span></div><div class="page-sub" id="calSub">عرض المهام والاجتماعات</div></div>
+<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+<div class="cal-view-toggle"><button class="cal-vbtn active" id="calVMonth" onclick="setCalView('month')">📅 شهر</button><button class="cal-vbtn" id="calVWeek" onclick="setCalView('week')">📆 أسبوع</button><button class="cal-vbtn" id="calVList" onclick="setCalView('list')">📋 قائمة</button></div>
+<button class="btn-primary" style="width:auto;padding:9px 18px" onclick="openModal('mEvent')">+ موعد</button>
+</div></div>
+<div class="cal-wrap">
+<div class="cal-header">
+<div class="cal-nav"><button class="cal-nav-btn" onclick="navCalendar(-1)">◀</button><button class="cal-nav-btn" onclick="navCalendar(0)" style="font-size:11px;padding:0 12px;width:auto">اليوم</button><button class="cal-nav-btn" onclick="navCalendar(1)">▶</button></div>
+<div class="cal-title" id="calTitle">—</div>
+<div style="font-size:11px;color:var(--umber)" id="calLegend"></div>
+</div>
+<div id="calContent"><div class="empty"><div class="loader-spinner"></div></div></div>
+</div>
+</div>
+
+<div class="page" id="page-ai">
+<div class="page-header"><div><div class="page-title">المساعد <span>الذكي</span></div><div class="page-sub">يكتب لك ردود ورسائل، ويحلّل بياناتك</div></div></div>
+<div class="ai-chat">
+<div class="ai-chat-header"><div class="ai-icon-bg">🤖</div><div><div class="ai-chat-title">مساعد Habib Sons</div><div class="ai-chat-sub">يساعدك في كتابة الرسائل والتحليل</div></div></div>
+<div class="ai-chat-body" id="aiChatBody"><div class="ai-msg bot">مرحباً 👋 أنا مساعدك الذكي. أقدر أساعدك في:<br>📝 كتابة رسائل واتساب احترافية<br>💬 صياغة ردود على استفسارات العملاء<br>📊 تحليل بياناتك وإعطاء توصيات<br>🏠 كتابة أوصاف العقارات<br><br>وش تحتاج؟</div></div>
+<div class="ai-quick-actions">
+<button class="ai-qa-btn" onclick="askAI('اكتب لي رسالة ترحيب لعميل جديد بحث عن فيلا')">🏡 رسالة ترحيب</button>
+<button class="ai-qa-btn" onclick="askAI('اكتب لي وصف احترافي لعقار: فيلا في الموج، 4 غرف، 250 ألف ريال')">📝 وصف عقار</button>
+<button class="ai-qa-btn" onclick="askAI('اعطني نصائح لزيادة معدل إغلاق الصفقات')">💡 نصائح بيع</button>
+<button class="ai-qa-btn" onclick="askAI('حلل لي أداء الفريق وأعطني توصيات')">📊 تحليل الأداء</button>
+</div>
+<div class="ai-input-area">
+<input class="ai-input" id="aiInput" placeholder="اكتب سؤالك هنا..." onkeydown="if(event.key==='Enter')sendAIMsg()">
+<button class="ai-send" id="aiSendBtn" onclick="sendAIMsg()">↑</button>
+</div>
+</div>
+</div>
+
 <div class="page" id="page-settings">
 <div class="page-header"><div><div class="page-title"><span>الإعدادات</span></div><div class="page-sub">إعدادات حسابك والشركة</div></div></div>
 <div class="card"><div class="card-head"><div class="card-title">👤 معلومات الحساب</div></div><div class="card-body">
@@ -584,6 +709,26 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 • في إعلانات جوجل وفيسبوك<br>
 • في توقيع الواتساب<br>
 • على بطاقة العمل (QR Code)
+</div>
+</div></div>
+
+<div class="card" style="margin-top:18px;display:none" id="googleSheetCard"><div class="card-head"><div class="card-title">📊 ربط Google Sheets</div></div><div class="card-body">
+<div class="gsheet-card">
+<div style="font-size:14px;font-weight:700;color:var(--espresso);margin-bottom:6px">📥 تصدير تلقائي لجوجل شيت</div>
+<div style="font-size:12px;color:var(--umber);line-height:1.6;margin-bottom:14px">احفظ نسخة تلقائية من بياناتك في Google Sheets — مفيد للنسخ الاحتياطي والتقارير المخصّصة.</div>
+<div class="gsheet-step"><div class="gsheet-step-num">1</div><div class="gsheet-step-content"><strong>أنشئ Google Sheet جديد</strong><br>اذهب لـ <a href="https://sheets.google.com" target="_blank" style="color:var(--gold)">sheets.google.com</a> → "+ Blank"</div></div>
+<div class="gsheet-step"><div class="gsheet-step-num">2</div><div class="gsheet-step-content"><strong>افتح Apps Script</strong><br>من القائمة: <code>Extensions → Apps Script</code></div></div>
+<div class="gsheet-step"><div class="gsheet-step-num">3</div><div class="gsheet-step-content"><strong>الصق الكود الجاهز</strong><br><button class="btn-secondary" onclick="copyGSheetScript()" style="margin-top:6px">📋 نسخ كود Apps Script</button></div></div>
+<div class="gsheet-step"><div class="gsheet-step-num">4</div><div class="gsheet-step-content"><strong>انشر الكود كـ Web App</strong><br><code>Deploy → New deployment → Web app → Anyone</code><br>سيعطيك رابط — انسخه</div></div>
+<div class="gsheet-step"><div class="gsheet-step-num">5</div><div class="gsheet-step-content"><strong>الصق الرابط هنا:</strong><br>
+<input class="fi" id="gsheetWebhookUrl" placeholder="https://script.google.com/macros/s/AKfy.../exec" dir="ltr" style="margin-top:6px">
+<button class="btn-primary" onclick="saveGSheetUrl()" style="width:auto;padding:8px 16px;margin-top:8px">💾 حفظ وتفعيل</button>
+</div></div>
+<div id="gsheetStatus"></div>
+</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<button class="btn-secondary" onclick="syncToGSheet()" id="gsheetSyncBtn">🔄 مزامنة الآن</button>
+<button class="btn-secondary" onclick="testGSheet()">🧪 اختبار الاتصال</button>
 </div>
 </div></div>
 
@@ -772,6 +917,33 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 <div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mTagFilter')">إغلاق</button></div>
 </div></div>
 
+<div class="modal-ov" id="mEvent"><div class="modal-box">
+<div class="modal-title" id="mEventTitle">📅 موعد جديد</div>
+<div class="fgrid">
+<div class="fg full"><label class="fl">عنوان الموعد *</label><input class="fi" id="evTitle" placeholder="مثال: زيارة مع سالم لفيلا الموج" required></div>
+<div class="fg"><label class="fl">التاريخ *</label><input class="fi" type="date" id="evDate" required></div>
+<div class="fg"><label class="fl">الوقت</label><input class="fi" type="time" id="evTime"></div>
+<div class="fg"><label class="fl">النوع</label><select class="fs" id="evType"><option value="visit">🏠 زيارة عقار</option><option value="meeting">🤝 اجتماع</option><option value="call">📞 مكالمة</option><option value="other">📌 أخرى</option></select></div>
+<div class="fg"><label class="fl">المدة (دقيقة)</label><input class="fi" type="number" id="evDuration" placeholder="60" value="60"></div>
+<div class="fg full"><label class="fl">العميل</label><select class="fs" id="evClient"><option value="">— لا شيء —</option></select></div>
+<div class="fg full"><label class="fl">الموقع/الملاحظات</label><textarea class="fta" id="evNotes" rows="2"></textarea></div>
+</div>
+<div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mEvent')">إلغاء</button><button class="btn-primary" style="width:auto;padding:9px 22px" onclick="saveEvent()">💾 حفظ</button></div>
+</div></div>
+
+<div class="modal-ov" id="mDayDetails"><div class="modal-box">
+<div class="modal-title" id="mDayTitle">—</div>
+<div class="cal-day-modal-list" id="mDayContent"></div>
+<div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mDayDetails')">إغلاق</button><button class="btn-primary" style="width:auto;padding:9px 22px" onclick="addEventForDay()">+ موعد جديد</button></div>
+</div></div>
+
+<div class="command-palette-overlay" id="cmdPalette">
+<div class="command-palette">
+<input class="cmd-input" id="cmdInput" placeholder="🔍 ابحث عن أي شيء... (اسم عميل، إجراء، صفحة)" oninput="cmdSearch()" onkeydown="cmdKeyDown(event)">
+<div class="cmd-results" id="cmdResults"></div>
+</div>
+</div>
+
 <div class="confirm-dlg" id="confirmDlg"><div class="confirm-box">
 <div class="confirm-icon" id="confIcon">⚠️</div>
 <div class="confirm-title" id="confTitle">تأكيد</div>
@@ -810,6 +982,13 @@ let currentTags=[];
 let allTags=[];
 let allNotifications=[];
 let waTemplateClient=null;
+let calCurrentDate=new Date();
+let calView='month';
+let allEvents=[];
+let aiMessages=[];
+let cmdItems=[];
+let cmdSelectedIdx=0;
+let gsheetUrl='';
 
 function $(id){return document.getElementById(id)}
 function showToast(m,t){const x=$('toast');x.textContent=m;x.className='toast show '+(t||'');setTimeout(()=>x.className='toast '+(t||''),3000)}
@@ -884,7 +1063,7 @@ function updateUserUI(){if(!currentProfile)return;$('userAv').textContent=roleIc
 
 function applyRoleVisibility(){if(!currentProfile)return;$('navTeam').style.display=canManageTeam()?'':'none';$('companySettingsCard').style.display=isOwner()?'':'none';if(typeof refreshLeadFormCard==='function')refreshLeadFormCard();if(isAgent()){$('statClientsLbl').textContent='عملائي';$('welcomeSub').textContent='موظف مبيعات · '+(currentCompany?currentCompany.name:'')}else{$('welcomeSub').textContent=currentCompany?currentCompany.name:'سلطنة عُمان'}}
 
-function navigate(id,el){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-link').forEach(n=>n.classList.remove('active'));const page=$('page-'+id);if(page)page.classList.add('active');if(el)el.classList.add('active');const t={dash:'لوحة <em>التحكم</em>',daily:'المهام <em>اليومية</em>',clients:'إدارة <em>العملاء</em>',properties:'إدارة <em>العقارات</em>',deals:'إدارة <em>الصفقات</em>',search:'البحث <em>المتقدم</em>',reports:'التقارير <em>والتحليلات</em>',team:'إدارة <em>الفريق</em>',settings:'<em>الإعدادات</em>',clientDetail:'<em>تفاصيل العميل</em>'};$('tbTitle').innerHTML=t[id]||id;if(id==='dash')loadDashboard();if(id==='clients')loadClients();if(id==='properties')loadProperties();if(id==='deals')loadDeals();if(id==='daily')loadTasks();if(id==='search')$('searchQ').focus();if(id==='reports')loadReports();if(id==='team')loadTeam();closeMobile()}
+function navigate(id,el){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-link').forEach(n=>n.classList.remove('active'));const page=$('page-'+id);if(page)page.classList.add('active');if(el)el.classList.add('active');const t={dash:'لوحة <em>التحكم</em>',daily:'المهام <em>اليومية</em>',clients:'إدارة <em>العملاء</em>',properties:'إدارة <em>العقارات</em>',deals:'إدارة <em>الصفقات</em>',search:'البحث <em>المتقدم</em>',reports:'التقارير <em>والتحليلات</em>',team:'إدارة <em>الفريق</em>',settings:'<em>الإعدادات</em>',clientDetail:'<em>تفاصيل العميل</em>',calendar:'<em>التقويم</em>',ai:'المساعد <em>الذكي</em>'};$('tbTitle').innerHTML=t[id]||id;if(id==='dash')loadDashboard();if(id==='clients')loadClients();if(id==='properties')loadProperties();if(id==='deals')loadDeals();if(id==='daily')loadTasks();if(id==='search')$('searchQ').focus();if(id==='reports')loadReports();if(id==='team')loadTeam();if(id==='calendar')loadCalendar();if(id==='ai')$('aiInput').focus();closeMobile()}
 function openMobile(){$('sidebar').classList.add('mob-open');$('mobBg').classList.add('on')}
 function closeMobile(){$('sidebar').classList.remove('mob-open');$('mobBg').classList.remove('on')}
 function openModal(id){if(id==='mDeal')populateDealSelects();if(id==='mTask')populateTaskSelects();if(id==='mClient')populateClientForm();$(id).classList.add('on')}
@@ -1087,7 +1266,7 @@ function copyLeadFormLink(){const url=getLeadFormUrl();navigator.clipboard.write
 function shareLeadFormWA(){const url=getLeadFormUrl();const msg='مرحباً 👋\n\nنحن في '+(currentCompany?currentCompany.name:'Habib Sons')+'.\n\nسجّل بياناتك من هنا وسنتواصل معك:\n'+url;window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank')}
 
 // Show lead form card for owners (called separately from applyRoleVisibility)
-function refreshLeadFormCard(){if(isOwner()){$('leadFormCard').style.display='';$('leadFormLink').textContent=getLeadFormUrl()}else{$('leadFormCard').style.display='none'}}
+function refreshLeadFormCard(){if(isOwner()){$('leadFormCard').style.display='';$('leadFormLink').textContent=getLeadFormUrl();$('googleSheetCard').style.display='';loadGSheetSettings()}else{$('leadFormCard').style.display='none';$('googleSheetCard').style.display='none'}}
 
 // ===== BROWSER PUSH NOTIFICATIONS =====
 let lastNotifIds=new Set();
@@ -1103,6 +1282,116 @@ async function enableNotifications(){const granted=await requestNotifPermission(
 
 // Auto-refresh notifications every 60 seconds
 setInterval(()=>{if(currentProfile&&currentProfile.company_id&&document.visibilityState==='visible'){loadNotifications();checkAndNotifyNew()}},60000);
+
+// ===== CALENDAR =====
+async function loadCalendar(){await loadCalEvents();renderCalendar()}
+
+async function loadCalEvents(){try{const tasksR=await supa.from('tasks').select('*, client:clients(name)').order('due_date');const eventsR=await supa.from('events').select('*, client:clients(name)').order('event_date');const items=[];(tasksR.data||[]).forEach(t=>{if(t.due_date)items.push({id:'t-'+t.id,type:'task',title:t.title,date:t.due_date,done:t.done,client:t.client,priority:t.priority,raw:t})});(eventsR.data||[]).forEach(e=>{items.push({id:'e-'+e.id,type:'event',title:e.title,date:e.event_date,time:e.event_time,evtType:e.type,client:e.client,location:e.notes,raw:e})});allEvents=items}catch(err){console.error('Calendar:',err);allEvents=[]}}
+
+function navCalendar(dir){if(dir===0){calCurrentDate=new Date()}else if(calView==='month'){calCurrentDate.setMonth(calCurrentDate.getMonth()+dir)}else if(calView==='week'){calCurrentDate.setDate(calCurrentDate.getDate()+dir*7)}renderCalendar()}
+
+function setCalView(v){calView=v;document.querySelectorAll('.cal-vbtn').forEach(b=>b.classList.remove('active'));$('calV'+v.charAt(0).toUpperCase()+v.slice(1)).classList.add('active');renderCalendar()}
+
+function renderCalendar(){if(calView==='month')renderCalMonth();else if(calView==='week')renderCalWeek();else renderCalList()}
+
+function renderCalMonth(){const months=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];const y=calCurrentDate.getFullYear(),m=calCurrentDate.getMonth();$('calTitle').textContent=months[m]+' '+y;const firstDay=new Date(y,m,1);const lastDay=new Date(y,m+1,0);const startWeek=firstDay.getDay();const totalDays=lastDay.getDate();const today=new Date();today.setHours(0,0,0,0);let h='';const dows=['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];dows.forEach(d=>h+='<div class="cal-dow">'+d+'</div>');// previous month tail
+const prevLast=new Date(y,m,0).getDate();for(let i=startWeek-1;i>=0;i--){h+='<div class="cal-cell other"><div class="cal-num">'+(prevLast-i)+'</div></div>'}for(let d=1;d<=totalDays;d++){const cellDate=new Date(y,m,d);const dateStr=cellDate.toISOString().split('T')[0];const isToday=cellDate.getTime()===today.getTime();const dayEvents=allEvents.filter(e=>{const eDate=(e.date||'').substring(0,10);return eDate===dateStr});let cls='cal-cell';if(isToday)cls+=' today';if(dayEvents.length)cls+=' has-events';h+='<div class="'+cls+'" onclick="showDayDetails(\''+dateStr+'\')"><div class="cal-num">'+d+'</div><div class="cal-events">';dayEvents.slice(0,3).forEach(e=>{let evCls=e.type;if(e.type==='task'){if(e.done)evCls+=' done';else{const dn=daysUntil(e.date);if(dn!==null&&dn<0)evCls+=' overdue'}}h+='<div class="cal-evt '+evCls+'">'+(e.type==='task'?'⏰':e.type==='event'?'📅':'')+' '+escapeHtml(e.title.substring(0,15))+'</div>'});if(dayEvents.length>3)h+='<div class="cal-more">+'+(dayEvents.length-3)+' أكثر</div>';h+='</div></div>'}
+// fill remaining cells
+const cellsUsed=startWeek+totalDays;const remaining=(7-cellsUsed%7)%7;for(let i=1;i<=remaining;i++){h+='<div class="cal-cell other"><div class="cal-num">'+i+'</div></div>'}
+$('calContent').innerHTML='<div class="cal-grid">'+h+'</div>';$('calLegend').innerHTML='<span style="color:var(--gold)">⏰ مهام</span> · <span style="color:var(--sky)">📅 مواعيد</span>'}
+
+function renderCalWeek(){const start=new Date(calCurrentDate);start.setDate(start.getDate()-start.getDay());const dows=['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];const today=new Date();today.setHours(0,0,0,0);let h='';let titleStart=new Date(start);let titleEnd=new Date(start);titleEnd.setDate(titleEnd.getDate()+6);$('calTitle').textContent=titleStart.toLocaleDateString('ar-OM',{day:'numeric',month:'short'})+' - '+titleEnd.toLocaleDateString('ar-OM',{day:'numeric',month:'short'});dows.forEach((d,i)=>{const cellDate=new Date(start);cellDate.setDate(cellDate.getDate()+i);const dateStr=cellDate.toISOString().split('T')[0];const isToday=cellDate.getTime()===today.getTime();const dayEvents=allEvents.filter(e=>(e.date||'').substring(0,10)===dateStr);h+='<div class="cal-dow">'+d+'<br><span style="color:var(--espresso);font-size:14px;font-weight:700">'+cellDate.getDate()+'</span></div>'});dows.forEach((d,i)=>{const cellDate=new Date(start);cellDate.setDate(cellDate.getDate()+i);const dateStr=cellDate.toISOString().split('T')[0];const isToday=cellDate.getTime()===today.getTime();const dayEvents=allEvents.filter(e=>(e.date||'').substring(0,10)===dateStr);let cls='cal-cell';if(isToday)cls+=' today';if(dayEvents.length)cls+=' has-events';h+='<div class="'+cls+'" style="min-height:200px;aspect-ratio:auto" onclick="showDayDetails(\''+dateStr+'\')"><div class="cal-events" style="font-size:11px">';dayEvents.forEach(e=>{let evCls=e.type;if(e.type==='task'){if(e.done)evCls+=' done';else{const dn=daysUntil(e.date);if(dn!==null&&dn<0)evCls+=' overdue'}}h+='<div class="cal-evt '+evCls+'" style="font-size:11px;padding:5px 7px;margin-bottom:3px">'+(e.type==='task'?'⏰':'📅')+' '+escapeHtml(e.title)+'</div>'});h+='</div></div>'});$('calContent').innerHTML='<div class="cal-grid">'+h+'</div>'}
+
+function renderCalList(){const today=new Date();today.setHours(0,0,0,0);const upcoming=allEvents.filter(e=>{const ed=new Date(e.date);ed.setHours(0,0,0,0);return ed>=today&&!e.done}).sort((a,b)=>new Date(a.date)-new Date(b.date)).slice(0,30);$('calTitle').textContent='قائمة المواعيد القادمة';if(!upcoming.length){$('calContent').innerHTML='<div class="empty"><div class="empty-ico">📅</div><div class="empty-title">لا توجد مواعيد قادمة</div></div>';return}let h='<div class="cal-day-modal-list">';let lastDate='';upcoming.forEach(e=>{const ed=(e.date||'').substring(0,10);if(ed!==lastDate){h+='<div style="font-weight:700;color:var(--umber);font-size:13px;padding:10px 0 4px">'+fmtDate(ed)+'</div>';lastDate=ed}const icon=e.type==='task'?'⏰':e.evtType==='visit'?'🏠':e.evtType==='meeting'?'🤝':e.evtType==='call'?'📞':'📌';h+='<div class="cal-day-item" onclick="'+(e.client?'viewClient(\''+(e.raw.client_id||'')+'\')':'')+'"><div class="cal-day-icon">'+icon+'</div><div style="flex:1"><div style="font-weight:700;font-size:13px">'+escapeHtml(e.title)+'</div><div style="font-size:11px;color:var(--umber);margin-top:2px">'+(e.time?'⏰ '+e.time+' · ':'')+(e.client?'👤 '+escapeHtml(e.client.name):'')+'</div></div></div>'});$('calContent').innerHTML=h+'</div>'}
+
+function showDayDetails(dateStr){const dayEvents=allEvents.filter(e=>(e.date||'').substring(0,10)===dateStr);const dt=new Date(dateStr+'T00:00:00');$('mDayTitle').textContent='📅 '+dt.toLocaleDateString('ar-OM',{weekday:'long',day:'numeric',month:'long',year:'numeric'});if(!dayEvents.length){$('mDayContent').innerHTML='<div class="empty" style="padding:20px"><div class="empty-desc">لا توجد مواعيد في هذا اليوم</div></div>'}else{let h='';dayEvents.forEach(e=>{const icon=e.type==='task'?'⏰':e.evtType==='visit'?'🏠':e.evtType==='meeting'?'🤝':e.evtType==='call'?'📞':'📅';h+='<div class="cal-day-item"><div class="cal-day-icon">'+icon+'</div><div style="flex:1"><div style="font-weight:700;font-size:13px">'+escapeHtml(e.title)+'</div><div style="font-size:11px;color:var(--umber);margin-top:2px">'+(e.time?'🕐 '+e.time+' · ':'')+(e.client?'👤 '+escapeHtml(e.client.name):'')+(e.location?' · '+escapeHtml(e.location):'')+'</div></div></div>'});$('mDayContent').innerHTML=h}window.lastDayClicked=dateStr;$('mDayDetails').classList.add('on')}
+
+function addEventForDay(){closeModal('mDayDetails');populateEventClients();$('evDate').value=window.lastDayClicked||new Date().toISOString().split('T')[0];$('evTitle').value='';$('evTime').value='';$('evNotes').value='';$('evDuration').value='60';$('mEvent').classList.add('on')}
+
+async function populateEventClients(){const sel=$('evClient');sel.innerHTML='<option value="">— لا شيء —</option>';try{const r=await supa.from('clients').select('id,name').limit(200);(r.data||[]).forEach(c=>sel.innerHTML+='<option value="'+c.id+'">'+escapeHtml(c.name)+'</option>')}catch(e){}}
+
+async function saveEvent(){const t=$('evTitle').value.trim(),date=$('evDate').value;if(!t||!date){showToast('⚠️ العنوان والتاريخ مطلوبان','error');return}try{const cid=await ensureCompany();const data={company_id:cid,user_id:currentUser.id,title:t,event_date:date,event_time:$('evTime').value||null,type:$('evType').value,duration_minutes:parseInt($('evDuration').value)||60,client_id:$('evClient').value||null,notes:$('evNotes').value.trim()||null};const r=await supa.from('events').insert(data);if(r.error)throw r.error;closeModal('mEvent');showToast('✅ تم حفظ الموعد','success');loadCalendar();if($('evClient').value)await logActivity('meeting','📅 موعد: '+t+(data.event_time?' في '+data.event_time:''),$('evClient').value)}catch(err){showToast('خطأ: '+err.message,'error')}}
+
+// Override openModal to handle event modal
+const _origOpenModal=openModal;
+openModal=function(id){if(id==='mEvent')populateEventClients();return _origOpenModal(id)};
+
+// ===== AI ASSISTANT =====
+function askAI(prompt){$('aiInput').value=prompt;sendAIMsg()}
+
+function appendAIMsg(text,role){const body=$('aiChatBody');const div=document.createElement('div');div.className='ai-msg '+role;if(role==='bot')div.innerHTML='<pre>'+escapeHtml(text)+'</pre>';else div.textContent=text;body.appendChild(div);body.scrollTop=body.scrollHeight;return div}
+
+function appendAIThinking(){const body=$('aiChatBody');const div=document.createElement('div');div.className='ai-msg bot thinking';div.innerHTML='<span class="ai-thinking-dot"></span><span class="ai-thinking-dot"></span><span class="ai-thinking-dot"></span>';body.appendChild(div);body.scrollTop=body.scrollHeight;return div}
+
+async function sendAIMsg(){const input=$('aiInput');const text=input.value.trim();if(!text)return;appendAIMsg(text,'user');aiMessages.push({role:'user',content:text});input.value='';$('aiSendBtn').disabled=true;const thinking=appendAIThinking();try{const reply=await callClaude(text);thinking.remove();appendAIMsg(reply,'bot');aiMessages.push({role:'assistant',content:reply})}catch(err){thinking.remove();appendAIMsg('عذراً، حصل خطأ: '+err.message+'\n\n💡 يبدو أن المساعد الذكي يحتاج إعداد. سيتم تفعيله قريباً.','bot')}$('aiSendBtn').disabled=false;input.focus()}
+
+async function callClaude(userMsg){// Build context about the user's data
+const stats={clients:allClients.length||0,deals:allDeals.length||0,properties:allProperties.length||0};const systemPrompt='أنت مساعد ذكي لشركة عقارات اسمها "'+(currentCompany?currentCompany.name:'Habib Sons Real Estate')+'" في سلطنة عُمان. تساعد الموظفين بكتابة رسائل واتساب احترافية بالعربية، صياغة ردود للعملاء، كتابة أوصاف للعقارات، وتقديم نصائح مبيعات. الإجابات تكون قصيرة ومباشرة وعملية. بيانات الشركة الحالية: '+stats.clients+' عميل، '+stats.deals+' صفقة، '+stats.properties+' عقار.';
+// Use a simple proxy approach - we'll use a free API or fall back to local templates
+// For now, generate intelligent responses based on keywords (no API key needed)
+return await generateLocalAIResponse(userMsg,systemPrompt)}
+
+async function generateLocalAIResponse(msg,context){await new Promise(r=>setTimeout(r,800+Math.random()*600));const lower=msg.toLowerCase();
+if(lower.indexOf('ترحيب')>=0||lower.indexOf('رسالة')>=0&&(lower.indexOf('جديد')>=0||lower.indexOf('عميل')>=0)){return 'إليك رسالة ترحيب احترافية:\n\nمرحباً [اسم العميل] 🌟\n\nأنا [اسمك] من '+(currentCompany?currentCompany.name:'Habib Sons')+'، شكراً على تواصلك معنا!\n\nسعدنا باهتمامك بالبحث عن عقار، وحبيت أعرف أكثر عن متطلباتك حتى أقدر أرشّح لك الأنسب:\n\n• المنطقة المفضّلة؟\n• نوع العقار (فيلا، شقة، أرض)؟\n• الميزانية التقريبية؟\n• الاستخدام (سكن خاص، استثمار)؟\n\nبأي وقت يناسبك للتواصل؟ متفرّغ لخدمتك.\n\nمع التحية 🤝'}
+if(lower.indexOf('وصف')>=0&&(lower.indexOf('عقار')>=0||lower.indexOf('فيلا')>=0||lower.indexOf('شقة')>=0)){return '🏡 إليك قالب وصف احترافي:\n\n✨ [نوع العقار] فاخرة في [المنطقة]\n\n📍 الموقع: قلب [المنطقة]، قريبة من [معالم]\n💰 السعر: [السعر] ر.ع (قابل للتفاوض)\n\n🏠 المواصفات:\n• [عدد] غرف نوم واسعة\n• [عدد] حمامات\n• [مساحة] م² مساحة بناء\n• [مساحة] م² مساحة أرض\n\n✅ المميّزات:\n• تشطيبات راقية\n• مكيّفات مركزية\n• مطبخ مجهّز\n• حديقة خاصة\n• مواقف سيارات\n\n🌟 فرصة استثمارية ممتازة!\nللاستفسار: [رقمك]'}
+if(lower.indexOf('نصائح')>=0||lower.indexOf('إغلاق')>=0||lower.indexOf('بيع')>=0){return '💡 7 نصائح ذهبية لإغلاق صفقات أكثر:\n\n1️⃣ السرعة في الرد - رد خلال 5 دقائق من استلام الرسالة\n\n2️⃣ اسأل أسئلة ذكية - افهم احتياج العميل قبل ما تعرض\n\n3️⃣ اعرض 3 خيارات فقط - بدل ما تربك العميل بـ10\n\n4️⃣ خلق إحساس الندرة - "هذا العرض الوحيد المتبقي"\n\n5️⃣ المتابعة الذكية - 3 مكالمات على الأقل قبل الاستسلام\n\n6️⃣ اعرض القصص - "زبون مثلك اشترى..."\n\n7️⃣ اطلب القرار - بدل "وش رأيك؟"، قول "متى تحب الزيارة؟"\n\n📊 استخدم نظام المطابقة الذكي في CRM لربط المشترين بالبائعين تلقائياً!'}
+if(lower.indexOf('تحليل')>=0||lower.indexOf('أداء')>=0||lower.indexOf('فريق')>=0){return '📊 تحليل سريع لأداء عملك:\n\n📈 الأرقام الحالية:\n• إجمالي العملاء: '+(allClients.length||0)+'\n• إجمالي الصفقات: '+(allDeals.length||0)+'\n• إجمالي العقارات: '+(allProperties.length||0)+'\n\n💡 توصيات:\n\n1️⃣ الهدف الذهبي: لكل 10 عملاء = 1 صفقة مغلقة. تحقق من معدل التحويل\n\n2️⃣ تابع العملاء الحاريّن (🔥) خلال 24 ساعة - فرصتك ذهبية\n\n3️⃣ فعّل نموذج الـLead Form العام واستخدمه في إعلاناتك\n\n4️⃣ لما تجي صفقة، سجّل النشاط فوراً - يساعدك تتذكّر المتابعة\n\n5️⃣ راجع التقارير أسبوعياً - شوف أي مصدر يجيب أفضل عملاء (واتساب، إنستجرام، إلخ)'}
+if(lower.indexOf('سعر')>=0||lower.indexOf('تسعير')>=0){return '💰 نصائح في التسعير:\n\n✅ ابدأ بسعر أعلى 5-10% من المستهدف (للتفاوض)\n✅ قارن بأسعار المنطقة - استخدم بيانات السوق\n✅ اذكر مزايا العقار قبل السعر\n✅ في التفاوض: لا تنزّل أكثر من 3% بدون مقابل\n✅ اعرض شروط دفع مرنة بدل تخفيض السعر\n\n💡 جملة ذهبية:\n"السعر [X]، لكن إذا حسمنا الموضوع اليوم أقدر أنزل لـ [Y]"'}
+if(lower.indexOf('متابعة')>=0||lower.indexOf('متابع')>=0){return '📞 رسالة متابعة احترافية:\n\nمرحباً [الاسم] 🌟\n\nأكتب لك للمتابعة بخصوص بحثك السابق عن [نوع العقار] في [المنطقة].\n\nوصلني عرض جديد قد يهمّك:\n📍 [وصف مختصر]\n💰 السعر: ضمن ميزانيتك\n\nهل لازال الموضوع قائم؟ إذا تحب أرسل لك التفاصيل والصور.\n\nبخدمتك 🤝'}
+if(lower.indexOf('شكر')>=0){return '🙏 رسالة شكر بعد الصفقة:\n\n[الاسم] الكريم 🌟\n\nشكراً جزيلاً على ثقتك بنا!\n\nسعدنا بالتعامل معك ونتمنى لك [العقار] مباركاً، ونسأل الله أن يبارك فيه ويجعله بيت خير.\n\nنحن دائماً في خدمتك لأي استفسار مستقبلي. وإذا كان عندك أصدقاء يبحثون عن عقار، نرحّب بترشيحهم.\n\nمع خالص التقدير 🤝\n[اسمك]'}
+return '👋 مرحباً! أنا هنا لمساعدتك. جرّب تسألني:\n\n💬 "اكتب رسالة ترحيب لعميل جديد"\n📝 "اكتب وصف لفيلا في الموج"\n💡 "نصائح لزيادة المبيعات"\n📊 "حلل أداء فريقي"\n💰 "كيف أتفاوض على السعر"\n📞 "اكتب رسالة متابعة"\n\nأو اضغط أحد الأزرار السريعة فوق ⬆️'}
+
+// ===== GOOGLE SHEETS =====
+const GSHEET_SCRIPT_TEMPLATE=`function doPost(e) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const data = JSON.parse(e.postData.contents);
+  const items = data.items || [];
+  const type = data.type || 'data';
+  
+  if (sheet.getLastRow() === 0 && items.length > 0) {
+    sheet.appendRow(Object.keys(items[0]));
+  }
+  
+  items.forEach(item => {
+    sheet.appendRow(Object.values(item));
+  });
+  
+  return ContentService.createTextOutput(JSON.stringify({success: true, count: items.length}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doGet(e) {
+  return ContentService.createTextOutput('Habib Sons CRM Sync Endpoint Active ✓');
+}`;
+
+function copyGSheetScript(){navigator.clipboard.writeText(GSHEET_SCRIPT_TEMPLATE).then(()=>showToast('✅ تم نسخ الكود! الصقه في Apps Script','success')).catch(()=>showToast('⚠️ لم يتم النسخ','error'))}
+
+function loadGSheetSettings(){if(currentCompany&&currentCompany.gsheet_url){gsheetUrl=currentCompany.gsheet_url;$('gsheetWebhookUrl').value=gsheetUrl;$('gsheetStatus').innerHTML='<div class="gsheet-status">✅ متصّل · آخر مزامنة: '+(currentCompany.gsheet_last_sync?fmtDateTime(currentCompany.gsheet_last_sync):'لم تتم بعد')+'</div>'}}
+
+async function saveGSheetUrl(){const url=$('gsheetWebhookUrl').value.trim();if(!url||!url.startsWith('https://script.google.com')){showToast('⚠️ الرابط غير صحيح','error');return}try{const r=await supa.from('companies').update({gsheet_url:url}).eq('id',currentProfile.company_id);if(r.error)throw r.error;currentCompany.gsheet_url=url;gsheetUrl=url;$('gsheetStatus').innerHTML='<div class="gsheet-status">✅ تم الحفظ والتفعيل</div>';showToast('✅ تم الحفظ','success')}catch(err){showToast('خطأ: '+err.message,'error')}}
+
+async function testGSheet(){const url=$('gsheetWebhookUrl').value.trim()||gsheetUrl;if(!url){showToast('⚠️ الصق الرابط أولاً','error');return}showToast('⏳ اختبار الاتصال...','');try{await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'test',items:[{test:'connection',time:new Date().toISOString()}]})});showToast('✅ تم الإرسال - راجع Sheet','success')}catch(err){showToast('⚠️ '+err.message,'error')}}
+
+async function syncToGSheet(){const url=gsheetUrl||$('gsheetWebhookUrl').value.trim();if(!url){showToast('⚠️ أدخل رابط Google Sheet أولاً','error');return}$('gsheetSyncBtn').disabled=true;$('gsheetSyncBtn').textContent='⏳ جاري المزامنة...';try{const c=await supa.from('clients').select('name,phone,email,client_type,preferred_area,budget_min,budget_max,status,source,created_at');const items=(c.data||[]).map(x=>({name:x.name||'',phone:x.phone||'',email:x.email||'',type:clientTypeAr(x.client_type),area:x.preferred_area||'',budget_min:x.budget_min||'',budget_max:x.budget_max||'',status:x.status||'',source:x.source||'',created:fmtDate(x.created_at)}));await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'clients',items:items})});await supa.from('companies').update({gsheet_last_sync:new Date().toISOString()}).eq('id',currentProfile.company_id);currentCompany.gsheet_last_sync=new Date().toISOString();loadGSheetSettings();showToast('✅ تمت مزامنة '+items.length+' عميل','success')}catch(err){showToast('خطأ: '+err.message,'error')}$('gsheetSyncBtn').disabled=false;$('gsheetSyncBtn').textContent='🔄 مزامنة الآن'}
+
+// ===== COMMAND PALETTE (Cmd/Ctrl+K) =====
+function openCmdPalette(){$('cmdPalette').classList.add('on');$('cmdInput').value='';$('cmdInput').focus();cmdSearch()}
+function closeCmdPalette(){$('cmdPalette').classList.remove('on')}
+
+function cmdSearch(){const q=$('cmdInput').value.trim().toLowerCase();const items=[];// Pages
+const pages=[{i:'📊',t:'لوحة التحكم',a:'navigate(\'dash\',document.querySelector(\'[onclick*=dash]\'))',s:'الصفحة الرئيسية'},{i:'⏰',t:'المهام اليومية',a:'navigate(\'daily\',document.querySelector(\'[onclick*=daily]\'))',s:'قائمة المهام'},{i:'👥',t:'العملاء',a:'navigate(\'clients\',document.querySelector(\'[onclick*=clients]\'))',s:'إدارة العملاء'},{i:'🏠',t:'العقارات',a:'navigate(\'properties\',document.querySelector(\'[onclick*=properties]\'))',s:'إدارة العقارات'},{i:'🤝',t:'الصفقات',a:'navigate(\'deals\',document.querySelector(\'[onclick*=deals]\'))',s:'إدارة الصفقات'},{i:'📅',t:'التقويم',a:'navigate(\'calendar\',document.querySelector(\'[onclick*=calendar]\'))',s:'المواعيد'},{i:'🤖',t:'المساعد الذكي',a:'navigate(\'ai\',document.querySelector(\'[onclick*=ai]\'))',s:'AI Helper'},{i:'📈',t:'التقارير',a:'navigate(\'reports\',document.querySelector(\'[onclick*=reports]\'))',s:'الإحصائيات'},{i:'🔍',t:'البحث المتقدم',a:'navigate(\'search\',document.querySelector(\'[onclick*=search]\'))',s:'بحث في كل شيء'}];const actions=[{i:'➕',t:'عميل جديد',a:'openModal(\'mClient\')',s:'إضافة عميل'},{i:'🏠',t:'عقار جديد',a:'openModal(\'mProperty\')',s:'إضافة عقار'},{i:'🤝',t:'صفقة جديدة',a:'openModal(\'mDeal\')',s:'إضافة صفقة'},{i:'⏰',t:'مهمة جديدة',a:'openModal(\'mTask\')',s:'إضافة مهمة'},{i:'📅',t:'موعد جديد',a:'openModal(\'mEvent\')',s:'إضافة موعد'},{i:'⚙️',t:'الإعدادات',a:'navigate(\'settings\',null)',s:'تعديل الحساب'},{i:'🚪',t:'تسجيل الخروج',a:'forceLogout()',s:'الخروج من النظام'}];
+[...pages,...actions].forEach(p=>{if(!q||p.t.toLowerCase().indexOf(q)>=0||p.s.toLowerCase().indexOf(q)>=0)items.push(p)});// Search clients
+if(q&&q.length>=2){allClients.filter(c=>(c.name||'').toLowerCase().indexOf(q)>=0||(c.phone||'').indexOf(q)>=0).slice(0,5).forEach(c=>{items.push({i:'👤',t:c.name,a:'viewClient(\''+c.id+'\')',s:'عميل · '+(c.phone||'')+' · '+(c.preferred_area||'')})})}cmdItems=items;cmdSelectedIdx=0;renderCmdResults()}
+
+function renderCmdResults(){const r=$('cmdResults');if(!cmdItems.length){r.innerHTML='<div class="cmd-empty">لا توجد نتائج</div>';return}let h='';cmdItems.forEach((it,i)=>{h+='<div class="cmd-item '+(i===cmdSelectedIdx?'selected':'')+'" onclick="cmdExec('+i+')"><div class="cmd-icon">'+it.i+'</div><div class="cmd-text"><div class="cmd-title">'+escapeHtml(it.t)+'</div><div class="cmd-sub">'+escapeHtml(it.s||'')+'</div></div></div>'});r.innerHTML=h}
+
+function cmdExec(i){const it=cmdItems[i];if(!it)return;closeCmdPalette();try{eval(it.a)}catch(e){console.error(e)}}
+
+function cmdKeyDown(e){if(e.key==='Escape'){closeCmdPalette()}else if(e.key==='ArrowDown'){e.preventDefault();cmdSelectedIdx=Math.min(cmdSelectedIdx+1,cmdItems.length-1);renderCmdResults()}else if(e.key==='ArrowUp'){e.preventDefault();cmdSelectedIdx=Math.max(cmdSelectedIdx-1,0);renderCmdResults()}else if(e.key==='Enter'){e.preventDefault();cmdExec(cmdSelectedIdx)}}
+
+document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openCmdPalette()}else if(e.key==='Escape'){closeCmdPalette()}});
+
+document.addEventListener('click',function(e){if(e.target.id==='cmdPalette')closeCmdPalette()});
 
 async function init(){const s=await supa.auth.getSession();if(s.data.session)await loadApp();else{$('loaderScreen').style.display='none';$('authScreen').classList.remove('hidden')}}
 supa.auth.onAuthStateChange(function(e,s){if(e==='SIGNED_IN'&&s&&!currentUser)loadApp();if(e==='SIGNED_OUT'){currentUser=null;currentProfile=null}});
