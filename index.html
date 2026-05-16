@@ -3181,8 +3181,8 @@ function renderFollowUpSection(containerId){
       h+='<span class="fue-rule-item-meta">'+item.meta+'</span>';
       if(phoneCleaned){
         h+='<div class="fue-quick-actions" onclick="event.stopPropagation()">';
-        h+='<a class="fue-qa-btn wa" href="https://wa.me/'+phoneCleaned+'" target="_blank" title="واتساب" style="text-decoration:none">💚</a>';
-        h+='<a class="fue-qa-btn call" href="tel:+'+phoneCleaned+'" title="اتصال" style="text-decoration:none">📞</a>';
+        h+='<button type="button" class="fue-qa-btn wa" data-phone="'+phoneCleaned+'" onclick="event.stopPropagation();window.open(\'https://wa.me/\'+this.dataset.phone,\'_blank\')" title="واتساب">💚</button>';
+        h+='<button type="button" class="fue-qa-btn call" data-phone="'+phoneCleaned+'" onclick="event.stopPropagation();window.location.href=\'tel:+\'+this.dataset.phone" title="اتصال">📞</button>';
         h+='</div>';
       }
       h+='</div></div>';
