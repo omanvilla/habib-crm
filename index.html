@@ -1280,7 +1280,7 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 <div class="modal-title" id="mClientTitle">➕ إضافة عميل جديد</div>
 <div class="fgrid">
 <div class="fg full"><label class="fl">الاسم *</label><input class="fi" id="cName" required></div>
-<div class="fg"><label class="fl">رقم الهاتف</label><input class="fi" id="cPhone" dir="ltr"></div>
+<div class="fg"><label class="fl">رقم الهاتف</label><input class="fi" id="cPhone" dir="ltr" placeholder="+968 9XXX XXXX" style="text-align:left" dir="ltr"></div>
 <div class="fg"><label class="fl">البريد الإلكتروني</label><input class="fi" id="cEmail" dir="ltr"></div>
 <div class="fg full"><label class="fl">أدوار العميل * (اختر أكثر من واحد إذا لزم)</label>
 <div class="role-checkbox">
@@ -1413,7 +1413,7 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 <div class="modal-title" id="mOwnerTitle">🏛 إضافة مالك جديد</div>
 <div class="fgrid">
 <div class="fg full"><label class="fl">الاسم الكامل *</label><input class="fi" id="oName" required></div>
-<div class="fg"><label class="fl">رقم الهاتف *</label><input class="fi" id="oPhone" dir="ltr" required></div>
+<div class="fg"><label class="fl">رقم الهاتف *</label><input class="fi" id="oPhone" dir="ltr" placeholder="+968 9XXX XXXX" style="text-align:left" dir="ltr" required></div>
 <div class="fg"><label class="fl">البريد الإلكتروني</label><input class="fi" id="oEmail" dir="ltr"></div>
 <div class="fg"><label class="fl">الجنسية</label><input class="fi" id="oNationality"></div>
 <div class="fg"><label class="fl">رقم الهوية/الإقامة</label><input class="fi" id="oIdNumber" dir="ltr"></div>
@@ -1835,7 +1835,7 @@ async function viewClient(id){try{const r=await supa.from('clients').select('*, 
 
 function renderClientDetail(){if(!viewingClient)return;const c=viewingClient;$('cdName').innerHTML=escapeHtml(c.name)+' '+statusBadge(c.lead_temperature||c.status,c.lead_score)+' '+rolePillsHTML(c);$('cdSub').innerHTML=(c.preferred_area||'—')+' · '+contactStatusHTML(c)+(c.importance?' · '+starsHTML(c.importance):'')+(c.tags&&c.tags.length?'<br>'+tagsDisplayHTML(c.tags):'');const isSeller=getRoles(c).indexOf('seller')>=0;$('cdListingsTab').style.display=isSeller?'':'none';const phone=c.phone?c.phone.replace(/[^0-9+]/g,''):'';let actions='';if(c.phone){actions+='<a class="qa-btn call" href="tel:'+phone+'">📞 اتصال</a>';actions+='<button class="qa-btn wa" onclick="openWATemplates()">💚 واتساب</button>'}if(c.email)actions+='<a class="qa-btn" href="mailto:'+escapeHtml(c.email)+'">📧 بريد</a>';actions+='<button class="qa-btn" onclick="openAddActivity()">📝 إضافة نشاط</button>';actions+='<button class="qa-btn" onclick="addTaskForClient(\''+c.id+'\')">⏰ مهمة</button>';actions+='<button class="qa-btn" onclick="addDealForClient(\''+c.id+'\')">🤝 صفقة</button>';$('cdActions').innerHTML=actions;renderClientInfo();loadClientActivities();renderClientDealsTab();renderClientTasksTab();findSmartMatches();if(isSeller)loadClientListings()}
 
-function renderClientInfo(){const c=viewingClient;const b=(c.budget_min&&c.budget_max)?(fmtMoney(c.budget_min)+' — '+fmtMoney(c.budget_max)):'—';$('cdTabInfo').innerHTML='<div class="info-row"><span class="info-label">📞 الهاتف</span><span class="info-value" dir="ltr">'+(c.phone||'—')+'</span></div><div class="info-row"><span class="info-label">📧 البريد</span><span class="info-value" dir="ltr">'+(c.email||'—')+'</span></div><div class="info-row"><span class="info-label">👤 النوع</span><span class="info-value">'+(clientTypeAr(c.client_type)||'—')+'</span></div><div class="info-row"><span class="info-label">🏠 العقار المطلوب</span><span class="info-value">'+(propTypeAr(c.property_type)||'—')+'</span></div><div class="info-row"><span class="info-label">📍 المنطقة</span><span class="info-value">'+escapeHtml(c.preferred_area||'—')+'</span></div><div class="info-row"><span class="info-label">💰 الميزانية</span><span class="info-value">'+b+'</span></div><div class="info-row"><span class="info-label">📡 المصدر</span><span class="info-value">'+sourceAr(c.source)+'</span></div><div class="info-row"><span class="info-label">👨‍💼 الموظف المسؤول</span><span class="info-value">'+escapeHtml(c.agent&&c.agent.full_name||'—')+'</span></div><div class="info-row"><span class="info-label">📅 تاريخ التسجيل</span><span class="info-value">'+fmtDate(c.created_at)+'</span></div>'+(c.readiness?'<div class="info-row"><span class="info-label">📊 جاهزية الشراء</span><span class="info-value" style="flex:1;max-width:200px">'+readinessHTML(c.readiness)+'</span></div>':'')+(c.importance?'<div class="info-row"><span class="info-label">⭐ الأهمية</span><span class="info-value">'+starsHTML(c.importance)+'</span></div>':'')+(c.notes?'<div style="background:var(--cream);padding:14px;border-radius:10px;margin-top:14px;font-size:13px;line-height:1.6"><strong style="color:var(--umber)">📝 ملاحظات:</strong><br>'+escapeHtml(c.notes)+'</div>':'')}
+function renderClientInfo(){const c=viewingClient;const b=(c.budget_min&&c.budget_max)?(fmtMoney(c.budget_min)+' — '+fmtMoney(c.budget_max)):'—';$('cdTabInfo').innerHTML='<div class="info-row"><span class="info-label">📞 الهاتف</span><span class="info-value">'+(c.phone?phoneCountryFlag(c.phone)+' '+formatPhone(c.phone):'—')+'</span></div><div class="info-row"><span class="info-label">📧 البريد</span><span class="info-value" dir="ltr">'+(c.email||'—')+'</span></div><div class="info-row"><span class="info-label">👤 النوع</span><span class="info-value">'+(clientTypeAr(c.client_type)||'—')+'</span></div><div class="info-row"><span class="info-label">🏠 العقار المطلوب</span><span class="info-value">'+(propTypeAr(c.property_type)||'—')+'</span></div><div class="info-row"><span class="info-label">📍 المنطقة</span><span class="info-value">'+escapeHtml(c.preferred_area||'—')+'</span></div><div class="info-row"><span class="info-label">💰 الميزانية</span><span class="info-value">'+b+'</span></div><div class="info-row"><span class="info-label">📡 المصدر</span><span class="info-value">'+sourceAr(c.source)+'</span></div><div class="info-row"><span class="info-label">👨‍💼 الموظف المسؤول</span><span class="info-value">'+escapeHtml(c.agent&&c.agent.full_name||'—')+'</span></div><div class="info-row"><span class="info-label">📅 تاريخ التسجيل</span><span class="info-value">'+fmtDate(c.created_at)+'</span></div>'+(c.readiness?'<div class="info-row"><span class="info-label">📊 جاهزية الشراء</span><span class="info-value" style="flex:1;max-width:200px">'+readinessHTML(c.readiness)+'</span></div>':'')+(c.importance?'<div class="info-row"><span class="info-label">⭐ الأهمية</span><span class="info-value">'+starsHTML(c.importance)+'</span></div>':'')+(c.notes?'<div style="background:var(--cream);padding:14px;border-radius:10px;margin-top:14px;font-size:13px;line-height:1.6"><strong style="color:var(--umber)">📝 ملاحظات:</strong><br>'+escapeHtml(c.notes)+'</div>':'')}
 
 async function loadClientActivities(){if(!viewingClient)return;try{const r=await supa.from('activities').select('*, user:profiles(full_name)').eq('client_id',viewingClient.id).order('created_at',{ascending:false});const acts=r.data||[];if(!acts.length){$('cdActivities').innerHTML='<div class="empty" style="padding:30px"><div class="empty-ico" style="font-size:32px">📜</div><div class="empty-desc">لا توجد نشاطات. ابدأ بإضافة نشاط جديد!</div></div>';return}let h='';acts.forEach(function(a){h+='<div class="activity-item"><div class="activity-icon '+a.activity_type+'">'+activityIcon(a.activity_type)+'</div><div class="activity-content"><div style="font-size:11px;font-weight:700;color:var(--umber);margin-bottom:3px">'+activityLabel(a.activity_type)+'</div><div class="activity-text">'+escapeHtml(a.activity_text||'')+'</div><div class="activity-meta">'+(a.user?'<span>👤 '+escapeHtml(a.user.full_name)+'</span>':'')+'<span>· '+timeAgo(a.created_at)+'</span></div></div></div>'});$('cdActivities').innerHTML=h}catch(err){console.error(err)}}
 
@@ -2150,7 +2150,7 @@ async function loadActivityLog(){if(!canManage())return;const list=$('activityLo
 async function loadOwners(){const list=$('ownersList');list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';try{const r=await supa.from('owners').select('*').eq('archived',false).order('created_at',{ascending:false});if(r.error)throw r.error;allOwners=r.data||[];$('ownersSub').textContent=allOwners.length+' مالك';renderOwners()}catch(err){console.error(err);list.innerHTML='<div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(err.message)+'<br><br>تأكد من تشغيل SQL إنشاء جدول owners</div></div>'}}
 
 async function renderOwners(){const list=$('ownersList');const q=($('ownerSearchQ')?$('ownerSearchQ').value:'').trim().toLowerCase();let filtered=allOwners;if(q){filtered=allOwners.filter(o=>(o.name||'').toLowerCase().indexOf(q)>=0||(o.phone||'').indexOf(q)>=0)}if(!filtered.length){list.innerHTML='<div class="empty"><div class="empty-ico">🏛</div><div class="empty-title">لا يوجد ملاك بعد</div><div class="empty-desc">ابدأ بإضافة المالك الأول</div>'+(canEdit()?'<button class="btn-primary" style="margin-top:14px;width:auto;padding:10px 22px" onclick="openModal(\'mOwner\')">+ مالك جديد</button>':'')+'</div>';return}
-const propsR=await supa.from('properties').select('owner_id, status').eq('archived',false);const counts={};(propsR.data||[]).forEach(p=>{if(!counts[p.owner_id])counts[p.owner_id]={total:0,available:0,sold:0};counts[p.owner_id].total++;if(p.status==='available')counts[p.owner_id].available++;if(p.status==='sold')counts[p.owner_id].sold++});let h='';filtered.forEach(o=>{const stats=counts[o.id]||{total:0,available:0,sold:0};const initial=(o.name||'؟').charAt(0);h+='<div class="owner-card" onclick="editOwner(\''+o.id+'\')"><div class="owner-av '+(o.exclusive?'exclusive':'')+'">'+initial+'</div><div class="owner-info"><div class="owner-name">'+escapeHtml(o.name)+(o.exclusive?'<span class="exclusive-badge">⭐ حصري</span>':'')+'</div><div class="owner-meta"><span dir="ltr">📞 '+(o.phone||'—')+'</span>'+(o.nationality?'<span>· '+escapeHtml(o.nationality)+'</span>':'')+'</div><div class="owner-stats"><span class="owner-stat">🏠 '+stats.total+' عقار</span>'+(stats.available?'<span class="owner-stat">✅ '+stats.available+' متاح</span>':'')+(stats.sold?'<span class="owner-stat">🔴 '+stats.sold+' مباع</span>':'')+'</div></div><div class="owner-actions" onclick="event.stopPropagation()">'+(canEdit()?'<button class="btn-icon" onclick="editOwner(\''+o.id+'\')" title="تعديل">✏️</button>':'')+(o.phone?'<button type="button" class="btn-icon" onclick="event.stopPropagation();openWA(o.phone)" title="واتساب" style="background:#25D366;color:white;border-color:#25D366">💚</button>':'')+(canDelete()?'<button class="btn-icon" onclick="archiveOwner(\''+o.id+'\',\''+escapeHtml(o.name).replace(/[\x27"]/g,'')+'\')" title="أرشفة">📦</button>':'')+'</div></div>'});list.innerHTML=h}
+const propsR=await supa.from('properties').select('owner_id, status').eq('archived',false);const counts={};(propsR.data||[]).forEach(p=>{if(!counts[p.owner_id])counts[p.owner_id]={total:0,available:0,sold:0};counts[p.owner_id].total++;if(p.status==='available')counts[p.owner_id].available++;if(p.status==='sold')counts[p.owner_id].sold++});let h='';filtered.forEach(o=>{const stats=counts[o.id]||{total:0,available:0,sold:0};const initial=(o.name||'؟').charAt(0);h+='<div class="owner-card" onclick="editOwner(\''+o.id+'\')"><div class="owner-av '+(o.exclusive?'exclusive':'')+'">'+initial+'</div><div class="owner-info"><div class="owner-name">'+escapeHtml(o.name)+(o.exclusive?'<span class="exclusive-badge">⭐ حصري</span>':'')+'</div><div class="owner-meta"><span>📞 '+(o.phone?phoneCountryFlag(o.phone)+' '+formatPhone(o.phone):'—')+'</span>'+(o.nationality?'<span>· '+escapeHtml(o.nationality)+'</span>':'')+'</div><div class="owner-stats"><span class="owner-stat">🏠 '+stats.total+' عقار</span>'+(stats.available?'<span class="owner-stat">✅ '+stats.available+' متاح</span>':'')+(stats.sold?'<span class="owner-stat">🔴 '+stats.sold+' مباع</span>':'')+'</div></div><div class="owner-actions" onclick="event.stopPropagation()">'+(canEdit()?'<button class="btn-icon" onclick="editOwner(\''+o.id+'\')" title="تعديل">✏️</button>':'')+(o.phone?'<button type="button" class="btn-icon" onclick="event.stopPropagation();openWA(o.phone)" title="واتساب" style="background:#25D366;color:white;border-color:#25D366">💚</button>':'')+(canDelete()?'<button class="btn-icon" onclick="archiveOwner(\''+o.id+'\',\''+escapeHtml(o.name).replace(/[\x27"]/g,'')+'\')" title="أرشفة">📦</button>':'')+'</div></div>'});list.innerHTML=h}
 
 async function saveOwner(){const n=$('oName').value.trim(),p=$('oPhone').value.trim();if(!n||!p){showToast('⚠️ الاسم والهاتف مطلوبان','error');return}try{const cid=await ensureCompany();const data={company_id:cid,name:n,phone:p,email:$('oEmail').value.trim()||null,nationality:$('oNationality').value.trim()||null,id_number:$('oIdNumber').value.trim()||null,exclusive:$('oExclusive').value==='true',terms:$('oTerms').value.trim()||null,address:$('oAddress').value.trim()||null,notes:$('oNotes').value.trim()||null,added_by:currentUser.id,archived:false};let r;if(editingOwner){r=await supa.from('owners').update(data).eq('id',editingOwner);await logSystemActivity('edit','owner',editingOwner,'تعديل المالك: '+n)}else{r=await supa.from('owners').insert(data).select().single();if(!r.error)await logSystemActivity('create','owner',r.data.id,'إضافة المالك: '+n)}if(r.error)throw r.error;closeModal('mOwner');showToast('✅ تم الحفظ','success');['oName','oPhone','oEmail','oNationality','oIdNumber','oTerms','oAddress','oNotes'].forEach(i=>$(i).value='');editingOwner=null;loadOwners()}catch(err){showToast('خطأ: '+err.message,'error')}}
 
@@ -2775,7 +2775,7 @@ async function loadTodayPriorities(){
     if(hotLeads.length){
       h+='<div class="priority-box urgent"><div class="priority-box-title">🔥 عملاء حارون لم تتم متابعتهم<span class="priority-box-count">'+hotLeads.length+'</span></div><div class="priority-list">';
       hotLeads.slice(0,5).forEach(c=>{
-        h+='<div class="priority-item" onclick="viewClient(\''+c.id+'\')"><span class="priority-item-name">'+escapeHtml(c.name)+'</span><span class="priority-item-meta">'+(c.phone||'—')+'</span></div>';
+        h+='<div class="priority-item" onclick="viewClient(\''+c.id+'\')"><span class="priority-item-name">'+escapeHtml(c.name)+'</span><span class="priority-item-meta">'+(c.phone?formatPhone(c.phone):'—')+'</span></div>';
       });
       h+='</div></div>';
     }
@@ -3277,6 +3277,75 @@ window.autoFixWAButtons = function(){
 
 // Run auto-fix every 3 seconds in case dynamic content is added
 setInterval(function(){ if(typeof autoFixWAButtons === 'function') autoFixWAButtons(); }, 3000);
+
+
+window.formatPhone = function(phone){
+  if(!phone) return '—';
+  var s = String(phone).replace(/[^0-9+]/g,'');
+  if(!s) return '—';
+  if(s.startsWith('+')) s = s.substring(1);
+  
+  var countryCode = '';
+  var localNumber = '';
+  
+  if(s.startsWith('968') && s.length === 11){countryCode='968';localNumber=s.substring(3);}
+  else if(s.startsWith('971') && s.length === 12){countryCode='971';localNumber=s.substring(3);}
+  else if(s.startsWith('966') && s.length === 12){countryCode='966';localNumber=s.substring(3);}
+  else if(s.startsWith('965') && s.length === 11){countryCode='965';localNumber=s.substring(3);}
+  else if(s.startsWith('974') && s.length === 11){countryCode='974';localNumber=s.substring(3);}
+  else if(s.startsWith('973') && s.length === 11){countryCode='973';localNumber=s.substring(3);}
+  else if(s.startsWith('20') && s.length === 12){countryCode='20';localNumber=s.substring(2);}
+  else if(s.startsWith('962') && s.length === 12){countryCode='962';localNumber=s.substring(3);}
+  else if(s.startsWith('961') && s.length === 11){countryCode='961';localNumber=s.substring(3);}
+  else if(s.startsWith('963') && s.length === 12){countryCode='963';localNumber=s.substring(3);}
+  else if(s.startsWith('964') && s.length === 13){countryCode='964';localNumber=s.substring(3);}
+  else if(s.startsWith('970') && s.length === 12){countryCode='970';localNumber=s.substring(3);}
+  else if(s.startsWith('967') && s.length === 12){countryCode='967';localNumber=s.substring(3);}
+  else if(s.startsWith('212') && s.length === 12){countryCode='212';localNumber=s.substring(3);}
+  else if(s.startsWith('216') && s.length === 11){countryCode='216';localNumber=s.substring(3);}
+  else if(s.startsWith('213') && s.length === 12){countryCode='213';localNumber=s.substring(3);}
+  else if(s.startsWith('91') && s.length === 12){countryCode='91';localNumber=s.substring(2);}
+  else if(s.startsWith('92') && s.length === 12){countryCode='92';localNumber=s.substring(2);}
+  else if(s.startsWith('44') && s.length >= 12){countryCode='44';localNumber=s.substring(2);}
+  else if(s.startsWith('1') && s.length === 11){countryCode='1';localNumber=s.substring(1);}
+  else if(s.length === 8 && (s.startsWith('9')||s.startsWith('7'))){countryCode='968';localNumber=s;}
+  else {return '<span dir="ltr" style="font-family:monospace">+'+s+'</span>';}
+  
+  // Format the local number with spaces every 4 digits
+  var formatted = localNumber.replace(/(\d{4})(\d{4})/, '$1 $2');
+  if(localNumber.length === 9) formatted = localNumber.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3');
+  if(localNumber.length === 10) formatted = localNumber.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3');
+  
+  return '<span dir="ltr" style="font-family:monospace">+'+countryCode+' '+formatted+'</span>';
+};
+
+// Also export country flag for display
+window.phoneCountryFlag = function(phone){
+  if(!phone) return '';
+  var s = String(phone).replace(/[^0-9]/g,'');
+  if(s.startsWith('968')) return '🇴🇲';
+  if(s.startsWith('971')) return '🇦🇪';
+  if(s.startsWith('966')) return '🇸🇦';
+  if(s.startsWith('965')) return '🇰🇼';
+  if(s.startsWith('974')) return '🇶🇦';
+  if(s.startsWith('973')) return '🇧🇭';
+  if(s.startsWith('20')) return '🇪🇬';
+  if(s.startsWith('962')) return '🇯🇴';
+  if(s.startsWith('961')) return '🇱🇧';
+  if(s.startsWith('963')) return '🇸🇾';
+  if(s.startsWith('964')) return '🇮🇶';
+  if(s.startsWith('970')) return '🇵🇸';
+  if(s.startsWith('967')) return '🇾🇪';
+  if(s.startsWith('212')) return '🇲🇦';
+  if(s.startsWith('216')) return '🇹🇳';
+  if(s.startsWith('213')) return '🇩🇿';
+  if(s.startsWith('91')) return '🇮🇳';
+  if(s.startsWith('92')) return '🇵🇰';
+  if(s.startsWith('44')) return '🇬🇧';
+  if(s.startsWith('1')) return '🇺🇸';
+  if(s.length === 8) return '🇴🇲';
+  return '🌍';
+};
 
 window.openWA = function(phone, message){
   if(!phone) return;
