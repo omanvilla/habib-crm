@@ -1220,8 +1220,8 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 <div class="fg"><label class="fl">المنطقة</label><input class="fi" id="cArea"></div>
 <div class="fg"><label class="fl">نوع العقار</label><select class="fs" id="cPropType"><option value="">اختر</option><option value="villa">فيلا</option><option value="apartment">شقة</option><option value="land">أرض</option><option value="office">مكتب</option><option value="shop">محل</option></select></div>
 <div class="fg"><label class="fl">التصنيف</label><select class="fs" id="cStatus"><option value="hot">🔥 حار</option><option value="warm" selected>🟡 متوسط</option><option value="cold">❄ بارد</option></select></div>
-<div class="fg"><label class="fl">الميزانية من (ر.ع)</label><input class="fi" type="number" id="cBudgetMin"></div>
-<div class="fg"><label class="fl">الميزانية إلى (ر.ع)</label><input class="fi" type="number" id="cBudgetMax"></div>
+<div class="fg"><label class="fl">الميزانية من (ر.ع)</label><input class="fi" type="number" id="cBudgetMin" oninput="updateLeadScorePreview()"></div>
+<div class="fg"><label class="fl">الميزانية إلى (ر.ع)</label><input class="fi" type="number" id="cBudgetMax" oninput="updateLeadScorePreview()"></div>
 <div class="fg full" id="cAssignedFG" style="display:none"><label class="fl">الموظف المسؤول</label><select class="fs" id="cAssignedTo"></select></div>
 <div class="fg"><label class="fl">⭐ الأهمية</label><div class="star-rating" id="cStarRating">
 <span class="star" data-v="1" onclick="setStars(1)">★</span>
@@ -1238,6 +1238,45 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 <div style="font-size:10px;color:var(--umber);margin-top:5px">💡 اقتراحات: VIP، عاجل، خليجي، إماراتي، استثمار، تمويل، نقد</div>
 </div>
 <div class="fg full"><label class="fl">ملاحظات</label><textarea class="fta" id="cNotes" rows="2"></textarea></div>
+
+<div class="fg" style="padding-top:10px;border-top:1px dashed var(--cream-deeper)"><label class="fl">💵 طريقة الدفع</label><select class="fs" id="cPaymentMethod" onchange="updateLeadScorePreview()">
+<option value="">—</option>
+<option value="cash">💵 كاش</option>
+<option value="bank_ready">🏦 تمويل بنكي جاهز</option>
+<option value="needs_finance">📝 يحتاج ترتيب تمويل</option>
+<option value="unclear">❓ غير واضح</option>
+</select></div>
+
+<div class="fg" style="padding-top:10px;border-top:1px dashed var(--cream-deeper)"><label class="fl">⏰ موعد الشراء المتوقع</label><select class="fs" id="cPurchaseTiming" onchange="updateLeadScorePreview()">
+<option value="">—</option>
+<option value="immediate">🔥 فوراً</option>
+<option value="this_week">⚡ خلال أسبوع</option>
+<option value="this_month">📅 خلال شهر</option>
+<option value="3_months">📆 خلال 3 أشهر</option>
+<option value="just_looking">👀 أبحث فقط</option>
+</select></div>
+
+<div class="fg"><label class="fl">🎯 الغرض من الشراء</label><select class="fs" id="cPurpose" onchange="updateLeadScorePreview()">
+<option value="">—</option>
+<option value="residence">🏠 سكن</option>
+<option value="investment">💼 استثمار</option>
+<option value="residency">🛂 إقامة</option>
+<option value="rental">🏘 تأجير</option>
+<option value="resale">🔄 إعادة بيع</option>
+</select></div>
+
+<div class="fg"><label class="fl">📍 الولاية</label><input class="fi" id="cWilayat" placeholder="مسقط، السيب..."></div>
+<div class="fg"><label class="fl">🌍 الجنسية</label><input class="fi" id="cNationality"></div>
+<div class="fg"><label class="fl">🗺 الدولة</label><input class="fi" id="cCountry"></div>
+
+<div class="fg full">
+<div class="score-preview">
+<div class="score-preview-label">🎯 درجة جدية العميل (Lead Score)</div>
+<div class="score-preview-value" id="scorePreviewValue">20</div>
+<div class="score-preview-temp" id="scorePreviewTemp"><span class="lead-temp cold">❄️ COLD</span></div>
+<div style="font-size:11px;color:var(--umber);margin-top:8px">يُحسب تلقائياً حسب الميزانية، التمويل، التوقيت، والغرض</div>
+</div>
+</div>
 </div>
 <div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mClient')">إلغاء</button><button class="btn-primary" style="width:auto;padding:9px 22px" onclick="saveClient()">💾 حفظ</button></div>
 </div></div>
@@ -2145,32 +2184,28 @@ const PIPELINE_STAGES=[
 function pipelineLabel(stage){const s=PIPELINE_STAGES.find(x=>x.key===stage);return s?s.label:stage||'—'}
 
 function calcLeadScore(client){
-  let score=30;
-  // Budget clarity
+  let score=20;
   if(client.budget_min||client.budget_max)score+=15;
-  // Payment method
-  if(client.payment_method==='cash')score+=20;
-  else if(client.payment_method==='bank_ready')score+=18;
+  if(client.payment_method==='cash')score+=25;
+  else if(client.payment_method==='bank_ready')score+=20;
   else if(client.payment_method==='needs_finance')score+=8;
-  // Purchase timing
-  if(client.purchase_timing==='immediate')score+=20;
-  else if(client.purchase_timing==='this_week')score+=15;
-  else if(client.purchase_timing==='this_month')score+=10;
+  else if(client.payment_method==='unclear')score-=5;
+  if(client.purchase_timing==='immediate')score+=25;
+  else if(client.purchase_timing==='this_week')score+=20;
+  else if(client.purchase_timing==='this_month')score+=12;
   else if(client.purchase_timing==='3_months')score+=5;
-  else if(client.purchase_timing==='just_looking')score-=10;
-  // Purpose clarity
-  if(client.purpose)score+=5;
-  // Area/property type defined
+  else if(client.purchase_timing==='just_looking')score-=15;
+  if(client.purpose==='investment'||client.purpose==='residence')score+=8;
+  else if(client.purpose)score+=5;
   if(client.preferred_area)score+=5;
   if(client.property_type)score+=3;
-  // Phone provided (always since required)
   if(client.phone)score+=2;
   return Math.max(0,Math.min(100,score));
 }
 
 function calcLeadTemperature(score){
-  if(score>=75)return 'hot';
-  if(score>=45)return 'warm';
+  if(score>=65)return 'hot';
+  if(score>=35)return 'warm';
   return 'cold';
 }
 
