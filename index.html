@@ -2876,7 +2876,7 @@ async function runFollowUpEngine(){
       supa.from('viewings').select('id,viewing_date,viewing_time,status,client_id,property_id,client:clients(name,phone),property:properties(title)').neq('archived',true).gte('viewing_date',toLocalDateStr(new Date(Date.now()-3*24*60*60*1000))),
       supa.from('deposits').select('id,amount,expiry_date,status,deal_id,client:clients(name,phone)').neq('status','applied').neq('status','refunded'),
       supa.from('properties').select('id,title,status,updated_at,created_at,owner_id,added_by').neq('archived',true).neq('status','sold').limit(500),
-      supa.from('owners').select('id,name,phone,last_contact,next_followup').neq('archived',true).limit(500),
+      supa.from('owners').select('id,name,phone,created_at').neq('archived',true).limit(500),
       supa.from('activities').select('client_id,created_at').order('created_at',{ascending:false}).limit(2000)
     ]);
     
@@ -3096,12 +3096,8 @@ async function runFollowUpEngine(){
       });
     }
     
-    // RULE 9: Owners not contacted in 7+ days
-    const staleOwners=owners.filter(o=>{
-      if(!o.last_contact)return false;
-      const days=daysAgo(o.last_contact);
-      return days!==null&&days>=7;
-    });
+    // RULE 9: Owners not contacted in 7+ days (disabled - need last_contact column)
+    const staleOwners=[];
     
     if(staleOwners.length){
       fueData.alerts.push({
