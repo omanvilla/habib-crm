@@ -1220,8 +1220,8 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 <div class="fg"><label class="fl">المنطقة</label><input class="fi" id="cArea"></div>
 <div class="fg"><label class="fl">نوع العقار</label><select class="fs" id="cPropType"><option value="">اختر</option><option value="villa">فيلا</option><option value="apartment">شقة</option><option value="land">أرض</option><option value="office">مكتب</option><option value="shop">محل</option></select></div>
 <div class="fg"><label class="fl">📊 التصنيف (تلقائي)</label><div style="background:var(--cream);border:1px dashed var(--cream-deeper);border-radius:8px;padding:11px 14px;font-size:12px;color:var(--umber);line-height:1.5">يُحسب تلقائياً حسب: الميزانية + طريقة الدفع + التوقيت + الغرض. شاهده في أسفل النموذج 👇</div><input type="hidden" id="cStatus" value="warm"></div>
-<div class="fg"><label class="fl">الميزانية من (ر.ع)</label><input class="fi" type="number" id="cBudgetMin" oninput="updateLeadScorePreview()"></div>
-<div class="fg"><label class="fl">الميزانية إلى (ر.ع)</label><input class="fi" type="number" id="cBudgetMax" oninput="updateLeadScorePreview()"></div>
+<div class="fg"><label class="fl">الميزانية من (ر.ع)</label><input class="fi" type="number" id="cBudgetMin" dir="ltr" style="text-align:left" oninput="updateLeadScorePreview()"></div>
+<div class="fg"><label class="fl">الميزانية إلى (ر.ع)</label><input class="fi" type="number" id="cBudgetMax" dir="ltr" style="text-align:left" oninput="updateLeadScorePreview()"></div>
 <div class="fg full" id="cAssignedFG" style="display:none"><label class="fl">الموظف المسؤول</label><select class="fs" id="cAssignedTo"></select></div>
 <div class="fg"><label class="fl">⭐ الأهمية</label><div class="star-rating" id="cStarRating">
 <span class="star" data-v="1" onclick="setStars(1)">★</span>
@@ -1287,13 +1287,13 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 <div class="fg full"><label class="fl">عنوان العقار *</label><input class="fi" id="pTitle" required></div>
 <div class="fg"><label class="fl">النوع *</label><select class="fs" id="pType"><option value="villa">فيلا</option><option value="apartment">شقة</option><option value="land">أرض</option><option value="office">مكتب</option><option value="shop">محل</option></select></div>
 <div class="fg"><label class="fl">المنطقة *</label><input class="fi" id="pArea" required></div>
-<div class="fg"><label class="fl">السعر (ر.ع) *</label><input class="fi" type="number" id="pPrice" required></div>
+<div class="fg"><label class="fl">السعر (ر.ع) *</label><input class="fi" type="number" id="pPrice" dir="ltr" style="text-align:left" required></div>
 <div class="fg"><label class="fl">الحالة</label><select class="fs" id="pStatus"><option value="available">متوفر</option><option value="reserved">محجوز</option><option value="sold">تم البيع</option></select></div>
-<div class="fg"><label class="fl">عدد الغرف</label><input class="fi" type="number" id="pBeds"></div>
-<div class="fg"><label class="fl">عدد الحمامات</label><input class="fi" type="number" id="pBaths"></div>
-<div class="fg"><label class="fl">مساحة الأرض (م²)</label><input class="fi" type="number" id="pLandSize"></div>
-<div class="fg"><label class="fl">مساحة البناء (م²)</label><input class="fi" type="number" id="pBuiltSize"></div>
-<div class="fg"><label class="fl">صافي المالك (ر.ع)</label><input class="fi" type="number" id="pOwnerNet" placeholder="السعر الذي يريده المالك"></div>
+<div class="fg"><label class="fl">عدد الغرف</label><input class="fi" type="number" id="pBeds" dir="ltr" style="text-align:left"></div>
+<div class="fg"><label class="fl">عدد الحمامات</label><input class="fi" type="number" id="pBaths" dir="ltr" style="text-align:left"></div>
+<div class="fg"><label class="fl">مساحة الأرض (م²)</label><input class="fi" type="number" id="pLandSize" dir="ltr" style="text-align:left"></div>
+<div class="fg"><label class="fl">مساحة البناء (م²)</label><input class="fi" type="number" id="pBuiltSize" dir="ltr" style="text-align:left"></div>
+<div class="fg"><label class="fl">صافي المالك (ر.ع)</label><input class="fi" type="number" id="pOwnerNet" dir="ltr" style="text-align:left" placeholder="السعر الذي يريده المالك"></div>
 <div class="fg full"><label class="fl">المالك</label><select class="fs" id="pOwnerId"><option value="">— اختر مالك —</option></select></div>
 <div class="fg full"><label class="fl">الوصف</label><textarea class="fta" id="pDesc" rows="3"></textarea></div>
 </div>
@@ -1316,7 +1316,7 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 <div class="fgrid">
 <div class="fg"><label class="fl">العميل *</label><select class="fs" id="dClient" required><option value="">اختر عميلاً</option></select></div>
 <div class="fg"><label class="fl">العقار</label><select class="fs" id="dProperty"><option value="">اختر عقاراً</option></select></div>
-<div class="fg"><label class="fl">قيمة البيع (ر.ع) *</label><input class="fi" type="number" id="dValue" placeholder="100000"></div>
+<div class="fg"><label class="fl">قيمة البيع (ر.ع) *</label><input class="fi" type="number" id="dValue" dir="ltr" style="text-align:left" placeholder="100000"></div>
 <div class="fg"><label class="fl">المرحلة</label><select class="fs" id="dStage">
 <option value="new">عميل مهتم</option>
 <option value="visit">تمت المعاينة</option>
@@ -1327,9 +1327,9 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 <option value="closed">مكتملة</option>
 <option value="lost">ملغاة</option>
 </select></div>
-<div class="fg" id="dCommissionFG"><label class="fl">العمولة الكاملة (ر.ع)</label><input class="fi" type="number" id="dCommission" placeholder="3000"></div>
-<div class="fg" id="dCompanyShareFG"><label class="fl">نصيب الشركة (ر.ع)</label><input class="fi" type="number" id="dCompanyShare" placeholder="2000"></div>
-<div class="fg" id="dAgentShareFG"><label class="fl">نصيب الموظف (ر.ع)</label><input class="fi" type="number" id="dAgentShare" placeholder="1000"></div>
+<div class="fg" id="dCommissionFG"><label class="fl">العمولة الكاملة (ر.ع)</label><input class="fi" type="number" id="dCommission" dir="ltr" style="text-align:left" placeholder="3000"></div>
+<div class="fg" id="dCompanyShareFG"><label class="fl">نصيب الشركة (ر.ع)</label><input class="fi" type="number" id="dCompanyShare" dir="ltr" style="text-align:left" placeholder="2000"></div>
+<div class="fg" id="dAgentShareFG"><label class="fl">نصيب الموظف (ر.ع)</label><input class="fi" type="number" id="dAgentShare" dir="ltr" style="text-align:left" placeholder="1000"></div>
 <div class="fg" id="dCommissionStatusFG"><label class="fl">حالة العمولة</label><select class="fs" id="dCommissionStatus"><option value="pending">⏳ معلّقة</option><option value="received">✅ مستلمة</option></select></div>
 <div class="fg full"><label class="fl">ملاحظات</label><textarea class="fta" id="dNotes" rows="2"></textarea></div>
 </div>
@@ -1367,7 +1367,7 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 <option value="subscriptions">💳 اشتراكات</option>
 <option value="other">📌 أخرى</option>
 </select></div>
-<div class="fg"><label class="fl">المبلغ (ر.ع) *</label><input class="fi" type="number" id="exAmount" required></div>
+<div class="fg"><label class="fl">المبلغ (ر.ع) *</label><input class="fi" type="number" id="exAmount" dir="ltr" style="text-align:left" required></div>
 <div class="fg"><label class="fl">التاريخ *</label><input class="fi" type="date" id="exDate" required></div>
 <div class="fg"><label class="fl">طريقة الدفع</label><select class="fs" id="exPaymentMethod"><option value="cash">نقد</option><option value="bank">تحويل بنكي</option><option value="card">بطاقة</option><option value="other">أخرى</option></select></div>
 <div class="fg full"><label class="fl">ملاحظات</label><textarea class="fta" id="exNotes" rows="2"></textarea></div>
@@ -1480,7 +1480,7 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 <div class="fg"><label class="fl">العقار *</label><select class="fs" id="vProperty" required><option value="">اختر عقاراً</option></select></div>
 <div class="fg"><label class="fl">التاريخ *</label><input class="fi" type="date" id="vDate" required></div>
 <div class="fg"><label class="fl">الوقت</label><input class="fi" type="time" id="vTime"></div>
-<div class="fg"><label class="fl">المدة (دقيقة)</label><input class="fi" type="number" id="vDuration" value="60"></div>
+<div class="fg"><label class="fl">المدة (دقيقة)</label><input class="fi" type="number" id="vDuration" dir="ltr" style="text-align:left" value="60"></div>
 <div class="fg"><label class="fl">الموظف</label><select class="fs" id="vAgent"></select></div>
 <div class="fg full"><label class="fl">الموقع/العنوان</label><input class="fi" id="vLocation" placeholder="عنوان مفصّل للقاء"></div>
 <div class="fg" id="vStatusFG"><label class="fl">الحالة</label><select class="fs" id="vStatus">
@@ -1530,7 +1530,7 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 <div class="modal-title" id="mDepositTitle">💰 عربون جديد</div>
 <div class="fgrid">
 <div class="fg full"><label class="fl">الصفقة المرتبطة *</label><select class="fs" id="dpDeal" required><option value="">اختر صفقة</option></select></div>
-<div class="fg"><label class="fl">قيمة العربون (ر.ع) *</label><input class="fi" type="number" id="dpAmount" required></div>
+<div class="fg"><label class="fl">قيمة العربون (ر.ع) *</label><input class="fi" type="number" id="dpAmount" dir="ltr" style="text-align:left" required></div>
 <div class="fg"><label class="fl">تاريخ الدفع *</label><input class="fi" type="date" id="dpPaymentDate" required></div>
 <div class="fg"><label class="fl">طريقة الدفع</label><select class="fs" id="dpMethod">
 <option value="cash">💵 كاش</option>
@@ -1546,7 +1546,7 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 <option value="yes">نعم</option>
 <option value="no">لا</option>
 </select></div>
-<div class="fg"><label class="fl">مدة العربون (أيام) *</label><input class="fi" type="number" id="dpDuration" value="30" required></div>
+<div class="fg"><label class="fl">مدة العربون (أيام) *</label><input class="fi" type="number" id="dpDuration" dir="ltr" style="text-align:left" value="30" required></div>
 <div class="fg full"><label class="fl">ملاحظات قانونية</label><textarea class="fta" id="dpLegalNotes" rows="2"></textarea></div>
 <div class="fg full"><label class="fl">ملاحظات</label><textarea class="fta" id="dpNotes" rows="2"></textarea></div>
 </div>
@@ -1627,11 +1627,11 @@ function dealStageAr(s){return{new:'جديد',follow_up:'متابعة',visit:'ز
 function sourceAr(s){return{whatsapp:'💚 واتساب',instagram:'📸 إنستجرام',facebook:'📘 فيسبوك',google:'🔍 جوجل',referral:'🤝 إحالة',other:'📌 أخرى'}[s]||s}
 function activityIcon(t){return{note:'📝',call:'📞',whatsapp:'💚',meeting:'🤝',visit:'🏠',email:'📧',system:'⚙️'}[t]||'📌'}
 function activityLabel(t){return{note:'ملاحظة',call:'مكالمة',whatsapp:'واتساب',meeting:'اجتماع',visit:'زيارة',email:'إيميل',system:'نظام'}[t]||t}
-function fmtMoney(n){if(!n)return '—';return parseFloat(n).toLocaleString('ar-OM')+' ر.ع'}
-function fmtMoneyShort(n){if(!n)return '0';if(n>=1000000)return (n/1000000).toFixed(1)+'M';if(n>=1000)return (n/1000).toFixed(0)+'K';return n.toString()}
-function fmtDate(d){if(!d)return '—';return new Date(d).toLocaleDateString('ar-OM')}
+function fmtMoney(n){if(!n&&n!==0)return '—';return '<span dir="ltr" style="display:inline-block">'+parseFloat(n).toLocaleString('en-US')+'</span> ر.ع'}
+function fmtMoneyShort(n){if(!n&&n!==0)return '0';n=parseFloat(n);if(n>=1000000)return (n/1000000).toFixed(1)+'M';if(n>=1000)return (n/1000).toFixed(0)+'K';return Math.round(n).toString()}
+function fmtDate(d){if(!d)return '—';const dt=new Date(d);const day=dt.getDate();const months=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];const month=months[dt.getMonth()];const year=dt.getFullYear();return '<span dir="ltr" style="display:inline-block">'+day+'</span> '+month+' <span dir="ltr" style="display:inline-block">'+year+'</span>'}
 function toLocalDateStr(date){const y=date.getFullYear();const m=String(date.getMonth()+1).padStart(2,'0');const d=String(date.getDate()).padStart(2,'0');return y+'-'+m+'-'+d}
-function fmtDateTime(d){if(!d)return '—';const dt=new Date(d);return dt.toLocaleDateString('ar-OM')+' '+dt.toLocaleTimeString('ar-OM',{hour:'2-digit',minute:'2-digit'})}
+function fmtDateTime(d){if(!d)return '—';const dt=new Date(d);const day=dt.getDate();const months=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];const month=months[dt.getMonth()];const year=dt.getFullYear();const hh=String(dt.getHours()).padStart(2,'0');const mm=String(dt.getMinutes()).padStart(2,'0');return '<span dir="ltr" style="display:inline-block">'+day+'</span> '+month+' <span dir="ltr" style="display:inline-block">'+year+'</span> <span dir="ltr" style="display:inline-block">'+hh+':'+mm+'</span>'}
 function timeAgo(d){if(!d)return '—';const sec=Math.floor((new Date()-new Date(d))/1000);if(sec<60)return 'الآن';if(sec<3600)return Math.floor(sec/60)+' دقيقة';if(sec<86400)return Math.floor(sec/3600)+' ساعة';if(sec<604800)return Math.floor(sec/86400)+' يوم';return fmtDate(d)}
 function daysUntil(d){if(!d)return null;const today=new Date();today.setHours(0,0,0,0);const target=new Date(d);target.setHours(0,0,0,0);return Math.round((target-today)/(1000*60*60*24))}
 function escapeHtml(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
