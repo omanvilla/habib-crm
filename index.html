@@ -743,6 +743,78 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
   .priority-grid{grid-template-columns:1fr}
 }
 
+/* ===== FOLLOW-UP ENGINE ===== */
+.fue-banner{background:linear-gradient(135deg,#FEF3E2,#FDE7D2);border:1px solid #F59E0B;border-radius:14px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:all .2s}
+.fue-banner:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(245,158,11,0.2)}
+.fue-banner.urgent{background:linear-gradient(135deg,#FEE4E2,#FCD0CD);border-color:#DC2626}
+.fue-banner-icon{font-size:32px}
+.fue-banner-content{flex:1;min-width:0}
+.fue-banner-title{font-size:14px;font-weight:700;color:#92400E;margin-bottom:2px}
+.fue-banner.urgent .fue-banner-title{color:#991B1B}
+.fue-banner-sub{font-size:12px;color:#78350F}
+.fue-banner.urgent .fue-banner-sub{color:#7F1D1D}
+.fue-banner-arrow{font-size:20px;color:#92400E}
+
+/* Alert badge in nav */
+.nav-alert-badge{position:absolute;top:8px;right:8px;background:#DC2626;color:white;font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;min-width:18px;text-align:center;animation:pulse-badge 2s infinite}
+@keyframes pulse-badge{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.1)}
+}
+
+/* Follow-up panel inside priorities */
+.fue-section{background:linear-gradient(135deg,rgba(245,158,11,0.04),rgba(220,38,38,0.04));border:1px solid rgba(245,158,11,0.2);border-radius:14px;padding:18px;margin-bottom:18px}
+.fue-section-title{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:#92400E;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.fue-rules-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.fue-rule-card{background:white;border-radius:10px;padding:14px;border-left:3px solid #F59E0B;transition:all .15s}
+.fue-rule-card.urgent{border-left-color:#DC2626;background:linear-gradient(90deg,rgba(220,38,38,0.04),white)}
+.fue-rule-card.warning{border-left-color:#F59E0B;background:linear-gradient(90deg,rgba(245,158,11,0.04),white)}
+.fue-rule-card.info{border-left-color:#3B82F6;background:linear-gradient(90deg,rgba(59,130,246,0.04),white)}
+.fue-rule-card.success{border-left-color:#10B981;background:linear-gradient(90deg,rgba(16,185,129,0.04),white)}
+.fue-rule-card:hover{transform:translateX(-3px);box-shadow:0 4px 12px rgba(0,0,0,0.06)}
+.fue-rule-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.fue-rule-title{font-size:13px;font-weight:700;color:var(--espresso);flex:1}
+.fue-rule-count{background:#DC2626;color:white;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;min-width:24px;text-align:center}
+.fue-rule-count.warn{background:#F59E0B}
+.fue-rule-count.info{background:#3B82F6}
+.fue-rule-count.success{background:#10B981}
+.fue-rule-items{display:flex;flex-direction:column;gap:5px;max-height:160px;overflow-y:auto}
+.fue-rule-item{font-size:11px;padding:6px 10px;background:var(--cream);border-radius:6px;cursor:pointer;transition:all .12s;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.fue-rule-item:hover{background:var(--cream-dark);transform:translateX(-2px)}
+.fue-rule-item-name{font-weight:600;color:var(--espresso);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fue-rule-item-meta{font-size:10px;color:var(--umber);flex-shrink:0;font-weight:700}
+
+/* Quick action buttons inside follow-up */
+.fue-quick-actions{display:flex;gap:4px;flex-shrink:0}
+.fue-qa-btn{background:transparent;border:1px solid var(--cream-deeper);width:24px;height:24px;border-radius:5px;cursor:pointer;font-size:11px;transition:all .15s;display:flex;align-items:center;justify-content:center;padding:0}
+.fue-qa-btn:hover{transform:scale(1.1)}
+.fue-qa-btn.wa{border-color:#25D366;color:#25D366}
+.fue-qa-btn.wa:hover{background:#25D366;color:white}
+.fue-qa-btn.call{border-color:#3B82F6;color:#3B82F6}
+.fue-qa-btn.call:hover{background:#3B82F6;color:white}
+
+/* SLA Timer (small inline countdown) */
+.sla-timer{display:inline-flex;align-items:center;gap:4px;background:var(--cream);padding:3px 8px;border-radius:10px;font-size:10px;font-weight:700;color:var(--umber)}
+.sla-timer.overdue{background:rgba(220,38,38,0.15);color:#B91C1C}
+.sla-timer.warning{background:rgba(245,158,11,0.15);color:#92400E}
+.sla-timer.fresh{background:rgba(16,185,129,0.15);color:#059669}
+
+/* Activity log indicator on client cards */
+.activity-pulse{display:inline-block;width:6px;height:6px;border-radius:50%;background:#10B981;animation:pulse-dot 1.5s infinite}
+@keyframes pulse-dot{
+  0%,100%{opacity:1;transform:scale(1)}
+  50%{opacity:0.5;transform:scale(0.8)}
+}
+.activity-pulse.stale{background:#F59E0B}
+.activity-pulse.dead{background:#DC2626;animation:none}
+
+/* Mobile */
+@media(max-width:768px){
+  .fue-rules-grid{grid-template-columns:1fr}
+  .fue-banner{padding:12px}
+  .fue-banner-icon{font-size:24px}
+}
+
 </style>
 </head>
 <body>
@@ -1708,7 +1780,7 @@ function copyInviteLink(){const l=$('inviteLink').textContent;navigator.clipboar
 async function saveCompany(){if(!isOwner())return;const data={name:$('setCompanyName').value.trim(),cr_number:$('setCompanyCR').value.trim()||null,phone:$('setCompanyPhone').value.trim()||null,email:$('setCompanyEmail').value.trim()||null,address:$('setCompanyAddress').value.trim()||null};const r=await supa.from('companies').update(data).eq('id',currentProfile.company_id);if(r.error)showToast('خطأ: '+r.error.message,'error');else{Object.assign(currentCompany,data);showToast('✅ تم حفظ بيانات الشركة','success');applyRoleVisibility()}}
 
 async function saveProfile(){const n=$('setName').value.trim(),p=$('setPhone').value.trim();const r=await supa.from('profiles').update({full_name:n,phone:p}).eq('id',currentUser.id);if(r.error)showToast('خطأ: '+r.error.message,'error');else{currentProfile.full_name=n;currentProfile.phone=p;updateUserUI();showToast('✅ تم الحفظ','success')}}
-async function loadDashboard(){loadTodayPriorities();try{const tasks=[supa.from('clients').select('*',{count:'exact',head:true}),supa.from('deals').select('*',{count:'exact',head:true}).neq('stage','closed').neq('stage','lost'),supa.from('properties').select('*',{count:'exact',head:true}),supa.from('deals').select('*',{count:'exact',head:true}).eq('stage','closed'),supa.from('tasks').select('*').eq('done',false).order('due_date',{ascending:true,nullsFirst:false}).limit(5),supa.from('clients').select('*').or('lead_temperature.eq.hot,status.eq.hot').limit(5),supa.from('activities').select('*, user:profiles(full_name), client:clients(name)').order('created_at',{ascending:false}).limit(8)];const r=await Promise.all(tasks);$('statClients').textContent=r[0].count||0;$('statDeals').textContent=r[1].count||0;$('statProperties').textContent=r[2].count||0;$('statClosed').textContent=r[3].count||0;renderDashTasks(r[4].data||[]);renderDashHot(r[5].data||[]);renderDashActivities(r[6].data||[]);const tCount=r[4].data?r[4].data.length:0;if(tCount){$('navTasksCount').textContent=tCount;$('navTasksCount').style.display=''}else{$('navTasksCount').style.display='none'}}catch(err){console.error('Dashboard error:',err)}}
+async function loadDashboard(){loadTodayPriorities();refreshFollowUpEngine();try{const tasks=[supa.from('clients').select('*',{count:'exact',head:true}),supa.from('deals').select('*',{count:'exact',head:true}).neq('stage','closed').neq('stage','lost'),supa.from('properties').select('*',{count:'exact',head:true}),supa.from('deals').select('*',{count:'exact',head:true}).eq('stage','closed'),supa.from('tasks').select('*').eq('done',false).order('due_date',{ascending:true,nullsFirst:false}).limit(5),supa.from('clients').select('*').or('lead_temperature.eq.hot,status.eq.hot').limit(5),supa.from('activities').select('*, user:profiles(full_name), client:clients(name)').order('created_at',{ascending:false}).limit(8)];const r=await Promise.all(tasks);$('statClients').textContent=r[0].count||0;$('statDeals').textContent=r[1].count||0;$('statProperties').textContent=r[2].count||0;$('statClosed').textContent=r[3].count||0;renderDashTasks(r[4].data||[]);renderDashHot(r[5].data||[]);renderDashActivities(r[6].data||[]);const tCount=r[4].data?r[4].data.length:0;if(tCount){$('navTasksCount').textContent=tCount;$('navTasksCount').style.display=''}else{$('navTasksCount').style.display='none'}}catch(err){console.error('Dashboard error:',err)}}
 
 function renderDashTasks(tasks){if(!tasks.length){$('dashTasksList').innerHTML='<div class="empty" style="padding:30px"><div class="empty-ico" style="font-size:36px">⏰</div><div class="empty-desc">لا توجد مهام قادمة</div></div>';return}let h='';tasks.forEach(function(t){const d=daysUntil(t.due_date);const ov=d!==null&&d<0,td=d===0;h+='<div class="task-item"><div class="task-check '+(t.done?'done':'')+'" onclick="toggleTask(\''+t.id+'\','+(!t.done)+')">'+(t.done?'✓':'')+'</div><div class="task-content"><div class="task-title">'+escapeHtml(t.title)+'</div><div class="task-meta">'+(t.due_date?'<span class="task-due '+(ov?'overdue':'')+'">📅 '+(ov?'متأخّرة '+(-d)+' يوم':td?'اليوم':'بعد '+d+' يوم')+'</span>':'')+'<span class="task-priority tp-'+(t.priority==='high'?'high':t.priority==='low'?'low':'med')+'">'+(t.priority==='high'?'🔴 عاجلة':t.priority==='low'?'⚪ منخفضة':'🟡 متوسطة')+'</span></div></div></div>'});$('dashTasksList').innerHTML=h}
 
@@ -2761,6 +2833,415 @@ async function loadTodayPriorities(){
     console.error('Priorities:',err);
   }
 }
+
+
+/* eslint-disable */
+// ===== FOLLOW-UP ENGINE =====
+// Automated intelligence that finds what needs attention
+
+const FUE_RULES={
+  newLeadNoContact:{minutes:60,priority:'urgent',label:'⚡ عميل جديد لم يُتواصل',icon:'⚡'},
+  hotLeadStale:{hours:24,priority:'urgent',label:'🔥 عميل حار بدون متابعة',icon:'🔥'},
+  optionsSentNoReply:{hours:48,priority:'warning',label:'📋 أُرسلت خيارات بدون رد',icon:'📋'},
+  viewingBefore:{hours:1,priority:'info',label:'👁 زيارة قاربت',icon:'👁'},
+  viewingAfter:{hours:2,priority:'warning',label:'☎️ متابعة بعد الزيارة',icon:'☎️'},
+  depositEnding3:{days:3,priority:'urgent',label:'💰 عربون قارب ينتهي (3 أيام)',icon:'💰'},
+  depositEnding7:{days:7,priority:'warning',label:'💰 عربون ينتهي خلال أسبوع',icon:'⏰'},
+  propertyStale:{days:14,priority:'info',label:'🏠 عقار لم يُحدث 14 يوم',icon:'🏠'},
+  unresponsiveOwner:{days:7,priority:'warning',label:'👤 مالك لم يرد 7 أيام',icon:'👤'},
+  followupOverdue:{priority:'urgent',label:'📅 متابعة متأخرة',icon:'📅'}
+};
+
+let fueData={
+  alerts:[],
+  totalCount:0,
+  lastRun:null
+};
+
+function hoursAgo(date){if(!date)return null;return (new Date()-new Date(date))/(1000*60*60)}
+function daysAgo(date){if(!date)return null;return (new Date()-new Date(date))/(1000*60*60*24)}
+function daysUntil2(date){if(!date)return null;const today=new Date();today.setHours(0,0,0,0);const target=new Date(date);return Math.ceil((target-today)/(1000*60*60*24))}
+
+async function runFollowUpEngine(){
+  fueData.alerts=[];
+  
+  try{
+    const todayStr=toLocalDateStr(new Date());
+    const tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);
+    const tomorrowStr=toLocalDateStr(tomorrow);
+    
+    // Fetch all needed data in parallel
+    const [clientsR,viewingsR,depositsR,propertiesR,ownersR,activitiesR]=await Promise.all([
+      supa.from('clients').select('id,name,phone,lead_temperature,pipeline_stage,status,created_at,next_followup,assigned_to,agent:profiles!clients_assigned_to_fkey(full_name)').neq('archived',true).limit(1000),
+      supa.from('viewings').select('id,viewing_date,viewing_time,status,client_id,property_id,client:clients(name,phone),property:properties(title)').neq('archived',true).gte('viewing_date',toLocalDateStr(new Date(Date.now()-3*24*60*60*1000))),
+      supa.from('deposits').select('id,amount,expiry_date,status,deal_id,client:clients(name,phone)').neq('status','applied').neq('status','refunded'),
+      supa.from('properties').select('id,title,status,updated_at,created_at,owner_id,added_by').neq('archived',true).neq('status','sold').limit(500),
+      supa.from('owners').select('id,name,phone,last_contact,next_followup').neq('archived',true).limit(500),
+      supa.from('activities').select('client_id,created_at').order('created_at',{ascending:false}).limit(2000)
+    ]);
+    
+    const clients=clientsR.data||[];
+    const viewings=viewingsR.data||[];
+    const deposits=depositsR.data||[];
+    const properties=propertiesR.data||[];
+    const owners=ownersR.data||[];
+    const activities=activitiesR.data||[];
+    
+    // Build last-activity map per client
+    const lastActivityMap={};
+    activities.forEach(a=>{
+      if(a.client_id&&!lastActivityMap[a.client_id]){
+        lastActivityMap[a.client_id]=a.created_at;
+      }
+    });
+    
+    // RULE 1: New leads not contacted within 1 hour
+    const newLeadsNoContact=clients.filter(c=>{
+      if(c.pipeline_stage&&c.pipeline_stage!=='new')return false;
+      const created=hoursAgo(c.created_at);
+      if(created===null||created<1)return false;
+      const lastAct=lastActivityMap[c.id];
+      if(lastAct&&hoursAgo(lastAct)<created)return false;
+      return true;
+    });
+    
+    if(newLeadsNoContact.length){
+      fueData.alerts.push({
+        rule:'newLeadNoContact',
+        priority:'urgent',
+        title:'⚡ عملاء جدد لم يُتواصل معهم',
+        count:newLeadsNoContact.length,
+        items:newLeadsNoContact.slice(0,10).map(c=>({
+          id:c.id,
+          name:c.name,
+          phone:c.phone,
+          meta:Math.round(hoursAgo(c.created_at))+'h',
+          action:'viewClient'
+        }))
+      });
+    }
+    
+    // RULE 2: Hot leads without follow-up in 24h
+    const hotLeadsStale=clients.filter(c=>{
+      if((c.lead_temperature||c.status)!=='hot')return false;
+      const lastAct=lastActivityMap[c.id];
+      if(lastAct&&hoursAgo(lastAct)<24)return false;
+      const created=hoursAgo(c.created_at);
+      if(created===null||created<24)return false;
+      return true;
+    });
+    
+    if(hotLeadsStale.length){
+      fueData.alerts.push({
+        rule:'hotLeadStale',
+        priority:'urgent',
+        title:'🔥 عملاء حارون بحاجة متابعة عاجلة',
+        count:hotLeadsStale.length,
+        items:hotLeadsStale.slice(0,10).map(c=>{
+          const lastAct=lastActivityMap[c.id];
+          const since=lastAct?Math.round(hoursAgo(lastAct))+'h':Math.round(hoursAgo(c.created_at))+'h';
+          return {
+            id:c.id,
+            name:c.name,
+            phone:c.phone,
+            meta:'منذ '+since,
+            action:'viewClient'
+          };
+        })
+      });
+    }
+    
+    // RULE 3: Clients in "options_sent" or "qualified" stage without reply > 48h
+    const optionsSentStale=clients.filter(c=>{
+      if(['options_sent','qualified'].indexOf(c.pipeline_stage)<0)return false;
+      const lastAct=lastActivityMap[c.id]||c.created_at;
+      return hoursAgo(lastAct)>=48;
+    });
+    
+    if(optionsSentStale.length){
+      fueData.alerts.push({
+        rule:'optionsSentNoReply',
+        priority:'warning',
+        title:'📋 عملاء أُرسلت لهم خيارات بدون رد',
+        count:optionsSentStale.length,
+        items:optionsSentStale.slice(0,10).map(c=>{
+          const lastAct=lastActivityMap[c.id]||c.created_at;
+          return {
+            id:c.id,
+            name:c.name,
+            phone:c.phone,
+            meta:Math.round(hoursAgo(lastAct))+'h',
+            action:'viewClient'
+          };
+        })
+      });
+    }
+    
+    // RULE 4: Viewings happening soon (next 24h)
+    const upcomingViewings=viewings.filter(v=>{
+      if(v.status!=='scheduled')return false;
+      if(!v.viewing_date)return false;
+      const today=v.viewing_date===todayStr;
+      const tomorrow=v.viewing_date===tomorrowStr;
+      return today||tomorrow;
+    });
+    
+    if(upcomingViewings.length){
+      fueData.alerts.push({
+        rule:'viewingBefore',
+        priority:'info',
+        title:'👁 زيارات قادمة (اليوم/غداً)',
+        count:upcomingViewings.length,
+        items:upcomingViewings.slice(0,10).map(v=>({
+          id:v.id,
+          name:(v.client?v.client.name:'')+(v.property?' - '+v.property.title:''),
+          phone:v.client?v.client.phone:null,
+          meta:v.viewing_date===todayStr?'اليوم'+(v.viewing_time?' '+v.viewing_time.substring(0,5):''):'غداً'+(v.viewing_time?' '+v.viewing_time.substring(0,5):''),
+          action:'navigateViewings'
+        }))
+      });
+    }
+    
+    // RULE 5: Viewings that happened but no follow-up yet
+    const yesterdayStr=toLocalDateStr(new Date(Date.now()-24*60*60*1000));
+    const needFollowupViewings=viewings.filter(v=>{
+      if(v.status!=='done')return false;
+      if(!v.viewing_date)return false;
+      if(v.viewing_date<yesterdayStr)return false;
+      const clientLastAct=lastActivityMap[v.client_id];
+      if(clientLastAct&&new Date(clientLastAct)>new Date(v.viewing_date+'T23:59:59'))return false;
+      return true;
+    });
+    
+    if(needFollowupViewings.length){
+      fueData.alerts.push({
+        rule:'viewingAfter',
+        priority:'warning',
+        title:'☎️ متابعة بعد الزيارة',
+        count:needFollowupViewings.length,
+        items:needFollowupViewings.slice(0,10).map(v=>({
+          id:v.id,
+          name:(v.client?v.client.name:'')+(v.property?' - '+v.property.title:''),
+          phone:v.client?v.client.phone:null,
+          meta:'تمت '+fmtDate(v.viewing_date).replace(/<[^>]+>/g,''),
+          action:'navigateViewings'
+        }))
+      });
+    }
+    
+    // RULE 6: Deposits ending in 3 days or less
+    const dep3Days=deposits.filter(d=>{
+      const left=daysUntil2(d.expiry_date);
+      return left!==null&&left>=0&&left<=3;
+    });
+    
+    if(dep3Days.length){
+      fueData.alerts.push({
+        rule:'depositEnding3',
+        priority:'urgent',
+        title:'💰 عرابين قاربت تنتهي (≤3 أيام)',
+        count:dep3Days.length,
+        items:dep3Days.slice(0,10).map(d=>({
+          id:d.id,
+          name:(d.client?d.client.name:'')+' - '+fmtMoney(d.amount).replace(/<[^>]+>/g,''),
+          phone:d.client?d.client.phone:null,
+          meta:daysUntil2(d.expiry_date)+' أيام',
+          action:'navigateDeposits'
+        }))
+      });
+    }
+    
+    // RULE 7: Deposits ending in 4-7 days
+    const dep7Days=deposits.filter(d=>{
+      const left=daysUntil2(d.expiry_date);
+      return left!==null&&left>3&&left<=7;
+    });
+    
+    if(dep7Days.length){
+      fueData.alerts.push({
+        rule:'depositEnding7',
+        priority:'warning',
+        title:'⏰ عرابين تنتهي خلال أسبوع',
+        count:dep7Days.length,
+        items:dep7Days.slice(0,10).map(d=>({
+          id:d.id,
+          name:(d.client?d.client.name:'')+' - '+fmtMoney(d.amount).replace(/<[^>]+>/g,''),
+          phone:d.client?d.client.phone:null,
+          meta:daysUntil2(d.expiry_date)+' أيام',
+          action:'navigateDeposits'
+        }))
+      });
+    }
+    
+    // RULE 8: Properties not updated in 14+ days (and status is active/available)
+    const staleProperties=properties.filter(p=>{
+      if(p.status&&['available','reserved'].indexOf(p.status)<0)return false;
+      const lastUpd=p.updated_at||p.created_at;
+      const days=daysAgo(lastUpd);
+      return days!==null&&days>=14;
+    });
+    
+    if(staleProperties.length){
+      fueData.alerts.push({
+        rule:'propertyStale',
+        priority:'info',
+        title:'🏠 عقارات بحاجة تحديث (>14 يوم)',
+        count:staleProperties.length,
+        items:staleProperties.slice(0,10).map(p=>({
+          id:p.id,
+          name:p.title,
+          meta:Math.round(daysAgo(p.updated_at||p.created_at))+' يوم',
+          action:'navigateProperties'
+        }))
+      });
+    }
+    
+    // RULE 9: Owners not contacted in 7+ days
+    const staleOwners=owners.filter(o=>{
+      if(!o.last_contact)return false;
+      const days=daysAgo(o.last_contact);
+      return days!==null&&days>=7;
+    });
+    
+    if(staleOwners.length){
+      fueData.alerts.push({
+        rule:'unresponsiveOwner',
+        priority:'warning',
+        title:'👤 ملاك لم يتم التواصل معهم (>7 أيام)',
+        count:staleOwners.length,
+        items:staleOwners.slice(0,10).map(o=>({
+          id:o.id,
+          name:o.name,
+          phone:o.phone,
+          meta:Math.round(daysAgo(o.last_contact))+' يوم',
+          action:'navigateOwners'
+        }))
+      });
+    }
+    
+    // RULE 10: Follow-ups due today or overdue
+    const overdueFollowups=clients.filter(c=>{
+      if(!c.next_followup)return false;
+      return c.next_followup<=todayStr;
+    });
+    
+    if(overdueFollowups.length){
+      fueData.alerts.push({
+        rule:'followupOverdue',
+        priority:overdueFollowups.some(c=>c.next_followup<todayStr)?'urgent':'warning',
+        title:'📅 متابعات اليوم/متأخرة',
+        count:overdueFollowups.length,
+        items:overdueFollowups.slice(0,10).map(c=>({
+          id:c.id,
+          name:c.name,
+          phone:c.phone,
+          meta:c.next_followup<todayStr?'متأخرة':'اليوم',
+          action:'viewClient'
+        }))
+      });
+    }
+    
+    // Total count
+    fueData.totalCount=fueData.alerts.reduce((s,a)=>s+a.count,0);
+    fueData.lastRun=new Date();
+    
+    return fueData;
+  }catch(err){
+    console.error('[FUE]',err);
+    return fueData;
+  }
+}
+
+function renderFollowUpSection(containerId){
+  const c=document.getElementById(containerId);
+  if(!c)return;
+  
+  if(!fueData.alerts.length){
+    c.innerHTML='<div class="fue-section"><div class="fue-section-title">🤖 محرّك المتابعة الذكي</div><div style="text-align:center;padding:30px;color:var(--umber)"><div style="font-size:48px;margin-bottom:10px">✅</div><div style="font-weight:700;color:var(--emerald)">كل شي تحت السيطرة!</div><div style="font-size:12px;margin-top:6px">لا توجد متابعات عاجلة الآن</div></div></div>';
+    return;
+  }
+  
+  // Sort: urgent first, then warning, then info
+  const order={urgent:1,warning:2,info:3,success:4};
+  const sorted=[...fueData.alerts].sort((a,b)=>order[a.priority]-order[b.priority]);
+  
+  let h='<div class="fue-section">';
+  h+='<div class="fue-section-title">🤖 محرّك المتابعة الذكي <span style="font-size:12px;color:var(--umber);font-weight:600;margin-right:auto">'+fueData.totalCount+' عنصر يحتاج اهتمامك</span></div>';
+  h+='<div class="fue-rules-grid">';
+  
+  sorted.forEach(alert=>{
+    const cls=alert.priority;
+    const countCls=alert.priority==='urgent'?'':alert.priority==='warning'?'warn':alert.priority==='info'?'info':'success';
+    h+='<div class="fue-rule-card '+cls+'">';
+    h+='<div class="fue-rule-header"><div class="fue-rule-title">'+alert.title+'</div><div class="fue-rule-count '+countCls+'">'+alert.count+'</div></div>';
+    h+='<div class="fue-rule-items">';
+    alert.items.forEach(item=>{
+      const action=item.action==='viewClient'?'viewClient(\''+item.id+'\')':item.action==='navigateViewings'?'navigate(\'viewings\',null)':item.action==='navigateDeposits'?'navigate(\'deposits\',null)':item.action==='navigateProperties'?'navigate(\'properties\',null)':item.action==='navigateOwners'?'navigate(\'owners\',null)':'';
+      const phoneCleaned=item.phone?item.phone.replace(/[^0-9+]/g,'').replace(/^\+/,''):'';
+      h+='<div class="fue-rule-item">';
+      h+='<span class="fue-rule-item-name" onclick="'+action+'">'+escapeHtml(item.name||'—')+'</span>';
+      h+='<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">';
+      h+='<span class="fue-rule-item-meta">'+item.meta+'</span>';
+      if(phoneCleaned){
+        h+='<div class="fue-quick-actions" onclick="event.stopPropagation()">';
+        h+='<a class="fue-qa-btn wa" href="https://wa.me/'+phoneCleaned+'" target="_blank" title="واتساب" style="text-decoration:none">💚</a>';
+        h+='<a class="fue-qa-btn call" href="tel:+'+phoneCleaned+'" title="اتصال" style="text-decoration:none">📞</a>';
+        h+='</div>';
+      }
+      h+='</div></div>';
+    });
+    h+='</div></div>';
+  });
+  
+  h+='</div></div>';
+  c.innerHTML=h;
+}
+
+function renderFollowUpBanner(){
+  // Top banner that appears across the app if there are urgent items
+  const urgentCount=fueData.alerts.filter(a=>a.priority==='urgent').reduce((s,a)=>s+a.count,0);
+  const totalCount=fueData.totalCount;
+  
+  let banner=document.getElementById('fueBanner');
+  if(!banner){
+    banner=document.createElement('div');
+    banner.id='fueBanner';
+    const main=document.querySelector('.main-content');
+    if(main)main.insertBefore(banner,main.firstChild);
+  }
+  
+  if(totalCount===0){
+    banner.innerHTML='';
+    return;
+  }
+  
+  const cls=urgentCount>0?'urgent':'';
+  const icon=urgentCount>0?'🚨':'⏰';
+  const title=urgentCount>0?urgentCount+' عنصر عاجل يحتاج اهتمامك الآن':totalCount+' عنصر يحتاج متابعة';
+  const sub=urgentCount>0&&totalCount>urgentCount?'+ '+(totalCount-urgentCount)+' عنصر آخر':'اضغط لرؤية كل التفاصيل';
+  
+  banner.innerHTML='<div class="fue-banner '+cls+'" onclick="navigate(\'dash\',null)"><div class="fue-banner-icon">'+icon+'</div><div class="fue-banner-content"><div class="fue-banner-title">'+title+'</div><div class="fue-banner-sub">'+sub+'</div></div><div class="fue-banner-arrow">←</div></div>';
+}
+
+async function refreshFollowUpEngine(){
+  await runFollowUpEngine();
+  renderFollowUpBanner();
+  const container=document.getElementById('fueContainer');
+  if(container)renderFollowUpSection('fueContainer');
+}
+
+// Auto-run every 5 minutes
+function startFollowUpEngine(){
+  refreshFollowUpEngine();
+  setInterval(refreshFollowUpEngine,5*60*1000);
+}
+
+// Helper for direct nav
+function navigateViewings(){navigate('viewings',null)}
+function navigateDeposits(){navigate('deposits',null)}
+function navigateProperties(){navigate('properties',null)}
+function navigateOwners(){navigate('owners',null)}
+
 
 async function init(){const s=await supa.auth.getSession();if(s.data.session)await loadApp();else{$('loaderScreen').style.display='none';$('authScreen').classList.remove('hidden')}}
 supa.auth.onAuthStateChange(function(e,s){if(e==='SIGNED_IN'&&s&&!currentUser)loadApp();if(e==='SIGNED_OUT'){currentUser=null;currentProfile=null}});
