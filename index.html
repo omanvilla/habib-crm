@@ -2150,7 +2150,7 @@ async function loadActivityLog(){if(!canManage())return;const list=$('activityLo
 async function loadOwners(){const list=$('ownersList');list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';try{const r=await supa.from('owners').select('*').eq('archived',false).order('created_at',{ascending:false});if(r.error)throw r.error;allOwners=r.data||[];$('ownersSub').textContent=allOwners.length+' مالك';renderOwners()}catch(err){console.error(err);list.innerHTML='<div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(err.message)+'<br><br>تأكد من تشغيل SQL إنشاء جدول owners</div></div>'}}
 
 async function renderOwners(){const list=$('ownersList');const q=($('ownerSearchQ')?$('ownerSearchQ').value:'').trim().toLowerCase();let filtered=allOwners;if(q){filtered=allOwners.filter(o=>(o.name||'').toLowerCase().indexOf(q)>=0||(o.phone||'').indexOf(q)>=0)}if(!filtered.length){list.innerHTML='<div class="empty"><div class="empty-ico">🏛</div><div class="empty-title">لا يوجد ملاك بعد</div><div class="empty-desc">ابدأ بإضافة المالك الأول</div>'+(canEdit()?'<button class="btn-primary" style="margin-top:14px;width:auto;padding:10px 22px" onclick="openModal(\'mOwner\')">+ مالك جديد</button>':'')+'</div>';return}
-const propsR=await supa.from('properties').select('owner_id, status').eq('archived',false);const counts={};(propsR.data||[]).forEach(p=>{if(!counts[p.owner_id])counts[p.owner_id]={total:0,available:0,sold:0};counts[p.owner_id].total++;if(p.status==='available')counts[p.owner_id].available++;if(p.status==='sold')counts[p.owner_id].sold++});let h='';filtered.forEach(o=>{const stats=counts[o.id]||{total:0,available:0,sold:0};const initial=(o.name||'؟').charAt(0);h+='<div class="owner-card" onclick="editOwner(\''+o.id+'\')"><div class="owner-av '+(o.exclusive?'exclusive':'')+'">'+initial+'</div><div class="owner-info"><div class="owner-name">'+escapeHtml(o.name)+(o.exclusive?'<span class="exclusive-badge">⭐ حصري</span>':'')+'</div><div class="owner-meta"><span dir="ltr">📞 '+(o.phone||'—')+'</span>'+(o.nationality?'<span>· '+escapeHtml(o.nationality)+'</span>':'')+'</div><div class="owner-stats"><span class="owner-stat">🏠 '+stats.total+' عقار</span>'+(stats.available?'<span class="owner-stat">✅ '+stats.available+' متاح</span>':'')+(stats.sold?'<span class="owner-stat">🔴 '+stats.sold+' مباع</span>':'')+'</div></div><div class="owner-actions" onclick="event.stopPropagation()">'+(canEdit()?'<button class="btn-icon" onclick="editOwner(\''+o.id+'\')" title="تعديل">✏️</button>':'')+(o.phone?'<a class="btn-icon" href="https://wa.me/'+(o.phone.replace(/[^0-9+]/g,'').replace(/^\+/,''))+'" target="_blank" title="واتساب" style="text-decoration:none;background:#25D366;color:white;border-color:#25D366">💚</a>':'')+(canDelete()?'<button class="btn-icon" onclick="archiveOwner(\''+o.id+'\',\''+escapeHtml(o.name).replace(/[\x27"]/g,'')+'\')" title="أرشفة">📦</button>':'')+'</div></div>'});list.innerHTML=h}
+const propsR=await supa.from('properties').select('owner_id, status').eq('archived',false);const counts={};(propsR.data||[]).forEach(p=>{if(!counts[p.owner_id])counts[p.owner_id]={total:0,available:0,sold:0};counts[p.owner_id].total++;if(p.status==='available')counts[p.owner_id].available++;if(p.status==='sold')counts[p.owner_id].sold++});let h='';filtered.forEach(o=>{const stats=counts[o.id]||{total:0,available:0,sold:0};const initial=(o.name||'؟').charAt(0);h+='<div class="owner-card" onclick="editOwner(\''+o.id+'\')"><div class="owner-av '+(o.exclusive?'exclusive':'')+'">'+initial+'</div><div class="owner-info"><div class="owner-name">'+escapeHtml(o.name)+(o.exclusive?'<span class="exclusive-badge">⭐ حصري</span>':'')+'</div><div class="owner-meta"><span dir="ltr">📞 '+(o.phone||'—')+'</span>'+(o.nationality?'<span>· '+escapeHtml(o.nationality)+'</span>':'')+'</div><div class="owner-stats"><span class="owner-stat">🏠 '+stats.total+' عقار</span>'+(stats.available?'<span class="owner-stat">✅ '+stats.available+' متاح</span>':'')+(stats.sold?'<span class="owner-stat">🔴 '+stats.sold+' مباع</span>':'')+'</div></div><div class="owner-actions" onclick="event.stopPropagation()">'+(canEdit()?'<button class="btn-icon" onclick="editOwner(\''+o.id+'\')" title="تعديل">✏️</button>':'')+(o.phone?'<button type="button" class="btn-icon" onclick="event.stopPropagation();openWA(o.phone)" title="واتساب" style="background:#25D366;color:white;border-color:#25D366">💚</button>':'')+(canDelete()?'<button class="btn-icon" onclick="archiveOwner(\''+o.id+'\',\''+escapeHtml(o.name).replace(/[\x27"]/g,'')+'\')" title="أرشفة">📦</button>':'')+'</div></div>'});list.innerHTML=h}
 
 async function saveOwner(){const n=$('oName').value.trim(),p=$('oPhone').value.trim();if(!n||!p){showToast('⚠️ الاسم والهاتف مطلوبان','error');return}try{const cid=await ensureCompany();const data={company_id:cid,name:n,phone:p,email:$('oEmail').value.trim()||null,nationality:$('oNationality').value.trim()||null,id_number:$('oIdNumber').value.trim()||null,exclusive:$('oExclusive').value==='true',terms:$('oTerms').value.trim()||null,address:$('oAddress').value.trim()||null,notes:$('oNotes').value.trim()||null,added_by:currentUser.id,archived:false};let r;if(editingOwner){r=await supa.from('owners').update(data).eq('id',editingOwner);await logSystemActivity('edit','owner',editingOwner,'تعديل المالك: '+n)}else{r=await supa.from('owners').insert(data).select().single();if(!r.error)await logSystemActivity('create','owner',r.data.id,'إضافة المالك: '+n)}if(r.error)throw r.error;closeModal('mOwner');showToast('✅ تم الحفظ','success');['oName','oPhone','oEmail','oNationality','oIdNumber','oTerms','oAddress','oNotes'].forEach(i=>$(i).value='');editingOwner=null;loadOwners()}catch(err){showToast('خطأ: '+err.message,'error')}}
 
@@ -3181,8 +3181,8 @@ function renderFollowUpSection(containerId){
       h+='<span class="fue-rule-item-meta">'+item.meta+'</span>';
       if(phoneCleaned){
         h+='<div class="fue-quick-actions" onclick="event.stopPropagation()">';
-        h+='<button type="button" class="fue-qa-btn wa" data-phone="'+phoneCleaned+'" onclick="event.stopPropagation();window.open(\'https://wa.me/\'+this.dataset.phone,\'_blank\')" title="واتساب">💚</button>';
-        h+='<button type="button" class="fue-qa-btn call" data-phone="'+phoneCleaned+'" onclick="event.stopPropagation();window.location.href=\'tel:+\'+this.dataset.phone" title="اتصال">📞</button>';
+        h+='<button type="button" class="fue-qa-btn wa" onclick="event.stopPropagation();openWA(\''+phoneCleaned+'\')" title="واتساب">💚</button>';
+        h+='<button type="button" class="fue-qa-btn call" onclick="event.stopPropagation();openCall(\''+phoneCleaned+'\')" title="اتصال">📞</button>';
         h+='</div>';
       }
       h+='</div></div>';
@@ -3239,6 +3239,23 @@ function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
 
+
+
+window.openWA = function(phone){
+  if(!phone) return;
+  var clean = String(phone).replace(/[^0-9]/g,'');
+  if(!clean) return;
+  var url = 'https://wa.me/' + clean;
+  console.log('[WA] Opening:', url);
+  window.open(url, '_blank');
+};
+
+window.openCall = function(phone){
+  if(!phone) return;
+  var clean = String(phone).replace(/[^0-9]/g,'');
+  if(!clean) return;
+  window.location.href = 'tel:+' + clean;
+};
 
 async function init(){const s=await supa.auth.getSession();if(s.data.session)await loadApp();else{$('loaderScreen').style.display='none';$('authScreen').classList.remove('hidden')}}
 supa.auth.onAuthStateChange(function(e,s){if(e==='SIGNED_IN'&&s&&!currentUser)loadApp();if(e==='SIGNED_OUT'){currentUser=null;currentProfile=null}});
