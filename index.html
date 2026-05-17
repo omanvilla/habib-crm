@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="app-version" content="20260517-1008">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Habib Sons Real Estate — منصة CRM</title>
 <meta name="theme-color" content="#2A2118">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -3574,6 +3578,49 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
+
+
+
+// ===== AUTO-UPDATE CHECKER =====
+// Checks if a new version is available every 5 minutes
+window.APP_VERSION = '20260517-1008';
+window.checkForUpdates = async function(){
+  try{
+    var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
+    var text = await r.text();
+    var m = text.match(/<meta name="app-version" content="([^"]+)"/);
+    if(m && m[1] && m[1] !== window.APP_VERSION){
+      console.log('🔄 New version available:', m[1], 'current:', window.APP_VERSION);
+      showUpdateBanner(m[1]);
+    }
+  }catch(e){console.warn('Update check failed:',e);}
+};
+
+window.showUpdateBanner = function(newVersion){
+  if(document.getElementById('updateBanner'))return;
+  var banner = document.createElement('div');
+  banner.id = 'updateBanner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:linear-gradient(90deg,#10B981,#059669);color:white;padding:12px 20px;text-align:center;font-weight:700;z-index:99999;box-shadow:0 4px 12px rgba(0,0,0,0.2);font-size:14px;display:flex;align-items:center;justify-content:center;gap:14px';
+  banner.innerHTML = '🎉 يتوفر تحديث جديد للنظام! <button onclick="forceUpdate()" style="background:white;color:#059669;border:none;padding:6px 16px;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px">🔄 تحديث الآن</button> <button onclick="document.getElementById(\'updateBanner\').remove()" style="background:transparent;color:white;border:1px solid rgba(255,255,255,0.5);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px">لاحقاً</button>';
+  document.body.appendChild(banner);
+};
+
+window.forceUpdate = function(){
+  try{
+    if('caches' in window){
+      caches.keys().then(function(keys){
+        keys.forEach(function(k){caches.delete(k);});
+      });
+    }
+    // Don't clear localStorage as it has user data
+    location.reload(true);
+  }catch(e){location.reload(true);}
+};
+
+// Check for updates every 5 minutes
+setInterval(window.checkForUpdates, 5 * 60 * 1000);
+// Also check 30 seconds after page loads
+setTimeout(window.checkForUpdates, 30000);
 
 
 async function init(){const s=await supa.auth.getSession();if(s.data.session)await loadApp();else{$('loaderScreen').style.display='none';$('authScreen').classList.remove('hidden')}}
