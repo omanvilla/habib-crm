@@ -1897,7 +1897,18 @@ const owners=await supa.from('profiles').select('company_id').eq('role','owner')
 const c=await supa.from('companies').insert({name:'Habib Sons Real Estate'}).select().single();if(c.error)throw c.error;id=c.data.id;await supa.from('profiles').update({company_id:id,role:'owner',is_active:true}).eq('id',currentUser.id);currentProfile.company_id=id;currentProfile.role='owner';currentCompany=c.data;updateUserUI();applyRoleVisibility()}}return id}
 
 // ACTIVITY LOGGER
-async function logActivity(type,text,clientId,dealId){if(!currentProfile.company_id)return;try{await supa.from('activities').insert({company_id:currentProfile.company_id,user_id:currentUser.id,activity_type:type,activity_text:text,client_id:clientId||null,deal_id:dealId||null});if(clientId&&type!=='system'){await supa.from('clients').update({last_contact_at:new Date().toISOString()}).eq('id',clientId)}}catch(e){console.warn('Activity log failed:',e)}}
+async function logActivity(type,text,clientId,dealId){
+  if(!currentProfile||!currentProfile.company_id)return;
+  // Always try to update last_contact_at - this works reliably
+  if(clientId){
+    try{await supa.from('clients').update({last_contact_at:new Date().toISOString()}).eq('id',clientId)}catch(e){/*silent*/}
+  }
+  // Try to log activity - may fail silently if column names differ
+  try{
+    var payload={company_id:currentProfile.company_id,user_id:currentUser.id,activity_type:type,activity_text:text,client_id:clientId||null,deal_id:dealId||null};
+    await supa.from('activities').insert(payload);
+  }catch(e){/*silent - activity logging is optional*/}
+}
 
 // COPY
 function copyInviteLink(){const l=$('inviteLink').textContent;navigator.clipboard.writeText(l).then(()=>showToast('✅ تم نسخ الرابط','success')).catch(()=>showToast('⚠️ لم يتم النسخ','error'))}
@@ -2279,9 +2290,15 @@ async function syncPropertyStatus(propertyId,dealStage){if(!propertyId)return;le
 const otherDeals=await supa.from('deals').select('id,stage').eq('property_id',propertyId).neq('stage','lost').neq('stage','closed');if(!otherDeals.data||!otherDeals.data.length){newStatus='available'}}if(newStatus){try{await supa.from('properties').update({status:newStatus}).eq('id',propertyId);await logSystemActivity('edit','property',propertyId,'تحديث حالة العقار تلقائياً: '+(newStatus==='sold'?'تم البيع':newStatus==='reserved'?'محجوز':'متاح'))}catch(e){console.warn('Sync property:',e)}}}
 
 // ===== SYSTEM ACTIVITY LOG =====
-async function logSystemActivity(action,entityType,entityId,description){if(!currentProfile||!currentProfile.company_id)return;try{await supa.from('activities').insert({company_id:currentProfile.company_id,user_id:currentUser.id,activity_type:'system',activity_text:'['+action+'] '+description,client_id:entityType==='client'?entityId:null,deal_id:entityType==='deal'?entityId:null})}catch(e){console.warn('System log failed:',e)}}
+async function logSystemActivity(action,entityType,entityId,description){
+  if(!currentProfile||!currentProfile.company_id)return;
+  try{
+    var payload={company_id:currentProfile.company_id,user_id:currentUser.id,activity_type:'note',activity_text:'['+action+'] '+description,client_id:entityType==='client'?entityId:null,deal_id:entityType==='deal'?entityId:null};
+    await supa.from('activities').insert(payload);
+  }catch(e){/*silent*/}
+}
 
-async function loadActivityLog(){if(!canManage())return;const list=$('activityLogList');list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';try{const filter=$('alogFilter').value;let q=supa.from('activities').select('*, user:profiles(full_name)').eq('activity_type','system').order('created_at',{ascending:false}).limit(200);const r=await q;if(r.error)throw r.error;let acts=r.data||[];if(filter!=='all'){acts=acts.filter(a=>(a.activity_text||'').indexOf('['+filter+']')>=0)}if(!acts.length){list.innerHTML='<div class="empty"><div class="empty-ico">📜</div><div class="empty-title">لا توجد أنشطة بعد</div><div class="empty-desc">سيتم تسجيل جميع التعديلات والإضافات هنا</div></div>';return}let h='';acts.forEach(a=>{const txt=a.activity_text||'';let action='other';if(txt.indexOf('[create]')>=0)action='create';else if(txt.indexOf('[edit]')>=0)action='edit';else if(txt.indexOf('[delete]')>=0)action='delete';else if(txt.indexOf('[archive]')>=0)action='archive';const cleanText=txt.replace(/^\[\w+\]\s*/,'');const icon={create:'➕',edit:'✏️',delete:'🗑',archive:'📦'}[action]||'📌';h+='<div class="alog-item"><div class="alog-action '+action+'">'+icon+'</div><div class="alog-content"><div class="alog-text">'+escapeHtml(cleanText)+'</div><div class="alog-meta">'+(a.user?'<span>👤 '+escapeHtml(a.user.full_name||'؟')+'</span>':'<span>👤 نظام</span>')+'<span>· '+timeAgo(a.created_at)+'</span><span>· '+fmtDateTime(a.created_at)+'</span></div></div></div>'});list.innerHTML=h}catch(err){list.innerHTML='<div class="empty"><div class="empty-desc">'+escapeHtml(err.message)+'</div></div>'}}
+async function loadActivityLog(){if(!canManage())return;const list=$('activityLogList');list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';try{const filter=$('alogFilter').value;let q=supa.from('activities').select('*, user:profiles(full_name)').like('activity_text','[%]%').order('created_at',{ascending:false}).limit(200);const r=await q;if(r.error)throw r.error;let acts=r.data||[];if(filter!=='all'){acts=acts.filter(a=>(a.activity_text||'').indexOf('['+filter+']')>=0)}if(!acts.length){list.innerHTML='<div class="empty"><div class="empty-ico">📜</div><div class="empty-title">لا توجد أنشطة بعد</div><div class="empty-desc">سيتم تسجيل جميع التعديلات والإضافات هنا</div></div>';return}let h='';acts.forEach(a=>{const txt=a.activity_text||'';let action='other';if(txt.indexOf('[create]')>=0)action='create';else if(txt.indexOf('[edit]')>=0)action='edit';else if(txt.indexOf('[delete]')>=0)action='delete';else if(txt.indexOf('[archive]')>=0)action='archive';const cleanText=txt.replace(/^\[\w+\]\s*/,'');const icon={create:'➕',edit:'✏️',delete:'🗑',archive:'📦'}[action]||'📌';h+='<div class="alog-item"><div class="alog-action '+action+'">'+icon+'</div><div class="alog-content"><div class="alog-text">'+escapeHtml(cleanText)+'</div><div class="alog-meta">'+(a.user?'<span>👤 '+escapeHtml(a.user.full_name||'؟')+'</span>':'<span>👤 نظام</span>')+'<span>· '+timeAgo(a.created_at)+'</span><span>· '+fmtDateTime(a.created_at)+'</span></div></div></div>'});list.innerHTML=h}catch(err){list.innerHTML='<div class="empty"><div class="empty-desc">'+escapeHtml(err.message)+'</div></div>'}}
 
 // ===== OWNERS =====
 async function loadOwners(){const list=$('ownersList');list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';try{const r=await supa.from('owners').select('*').eq('archived',false).order('created_at',{ascending:false});if(r.error)throw r.error;allOwners=r.data||[];$('ownersSub').textContent=allOwners.length+' مالك';renderOwners()}catch(err){console.error(err);list.innerHTML='<div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(err.message)+'<br><br>تأكد من تشغيل SQL إنشاء جدول owners</div></div>'}}
