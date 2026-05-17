@@ -1733,7 +1733,7 @@ function setStars(v){starRating=v;document.querySelectorAll('#cStarRating .star'
 function toggleRoleCB(cb,id){document.getElementById(id).classList.toggle('checked',cb.checked)}
 function renderTagsInput(){const wrap=$('cTagsWrap');const input=$('cTagInput');
 wrap.querySelectorAll('.tag-pill').forEach(p=>p.remove());currentTags.forEach(t=>{const pill=document.createElement('span');pill.className='tag-pill';pill.innerHTML=escapeHtml(t)+'<span class="tag-x" onclick="removeTag(\''+t.replace(/[\x27]/g,'')+'\')">×</span>';wrap.insertBefore(pill,input)})}
-function addTag(t){t=(t||'').trim();if(!t)return;if(currentTags.indexOf(t)>=0)return;currentTags.push(t);renderTagsInput();$('cTagInput').value=''}
+function addTag(t){t=(t||'').trim();if(!t)return;if(currentTags.indexOf(t)>=0)return;currentTags.push(t);$('cTagInput').value=''}
 function removeTag(t){currentTags=currentTags.filter(x=>x!==t);renderTagsInput()}
 function addTagOnEnter(e){if(e.key==='Enter'||e.key===','){e.preventDefault();addTag(e.target.value);}else if(e.key==='Backspace'&&!e.target.value&&currentTags.length){currentTags.pop();renderTagsInput()}}
 function tagsDisplayHTML(tags){if(!tags||!tags.length)return '';return '<div class="tag-list-display">'+tags.map(t=>'<span class="tag-pill">'+escapeHtml(t)+'</span>').join('')+'</div>'}
@@ -1823,7 +1823,7 @@ function renderDashHot(clients){if(!clients.length){$('dashHotList').innerHTML='
 function renderDashActivities(acts){if(!acts.length){$('dashActivityList').innerHTML='<div class="empty" style="padding:30px"><div class="empty-ico" style="font-size:36px">📜</div><div class="empty-desc">لا توجد نشاطات بعد. ابدأ بالعمل!</div></div>';return}let h='';acts.forEach(function(a){h+='<div class="activity-item"><div class="activity-icon '+a.activity_type+'">'+activityIcon(a.activity_type)+'</div><div class="activity-content"><div class="activity-text">'+escapeHtml(a.activity_text||'')+'</div><div class="activity-meta">'+(a.user?'<span>👤 '+escapeHtml(a.user.full_name)+'</span>':'')+(a.client?'<span>· '+escapeHtml(a.client.name)+'</span>':'')+'<span>· '+timeAgo(a.created_at)+'</span></div></div></div>'});$('dashActivityList').innerHTML=h}
 
 function populateClientForm(){if(editingClient){const c=allClients.find(x=>x.id===editingClient);if(c){if($('cPaymentMethod'))$('cPaymentMethod').value=c.payment_method||'';if($('cPurchaseTiming'))$('cPurchaseTiming').value=c.purchase_timing||'';if($('cPurpose'))$('cPurpose').value=c.purpose||'';if($('cWilayat'))$('cWilayat').value=c.wilayat||'';if($('cNationality'))$('cNationality').value=c.nationality||'';if($('cCountry'))$('cCountry').value=c.country||''}}else{['cPaymentMethod','cPurchaseTiming','cPurpose','cWilayat','cNationality','cCountry'].forEach(i=>{const e=$(i);if(e)e.value=''})}setTimeout(updateLeadScorePreview,100);if($('cAssignedFG')){if(canManage()){$('cAssignedFG').style.display='';const sel=$('cAssignedTo');sel.innerHTML='<option value="">— تلقائي (أنت) —</option>';allMembers.forEach(function(m){if(m.is_active!==false)sel.innerHTML+='<option value="'+m.id+'">'+escapeHtml(m.full_name)+'</option>'})}else{$('cAssignedFG').style.display='none'}}
-if(!editingClient){['cRoleBuyer','cRoleSeller','cRoleInvestor'].forEach(id=>{$(id).checked=false;$(id).parentElement.classList.remove('checked')});$('cRoleBuyer').checked=true;$('cbBuyer').classList.add('checked');setStars(0);$('cReadiness').value='';currentTags=[];renderTagsInput()}}
+if(!editingClient){['cRoleBuyer','cRoleSeller','cRoleInvestor'].forEach(id=>{$(id).checked=false;$(id).parentElement.classList.remove('checked')});$('cRoleBuyer').checked=true;$('cbBuyer').classList.add('checked');var ph=document.getElementById('duplicatePhoneWarn');if(ph)ph.style.display='none'}}
 
 function setClientArchiveView(archived,btn){showArchivedClients=archived;document.querySelectorAll('.archive-toggle button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadClients()}
 
@@ -1848,7 +1848,7 @@ data.next_followup=$('cNextFollowup')?$('cNextFollowup').value||null:null;
 data.lead_score=calcLeadScore(data);
 data.lead_temperature=calcLeadTemperature(data.lead_score);
 // Set initial pipeline stage if new client
-if(!editingClient)data.pipeline_stage='new';console.log('[Save Client] Data:',data);let r;if(editingClient){r=await supa.from('clients').update(data).eq('id',editingClient);if(!r.error)await logActivity('system','تم تعديل بيانات العميل',editingClient)}else{r=await supa.from('clients').insert(data).select().single();if(!r.error&&r.data)await logActivity('system','تم إضافة العميل',r.data.id)}console.log('[Save Client] Result:',r);if(r.error)throw r.error;closeModal('mClient');showToast('✅ تم الحفظ','success');['cName','cPhone','cEmail','cArea','cBudgetMin','cBudgetMax','cNotes','cReadiness'].forEach(i=>$(i).value='');setStars(0);loadClients();loadDashboard()}catch(err){console.error('[Save Client] Error:',err);showToast('خطأ: '+err.message,'error')}}
+if(!editingClient)data.pipeline_stage='new';console.log('[Save Client] Data:',data);let r;if(editingClient){r=await supa.from('clients').update(data).eq('id',editingClient);if(!r.error)await logActivity('system','تم تعديل بيانات العميل',editingClient)}else{r=await supa.from('clients').insert(data).select().single();if(!r.error&&r.data)await logActivity('system','تم إضافة العميل',r.data.id)}console.log('[Save Client] Result:',r);if(r.error)throw r.error;closeModal('mClient');showToast('✅ تم الحفظ','success');['cName','cEmail','cArea','cBudgetMin','cBudgetMax','cNotes','cNextFollowup','cWilayat','cNationality'].forEach(i=>{var e=$(i);if(e)e.value=''});loadClients();loadDashboard()}catch(err){console.error('[Save Client] Error:',err);showToast('خطأ: '+err.message,'error')}}
 
 
 function archiveClientById(id){const c=allClients.find(x=>x.id===id);if(!c){showToast('⚠️ العميل غير موجود','error');return}deleteClient(id,c.name)}
@@ -3502,6 +3502,14 @@ function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
 
+
+
+// === STUBS for removed features ===
+if(typeof setStars!=='function')window.setStars=function(){};
+if(typeof renderTagsInput!=='function')window.renderTagsInput=function(){};
+if(typeof addTagOnEnter!=='function')window.addTagOnEnter=function(){};
+if(typeof window.currentTags==='undefined')window.currentTags=[];
+if(typeof window.starRating==='undefined')window.starRating=0;
 
 async function init(){const s=await supa.auth.getSession();if(s.data.session)await loadApp();else{$('loaderScreen').style.display='none';$('authScreen').classList.remove('hidden')}}
 supa.auth.onAuthStateChange(function(e,s){if(e==='SIGNED_IN'&&s&&!currentUser)loadApp();if(e==='SIGNED_OUT'){currentUser=null;currentProfile=null}});
