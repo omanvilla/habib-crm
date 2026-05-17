@@ -779,6 +779,19 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 .fue-qa-btn.call:hover{background:#3B82F6;color:white}
 @media(max-width:768px){.fue-rules-grid{grid-template-columns:1fr}}
 
+
+/* ===== FORM SECTIONS ===== */
+.form-section{background:linear-gradient(135deg,rgba(196,150,58,0.03),rgba(46,125,92,0.02));border:1px solid var(--cream-deeper);border-radius:12px;padding:16px;margin-bottom:14px}
+.form-section-title{font-size:13px;font-weight:700;color:var(--gold);margin-bottom:14px;padding-bottom:10px;border-bottom:1px dashed var(--cream-deeper);letter-spacing:0.5px}
+.form-section .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-section .fg.full{grid-column:1/-1}
+@media(max-width:600px){
+  .form-section .fgrid{grid-template-columns:1fr}
+}
+/* Manager-only field indicator */
+.manager-only-field{position:relative}
+.manager-only-field::before{content:'👑 خاص بالمدير';position:absolute;top:-8px;right:8px;background:linear-gradient(135deg,#FFD700,#C9A227);color:white;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700;letter-spacing:0.5px;z-index:1}
+
 </style>
 </head>
 <body>
@@ -1240,81 +1253,119 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 
 </div></main></div>
 
-<div class="modal-ov" id="mClient"><div class="modal-box">
+<div class="modal-ov" id="mClient"><div class="modal-box lg">
 <div class="modal-title" id="mClientTitle">➕ إضافة عميل جديد</div>
+
+<!-- ⚠️ Duplicate warning -->
+<div id="duplicatePhoneWarn" style="display:none;background:linear-gradient(135deg,#FEE2E2,#FECACA);border:2px solid #DC2626;border-radius:12px;padding:14px;margin-bottom:14px;font-size:13px"></div>
+
+<!-- 📞 SECTION 1: Contact Info -->
+<div class="form-section">
+<div class="form-section-title">📞 بيانات التواصل</div>
 <div class="fgrid">
-<div class="fg full"><label class="fl">الاسم *</label><input class="fi" id="cName" required></div>
-<div class="fg"><label class="fl">📞 رقم الهاتف</label><div class="phone-group"><select class="phone-country-select" id="cPhoneCountry" onchange="updatePhonePlaceholder('cPhoneCountry','cPhoneLocal')"></select><input class="phone-number-input" id="cPhoneLocal" type="tel" placeholder="9XXX XXXX"></div><input type="hidden" id="cPhone"></div>
-<div class="fg"><label class="fl">البريد الإلكتروني</label><input class="fi" id="cEmail" dir="ltr"></div>
-<div class="fg full"><label class="fl">أدوار العميل * (اختر أكثر من واحد إذا لزم)</label>
+<div class="fg full"><label class="fl">الاسم الكامل *</label><input class="fi" id="cName" required placeholder="الاسم الثلاثي على الأقل"></div>
+<div class="fg"><label class="fl">📱 رقم الهاتف *</label>
+<div class="phone-group">
+<select class="phone-country-select" id="cPhoneCountry" onchange="updatePhonePlaceholder('cPhoneCountry','cPhoneLocal')"></select>
+<input class="phone-number-input" id="cPhoneLocal" type="tel" placeholder="9XXX XXXX" onblur="checkDuplicatePhone()">
+</div>
+<input type="hidden" id="cPhone">
+</div>
+<div class="fg"><label class="fl">✉️ البريد الإلكتروني</label><input class="fi" id="cEmail" type="email" dir="ltr" placeholder="example@email.com"></div>
+<div class="fg"><label class="fl">🌍 الجنسية</label><input class="fi" id="cNationality" placeholder="عماني، إماراتي..."></div>
+</div>
+</div>
+
+<!-- 🏠 SECTION 2: Client's Request -->
+<div class="form-section">
+<div class="form-section-title">🏠 طلب العميل</div>
+<div class="fgrid">
+<div class="fg full"><label class="fl">نوع العميل * <span style="font-size:10px;color:var(--umber)">(يمكن اختيار أكثر من واحد)</span></label>
 <div class="role-checkbox">
 <label class="role-cb buyer" id="cbBuyer"><input type="checkbox" id="cRoleBuyer" onchange="toggleRoleCB(this,'cbBuyer')">🛒 مشتري</label>
 <label class="role-cb seller" id="cbSeller"><input type="checkbox" id="cRoleSeller" onchange="toggleRoleCB(this,'cbSeller')">🏠 بائع</label>
 <label class="role-cb investor" id="cbInvestor"><input type="checkbox" id="cRoleInvestor" onchange="toggleRoleCB(this,'cbInvestor')">💼 مستثمر</label>
 </div>
 </div>
-<div class="fg"><label class="fl">المصدر</label><select class="fs" id="cSource"><option value="whatsapp">واتساب</option><option value="instagram">إنستجرام</option><option value="facebook">فيسبوك</option><option value="google">جوجل</option><option value="referral">إحالة</option><option value="other">أخرى</option></select></div>
-<div class="fg"><label class="fl">المنطقة</label><input class="fi" id="cArea"></div>
-<div class="fg"><label class="fl">نوع العقار</label><select class="fs" id="cPropType"><option value="">اختر</option><option value="villa">فيلا</option><option value="apartment">شقة</option><option value="land">أرض</option><option value="office">مكتب</option><option value="shop">محل</option></select></div>
-<div class="fg"><label class="fl">📊 التصنيف (تلقائي)</label><div style="background:var(--cream);border:1px dashed var(--cream-deeper);border-radius:8px;padding:11px 14px;font-size:12px;color:var(--umber);line-height:1.5">يُحسب تلقائياً حسب: الميزانية + طريقة الدفع + التوقيت + الغرض. شاهده في أسفل النموذج 👇</div><input type="hidden" id="cStatus" value="warm"></div>
-<div class="fg"><label class="fl">الميزانية من (ر.ع)</label><input class="fi" type="number" id="cBudgetMin" dir="ltr" style="text-align:left" oninput="updateLeadScorePreview()"></div>
-<div class="fg"><label class="fl">الميزانية إلى (ر.ع)</label><input class="fi" type="number" id="cBudgetMax" dir="ltr" style="text-align:left" oninput="updateLeadScorePreview()"></div>
-<div class="fg full" id="cAssignedFG" style="display:none"><label class="fl">الموظف المسؤول</label><select class="fs" id="cAssignedTo"></select></div>
-<div class="fg"><label class="fl">⭐ الأهمية</label><div class="star-rating" id="cStarRating">
-<span class="star" data-v="1" onclick="setStars(1)">★</span>
-<span class="star" data-v="2" onclick="setStars(2)">★</span>
-<span class="star" data-v="3" onclick="setStars(3)">★</span>
-<span class="star" data-v="4" onclick="setStars(4)">★</span>
-<span class="star" data-v="5" onclick="setStars(5)">★</span>
-</div></div>
-<div class="fg"><label class="fl">📊 جاهزية الشراء (0-100%)</label><input class="fi" type="number" id="cReadiness" min="0" max="100" placeholder="50"></div>
-<div class="fg full"><label class="fl">🏷 التاجات (اضغط Enter بعد كل تاج)</label>
-<div class="tag-input-wrap" id="cTagsWrap" onclick="document.getElementById('cTagInput').focus()">
-<input class="tag-input-field" id="cTagInput" placeholder="مثال: VIP, خليجي, عاجل..." onkeydown="addTagOnEnter(event)">
+<div class="fg"><label class="fl">🏘 نوع العقار المطلوب</label><select class="fs" id="cPropType" onchange="updateLeadScorePreview()">
+<option value="">اختر</option>
+<option value="villa">🏡 فيلا</option>
+<option value="apartment">🏢 شقة</option>
+<option value="land">📐 أرض</option>
+<option value="office">🏬 مكتب</option>
+<option value="shop">🏪 محل تجاري</option>
+<option value="building">🏛 عمارة كاملة</option>
+</select></div>
+<div class="fg"><label class="fl">📍 الولاية</label><input class="fi" id="cWilayat" placeholder="مسقط، السيب، بوشر..."></div>
+<div class="fg full"><label class="fl">🗺 المنطقة/الحي المفضّل</label><input class="fi" id="cArea" placeholder="الموج، القرم، المعبيلة..." oninput="updateLeadScorePreview()"></div>
+<div class="fg"><label class="fl">💰 الميزانية من (ر.ع)</label><input class="fi" type="number" id="cBudgetMin" dir="ltr" style="text-align:left" placeholder="50000" oninput="updateLeadScorePreview()"></div>
+<div class="fg"><label class="fl">💰 الميزانية إلى (ر.ع)</label><input class="fi" type="number" id="cBudgetMax" dir="ltr" style="text-align:left" placeholder="100000" oninput="updateLeadScorePreview()"></div>
+<div class="fg full"><label class="fl">🎯 الغرض من الشراء</label><select class="fs" id="cPurpose" onchange="updateLeadScorePreview()">
+<option value="">اختر</option>
+<option value="residence">🏠 سكن شخصي</option>
+<option value="investment">💼 استثمار</option>
+<option value="residency">🛂 الحصول على إقامة</option>
+<option value="rental">🏘 تأجير</option>
+<option value="resale">🔄 إعادة بيع</option>
+</select></div>
 </div>
-<div style="font-size:10px;color:var(--umber);margin-top:5px">💡 اقتراحات: VIP، عاجل، خليجي، إماراتي، استثمار، تمويل، نقد</div>
 </div>
-<div class="fg full"><label class="fl">ملاحظات</label><textarea class="fta" id="cNotes" rows="2"></textarea></div>
 
-<div class="fg" style="padding-top:10px;border-top:1px dashed var(--cream-deeper)"><label class="fl">💵 طريقة الدفع</label><select class="fs" id="cPaymentMethod" onchange="updateLeadScorePreview()">
-<option value="">—</option>
+<!-- 🎯 SECTION 3: Qualification -->
+<div class="form-section">
+<div class="form-section-title">🎯 تأهيل العميل</div>
+<div class="fgrid">
+<div class="fg"><label class="fl">💵 طريقة الدفع</label><select class="fs" id="cPaymentMethod" onchange="updateLeadScorePreview()">
+<option value="">اختر</option>
 <option value="cash">💵 كاش</option>
 <option value="bank_ready">🏦 تمويل بنكي جاهز</option>
 <option value="needs_finance">📝 يحتاج ترتيب تمويل</option>
-<option value="unclear">❓ غير واضح</option>
+<option value="unclear">❓ غير محدّد</option>
 </select></div>
-
-<div class="fg" style="padding-top:10px;border-top:1px dashed var(--cream-deeper)"><label class="fl">⏰ موعد الشراء المتوقع</label><select class="fs" id="cPurchaseTiming" onchange="updateLeadScorePreview()">
-<option value="">—</option>
+<div class="fg"><label class="fl">⏰ موعد الشراء المتوقع</label><select class="fs" id="cPurchaseTiming" onchange="updateLeadScorePreview()">
+<option value="">اختر</option>
 <option value="immediate">🔥 فوراً</option>
 <option value="this_week">⚡ خلال أسبوع</option>
 <option value="this_month">📅 خلال شهر</option>
 <option value="3_months">📆 خلال 3 أشهر</option>
-<option value="just_looking">👀 أبحث فقط</option>
+<option value="just_looking">👀 يبحث فقط (غير جاد بعد)</option>
 </select></div>
-
-<div class="fg"><label class="fl">🎯 الغرض من الشراء</label><select class="fs" id="cPurpose" onchange="updateLeadScorePreview()">
-<option value="">—</option>
-<option value="residence">🏠 سكن</option>
-<option value="investment">💼 استثمار</option>
-<option value="residency">🛂 إقامة</option>
-<option value="rental">🏘 تأجير</option>
-<option value="resale">🔄 إعادة بيع</option>
+<div class="fg full"><label class="fl">📡 مصدر العميل</label><select class="fs" id="cSource">
+<option value="whatsapp">💚 واتساب</option>
+<option value="instagram">📷 إنستجرام</option>
+<option value="facebook">📘 فيسبوك</option>
+<option value="google">🔍 جوجل</option>
+<option value="website">🌐 الموقع</option>
+<option value="referral">🤝 إحالة من عميل</option>
+<option value="walk_in">🚶 زيارة مباشرة للمكتب</option>
+<option value="other">📌 أخرى</option>
 </select></div>
+</div>
+</div>
 
-<div class="fg"><label class="fl">📍 الولاية</label><input class="fi" id="cWilayat" placeholder="مسقط، السيب..."></div>
-<div class="fg"><label class="fl">🌍 الجنسية</label><input class="fi" id="cNationality"></div>
-<div class="fg"><label class="fl">🗺 الدولة</label><input class="fi" id="cCountry"></div>
-
-<div class="fg full">
+<!-- 📊 SECTION 4: Auto Lead Score -->
+<div class="form-section">
+<div class="form-section-title">📊 درجة الجدية (تُحسب تلقائياً)</div>
 <div class="score-preview">
-<div class="score-preview-label">🎯 درجة جدية العميل (Lead Score)</div>
 <div class="score-preview-value" id="scorePreviewValue">20</div>
 <div class="score-preview-temp" id="scorePreviewTemp"><span class="lead-temp cold">❄️ COLD</span></div>
-<div style="font-size:11px;color:var(--umber);margin-top:8px">يُحسب تلقائياً حسب الميزانية، التمويل، التوقيت، والغرض</div>
+<div style="font-size:11px;color:var(--umber);margin-top:8px">يُحسب حسب: الميزانية، طريقة الدفع، توقيت الشراء، الغرض، المنطقة</div>
+<input type="hidden" id="cStatus" value="warm">
 </div>
 </div>
+
+<!-- ⚙️ SECTION 5: Management -->
+<div class="form-section">
+<div class="form-section-title">⚙️ الإدارة والمتابعة</div>
+<div class="fgrid">
+<div class="fg full" id="cAssignedFG" style="display:none"><label class="fl">👨‍💼 الموظف المسؤول</label><select class="fs" id="cAssignedTo"></select></div>
+<div class="fg full"><label class="fl">📅 موعد المتابعة القادمة</label><input class="fi" type="date" id="cNextFollowup"></div>
+<div class="fg full"><label class="fl">📝 ملاحظات</label><textarea class="fta" id="cNotes" rows="3" placeholder="معلومات إضافية، اهتمامات خاصة، شروط مهمة..."></textarea></div>
 </div>
+</div>
+
+<input type="hidden" id="cCountry">
+
 <div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mClient')">إلغاء</button><button class="btn-primary" style="width:auto;padding:9px 22px" onclick="saveClient()">💾 حفظ</button></div>
 </div></div>
 
@@ -1330,7 +1381,7 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 <div class="fg"><label class="fl">عدد الحمامات</label><input class="fi" type="number" id="pBaths" dir="ltr" style="text-align:left"></div>
 <div class="fg"><label class="fl">مساحة الأرض (م²)</label><input class="fi" type="number" id="pLandSize" dir="ltr" style="text-align:left"></div>
 <div class="fg"><label class="fl">مساحة البناء (م²)</label><input class="fi" type="number" id="pBuiltSize" dir="ltr" style="text-align:left"></div>
-<div class="fg"><label class="fl">صافي المالك (ر.ع)</label><input class="fi" type="number" id="pOwnerNet" dir="ltr" style="text-align:left" placeholder="السعر الذي يريده المالك"></div>
+<div class="fg manager-only-field"><label class="fl">💰 صافي المالك (ر.ع)</label><input class="fi" type="number" id="pOwnerNet" dir="ltr" style="text-align:left" placeholder="السعر الذي يريده المالك"></div>
 <div class="fg full"><label class="fl">المالك</label><select class="fs" id="pOwnerId"><option value="">— اختر مالك —</option></select></div>
 <div class="fg full"><label class="fl">الوصف</label><textarea class="fta" id="pDesc" rows="3"></textarea></div>
 </div>
@@ -1364,10 +1415,10 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 <option value="closed">مكتملة</option>
 <option value="lost">ملغاة</option>
 </select></div>
-<div class="fg" id="dCommissionFG"><label class="fl">العمولة الكاملة (ر.ع)</label><input class="fi" type="number" id="dCommission" dir="ltr" style="text-align:left" placeholder="3000"></div>
-<div class="fg" id="dCompanyShareFG"><label class="fl">نصيب الشركة (ر.ع)</label><input class="fi" type="number" id="dCompanyShare" dir="ltr" style="text-align:left" placeholder="2000"></div>
-<div class="fg" id="dAgentShareFG"><label class="fl">نصيب الموظف (ر.ع)</label><input class="fi" type="number" id="dAgentShare" dir="ltr" style="text-align:left" placeholder="1000"></div>
-<div class="fg" id="dCommissionStatusFG"><label class="fl">حالة العمولة</label><select class="fs" id="dCommissionStatus"><option value="pending">⏳ معلّقة</option><option value="received">✅ مستلمة</option></select></div>
+<div class="fg manager-only-field" id="dCommissionFG"><label class="fl">العمولة الكاملة (ر.ع)</label><input class="fi" type="number" id="dCommission" dir="ltr" style="text-align:left" placeholder="3000"></div>
+<div class="fg manager-only-field" id="dCompanyShareFG"><label class="fl">نصيب الشركة (ر.ع)</label><input class="fi" type="number" id="dCompanyShare" dir="ltr" style="text-align:left" placeholder="2000"></div>
+<div class="fg manager-only-field" id="dAgentShareFG"><label class="fl">نصيب الموظف (ر.ع)</label><input class="fi" type="number" id="dAgentShare" dir="ltr" style="text-align:left" placeholder="1000"></div>
+<div class="fg manager-only-field" id="dCommissionStatusFG"><label class="fl">حالة العمولة</label><select class="fs" id="dCommissionStatus"><option value="pending">⏳ معلّقة</option><option value="received">✅ مستلمة</option></select></div>
 <div class="fg full"><label class="fl">ملاحظات</label><textarea class="fta" id="dNotes" rows="2"></textarea></div>
 </div>
 <div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mDeal')">إلغاء</button><button class="btn-primary" style="width:auto;padding:9px 22px" onclick="saveDeal()">💾 حفظ</button></div>
@@ -1727,7 +1778,25 @@ function applyRoleVisibility(){if(!currentProfile)return;$('navTeam').style.disp
 function navigate(id,el){if(id==='expenses'&&!canViewFinancials()){showPermissionDenied();return}if(id==='activityLog'&&!canManage()){showPermissionDenied();return}if(id==='team'&&!canManageTeam()){showPermissionDenied();return}if(id==='reports'&&isAgent()&&!canViewFinancials()){/* agents see limited reports */}document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-link').forEach(n=>n.classList.remove('active'));const page=$('page-'+id);if(page)page.classList.add('active');if(el)el.classList.add('active');const t={dash:'لوحة <em>التحكم</em>',daily:'المهام <em>اليومية</em>',clients:'إدارة <em>العملاء</em>',properties:'إدارة <em>العقارات</em>',deals:'إدارة <em>الصفقات</em>',search:'البحث <em>المتقدم</em>',reports:'التقارير <em>والتحليلات</em>',team:'إدارة <em>الفريق</em>',settings:'<em>الإعدادات</em>',clientDetail:'<em>تفاصيل العميل</em>',calendar:'<em>التقويم</em>',ai:'المساعد <em>الذكي</em>',owners:'إدارة <em>الملاك</em>',expenses:'<em>المصاريف والأرباح</em>',activityLog:'سجل <em>النشاط</em>',viewings:'إدارة <em>الزيارات</em>',deposits:'إدارة <em>العربون</em>'};$('tbTitle').innerHTML=t[id]||id;if(id==='dash')loadDashboard();if(id==='clients')loadClients();if(id==='properties')loadProperties();if(id==='deals')loadDeals();if(id==='daily')loadTasks();if(id==='search')$('searchQ').focus();if(id==='reports')loadReports();if(id==='team')loadTeam();if(id==='calendar')loadCalendar();if(id==='ai')$('aiInput').focus();if(id==='owners')loadOwners();if(id==='expenses')loadExpenses();if(id==='activityLog')loadActivityLog();if(id==='viewings'){populateViewingForm();loadViewings()}if(id==='deposits'){populateDepositForm();loadDeposits()}closeMobile()}
 function openMobile(){$('sidebar').classList.add('mob-open');$('mobBg').classList.add('on')}
 function closeMobile(){$('sidebar').classList.remove('mob-open');$('mobBg').classList.remove('on')}
-function openModal(id){setTimeout(function(){if(id==='mClient'&&!editingClient&&typeof setupPhoneField==='function'){setupPhoneField('cPhoneCountry','cPhoneLocal','');}if(id==='mOwner'&&!window.editingOwner&&typeof setupPhoneField==='function'){setupPhoneField('oPhoneCountry','oPhoneLocal','');}},50);if(id==='mDeal')populateDealSelects();if(id==='mTask'){if(!window.editingTask){$('mTaskTitle').textContent='⏰ مهمة جديدة';['tTitle','tDueDate','tNotes'].forEach(i=>$(i).value='');$('tPriority').value='medium';$('tClient').value='';$('tDeal').value=''}populateTaskSelects()}if(id==='mClient')populateClientForm();if(id==='mProperty'){if(!window.editingProperty){['pTitle','pArea','pPrice','pBeds','pBaths','pLandSize','pBuiltSize','pDesc','pOwnerNet'].forEach(i=>{const e=$(i);if(e)e.value=''});$('pType').value='apartment';$('pStatus').value='available';currentPropertyImages=[]}const sel=$('pOwnerId');if(sel){sel.innerHTML='<option value="">— اختر مالك —</option>';allOwners.forEach(o=>sel.innerHTML+='<option value="'+o.id+'">'+escapeHtml(o.name)+'</option>')}renderPropertyImages()}if(id==='mExpense'&&!editingExpense){$('exDate').value=toLocalDateStr(new Date())}if(id==='mViewing'&&!editingViewing){populateViewingForm();$('vDate').value=toLocalDateStr(new Date());['vTime','vLocation','vNextStep','vFollowupDate','vNotes'].forEach(i=>{const e=$(i);if(e)e.value=''});$('vStatus').value='scheduled';$('vDuration').value=60;$('vFeedbackFG').style.display='none';$('mViewingTitle').textContent='👁 زيارة جديدة'}if(id==='mDeposit'&&!editingDeposit){populateDepositForm();$('dpPaymentDate').value=toLocalDateStr(new Date());['dpAmount','dpLegalNotes','dpNotes'].forEach(i=>{const e=$(i);if(e)e.value=''});$('dpDuration').value=30;$('mDepositTitle').textContent='💰 عربون جديد'}$(id).classList.add('on')}
+function openModal(id){
+  var w=document.getElementById('duplicatePhoneWarn');if(w)w.style.display='none';
+  
+  // 👑 MANAGER-ONLY FIELDS: Hide financial fields for non-managers
+  if(id==='mDeal'){
+    var isMgr = (typeof canManage==='function') && canManage();
+    ['dCommissionFG','dCompanyShareFG','dAgentShareFG','dCommissionStatusFG'].forEach(function(fid){
+      var el=document.getElementById(fid);
+      if(el)el.style.display=isMgr?'':'none';
+    });
+  }
+  // Hide pOwnerNet for non-managers in property modal
+  if(id==='mProperty'){
+    var isMgr2 = (typeof canManage==='function') && canManage();
+    var pn=document.getElementById('pOwnerNet');
+    if(pn&&pn.parentElement)pn.parentElement.style.display=isMgr2?'':'none';
+  }
+  
+  setTimeout(function(){if(id==='mClient'&&!editingClient&&typeof setupPhoneField==='function'){setupPhoneField('cPhoneCountry','cPhoneLocal','');}if(id==='mOwner'&&!window.editingOwner&&typeof setupPhoneField==='function'){setupPhoneField('oPhoneCountry','oPhoneLocal','');}},50);if(id==='mDeal')populateDealSelects();if(id==='mTask'){if(!window.editingTask){$('mTaskTitle').textContent='⏰ مهمة جديدة';['tTitle','tDueDate','tNotes'].forEach(i=>$(i).value='');$('tPriority').value='medium';$('tClient').value='';$('tDeal').value=''}populateTaskSelects()}if(id==='mClient')populateClientForm();if(id==='mProperty'){if(!window.editingProperty){['pTitle','pArea','pPrice','pBeds','pBaths','pLandSize','pBuiltSize','pDesc','pOwnerNet'].forEach(i=>{const e=$(i);if(e)e.value=''});$('pType').value='apartment';$('pStatus').value='available';currentPropertyImages=[]}const sel=$('pOwnerId');if(sel){sel.innerHTML='<option value="">— اختر مالك —</option>';allOwners.forEach(o=>sel.innerHTML+='<option value="'+o.id+'">'+escapeHtml(o.name)+'</option>')}renderPropertyImages()}if(id==='mExpense'&&!editingExpense){$('exDate').value=toLocalDateStr(new Date())}if(id==='mViewing'&&!editingViewing){populateViewingForm();$('vDate').value=toLocalDateStr(new Date());['vTime','vLocation','vNextStep','vFollowupDate','vNotes'].forEach(i=>{const e=$(i);if(e)e.value=''});$('vStatus').value='scheduled';$('vDuration').value=60;$('vFeedbackFG').style.display='none';$('mViewingTitle').textContent='👁 زيارة جديدة'}if(id==='mDeposit'&&!editingDeposit){populateDepositForm();$('dpPaymentDate').value=toLocalDateStr(new Date());['dpAmount','dpLegalNotes','dpNotes'].forEach(i=>{const e=$(i);if(e)e.value=''});$('dpDuration').value=30;$('mDepositTitle').textContent='💰 عربون جديد'}$(id).classList.add('on')}
 function closeModal(id){$(id).classList.remove('on');if(id==='mClient'){editingClient=null;$('mClientTitle').textContent='➕ إضافة عميل جديد'}if(id==='mTask'){window.editingTask=null;$('mTaskTitle').textContent='⏰ مهمة جديدة'}if(id==='mProperty'){window.editingProperty=null}if(id==='mViewing'){editingViewing=null}if(id==='mDeposit'){editingDeposit=null}}
 document.querySelectorAll('.modal-ov').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('on')}));
 
@@ -1766,7 +1835,7 @@ async function loadClients(){const list=$('clientsList');list.innerHTML='<div cl
 
 function renderClients(){const list=$('clientsList');let filtered=allClients;if(clientRoleFilter==='buyer')filtered=allClients.filter(c=>getRoles(c).indexOf('buyer')>=0);else if(clientRoleFilter==='seller')filtered=allClients.filter(c=>getRoles(c).indexOf('seller')>=0);else if(clientRoleFilter==='investor')filtered=allClients.filter(c=>getRoles(c).indexOf('investor')>=0);else if(clientRoleFilter==='hot')filtered=allClients.filter(c=>(c.lead_temperature||c.status)==='hot');else if(clientRoleFilter==='followup')filtered=allClients.filter(c=>needsFollowup(c));$('clientsSub').textContent=filtered.length+' عميل'+(isAgent()?' (عملائي)':'');if(!filtered.length){list.innerHTML='<div class="empty"><div class="empty-ico">👥</div><div class="empty-title">لا يوجد عملاء '+(clientRoleFilter==='all'?'بعد':'في هذا التصنيف')+'</div>'+(clientRoleFilter==='all'&&canEdit()?'<button class="btn-primary" style="margin-top:14px;width:auto;padding:10px 22px" onclick="openModal(\'mClient\')">+ إضافة عميل جديد</button>':'')+'</div>';return}let h='<table class="tbl"><thead><tr><th>الاسم</th><th>الأدوار</th><th>الهاتف</th><th>المنطقة</th><th>الميزانية</th><th>الأهمية</th><th>آخر تواصل</th><th>التصنيف</th>'+(canManage()?'<th>الموظف</th>':'')+'<th></th></tr></thead><tbody>';filtered.forEach(function(c){const b=(c.budget_min&&c.budget_max)?(fmtMoneyShort(c.budget_min)+'–'+fmtMoneyShort(c.budget_max)):'—';h+='<tr class="row-clickable" onclick="viewClient(\''+c.id+'\')"><td><strong style="color:var(--espresso)">'+escapeHtml(c.name)+'</strong></td><td>'+rolePillsHTML(c)+'</td><td>'+(c.phone?formatPhoneDisplay(c.phone):'—')+'</td><td>'+escapeHtml(c.preferred_area||'—')+'</td><td style="color:var(--gold);font-weight:600">'+b+'</td><td>'+starsHTML(c.importance)+'</td><td>'+contactStatusHTML(c)+'</td><td>'+statusBadge(c.lead_temperature||c.status,c.lead_score)+'</td>'+(canManage()?'<td>'+escapeHtml(c.agent&&c.agent.full_name||'—')+'</td>':'')+'<td onclick="event.stopPropagation()">'+(c.archived?'<span style="cursor:pointer;margin-right:4px" onclick="event.stopPropagation();restoreClientById(\''+c.id+'\')">♻️</span>'+(isOwner()?'<span style="cursor:pointer" onclick="event.stopPropagation();permanentDeleteClientById(\''+c.id+'\')">🗑</span>':''):'<span style="cursor:pointer" onclick="event.stopPropagation();archiveClientById(\''+c.id+'\')">📦</span>')+'</td></tr>'});list.innerHTML=h+'</tbody></table>'}
 
-async function saveClient(){const n=$('cName').value.trim();if(!n){showToast('⚠️ الاسم مطلوب','error');return}const isB=$('cRoleBuyer').checked,isS=$('cRoleSeller').checked,isI=$('cRoleInvestor').checked;if(!isB&&!isS&&!isI){showToast('⚠️ اختر دور واحد على الأقل','error');return}console.log('[Save Client] Starting save...');try{const cid=await ensureCompany();console.log('[Save Client] Company ID:',cid);const primaryType=isB?'buyer':isS?'seller':'investor';const data={company_id:cid,name:n,phone:getFullPhone('cPhoneCountry','cPhoneLocal')||null,email:$('cEmail').value.trim()||null,client_type:primaryType,is_buyer:isB,is_seller:isS,is_investor:isI,source:$('cSource').value,preferred_area:$('cArea').value.trim()||null,property_type:$('cPropType').value||null,status:calcLeadTemperature(calcLeadScore({budget_min:parseFloat($('cBudgetMin').value)||null,budget_max:parseFloat($('cBudgetMax').value)||null,payment_method:$('cPaymentMethod')?$('cPaymentMethod').value:null,purchase_timing:$('cPurchaseTiming')?$('cPurchaseTiming').value:null,purpose:$('cPurpose')?$('cPurpose').value:null,preferred_area:$('cArea').value,property_type:$('cPropType').value,phone:$('cPhone').value})),budget_min:parseFloat($('cBudgetMin').value)||null,budget_max:parseFloat($('cBudgetMax').value)||null,importance:starRating||null,readiness:parseInt($('cReadiness').value)||null,notes:$('cNotes').value.trim()||null};const assignedTo=canManage()&&$('cAssignedTo').value?$('cAssignedTo').value:currentUser.id;data.assigned_to=assignedTo;data.tags=currentTags.length?currentTags:null;
+async function saveClient(){const n=$('cName').value.trim();if(!n){showToast('⚠️ الاسم مطلوب','error');return}const isB=$('cRoleBuyer').checked,isS=$('cRoleSeller').checked,isI=$('cRoleInvestor').checked;if(!isB&&!isS&&!isI){showToast('⚠️ اختر دور واحد على الأقل','error');return}console.log('[Save Client] Starting save...');try{const cid=await ensureCompany();console.log('[Save Client] Company ID:',cid);const primaryType=isB?'buyer':isS?'seller':'investor';const data={company_id:cid,name:n,phone:getFullPhone('cPhoneCountry','cPhoneLocal')||null,email:$('cEmail').value.trim()||null,client_type:primaryType,is_buyer:isB,is_seller:isS,is_investor:isI,source:$('cSource').value,preferred_area:$('cArea').value.trim()||null,property_type:$('cPropType').value||null,status:calcLeadTemperature(calcLeadScore({budget_min:parseFloat($('cBudgetMin').value)||null,budget_max:parseFloat($('cBudgetMax').value)||null,payment_method:$('cPaymentMethod')?$('cPaymentMethod').value:null,purchase_timing:$('cPurchaseTiming')?$('cPurchaseTiming').value:null,purpose:$('cPurpose')?$('cPurpose').value:null,preferred_area:$('cArea').value,property_type:$('cPropType').value,phone:$('cPhone').value})),budget_min:parseFloat($('cBudgetMin').value)||null,budget_max:parseFloat($('cBudgetMax').value)||null,notes:$('cNotes').value.trim()||null};const assignedTo=canManage()&&$('cAssignedTo').value?$('cAssignedTo').value:currentUser.id;data.assigned_to=assignedTo;// tags removed - using clear categorization fields
 // Extended fields for Lead Scoring
 data.payment_method=$('cPaymentMethod')?$('cPaymentMethod').value||null:null;
 data.purchase_timing=$('cPurchaseTiming')?$('cPurchaseTiming').value||null:null;
@@ -1774,6 +1843,7 @@ data.purpose=$('cPurpose')?$('cPurpose').value||null:null;
 data.wilayat=$('cWilayat')?$('cWilayat').value.trim()||null:null;
 data.nationality=$('cNationality')?$('cNationality').value.trim()||null:null;
 data.country=$('cCountry')?$('cCountry').value.trim()||null:null;
+data.next_followup=$('cNextFollowup')?$('cNextFollowup').value||null:null;
 // Compute Lead Score
 data.lead_score=calcLeadScore(data);
 data.lead_temperature=calcLeadTemperature(data.lead_score);
@@ -1814,7 +1884,7 @@ function switchClientTab(tab,el){document.querySelectorAll('.detail-tab').forEac
 function openAddActivity(){if(!viewingClient){showToast('⚠️ افتح عميلاً أولاً','error');return}$('aText').value='';$('mActivity').classList.add('on')}
 async function saveActivity(){if(!viewingClient)return;const type=$('aType').value,text=$('aText').value.trim();if(!text){showToast('⚠️ التفاصيل مطلوبة','error');return}try{await logActivity(type,text,viewingClient.id);closeModal('mActivity');showToast('✅ تم إضافة النشاط','success');loadClientActivities();loadDashboard()}catch(err){showToast('خطأ: '+err.message,'error')}}
 
-function editClient(){if(!viewingClient)return;const c=viewingClient;editingClient=c.id;$('mClientTitle').textContent='✏️ تعديل بيانات العميل';$('cName').value=c.name||'';setupPhoneField('cPhoneCountry','cPhoneLocal',c.phone||'');$('cEmail').value=c.email||'';$('cSource').value=c.source||'whatsapp';$('cArea').value=c.preferred_area||'';$('cPropType').value=c.property_type||'';$('cStatus').value=c.status||'warm';$('cBudgetMin').value=c.budget_min||'';$('cBudgetMax').value=c.budget_max||'';$('cNotes').value=c.notes||'';$('cReadiness').value=c.readiness||'';const isB=c.is_buyer||c.client_type==='buyer';const isS=c.is_seller||c.client_type==='seller';const isI=c.is_investor||c.client_type==='investor';$('cRoleBuyer').checked=isB;$('cbBuyer').classList.toggle('checked',isB);$('cRoleSeller').checked=isS;$('cbSeller').classList.toggle('checked',isS);$('cRoleInvestor').checked=isI;$('cbInvestor').classList.toggle('checked',isI);setStars(c.importance||0);currentTags=Array.isArray(c.tags)?c.tags.slice():[];renderTagsInput();openModal('mClient');if($('cAssignedTo'))$('cAssignedTo').value=c.assigned_to||''}
+function editClient(){if(!viewingClient)return;const c=viewingClient;editingClient=c.id;$('mClientTitle').textContent='✏️ تعديل بيانات العميل';$('cName').value=c.name||'';setupPhoneField('cPhoneCountry','cPhoneLocal',c.phone||'');$('cEmail').value=c.email||'';$('cSource').value=c.source||'whatsapp';$('cArea').value=c.preferred_area||'';$('cPropType').value=c.property_type||'';$('cStatus').value=c.lead_temperature||c.status||'warm';$('cBudgetMin').value=c.budget_min||'';$('cBudgetMax').value=c.budget_max||'';$('cNextFollowup').value=c.next_followup||'';$('cNotes').value=c.notes||'';const isB=c.is_buyer||c.client_type==='buyer';const isS=c.is_seller||c.client_type==='seller';const isI=c.is_investor||c.client_type==='investor';$('cRoleBuyer').checked=isB;$('cbBuyer').classList.toggle('checked',isB);$('cRoleSeller').checked=isS;$('cbSeller').classList.toggle('checked',isS);$('cRoleInvestor').checked=isI;$('cbInvestor').classList.toggle('checked',isI);openModal('mClient');if($('cAssignedTo'))$('cAssignedTo').value=c.assigned_to||''}
 
 function addTaskForClient(cid){populateTaskSelects().then(function(){$('tClient').value=cid;$('tTitle').value='';$('tDueDate').value='';$('tNotes').value='';$('mTask').classList.add('on')})}
 function addDealForClient(cid){populateDealSelects().then(function(){$('dClient').value=cid;$('dValue').value='';$('dNotes').value='';$('mDeal').classList.add('on')})}
@@ -2979,6 +3049,33 @@ window.formatPhoneDisplay = function(stored){
   else if(local.length === 10) formatted = local.substring(0,3) + ' ' + local.substring(3,6) + ' ' + local.substring(6);
   return country.flag + ' <span dir="ltr" style="font-family:monospace">+' + country.code + ' ' + formatted + '</span>';
 };
+
+
+// ===== DUPLICATE PHONE DETECTION =====
+window.checkDuplicatePhone = async function(){
+  var warnEl = document.getElementById('duplicatePhoneWarn');
+  if(!warnEl) return;
+  var fullPhone = getFullPhone('cPhoneCountry','cPhoneLocal');
+  if(!fullPhone || fullPhone.length < 8) {warnEl.style.display='none'; return;}
+  
+  try{
+    var r = await supa.from('clients')
+      .select('id,name,client_type,pipeline_stage,assigned_to,agent:profiles!clients_assigned_to_fkey(full_name)')
+      .eq('phone', fullPhone)
+      .neq('archived', true)
+      .limit(1);
+    
+    if(r.data && r.data.length > 0 && r.data[0].id !== window.editingClient){
+      var c = r.data[0];
+      var typeLabel = c.client_type === 'buyer' ? '🛒 مشتري' : c.client_type === 'seller' ? '🏠 بائع' : '💼 مستثمر';
+      warnEl.innerHTML = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:24px">⚠️</span><div style="flex:1;min-width:200px"><div style="font-weight:700;color:#991B1B;margin-bottom:4px">هذا الرقم مسجّل مسبقاً!</div><div style="color:#7F1D1D;font-size:12px">📋 <strong>' + escapeHtml(c.name) + '</strong> · ' + typeLabel + (c.agent && c.agent.full_name ? ' · 👨‍💼 ' + escapeHtml(c.agent.full_name) : '') + '</div></div><button onclick="closeModal(\'mClient\');viewClient(\''+c.id+'\')" style="background:#DC2626;color:white;border:none;padding:8px 16px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">👁 عرض العميل</button></div>';
+      warnEl.style.display = 'block';
+    } else {
+      warnEl.style.display = 'none';
+    }
+  }catch(e){console.warn('Duplicate check:',e);}
+};
+
 
 window.openWA = function(phone, message){
   if(!phone) return;
