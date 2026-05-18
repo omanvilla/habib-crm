@@ -822,6 +822,9 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 .lf-advanced summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--gold);user-select:none;padding:4px 0}
 .lf-advanced summary:hover{color:var(--espresso)}
 .lf-advanced[open]{padding:14px;background:linear-gradient(135deg,var(--cream),white);border:1px dashed var(--cream-deeper)}
+.lf-req{color:#DC2626;font-weight:700;margin-right:3px}
+.fi:invalid,.fs:invalid,.fta:invalid{border-color:rgba(220,38,38,0.3)}
+.fi:focus:invalid,.fs:focus:invalid,.fta:focus:invalid{border-color:#DC2626;box-shadow:0 0 0 3px rgba(220,38,38,0.1)}
 .lf-advanced .fg{margin-top:10px}
 
 @media(max-width:480px){
@@ -1930,8 +1933,8 @@ async function renderLeadForm(companyId){
       '<div class="fg"><label class="fl">📞 رقم الهاتف *</label><div class="phone-group"><select class="phone-country-select" id="lfPhoneCountry">'+countryOptions+'</select><input class="phone-number-input" id="lfPhoneLocal" type="tel" placeholder="9XXX XXXX" required></div></div>'+
       '<div class="fg"><label class="fl">💚 نفس الواتساب؟</label><select class="fs" id="lfWASame"><option value="yes">نعم</option><option value="no">لا (سأكتب رقم آخر)</option></select></div>'+
       '<div class="fg" id="lfWAGroupFG" style="display:none"><label class="fl">رقم الواتساب</label><div class="phone-group"><select class="phone-country-select" id="lfWACountry">'+countryOptions+'</select><input class="phone-number-input" id="lfWALocal" type="tel" placeholder="9XXX XXXX"></div></div>'+
-      '<div class="fg"><label class="fl">🌍 الجنسية</label><input class="fi" id="lfNationality" placeholder="عماني، إماراتي..."></div>'+
-      '<div class="fg"><label class="fl">⏰ أفضل وقت للتواصل</label><select class="fs" id="lfBestTime"><option value="anytime">أي وقت</option><option value="morning">الصباح (8-12)</option><option value="afternoon">بعد الظهر (12-5)</option><option value="evening">المساء (5-9)</option></select></div>'+
+      '<div class="fg"><label class="fl">🌍 الجنسية <span class="lf-req">*</span></label><input class="fi" id="lfNationality" required placeholder="عماني، إماراتي..."></div>'+
+      '<div class="fg"><label class="fl">⏰ أفضل وقت للتواصل <span class="lf-req">*</span></label><select class="fs" id="lfBestTime" required><option value="">اختر</option><option value="anytime">أي وقت</option><option value="morning">الصباح (8-12)</option><option value="afternoon">بعد الظهر (12-5)</option><option value="evening">المساء (5-9)</option></select></div>'+
       '<div id="lfOwnerAgreementBox" style="display:none;background:#FEF3C7;border:2px solid #F59E0B;border-radius:10px;padding:14px;margin-top:14px;font-size:12px;color:#78350F"><label style="display:flex;gap:10px;cursor:pointer;align-items:flex-start"><input type="checkbox" id="lfOwnerAgreement" style="margin-top:4px;width:18px;height:18px"><span><strong>📋 إقرار وموافقة:</strong> أُقر بأنني مالك العقار أو مفوض من المالك، وأوافق على أن تقوم الشركة بالتواصل معي والعمل على تسويق العقار للعملاء الجادين عبر الواتساب أو الاتصال الهاتفي.</span></label></div>'+
       '<button type="button" class="btn-gold" style="width:100%;margin-top:18px;padding:14px;font-size:15px;font-weight:700" onclick="submitLead(\''+companyId+'\')">📩 إرسال الطلب</button>'+
     '</div>'+
@@ -1999,6 +2002,7 @@ function propertyTypeOptions(includeRental){
     {v:'shop',l:'🏪 محل تجاري'},
     {v:'office',l:'🏬 مكتب'},
     {v:'warehouse',l:'📦 مخزن'},
+    {v:'not_sure',l:'🤔 لم أقرر بعد'},
     {v:'other',l:'📌 غير ذلك'}
   ];
   return arr.map(function(o){return '<option value="'+o.v+'">'+o.l+'</option>'}).join('');
@@ -2006,7 +2010,7 @@ function propertyTypeOptions(includeRental){
 
 function renderBuyerQuestions(){
   return ''+
-    '<div class="fg"><label class="fl">🎯 الغرض من الشراء</label><select class="fs" id="lfPurpose">'+
+    '<div class="fg"><label class="fl">🎯 الغرض من الشراء <span class="lf-req">*</span></label><select class="fs" id="lfPurpose" required>'+
       '<option value="">اختر</option>'+
       '<option value="residence">🏠 سكن عائلي</option>'+
       '<option value="investment">💼 استثمار</option>'+
@@ -2014,20 +2018,21 @@ function renderBuyerQuestions(){
       '<option value="land_build">🏗 شراء أرض للبناء</option>'+
       '<option value="rental">🏘 شراء للتأجير</option>'+
       '<option value="resale">🔄 شراء لإعادة البيع</option>'+
+      '<option value="not_sure">🤔 لم أقرر بعد</option>'+
       '<option value="other">📌 غير ذلك</option>'+
     '</select></div>'+
     
     '<div class="fg"><label class="fl">🏘 نوع العقار المطلوب *</label><select class="fs" id="lfPropType" required>'+propertyTypeOptions()+'</select></div>'+
     
-    '<div class="fg"><label class="fl">📍 المحافظة</label><select class="fs" id="lfGovernorate"><option value="">اختر</option><option value="muscat">مسقط</option><option value="dhofar">ظفار</option><option value="batinah_north">شمال الباطنة</option><option value="batinah_south">جنوب الباطنة</option><option value="sharqiyah_north">شمال الشرقية</option><option value="sharqiyah_south">جنوب الشرقية</option><option value="dakhliyah">الداخلية</option><option value="dhahirah">الظاهرة</option><option value="buraimi">البريمي</option><option value="musandam">مسندم</option><option value="wusta">الوسطى</option></select></div>'+
+    '<div class="fg"><label class="fl">📍 المحافظة <span class="lf-req">*</span></label><select class="fs" id="lfGovernorate" required><option value="">اختر</option><option value="muscat">مسقط</option><option value="dhofar">ظفار</option><option value="batinah_north">شمال الباطنة</option><option value="batinah_south">جنوب الباطنة</option><option value="sharqiyah_north">شمال الشرقية</option><option value="sharqiyah_south">جنوب الشرقية</option><option value="dakhliyah">الداخلية</option><option value="dhahirah">الظاهرة</option><option value="buraimi">البريمي</option><option value="musandam">مسندم</option><option value="wusta">الوسطى</option><option value="not_sure">🤔 غير محدد بعد</option></select></div>'+
     
-    '<div class="fg"><label class="fl">🗺 الولاية</label><input class="fi" id="lfWilayat" placeholder="السيب، بوشر، صلالة..."></div>'+
+    '<div class="fg"><label class="fl">🗺 الولاية <span class="lf-req">*</span></label><input class="fi" id="lfWilayat" required placeholder="السيب، بوشر، صلالة... أو اكتب: غير محدد"></div>'+
     
-    '<div class="fg"><label class="fl">📌 المنطقة بالتحديد</label><input class="fi" id="lfArea" placeholder="الموج، القرم، المعبيلة..."></div>'+
+    '<div class="fg"><label class="fl">📌 المنطقة بالتحديد <span class="lf-req">*</span></label><input class="fi" id="lfArea" required placeholder="الموج، القرم، المعبيلة... أو اكتب: غير محدد"></div>'+
     
-    '<div class="fg"><label class="fl">🤔 هل تقبل مناطق قريبة؟</label><select class="fs" id="lfFlexibleLocation"><option value="yes">نعم</option><option value="no">لا</option></select></div>'+
+    '<div class="fg"><label class="fl">🤔 هل تقبل مناطق قريبة؟ <span class="lf-req">*</span></label><select class="fs" id="lfFlexibleLocation" required><option value="">اختر</option><option value="yes">نعم</option><option value="no">لا</option><option value="not_sure">غير متأكد</option></select></div>'+
     
-    '<div class="fg"><label class="fl">💰 الميزانية</label><select class="fs" id="lfBudgetRange" onchange="lfToggleCustomBudget()">'+
+    '<div class="fg"><label class="fl">💰 الميزانية <span class="lf-req">*</span></label><select class="fs" id="lfBudgetRange" required onchange="lfToggleCustomBudget()">'+
       '<option value="">اختر</option>'+
       '<option value="under_20k">أقل من 20,000 ر.ع</option>'+
       '<option value="20-40k">20,000 - 40,000 ر.ع</option>'+
@@ -2037,26 +2042,29 @@ function renderBuyerQuestions(){
       '<option value="200-500k">200,000 - 500,000 ر.ع</option>'+
       '<option value="above_500k">أكثر من 500,000 ر.ع</option>'+
       '<option value="custom">سأحدد المبلغ يدوياً</option>'+
+      '<option value="not_sure">🤔 لم أحدد ميزانية بعد</option>'+
     '</select></div>'+
     
     '<div class="fg" id="lfCustomBudgetFG" style="display:none"><label class="fl">المبلغ المحدد (ر.ع)</label><input class="fi" type="number" id="lfCustomBudget" dir="ltr" style="text-align:left" placeholder="150000"></div>'+
     
-    '<div class="fg"><label class="fl">💵 طريقة الشراء</label><select class="fs" id="lfPaymentMethod">'+
+    '<div class="fg"><label class="fl">💵 طريقة الشراء <span class="lf-req">*</span></label><select class="fs" id="lfPaymentMethod" required>'+
       '<option value="">اختر</option>'+
       '<option value="cash">💵 كاش</option>'+
       '<option value="bank_finance">🏦 تمويل بنكي</option>'+
       '<option value="bank_not_yet">📝 لم أقدم على البنك بعد</option>'+
       '<option value="bank_approved">✅ عندي موافقة مبدئية</option>'+
       '<option value="needs_help">🆘 أحتاج مساعدة في التمويل</option>'+
+      '<option value="not_sure">🤔 لم أقرر بعد</option>'+
     '</select></div>'+
     
-    '<div class="fg"><label class="fl">⏰ موعد الشراء المتوقع</label><select class="fs" id="lfTiming">'+
+    '<div class="fg"><label class="fl">⏰ موعد الشراء المتوقع <span class="lf-req">*</span></label><select class="fs" id="lfTiming" required>'+
       '<option value="">اختر</option>'+
       '<option value="immediate">🔥 فوراً</option>'+
       '<option value="this_week">⚡ خلال أسبوع</option>'+
       '<option value="this_month">📅 خلال شهر</option>'+
       '<option value="3_months">📆 خلال 3 أشهر</option>'+
       '<option value="just_looking">👀 فقط أبحث حالياً</option>'+
+      '<option value="not_sure">🤔 غير محدد بعد</option>'+
     '</select></div>'+
     
     '<details class="lf-advanced"><summary>📐 مواصفات تفصيلية (اختياري)</summary>'+
@@ -2074,15 +2082,16 @@ function renderSellerQuestions(){
   return ''+
     '<div class="fg"><label class="fl">🏘 نوع العقار المعروض *</label><select class="fs" id="lfPropType" required>'+propertyTypeOptions()+'</select></div>'+
     
-    '<div class="fg"><label class="fl">📍 المحافظة</label><select class="fs" id="lfGovernorate"><option value="">اختر</option><option value="muscat">مسقط</option><option value="dhofar">ظفار</option><option value="batinah_north">شمال الباطنة</option><option value="batinah_south">جنوب الباطنة</option><option value="sharqiyah_north">شمال الشرقية</option><option value="sharqiyah_south">جنوب الشرقية</option><option value="dakhliyah">الداخلية</option><option value="dhahirah">الظاهرة</option><option value="buraimi">البريمي</option><option value="musandam">مسندم</option><option value="wusta">الوسطى</option></select></div>'+
-    '<div class="fg"><label class="fl">🗺 الولاية *</label><input class="fi" id="lfWilayat" required placeholder="السيب، بوشر..."></div>'+
-    '<div class="fg"><label class="fl">📌 المنطقة *</label><input class="fi" id="lfArea" required placeholder="الموج، القرم..."></div>'+
-    '<div class="fg"><label class="fl">🔢 رقم القطعة (إن وجد)</label><input class="fi" id="lfPlotNumber" dir="ltr" placeholder="123/45"></div>'+
-    '<div class="fg"><label class="fl">📏 المساحة (م²) *</label><input class="fi" type="number" id="lfSize" required dir="ltr" placeholder="600"></div>'+
-    '<div class="fg"><label class="fl">💵 السعر المطلوب (ر.ع) *</label><input class="fi" type="number" id="lfAskingPrice" required dir="ltr" placeholder="150000"></div>'+
-    '<div class="fg"><label class="fl">🤝 هل السعر قابل للتفاوض؟</label><select class="fs" id="lfNegotiable"><option value="yes">نعم</option><option value="slight">قليلاً</option><option value="no">لا</option></select></div>'+
+    '<div class="fg"><label class="fl">📍 المحافظة <span class="lf-req">*</span></label><select class="fs" id="lfGovernorate" required><option value="">اختر</option><option value="muscat">مسقط</option><option value="dhofar">ظفار</option><option value="batinah_north">شمال الباطنة</option><option value="batinah_south">جنوب الباطنة</option><option value="sharqiyah_north">شمال الشرقية</option><option value="sharqiyah_south">جنوب الشرقية</option><option value="dakhliyah">الداخلية</option><option value="dhahirah">الظاهرة</option><option value="buraimi">البريمي</option><option value="musandam">مسندم</option><option value="wusta">الوسطى</option></select></div>'+
+    '<div class="fg"><label class="fl">🗺 الولاية <span class="lf-req">*</span></label><input class="fi" id="lfWilayat" required placeholder="السيب، بوشر..."></div>'+
+    '<div class="fg"><label class="fl">📌 المنطقة <span class="lf-req">*</span></label><input class="fi" id="lfArea" required placeholder="الموج، القرم..."></div>'+
+    '<div class="fg"><label class="fl">🔢 رقم القطعة <span class="lf-req">*</span></label><input class="fi" id="lfPlotNumber" required dir="ltr" placeholder="123/45 أو اكتب: غير معروف"></div>'+
+    '<div class="fg"><label class="fl">📏 المساحة (م²) <span class="lf-req">*</span></label><input class="fi" type="number" id="lfSize" required dir="ltr" placeholder="600"></div>'+
+    '<div class="fg"><label class="fl">💵 السعر المطلوب (ر.ع) <span class="lf-req">*</span></label><input class="fi" type="number" id="lfAskingPrice" required dir="ltr" placeholder="150000"></div>'+
+    '<div class="fg"><label class="fl">🤝 هل السعر قابل للتفاوض؟ <span class="lf-req">*</span></label><select class="fs" id="lfNegotiable" required><option value="">اختر</option><option value="yes">نعم</option><option value="slight">قليلاً</option><option value="no">لا</option></select></div>'+
     
-    '<div class="fg"><label class="fl">🏗 حالة العقار</label><select class="fs" id="lfCondition">'+
+    '<div class="fg"><label class="fl">🏗 حالة العقار <span class="lf-req">*</span></label><select class="fs" id="lfCondition" required>'+
+      '<option value="">اختر</option>'+
       '<option value="new">🆕 جديد</option>'+
       '<option value="used">🏠 مستخدم</option>'+
       '<option value="under_construction">🚧 قيد الإنشاء</option>'+
@@ -2107,7 +2116,8 @@ function renderSellerQuestions(){
     '<div class="fg"><label class="fl">💬 سبب البيع (اختياري)</label><input class="fi" id="lfReason" placeholder="استثمار، تغيير سكن..."></div>'+
     '<div class="fg"><label class="fl">📝 ملاحظات إضافية</label><textarea class="fta" id="lfNotes" rows="2"></textarea></div>'+
     
-    '<div class="fg"><label class="fl">👤 صفتك</label><select class="fs" id="lfOwnerRole">'+
+    '<div class="fg"><label class="fl">👤 صفتك <span class="lf-req">*</span></label><select class="fs" id="lfOwnerRole" required>'+
+      '<option value="">اختر</option>'+
       '<option value="owner">👤 المالك</option>'+
       '<option value="agent">💼 وكيل</option>'+
       '<option value="broker">🤝 وسيط</option>'+
@@ -2117,22 +2127,25 @@ function renderSellerQuestions(){
 
 function renderTenantQuestions(){
   return ''+
-    '<div class="fg"><label class="fl">🏘 نوع العقار المطلوب *</label><select class="fs" id="lfPropType" required>'+propertyTypeOptions()+'</select></div>'+
-    '<div class="fg"><label class="fl">📍 المحافظة</label><select class="fs" id="lfGovernorate"><option value="">اختر</option><option value="muscat">مسقط</option><option value="dhofar">ظفار</option><option value="batinah_north">شمال الباطنة</option><option value="batinah_south">جنوب الباطنة</option><option value="sharqiyah_north">شمال الشرقية</option><option value="sharqiyah_south">جنوب الشرقية</option><option value="dakhliyah">الداخلية</option><option value="dhahirah">الظاهرة</option></select></div>'+
-    '<div class="fg"><label class="fl">🗺 الولاية</label><input class="fi" id="lfWilayat"></div>'+
-    '<div class="fg"><label class="fl">📌 المنطقة</label><input class="fi" id="lfArea"></div>'+
+    '<div class="fg"><label class="fl">🏘 نوع العقار المطلوب <span class="lf-req">*</span></label><select class="fs" id="lfPropType" required>'+propertyTypeOptions()+'</select></div>'+
+    '<div class="fg"><label class="fl">📍 المحافظة <span class="lf-req">*</span></label><select class="fs" id="lfGovernorate" required><option value="">اختر</option><option value="muscat">مسقط</option><option value="dhofar">ظفار</option><option value="batinah_north">شمال الباطنة</option><option value="batinah_south">جنوب الباطنة</option><option value="sharqiyah_north">شمال الشرقية</option><option value="sharqiyah_south">جنوب الشرقية</option><option value="dakhliyah">الداخلية</option><option value="dhahirah">الظاهرة</option><option value="not_sure">🤔 غير محدد</option></select></div>'+
+    '<div class="fg"><label class="fl">🗺 الولاية <span class="lf-req">*</span></label><input class="fi" id="lfWilayat" required placeholder="السيب، بوشر..."></div>'+
+    '<div class="fg"><label class="fl">📌 المنطقة <span class="lf-req">*</span></label><input class="fi" id="lfArea" required placeholder="القرم، الموج..."></div>'+
     
-    '<div class="fg"><label class="fl">💰 الميزانية الشهرية (ر.ع)</label><input class="fi" type="number" id="lfMonthlyRent" dir="ltr" placeholder="400"></div>'+
+    '<div class="fg"><label class="fl">💰 الميزانية الشهرية (ر.ع) <span class="lf-req">*</span></label><input class="fi" type="number" id="lfMonthlyRent" required dir="ltr" placeholder="400"></div>'+
     
-    '<div class="fg"><label class="fl">📅 مدة الإيجار المطلوبة</label><select class="fs" id="lfRentDuration">'+
+    '<div class="fg"><label class="fl">📅 مدة الإيجار المطلوبة <span class="lf-req">*</span></label><select class="fs" id="lfRentDuration" required>'+
+      '<option value="">اختر</option>'+
       '<option value="month">شهري</option>'+
       '<option value="3months">3 أشهر</option>'+
       '<option value="6months">6 أشهر</option>'+
       '<option value="year">سنة</option>'+
       '<option value="2years">سنتان</option>'+
+      '<option value="not_sure">🤔 مرن</option>'+
     '</select></div>'+
     
-    '<div class="fg"><label class="fl">👥 نوع الاستخدام</label><select class="fs" id="lfUseType">'+
+    '<div class="fg"><label class="fl">👥 نوع الاستخدام <span class="lf-req">*</span></label><select class="fs" id="lfUseType" required>'+
+      '<option value="">اختر</option>'+
       '<option value="residential_family">سكني عائلي</option>'+
       '<option value="residential_single">سكني عزّاب</option>'+
       '<option value="commercial">تجاري</option>'+
@@ -2145,30 +2158,32 @@ function renderTenantQuestions(){
 
 function renderLandlordQuestions(){
   return ''+
-    '<div class="fg"><label class="fl">🏘 نوع العقار *</label><select class="fs" id="lfPropType" required>'+propertyTypeOptions()+'</select></div>'+
-    '<div class="fg"><label class="fl">📍 المحافظة</label><select class="fs" id="lfGovernorate"><option value="">اختر</option><option value="muscat">مسقط</option><option value="dhofar">ظفار</option><option value="batinah_north">شمال الباطنة</option><option value="batinah_south">جنوب الباطنة</option></select></div>'+
-    '<div class="fg"><label class="fl">🗺 الولاية</label><input class="fi" id="lfWilayat"></div>'+
-    '<div class="fg"><label class="fl">📌 المنطقة</label><input class="fi" id="lfArea"></div>'+
+    '<div class="fg"><label class="fl">🏘 نوع العقار <span class="lf-req">*</span></label><select class="fs" id="lfPropType" required>'+propertyTypeOptions()+'</select></div>'+
+    '<div class="fg"><label class="fl">📍 المحافظة <span class="lf-req">*</span></label><select class="fs" id="lfGovernorate" required><option value="">اختر</option><option value="muscat">مسقط</option><option value="dhofar">ظفار</option><option value="batinah_north">شمال الباطنة</option><option value="batinah_south">جنوب الباطنة</option><option value="sharqiyah_north">شمال الشرقية</option><option value="sharqiyah_south">جنوب الشرقية</option><option value="dakhliyah">الداخلية</option><option value="dhahirah">الظاهرة</option></select></div>'+
+    '<div class="fg"><label class="fl">🗺 الولاية <span class="lf-req">*</span></label><input class="fi" id="lfWilayat" required placeholder="السيب، بوشر..."></div>'+
+    '<div class="fg"><label class="fl">📌 المنطقة <span class="lf-req">*</span></label><input class="fi" id="lfArea" required placeholder="الموج، القرم..."></div>'+
     
-    '<div class="fg"><label class="fl">💵 قيمة الإيجار المطلوبة (ر.ع/شهر)</label><input class="fi" type="number" id="lfMonthlyRent" dir="ltr" placeholder="500"></div>'+
+    '<div class="fg"><label class="fl">💵 قيمة الإيجار المطلوبة (ر.ع/شهر) <span class="lf-req">*</span></label><input class="fi" type="number" id="lfMonthlyRent" required dir="ltr" placeholder="500"></div>'+
     
-    '<div class="fg"><label class="fl">🛋 هل العقار مفروش؟</label><select class="fs" id="lfFurnished">'+
+    '<div class="fg"><label class="fl">🛋 هل العقار مفروش؟ <span class="lf-req">*</span></label><select class="fs" id="lfFurnished" required>'+
+      '<option value="">اختر</option>'+
       '<option value="no">❌ غير مفروش</option>'+
       '<option value="yes">✅ مفروش بالكامل</option>'+
       '<option value="partial">⚖️ مفروش جزئياً</option>'+
     '</select></div>'+
     
-    '<div class="fg"><label class="fl">🏗 حالة العقار</label><select class="fs" id="lfCondition">'+
+    '<div class="fg"><label class="fl">🏗 حالة العقار <span class="lf-req">*</span></label><select class="fs" id="lfCondition" required>'+
+      '<option value="">اختر</option>'+
       '<option value="new">🆕 جديد</option>'+
       '<option value="used">🏠 مستخدم</option>'+
       '<option value="renovated">✨ مجدد</option>'+
     '</select></div>'+
     
-    '<div class="fg"><label class="fl">📅 مدة الإيجار المفضّلة</label><select class="fs" id="lfRentDuration"><option value="month">شهري</option><option value="year">سنوي</option><option value="any">مرن</option></select></div>'+
+    '<div class="fg"><label class="fl">📅 مدة الإيجار المفضّلة <span class="lf-req">*</span></label><select class="fs" id="lfRentDuration" required><option value="">اختر</option><option value="month">شهري</option><option value="year">سنوي</option><option value="any">مرن</option></select></div>'+
     
-    '<div class="fg"><label class="fl">📝 ملاحظات</label><textarea class="fta" id="lfNotes" rows="2"></textarea></div>'+
+    '<div class="fg"><label class="fl">📝 ملاحظات إضافية</label><textarea class="fta" id="lfNotes" rows="2" placeholder="أي معلومات إضافية..."></textarea></div>'+
     
-    '<div class="fg"><label class="fl">👤 صفتك</label><select class="fs" id="lfOwnerRole"><option value="owner">المالك</option><option value="agent">وكيل</option><option value="broker">وسيط</option></select></div>';
+    '<div class="fg"><label class="fl">👤 صفتك <span class="lf-req">*</span></label><select class="fs" id="lfOwnerRole" required><option value="">اختر</option><option value="owner">المالك</option><option value="agent">وكيل</option><option value="broker">وسيط</option></select></div>';
 }
 
 function renderConsultationQuestions(){
@@ -2210,10 +2225,27 @@ window.lfGoToStep = function(n){
     document.getElementById('lfStep3').style.display = 'none';
     document.getElementById('lfStep2').style.display = '';
   } else if(n === 3){
-    // Validate step 2 has required fields
-    var propType = document.getElementById('lfPropType');
-    if(propType && propType.required && !propType.value){
-      alert('⚠️ الرجاء اختيار نوع العقار');
+    // Validate ALL required fields in step 2
+    var step2 = document.getElementById('lfStep2');
+    var requiredFields = step2.querySelectorAll('[required]');
+    var missing = [];
+    for(var i=0; i<requiredFields.length; i++){
+      var f = requiredFields[i];
+      if(!f.value || f.value.trim() === ''){
+        var label = f.previousElementSibling;
+        var labelText = label ? label.textContent.replace(/[*✱]/g,'').trim() : f.id;
+        missing.push(labelText);
+        f.style.borderColor = '#DC2626';
+        f.style.background = '#FEF2F2';
+      } else {
+        f.style.borderColor = '';
+        f.style.background = '';
+      }
+    }
+    if(missing.length > 0){
+      alert('⚠️ الرجاء إكمال الحقول التالية:\n\n• ' + missing.join('\n• ') + '\n\nإذا لا تعرف الإجابة، اختر "غير محدد" أو "لم أقرر بعد"');
+      // Scroll to first missing field
+      if(requiredFields[0]) requiredFields[0].scrollIntoView({behavior:'smooth', block:'center'});
       return;
     }
     document.getElementById('lfStep2').style.display = 'none';
@@ -2240,6 +2272,34 @@ async function submitLead(companyId){
   const service = leadFormState.service;
   const errEl = document.getElementById('leadFormError');
   const sucEl = document.getElementById('leadFormSuccess');
+  
+  // Validate ALL required fields in step 3
+  var step3 = document.getElementById('lfStep3');
+  var requiredFields = step3.querySelectorAll('[required]');
+  var missing = [];
+  for(var i=0; i<requiredFields.length; i++){
+    var f = requiredFields[i];
+    if(!f.value || f.value.trim() === ''){
+      var label = f.closest('.fg') ? f.closest('.fg').querySelector('label') : null;
+      var labelText = label ? label.textContent.replace(/[*✱]/g,'').trim() : f.id;
+      missing.push(labelText);
+      f.style.borderColor = '#DC2626';
+      f.style.background = '#FEF2F2';
+    } else {
+      f.style.borderColor = '';
+      f.style.background = '';
+    }
+  }
+  if(!phone){
+    missing.push('رقم الهاتف');
+    if(phoneInp){phoneInp.style.borderColor='#DC2626';phoneInp.style.background='#FEF2F2'}
+  }
+  if(missing.length > 0){
+    errEl.innerHTML = '⚠️ الرجاء إكمال:<br>• ' + missing.join('<br>• ');
+    errEl.style.display = 'flex';
+    window.scrollTo({top:0, behavior:'smooth'});
+    return;
+  }
   
   // Basic validation
   if(!name || !phone || !service){
