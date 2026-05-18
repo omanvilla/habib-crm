@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260517-1008">
+<meta name="app-version" content="20260518-0346">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -286,6 +286,13 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .role-cb.buyer.checked{border-color:var(--gold);background:rgba(196,150,58,0.08)}
 .role-cb.seller.checked{border-color:var(--emerald);background:rgba(46,125,92,0.08);color:var(--emerald)}
 .role-cb.investor.checked{border-color:var(--ruby);background:rgba(139,38,53,0.08);color:var(--ruby)}
+.role-cb.tenant{border-color:#10B981;color:#065F46}
+.role-cb.tenant.checked{background:linear-gradient(135deg,#D1FAE5,#A7F3D0);border-color:#10B981;color:#065F46;box-shadow:0 2px 8px rgba(16,185,129,0.2)}
+.role-cb.landlord{border-color:#F59E0B;color:#78350F}
+.role-cb.landlord.checked{background:linear-gradient(135deg,#FEF3C7,#FDE68A);border-color:#F59E0B;color:#78350F;box-shadow:0 2px 8px rgba(245,158,11,0.2)}
+.role-cb.consultation{border-color:#A855F7;color:#581C87}
+.role-cb.consultation.checked{background:linear-gradient(135deg,#F3E8FF,#E9D5FF);border-color:#A855F7;color:#581C87;box-shadow:0 2px 8px rgba(168,85,247,0.2)}
+
 .role-pills{display:inline-flex;gap:4px;flex-wrap:wrap}
 .role-pill{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px}
 .role-pill.buyer{background:rgba(196,150,58,0.15);color:#8B6514}
@@ -1327,17 +1334,28 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 <label class="role-cb buyer" id="cbBuyer"><input type="checkbox" id="cRoleBuyer" onchange="toggleRoleCB(this,'cbBuyer')">🛒 مشتري</label>
 <label class="role-cb seller" id="cbSeller"><input type="checkbox" id="cRoleSeller" onchange="toggleRoleCB(this,'cbSeller')">🏠 بائع</label>
 <label class="role-cb investor" id="cbInvestor"><input type="checkbox" id="cRoleInvestor" onchange="toggleRoleCB(this,'cbInvestor')">💼 مستثمر</label>
+<label class="role-cb tenant" id="cbTenant"><input type="checkbox" id="cRoleTenant" onchange="toggleRoleCB(this,'cbTenant')">🔑 مستأجر</label>
+<label class="role-cb landlord" id="cbLandlord"><input type="checkbox" id="cRoleLandlord" onchange="toggleRoleCB(this,'cbLandlord')">📋 مؤجر</label>
+<label class="role-cb consultation" id="cbConsultation"><input type="checkbox" id="cRoleConsultation" onchange="toggleRoleCB(this,'cbConsultation')">💡 استشارة</label>
 </div>
 </div>
 <div class="fg"><label class="fl">🏘 نوع العقار المطلوب</label><select class="fs" id="cPropType" onchange="updateLeadScorePreview()">
 <option value="">اختر</option>
 <option value="villa">🏡 فيلا</option>
 <option value="apartment">🏢 شقة</option>
+<option value="house">🏠 منزل</option>
+<option value="twin_villa">🏘 توين فيلا</option>
+<option value="townhouse">🏚 تاون هاوس</option>
+<option value="penthouse">🌆 بنتهاوس</option>
 <option value="land">📐 أرض</option>
+<option value="land_residential">📐 أرض سكنية</option>
+<option value="land_commercial">🏗 أرض تجارية</option>
+<option value="farm">🌾 مزرعة</option>
 <option value="resthouse">🌴 استراحة</option>
 <option value="chalet">🏖 شاليه</option>
 <option value="office">🏬 مكتب</option>
 <option value="shop">🏪 محل تجاري</option>
+<option value="warehouse">📦 مستودع</option>
 <option value="building">🏛 عمارة كاملة</option>
 </select></div>
 <div class="fg"><label class="fl">📍 الولاية</label><input class="fi" id="cWilayat" placeholder="مسقط، السيب، بوشر..."></div>
@@ -1424,15 +1442,25 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 <div class="fg"><label class="fl">🏘 نوع العقار *</label><select class="fs" id="pType" required>
 <option value="">اختر</option>
 <option value="villa">🏡 فيلا</option>
+<option value="house">🏠 منزل</option>
+<option value="twin_villa">🏘 توين فيلا</option>
+<option value="townhouse">🏚 تاون هاوس</option>
 <option value="apartment">🏢 شقة</option>
+<option value="penthouse">🌆 بنتهاوس</option>
 <option value="building">🏛 عمارة كاملة</option>
+<option value="residential_building">🏢 بناية سكنية</option>
+<option value="commercial_building">🏛 مبنى تجاري</option>
+<option value="income_property">💰 عقار دخل</option>
 <option value="land">📐 أرض</option>
+<option value="land_residential">📐 أرض سكنية</option>
+<option value="land_commercial">🏗 أرض تجارية</option>
+<option value="land_mixed">🏢 أرض سكني تجاري</option>
+<option value="farm">🌾 مزرعة</option>
 <option value="resthouse">🌴 استراحة</option>
 <option value="chalet">🏖 شاليه</option>
 <option value="office">🏬 مكتب</option>
 <option value="shop">🏪 محل تجاري</option>
 <option value="warehouse">📦 مستودع</option>
-<option value="farm">🌾 مزرعة</option>
 </select></div>
 <div class="fg"><label class="fl">📍 الولاية</label><input class="fi" id="pWilayat" placeholder="مسقط، السيب..."></div>
 <div class="fg full"><label class="fl">🗺 المنطقة *</label><input class="fi" id="pArea" required placeholder="الموج، القرم، المعبيلة..."></div>
@@ -2334,11 +2362,7 @@ async function submitLead(companyId){
   }
   
   // Map service to client_type
-  let clientType = 'buyer';
-  if(service === 'seller') clientType = 'seller';
-  else if(service === 'tenant') clientType = 'buyer'; // tenant tracked as buyer for now
-  else if(service === 'landlord') clientType = 'seller';
-  else if(service === 'consultation') clientType = 'buyer';
+  let clientType = service; // 'buyer', 'seller', 'tenant', 'landlord', 'consultation'
   
   // Build budget from range or custom
   let budgetMin = null, budgetMax = null;
@@ -2419,8 +2443,8 @@ async function submitLead(companyId){
       phone: phone,
       email: v('lfEmail') || null,
       client_type: clientType,
-      is_buyer: service === 'buyer' || service === 'tenant',
-      is_seller: service === 'seller' || service === 'landlord',
+      is_buyer: service === 'buyer',
+      is_seller: service === 'seller',
       is_investor: v('lfPurpose') === 'investment' || v('lfPurpose') === 'residence_investment',
       preferred_area: v('lfArea') || null,
       wilayat: v('lfWilayat') || null,
@@ -2511,7 +2535,41 @@ function clearAuthMessages(){$('authError').style.display='none';$('authSuccess'
 function roleAr(r){return{owner:'صاحب الشركة',manager:'منسق',agent:'موظف مبيعات',viewer:'عرض فقط'}[r]||r}
 function roleIcon(r){return{owner:'👑',manager:'💼',agent:'🤝',viewer:'👁'}[r]||'👤'}
 function statusBadge(s,score){const m={hot:['🔥 HOT','b-hot'],warm:['🟡 WARM','b-warm'],cold:['❄️ COLD','b-cold'],inactive:['⚪ غير نشط','b-cold']};const r=m[s]||['—','b-cold'];let h='<span class="badge '+r[1]+'">'+r[0]+'</span>';if(typeof score==='number')h+='<span style="font-size:10px;color:var(--umber);margin-right:4px;font-weight:700">'+score+'</span>';return h}
-function clientTypeAr(t){return{buyer:'مشتري',seller:'بائع',investor:'مستثمر'}[t]||t}
+function clientTypeAr(t){return{
+  buyer:'🛒 مشتري',
+  seller:'🏠 بائع',
+  investor:'💼 مستثمر',
+  tenant:'🔑 مستأجر',
+  landlord:'📋 مؤجر',
+  consultation:'💡 استشارة'
+}[t]||t||'—'}
+
+
+function propertyTypeAr(t){return({
+  villa:'🏡 فيلا',
+  house:'🏠 منزل',
+  twin_villa:'🏘 توين فيلا',
+  townhouse:'🏚 تاون هاوس',
+  apartment:'🏢 شقة',
+  penthouse:'🌆 بنتهاوس',
+  building:'🏛 عمارة',
+  residential_building:'🏢 بناية سكنية',
+  commercial_building:'🏛 مبنى تجاري',
+  income_property:'💰 عقار دخل',
+  land:'📐 أرض',
+  land_residential:'📐 أرض سكنية',
+  land_commercial:'🏗 أرض تجارية',
+  land_mixed:'🏢 أرض سكني تجاري',
+  farm:'🌾 مزرعة',
+  resthouse:'🌴 استراحة',
+  chalet:'🏖 شاليه',
+  office:'🏬 مكتب',
+  shop:'🏪 محل تجاري',
+  warehouse:'📦 مستودع',
+  not_sure:'🤔 لم يحدد بعد',
+  other:'📌 أخرى'
+}[t]||t||'—');}
+
 function propTypeAr(t){return{villa:'فيلا',apartment:'شقة',land:'أرض',office:'مكتب',shop:'محل'}[t]||t}
 function dealStageAr(s){return({
   new:'🆕 عميل مهتم',
@@ -2648,7 +2706,7 @@ function renderDashHot(clients){if(!clients.length){$('dashHotList').innerHTML='
 function renderDashActivities(acts){if(!acts.length){$('dashActivityList').innerHTML='<div class="empty" style="padding:30px"><div class="empty-ico" style="font-size:36px">📜</div><div class="empty-desc">لا توجد نشاطات بعد. ابدأ بالعمل!</div></div>';return}let h='';acts.forEach(function(a){h+='<div class="activity-item"><div class="activity-icon '+a.activity_type+'">'+activityIcon(a.activity_type)+'</div><div class="activity-content"><div class="activity-text">'+escapeHtml(a.activity_text||'')+'</div><div class="activity-meta">'+(a.user?'<span>👤 '+escapeHtml(a.user.full_name)+'</span>':'')+(a.client?'<span>· '+escapeHtml(a.client.name)+'</span>':'')+'<span>· '+timeAgo(a.created_at)+'</span></div></div></div>'});$('dashActivityList').innerHTML=h}
 
 function populateClientForm(){if(editingClient){const c=allClients.find(x=>x.id===editingClient);if(c){if($('cPaymentMethod'))$('cPaymentMethod').value=c.payment_method||'';if($('cPurchaseTiming'))$('cPurchaseTiming').value=c.purchase_timing||'';if($('cPurpose'))$('cPurpose').value=c.purpose||'';if($('cWilayat'))$('cWilayat').value=c.wilayat||'';if($('cNationality'))$('cNationality').value=c.nationality||'';if($('cCountry'))$('cCountry').value=c.country||''}}else{['cPaymentMethod','cPurchaseTiming','cPurpose','cWilayat','cNationality','cCountry'].forEach(i=>{const e=$(i);if(e)e.value=''})}setTimeout(updateLeadScorePreview,100);if($('cAssignedFG')){if(canManage()){$('cAssignedFG').style.display='';const sel=$('cAssignedTo');sel.innerHTML='<option value="">— تلقائي (أنت) —</option>';allMembers.forEach(function(m){if(m.is_active!==false)sel.innerHTML+='<option value="'+m.id+'">'+escapeHtml(m.full_name)+'</option>'})}else{$('cAssignedFG').style.display='none'}}
-if(!editingClient){['cRoleBuyer','cRoleSeller','cRoleInvestor'].forEach(id=>{var e=$(id);if(e){e.checked=false;if(e.parentElement)e.parentElement.classList.remove('checked')}});var rb=$('cRoleBuyer');if(rb)rb.checked=true;var cbB=$('cbBuyer');if(cbB)cbB.classList.add('checked');var ph=document.getElementById('duplicatePhoneWarn');if(ph)ph.style.display='none'}}
+if(!editingClient){['cRoleBuyer','cRoleSeller','cRoleInvestor','cRoleTenant','cRoleLandlord','cRoleConsultation'].forEach(id=>{var e=$(id);if(e){e.checked=false;if(e.parentElement)e.parentElement.classList.remove('checked')}});var rb=$('cRoleBuyer');if(rb)rb.checked=true;var cbB=$('cbBuyer');if(cbB)cbB.classList.add('checked');var ph=document.getElementById('duplicatePhoneWarn');if(ph)ph.style.display='none'}}
 
 function setClientArchiveView(archived,btn){showArchivedClients=archived;document.querySelectorAll('.archive-toggle button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadClients()}
 
@@ -2709,7 +2767,16 @@ function switchClientTab(tab,el){document.querySelectorAll('.detail-tab').forEac
 function openAddActivity(){if(!viewingClient){showToast('⚠️ افتح عميلاً أولاً','error');return}$('aText').value='';$('mActivity').classList.add('on')}
 async function saveActivity(){if(!viewingClient)return;const type=$('aType').value,text=$('aText').value.trim();if(!text){showToast('⚠️ التفاصيل مطلوبة','error');return}try{await logActivity(type,text,viewingClient.id);closeModal('mActivity');showToast('✅ تم إضافة النشاط','success');loadClientActivities();loadDashboard()}catch(err){showToast('خطأ: '+err.message,'error')}}
 
-function editClient(){if(!viewingClient)return;const c=viewingClient;editingClient=c.id;$('mClientTitle').textContent='✏️ تعديل بيانات العميل';$('cName').value=c.name||'';setupPhoneField('cPhoneCountry','cPhoneLocal',c.phone||'');$('cEmail').value=c.email||'';$('cSource').value=c.source||'whatsapp';$('cArea').value=c.preferred_area||'';$('cPropType').value=c.property_type||'';$('cStatus').value=c.lead_temperature||c.status||'warm';$('cBudgetMin').value=c.budget_min||'';$('cBudgetMax').value=c.budget_max||'';$('cNextFollowup').value=c.next_followup||'';$('cNotes').value=c.notes||'';const isB=c.is_buyer||c.client_type==='buyer';const isS=c.is_seller||c.client_type==='seller';const isI=c.is_investor||c.client_type==='investor';$('cRoleBuyer').checked=isB;$('cbBuyer').classList.toggle('checked',isB);$('cRoleSeller').checked=isS;$('cbSeller').classList.toggle('checked',isS);$('cRoleInvestor').checked=isI;$('cbInvestor').classList.toggle('checked',isI);openModal('mClient');if($('cAssignedTo'))$('cAssignedTo').value=c.assigned_to||''}
+function editClient(){if(!viewingClient)return;const c=viewingClient;editingClient=c.id;$('mClientTitle').textContent='✏️ تعديل بيانات العميل';$('cName').value=c.name||'';setupPhoneField('cPhoneCountry','cPhoneLocal',c.phone||'');$('cEmail').value=c.email||'';$('cSource').value=c.source||'whatsapp';$('cArea').value=c.preferred_area||'';$('cPropType').value=c.property_type||'';$('cStatus').value=c.lead_temperature||c.status||'warm';$('cBudgetMin').value=c.budget_min||'';$('cBudgetMax').value=c.budget_max||'';$('cNextFollowup').value=c.next_followup||'';$('cNotes').value=c.notes||'';const isB=c.is_buyer||c.client_type==='buyer';const isS=c.is_seller||c.client_type==='seller';const isI=c.is_investor||c.client_type==='investor';$('cRoleBuyer').checked=isB;$('cRoleSeller').checked=isS;$('cRoleInvestor').checked=isI;
+var ct=c.client_type;
+if($('cRoleTenant'))$('cRoleTenant').checked=(ct==='tenant');
+if($('cRoleLandlord'))$('cRoleLandlord').checked=(ct==='landlord');
+if($('cRoleConsultation'))$('cRoleConsultation').checked=(ct==='consultation');
+['cbBuyer','cbSeller','cbInvestor','cbTenant','cbLandlord','cbConsultation'].forEach(function(cb){
+  var el=document.getElementById(cb);if(!el)return;
+  var inp=document.getElementById(cb.replace('cb','cRole'));
+  if(inp&&inp.checked)el.classList.add('checked');else el.classList.remove('checked');
+});;$('cbSeller').classList.toggle('checked',isS);$('cRoleInvestor').checked=isI;$('cbInvestor').classList.toggle('checked',isI);openModal('mClient');if($('cAssignedTo'))$('cAssignedTo').value=c.assigned_to||''}
 
 function addTaskForClient(cid){populateTaskSelects().then(function(){$('tClient').value=cid;$('tTitle').value='';$('tDueDate').value='';$('tNotes').value='';$('mTask').classList.add('on')})}
 function addDealForClient(cid){populateDealSelects().then(function(){$('dClient').value=cid;$('dValue').value='';$('dNotes').value='';$('mDeal').classList.add('on')})}
@@ -4291,7 +4358,7 @@ function navigateOwners(){navigate('owners',null)}
 
 // ===== AUTO-UPDATE CHECKER =====
 // Checks if a new version is available every 5 minutes
-window.APP_VERSION = '20260517-1008';
+window.APP_VERSION = '20260518-0346';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
