@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260518-0400">
+<meta name="app-version" content="20260518-0806">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -974,6 +974,9 @@ tr.archived td:first-child::before{content:'📦 ';opacity:0.7}
 <button class="role-tab" onclick="filterClientRole('buyer',this)">🛒 مشترين <span class="count" id="cntBuyers">0</span></button>
 <button class="role-tab" onclick="filterClientRole('seller',this)">🏠 بائعين <span class="count" id="cntSellers">0</span></button>
 <button class="role-tab" onclick="filterClientRole('investor',this)">💼 مستثمرين <span class="count" id="cntInvestors">0</span></button>
+<button class="role-tab" onclick="filterClientRole('tenant',this)">🔑 مستأجرين <span class="count" id="cntTenants">0</span></button>
+<button class="role-tab" onclick="filterClientRole('landlord',this)">📋 مؤجرين <span class="count" id="cntLandlords">0</span></button>
+<button class="role-tab" onclick="filterClientRole('consultation',this)">💡 استشارات <span class="count" id="cntConsultations">0</span></button>
 <button class="role-tab" onclick="filterClientRole('hot',this)">🔥 حاريّن <span class="count" id="cntHot">0</span></button>
 <button class="role-tab" onclick="filterClientRole('followup',this)">⏰ يحتاج متابعة <span class="count" id="cntFollowup">0</span></button>
 </div>
@@ -2744,7 +2747,29 @@ function setClientArchiveView(archived,btn){showArchivedClients=archived;documen
 
 function filterClientRole(f,el){clientRoleFilter=f;document.querySelectorAll('#clientRoleTabs .role-tab').forEach(t=>{t.classList.remove('active','buyer','seller','investor')});el.classList.add('active');if(f==='buyer')el.classList.add('buyer');if(f==='seller')el.classList.add('seller');if(f==='investor')el.classList.add('investor');renderClients()}
 
-function updateRoleCounts(){let buyers=0,sellers=0,investors=0,hot=0,followup=0;allClients.forEach(c=>{const r=getRoles(c);if(r.indexOf('buyer')>=0)buyers++;if(r.indexOf('seller')>=0)sellers++;if(r.indexOf('investor')>=0)investors++;if(c.status==='hot')hot++;if(needsFollowup(c))followup++});$('cntAll').textContent=allClients.length;$('cntBuyers').textContent=buyers;$('cntSellers').textContent=sellers;$('cntInvestors').textContent=investors;$('cntHot').textContent=hot;$('cntFollowup').textContent=followup;if(followup>0){$('followupAlert').innerHTML='<div class="followup-alert"><div class="followup-text">⏰ <strong>'+followup+' عميل</strong> يحتاج متابعة (أكثر من أسبوع بدون تواصل)</div><button class="btn-primary" style="width:auto;padding:7px 14px;font-size:12px" onclick="filterClientRole(\'followup\',document.querySelector(\'#clientRoleTabs .role-tab:nth-child(6)\'))">عرضهم</button></div>'}else{$('followupAlert').innerHTML=''}}
+function updateRoleCounts(){
+  let buyers=0,sellers=0,investors=0,tenants=0,landlords=0,consultations=0,hot=0,followup=0;
+  allClients.forEach(function(c){
+    const r=getRoles(c);
+    if(r.indexOf('buyer')>=0)buyers++;
+    if(r.indexOf('seller')>=0)sellers++;
+    if(r.indexOf('investor')>=0)investors++;
+    if(c.client_type==='tenant')tenants++;
+    if(c.client_type==='landlord')landlords++;
+    if(c.client_type==='consultation')consultations++;
+    var temp=c.lead_temperature||c.status;
+    if(temp==='hot')hot++;
+    if(needsFollowup(c))followup++;
+  });
+  $('cntAll').textContent=allClients.length;
+  $('cntBuyers').textContent=buyers;
+  $('cntSellers').textContent=sellers;
+  $('cntInvestors').textContent=investors;
+  var et=$('cntTenants');if(et)et.textContent=tenants;
+  var el=$('cntLandlords');if(el)el.textContent=landlords;
+  var ec=$('cntConsultations');if(ec)ec.textContent=consultations;
+  $('cntHot').textContent=hot;
+  $('cntFollowup').textContent=followup;if(followup>0){$('followupAlert').innerHTML='<div class="followup-alert"><div class="followup-text">⏰ <strong>'+followup+' عميل</strong> يحتاج متابعة (أكثر من أسبوع بدون تواصل)</div><button class="btn-primary" style="width:auto;padding:7px 14px;font-size:12px" onclick="filterClientRole(\'followup\',document.querySelector(\'#clientRoleTabs .role-tab:nth-child(6)\'))">عرضهم</button></div>'}else{$('followupAlert').innerHTML=''}}
 
 async function loadClients(){const list=$('clientsList');list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';try{let q=supa.from('clients').select('*, agent:profiles!clients_assigned_to_fkey(full_name)').order('created_at',{ascending:false});const r=await q;if(r.error)throw r.error;allClients=(r.data||[]).filter(c=>showArchivedClients?c.archived===true:c.archived!==true);updateRoleCounts();renderClients()}catch(err){list.innerHTML='<div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(err.message)+'</div></div>'}}
 
@@ -4399,7 +4424,7 @@ function navigateOwners(){navigate('owners',null)}
 
 // ===== AUTO-UPDATE CHECKER =====
 // Checks if a new version is available every 5 minutes
-window.APP_VERSION = '20260518-0400';
+window.APP_VERSION = '20260518-0806';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
