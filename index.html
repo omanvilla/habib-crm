@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260519-0518">
+<meta name="app-version" content="20260519-0608">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -95,7 +95,7 @@
 <div class="nav-link" id="navExpenses" onclick="navigate('expenses',this)" style="display:none"><div class="nav-icon">💸</div><span class="nav-text">المصاريف</span></div>
 <div class="nav-link" id="navActivityLog" onclick="navigate('activityLog',this)" style="display:none"><div class="nav-icon">📜</div><span class="nav-text">سجل النشاط</span></div>
 <div class="nav-link" id="navTeam" onclick="navigate('team',this)" style="display:none"><div class="nav-icon">👤</div><span class="nav-text">الفريق</span></div>
-<div class="nav-link manager-only-nav" id="navBackup" style="display:none" onclick="navigate('backup',this)"><div class="nav-icon">🛡</div><span class="nav-text">الحماية والـ Backup</span></div>
+<div class="nav-link" id="navBackup" onclick="navigate('backup',this)"><div class="nav-icon">🛡</div><span class="nav-text">الحماية والـ Backup</span></div>
 <div class="nav-link" onclick="navigate('settings',this)"><div class="nav-icon">⚙️</div><span class="nav-text">الإعدادات</span></div>
 </div>
 </nav>
@@ -3109,7 +3109,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
-window.APP_VERSION = '20260519-0518';
+window.APP_VERSION = '20260519-0608';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
