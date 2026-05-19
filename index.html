@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260519-0451">
+<meta name="app-version" content="20260519-0518">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -95,6 +95,7 @@
 <div class="nav-link" id="navExpenses" onclick="navigate('expenses',this)" style="display:none"><div class="nav-icon">💸</div><span class="nav-text">المصاريف</span></div>
 <div class="nav-link" id="navActivityLog" onclick="navigate('activityLog',this)" style="display:none"><div class="nav-icon">📜</div><span class="nav-text">سجل النشاط</span></div>
 <div class="nav-link" id="navTeam" onclick="navigate('team',this)" style="display:none"><div class="nav-icon">👤</div><span class="nav-text">الفريق</span></div>
+<div class="nav-link manager-only-nav" id="navBackup" style="display:none" onclick="navigate('backup',this)"><div class="nav-icon">🛡</div><span class="nav-text">الحماية والـ Backup</span></div>
 <div class="nav-link" onclick="navigate('settings',this)"><div class="nav-icon">⚙️</div><span class="nav-text">الإعدادات</span></div>
 </div>
 </nav>
@@ -382,6 +383,11 @@
 <button class="viewing-tab" onclick="setDepositTab('all',this)">📋 الكل</button>
 </div>
 <div id="depositsList"><div class="empty"><div class="loader-spinner"></div></div></div>
+</div>
+
+<div class="page" id="page-backup">
+<div class="page-header"><div><div class="page-title">🛡 الحماية والنسخ الاحتياطية</div><div class="page-sub">احمِ بياناتك من الضياع</div></div></div>
+<div id="backupContent"><div class="empty"><div class="loader-spinner"></div></div></div>
 </div>
 
 <div class="page" id="page-settings">
@@ -3103,7 +3109,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
-window.APP_VERSION = '20260519-0451';
+window.APP_VERSION = '20260519-0518';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
@@ -3135,9 +3141,408 @@ window.forceUpdate = function(){
 };
 setInterval(window.checkForUpdates, 5 * 60 * 1000);
 setTimeout(window.checkForUpdates, 30000);
+
+// ===== BACKUP & PROTECTION SYSTEM =====
+
+// Constants for backup
+window.BACKUP_VERSION = '1.0';
+window.BACKUP_RETENTION_DAYS = 30;
+
+// Stats: count of records for each table
+async function getBackupStats(){
+  if(!currentProfile||!currentProfile.company_id)return null;
+  try{
+    const cid = currentProfile.company_id;
+    const results = await Promise.all([
+      supa.from('clients').select('id',{count:'exact',head:true}).eq('company_id',cid),
+      supa.from('properties').select('id',{count:'exact',head:true}).eq('company_id',cid),
+      supa.from('deals').select('id',{count:'exact',head:true}).eq('company_id',cid),
+      supa.from('owners').select('id',{count:'exact',head:true}).eq('company_id',cid),
+      supa.from('tasks').select('id',{count:'exact',head:true}).eq('company_id',cid),
+      supa.from('activities').select('id',{count:'exact',head:true}).eq('company_id',cid),
+      supa.from('viewings').select('id',{count:'exact',head:true}).eq('company_id',cid),
+      supa.from('deposits').select('id',{count:'exact',head:true}).eq('company_id',cid)
+    ]);
+    return {
+      clients: results[0].count || 0,
+      properties: results[1].count || 0,
+      deals: results[2].count || 0,
+      owners: results[3].count || 0,
+      tasks: results[4].count || 0,
+      activities: results[5].count || 0,
+      viewings: results[6].count || 0,
+      deposits: results[7].count || 0,
+      total: results.reduce((s,r)=>s+(r.count||0),0)
+    };
+  }catch(e){console.error('[Backup Stats]',e);return null;}
+}
+
+// Download full backup as JSON file
+async function downloadFullBackup(){
+  if(!isOwner()){showToast('⚠️ هذه الميزة للمدير فقط','error');return;}
+  
+  showToast('🔄 جاري تحضير النسخة الاحتياطية...','info');
+  const btn = document.getElementById('btnDownloadBackup');
+  if(btn){btn.disabled=true;btn.textContent='⏳ جاري التحضير...';}
+  
+  try{
+    const cid = currentProfile.company_id;
+    const tables = ['clients','properties','deals','owners','tasks','activities','viewings','deposits','companies','profiles'];
+    const backup = {
+      version: BACKUP_VERSION,
+      created_at: new Date().toISOString(),
+      company_id: cid,
+      created_by: currentProfile.full_name || currentUser.email,
+      tables: {}
+    };
+    
+    for(const t of tables){
+      let q = supa.from(t).select('*');
+      if(t !== 'companies' && t !== 'profiles') q = q.eq('company_id', cid);
+      const r = await q;
+      if(r.data) backup.tables[t] = r.data;
+      else backup.tables[t] = [];
+    }
+    
+    // Compute totals
+    const totals = {};
+    let grandTotal = 0;
+    Object.keys(backup.tables).forEach(t => {
+      totals[t] = backup.tables[t].length;
+      grandTotal += backup.tables[t].length;
+    });
+    backup.summary = {totals: totals, grand_total: grandTotal};
+    
+    // Convert to JSON
+    const json = JSON.stringify(backup, null, 2);
+    const blob = new Blob([json], {type:'application/json;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    
+    // Generate filename with timestamp
+    const now = new Date();
+    const ts = now.getFullYear() + '-' + 
+               String(now.getMonth()+1).padStart(2,'0') + '-' +
+               String(now.getDate()).padStart(2,'0') + '_' +
+               String(now.getHours()).padStart(2,'0') + '-' +
+               String(now.getMinutes()).padStart(2,'0');
+    const filename = 'habib-crm-backup-' + ts + '.json';
+    
+    // Download
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    // Save backup record to localStorage
+    saveBackupRecord({
+      filename: filename,
+      created_at: now.toISOString(),
+      size_kb: Math.round(json.length / 1024),
+      total_records: grandTotal,
+      summary: totals
+    });
+    
+    showToast('✅ تم تحميل النسخة الاحتياطية: ' + grandTotal + ' سجل','success');
+    if(btn){btn.disabled=false;btn.textContent='📥 تحميل نسخة احتياطية الآن';}
+    
+    // Reload UI
+    renderBackupPage();
+  }catch(err){
+    console.error('[Backup Download]',err);
+    showToast('❌ خطأ في الـ Backup: ' + err.message,'error');
+    if(btn){btn.disabled=false;btn.textContent='📥 تحميل نسخة احتياطية الآن';}
+  }
+}
+
+// Save backup record to localStorage history
+function saveBackupRecord(record){
+  try{
+    const key = 'backup_history_' + (currentProfile.company_id || 'default');
+    const history = JSON.parse(localStorage.getItem(key) || '[]');
+    history.unshift(record);
+    // Keep only last 50 records
+    if(history.length > 50) history.length = 50;
+    localStorage.setItem(key, JSON.stringify(history));
+  }catch(e){console.warn('Save backup record:',e);}
+}
+
+// Get backup history
+function getBackupHistory(){
+  try{
+    const key = 'backup_history_' + (currentProfile.company_id || 'default');
+    return JSON.parse(localStorage.getItem(key) || '[]');
+  }catch(e){return [];}
+}
+
+// Export specific table as CSV
+async function exportTableCSV(tableName){
+  if(!isOwner()){showToast('⚠️ هذه الميزة للمدير فقط','error');return;}
+  
+  try{
+    const cid = currentProfile.company_id;
+    let q = supa.from(tableName).select('*');
+    if(tableName !== 'companies' && tableName !== 'profiles') q = q.eq('company_id', cid);
+    const r = await q;
+    
+    if(!r.data || r.data.length === 0){
+      showToast('📭 لا توجد بيانات في هذا الجدول','info');
+      return;
+    }
+    
+    // Convert to CSV
+    const headers = Object.keys(r.data[0]);
+    let csv = '\uFEFF'; // BOM for UTF-8 Excel
+    csv += headers.join(',') + '\n';
+    r.data.forEach(row => {
+      csv += headers.map(h => {
+        let v = row[h];
+        if(v === null || v === undefined) return '';
+        if(typeof v === 'object') v = JSON.stringify(v);
+        v = String(v).replace(/"/g,'""');
+        if(v.indexOf(',')>=0 || v.indexOf('"')>=0 || v.indexOf('\n')>=0) v = '"'+v+'"';
+        return v;
+      }).join(',') + '\n';
+    });
+    
+    // Download
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const ts = new Date().toISOString().slice(0,10);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = tableName + '_' + ts + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    showToast('✅ تم تحميل ' + tableName + '.csv (' + r.data.length + ' سجل)','success');
+  }catch(err){
+    console.error('[Export CSV]',err);
+    showToast('❌ خطأ: ' + err.message,'error');
+  }
+}
+
+// Restore from JSON backup (with confirmation)
+async function restoreFromBackup(){
+  if(!isOwner()){showToast('⚠️ هذه الميزة للمدير فقط','error');return;}
+  
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = async function(e){
+    const file = e.target.files[0];
+    if(!file) return;
+    
+    if(!confirm('⚠️ تحذير خطير!\n\nهذه العملية ستحاول استرجاع البيانات من النسخة الاحتياطية.\nقد تتسبب في تكرار بيانات أو تعارض مع البيانات الحالية.\n\nهل أنت متأكد؟\n\n(يفضّل تشغيل هذا في حالة الطوارئ فقط)')){
+      return;
+    }
+    
+    try{
+      const text = await file.text();
+      const backup = JSON.parse(text);
+      
+      if(!backup.tables || !backup.version){
+        throw new Error('ملف نسخة احتياطية غير صالح');
+      }
+      
+      showToast('🔄 جاري الاسترجاع... قد يستغرق وقتاً','info');
+      
+      let totalRestored = 0;
+      const tables = ['owners','clients','properties','deals','tasks','activities','viewings','deposits'];
+      
+      for(const t of tables){
+        if(!backup.tables[t] || !backup.tables[t].length) continue;
+        try{
+          // Use upsert to avoid duplicate key errors
+          const r = await supa.from(t).upsert(backup.tables[t], {onConflict:'id'});
+          if(!r.error) totalRestored += backup.tables[t].length;
+          else console.warn('[Restore]',t,r.error);
+        }catch(e){console.warn('[Restore]',t,e);}
+      }
+      
+      showToast('✅ تم استرجاع ' + totalRestored + ' سجل','success');
+      setTimeout(()=>location.reload(), 2000);
+    }catch(err){
+      console.error('[Restore]',err);
+      showToast('❌ خطأ في الاسترجاع: ' + err.message,'error');
+    }
+  };
+  input.click();
+}
+
+// Auto-backup check (runs daily)
+async function checkAutoBackup(){
+  if(!isOwner())return;
+  
+  const lastKey = 'last_backup_check_' + (currentProfile.company_id || 'default');
+  const lastBackup = localStorage.getItem(lastKey);
+  const now = Date.now();
+  
+  // Check every 24 hours
+  if(lastBackup && (now - parseInt(lastBackup)) < 24*60*60*1000) return;
+  
+  localStorage.setItem(lastKey, String(now));
+  
+  // Show reminder if no backup in last 7 days
+  const history = getBackupHistory();
+  if(history.length === 0){
+    setTimeout(()=>{
+      showToast('💡 لم تأخذ نسخة احتياطية بعد! يُنصح بأخذ واحدة أسبوعياً','info');
+    }, 3000);
+    return;
+  }
+  
+  const lastBackupDate = new Date(history[0].created_at);
+  const daysSince = Math.floor((now - lastBackupDate.getTime()) / (1000*60*60*24));
+  
+  if(daysSince > 7){
+    setTimeout(()=>{
+      showBackupReminder(daysSince);
+    }, 3000);
+  }
+}
+
+function showBackupReminder(days){
+  const banner = document.createElement('div');
+  banner.id = 'backupReminder';
+  banner.style.cssText = 'position:fixed;bottom:20px;left:20px;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;padding:14px 18px;border-radius:12px;box-shadow:0 8px 24px rgba(245,158,11,0.3);z-index:99999;max-width:340px;font-size:13px;direction:rtl';
+  banner.innerHTML = '<div style="font-weight:700;margin-bottom:6px">⚠️ تذكير: نسخة احتياطية</div><div style="margin-bottom:10px">آخر نسخة احتياطية قبل ' + days + ' يوم. يُنصح بأخذ نسخة حديثة.</div><div style="display:flex;gap:8px"><button onclick="navigateToBackup();document.getElementById(\'backupReminder\').remove()" style="background:white;color:#D97706;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:700;font-size:12px">📥 أخذ نسخة</button><button onclick="document.getElementById(\'backupReminder\').remove()" style="background:transparent;color:white;border:1px solid rgba(255,255,255,0.4);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px">لاحقاً</button></div>';
+  document.body.appendChild(banner);
+  setTimeout(()=>{var b=document.getElementById('backupReminder');if(b)b.remove();}, 15000);
+}
+
+window.navigateToBackup = function(){
+  navigate('backup', document.querySelector('[onclick*=backup]'));
+};
+
+// Render the backup page
+async function renderBackupPage(){
+  if(!isOwner()){
+    document.getElementById('backupContent').innerHTML = '<div class="empty" style="padding:60px"><div class="empty-ico">🔒</div><div class="empty-title">هذه الصفحة للمدير فقط</div><div class="empty-desc">تواصل مع مالك النظام للوصول</div></div>';
+    return;
+  }
+  
+  const stats = await getBackupStats();
+  const history = getBackupHistory();
+  
+  let html = '';
+  
+  // Stats card
+  html += '<div class="card" style="background:linear-gradient(135deg,rgba(196,154,74,0.06),rgba(46,125,92,0.04));border:1px solid rgba(196,154,74,0.2)">'+
+    '<div class="card-head"><div class="card-title"><span>📊</span>إحصائيات البيانات الحالية</div></div>'+
+    '<div style="padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">'+
+    backupStatCard('👥 العملاء', stats?stats.clients:0, '#C49A4A')+
+    backupStatCard('🏠 العقارات', stats?stats.properties:0, '#2E7D5C')+
+    backupStatCard('🤝 الصفقات', stats?stats.deals:0, '#B91C1C')+
+    backupStatCard('👤 الملاك', stats?stats.owners:0, '#7C3AED')+
+    backupStatCard('⏰ المهام', stats?stats.tasks:0, '#3B82F6')+
+    backupStatCard('📝 النشاطات', stats?stats.activities:0, '#10B981')+
+    backupStatCard('👁 الزيارات', stats?stats.viewings:0, '#F59E0B')+
+    backupStatCard('💰 العربون', stats?stats.deposits:0, '#EC4899')+
+    '</div>'+
+    '<div style="padding:14px 18px;background:rgba(196,154,74,0.08);border-top:1px solid rgba(196,154,74,0.2);text-align:center;font-weight:700;color:var(--espresso)">'+
+    '📊 إجمالي السجلات: <span style="color:var(--gold);font-size:18px">'+(stats?stats.total:0)+'</span>'+
+    '</div></div>';
+  
+  // Action cards
+  html += '<div class="metrics" style="margin-bottom:20px">';
+  
+  // Download Backup
+  html += '<div class="card" style="border:2px solid #10B981;background:linear-gradient(135deg,rgba(16,185,129,0.05),white)">'+
+    '<div style="padding:24px;text-align:center">'+
+    '<div style="font-size:48px;margin-bottom:10px">📥</div>'+
+    '<div style="font-size:16px;font-weight:700;color:var(--espresso);margin-bottom:6px">تحميل نسخة احتياطية</div>'+
+    '<div style="font-size:12px;color:var(--umber);margin-bottom:16px">ملف JSON يحوي كل البيانات</div>'+
+    '<button id="btnDownloadBackup" class="btn-primary" style="background:#10B981;width:auto;padding:11px 28px" onclick="downloadFullBackup()">📥 تحميل النسخة الآن</button>'+
+    '</div></div>';
+  
+  // Restore Backup
+  html += '<div class="card" style="border:2px solid #F59E0B;background:linear-gradient(135deg,rgba(245,158,11,0.05),white)">'+
+    '<div style="padding:24px;text-align:center">'+
+    '<div style="font-size:48px;margin-bottom:10px">📤</div>'+
+    '<div style="font-size:16px;font-weight:700;color:var(--espresso);margin-bottom:6px">استعادة من نسخة</div>'+
+    '<div style="font-size:12px;color:var(--umber);margin-bottom:16px">⚠️ استخدم في الطوارئ فقط</div>'+
+    '<button class="btn-secondary" style="border-color:#F59E0B;color:#D97706;width:auto;padding:11px 28px" onclick="restoreFromBackup()">📤 رفع ملف نسخة احتياطية</button>'+
+    '</div></div>';
+  
+  html += '</div>';
+  
+  // Export individual tables
+  html += '<div class="card">'+
+    '<div class="card-head"><div class="card-title"><span>📊</span>تصدير الجداول منفصلة (CSV)</div></div>'+
+    '<div style="padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">'+
+    csvExportButton('👥 العملاء','clients')+
+    csvExportButton('🏠 العقارات','properties')+
+    csvExportButton('🤝 الصفقات','deals')+
+    csvExportButton('👤 الملاك','owners')+
+    csvExportButton('⏰ المهام','tasks')+
+    csvExportButton('📝 النشاطات','activities')+
+    csvExportButton('👁 الزيارات','viewings')+
+    csvExportButton('💰 العربون','deposits')+
+    '</div></div>';
+  
+  // Backup history
+  html += '<div class="card">'+
+    '<div class="card-head"><div class="card-title"><span>📜</span>سجل النسخ الاحتياطية</div>'+
+    (history.length > 0 ? '<button class="btn-secondary" style="width:auto;padding:6px 12px;font-size:11px" onclick="clearBackupHistory()">🗑 مسح السجل</button>' : '')+
+    '</div>';
+  
+  if(history.length === 0){
+    html += '<div class="empty" style="padding:40px"><div class="empty-ico">📭</div><div class="empty-title">لم تأخذ نسخ احتياطية بعد</div><div class="empty-desc">اضغط "تحميل نسخة احتياطية الآن" لإنشاء أول نسخة</div></div>';
+  } else {
+    html += '<table class="tbl"><thead><tr><th>التاريخ</th><th>اسم الملف</th><th>عدد السجلات</th><th>الحجم</th></tr></thead><tbody>';
+    history.forEach(function(h){
+      const d = new Date(h.created_at);
+      const dateStr = d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+      html += '<tr>'+
+        '<td>'+dateStr+'</td>'+
+        '<td style="font-family:monospace;font-size:11px">'+escapeHtml(h.filename)+'</td>'+
+        '<td><strong style="color:var(--gold)">'+h.total_records+'</strong></td>'+
+        '<td>'+h.size_kb+' KB</td>'+
+        '</tr>';
+    });
+    html += '</tbody></table>';
+  }
+  html += '</div>';
+  
+  // Tips
+  html += '<div class="card" style="background:linear-gradient(135deg,rgba(59,130,246,0.05),white);border:1px solid rgba(59,130,246,0.2)">'+
+    '<div class="card-head"><div class="card-title"><span>💡</span>نصائح للحماية القصوى</div></div>'+
+    '<div style="padding:18px;font-size:13px;color:var(--espresso);line-height:1.8">'+
+    '<div style="margin-bottom:10px"><strong>🗓️ خذ نسخة احتياطية أسبوعياً</strong> على الأقل، واحفظها على Google Drive أو OneDrive</div>'+
+    '<div style="margin-bottom:10px"><strong>📧 أرسل نسخة لإيميل احتياطي</strong> كنسخة إضافية</div>'+
+    '<div style="margin-bottom:10px"><strong>🔒 احفظ النسخ في مكانين</strong> مختلفين على الأقل (Cloud + جهاز شخصي)</div>'+
+    '<div style="margin-bottom:10px"><strong>⚠️ لا تشارك ملف النسخة الاحتياطية</strong> مع أي شخص — يحوي بيانات سرية</div>'+
+    '<div style="margin-bottom:10px"><strong>🔐 فعّل المصادقة الثنائية (2FA)</strong> على حساب Supabase و GitHub</div>'+
+    '<div><strong>📅 خذ نسخة قبل أي تحديث كبير</strong> للنظام</div>'+
+    '</div></div>';
+  
+  document.getElementById('backupContent').innerHTML = html;
+}
+
+function backupStatCard(label, count, color){
+  return '<div style="background:white;border-radius:10px;padding:14px;text-align:center;border-top:3px solid '+color+'">'+
+    '<div style="font-size:22px;font-weight:700;color:'+color+';margin-bottom:4px">'+(count||0)+'</div>'+
+    '<div style="font-size:11px;color:var(--umber);font-weight:600">'+label+'</div>'+
+    '</div>';
+}
+
+function csvExportButton(label, table){
+  return '<button class="btn-secondary" style="padding:11px;width:100%;text-align:center;font-size:13px" onclick="exportTableCSV(\''+table+'\')">'+label+' 📥</button>';
+}
+
+window.clearBackupHistory = function(){
+  if(!confirm('هل تريد مسح سجل النسخ الاحتياطية؟\n\n(لن يحذف الملفات اللي حملتها، فقط السجل)'))return;
+  const key = 'backup_history_' + (currentProfile.company_id || 'default');
+  localStorage.removeItem(key);
+  renderBackupPage();
+  showToast('✅ تم مسح السجل','success');
+};
+
+
 async function init(){const s=await supa.auth.getSession();if(s.data.session)await loadApp();else{$('loaderScreen').style.display='none';$('authScreen').classList.remove('hidden')}}
 supa.auth.onAuthStateChange(function(e,s){if(e==='SIGNED_IN'&&s&&!currentUser)loadApp();if(e==='SIGNED_OUT'){currentUser=null;currentProfile=null}});
-init();
+init();setTimeout(function(){if(typeof checkAutoBackup==='function')checkAutoBackup();},5000);
 </script>
 </body>
 </html>
