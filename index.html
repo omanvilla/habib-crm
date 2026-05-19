@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260519-0617">
+<meta name="app-version" content="20260519-0624">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2756,9 +2756,12 @@ window.openWA = function(phone, message){
   if(!phone) return;
   var clean = String(phone).replace(/[^0-9]/g,'');
   if(!clean) return;
-  var msgPart = message ? '&text=' + encodeURIComponent(message) : '';
-  var url = 'whatsapp://send?phone=' + clean + msgPart;
-  window.location.href = url;
+  // Add Oman country code if missing (8 digits)
+  if(clean.length === 8) clean = '968' + clean;
+  var msgPart = message ? '?text=' + encodeURIComponent(message) : '';
+  // Use wa.me which works on both web and mobile (auto-detects)
+  var url = 'https://wa.me/' + clean + msgPart;
+  window.open(url, '_blank');
 };
 window.openCall = function(phone){
   if(!phone) return;
@@ -3109,7 +3112,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
-window.APP_VERSION = '20260519-0617';
+window.APP_VERSION = '20260519-0624';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
