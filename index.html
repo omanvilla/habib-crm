@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260520-0809">
+<meta name="app-version" content="20260520-0814">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1905,11 +1905,13 @@ function restorePropertyById(id){const p=allProperties.find(x=>x.id===id);if(!p)
 function permanentDeletePropertyById(id){const p=allProperties.find(x=>x.id===id);if(!p)return;permanentDeleteProperty(id,p.title)}
 function deleteProperty(id,t){
 console.log('[DELETE-1] Starting:',id,t);
-console.log('[DELETE-2] canEdit?',canEdit(),'role:',currentProfile&&currentProfile.role);
-if(!canEdit()){alert('⚠️ ليس لديك صلاحية لحذف العقارات\n\nrole: '+(currentProfile&&currentProfile.role));return}
-console.log('[DELETE-3] About to show confirm dialog');
-confirmAction('أرشفة العقار','هل تريد أرشفة <strong>'+escapeHtml(t)+'</strong>؟<br>(يمكن استعادته لاحقاً)','📦',async function(){
-console.log('[DELETE-4] User confirmed, starting database operation');
+if(!canEdit()){alert('⚠️ ليس لديك صلاحية لحذف العقارات');return}
+console.log('[DELETE-2] About to show confirm');
+// استخدام native confirm بدل النافذة المخصصة - أضمن
+if(!confirm('📦 هل تريد أرشفة العقار:\n\n'+t+'\n\n(يمكن استعادته لاحقاً)'))return;
+console.log('[DELETE-3] User confirmed via native confirm');
+(async function(){
+console.log('[DELETE-4] Starting async operation');
 let success=false;
 try{
 console.log('[DELETE-5] Calling Supabase UPDATE...');
@@ -1957,7 +1959,7 @@ try{await logSystemActivity('archive','property',id,'أرشفة عقار: '+t)}c
 loadProperties();
 loadDashboard();
 }
-})
+})();
 }
 function switchDealView(v){dealView=v;$('viewTable').classList.toggle('active',v==='table');$('viewPipeline').classList.toggle('active',v==='pipeline');renderDeals()}
 async function populateDealSelects(){try{const c=await supa.from('clients').select('id,name').neq('archived',true);const p=await supa.from('properties').select('id,title,status').neq('archived',true);const cs=$('dClient');cs.innerHTML='<option value="">اختر عميلاً</option>';(c.data||[]).forEach(function(i){cs.innerHTML+='<option value="'+i.id+'">'+escapeHtml(i.name)+'</option>'});const ps=$('dProperty');ps.innerHTML='<option value="">اختر عقاراً</option>';(p.data||[]).forEach(function(i){const statusIcon=i.status==='sold'?'🔴 مباع':i.status==='reserved'?'⏳ محجوز':'✅';ps.innerHTML+='<option value="'+i.id+'"'+(i.status==='sold'?' disabled':'')+'>'+statusIcon+' '+escapeHtml(i.title)+'</option>'})}catch(err){console.error(err)}}
@@ -3197,7 +3199,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
-window.APP_VERSION = '20260520-0809';
+window.APP_VERSION = '20260520-0814';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
