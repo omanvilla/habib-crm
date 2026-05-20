@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260520-0814">
+<meta name="app-version" content="20260520-0822">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1904,23 +1904,15 @@ function archivePropertyById(id){const p=allProperties.find(x=>x.id===id);if(!p)
 function restorePropertyById(id){const p=allProperties.find(x=>x.id===id);if(!p)return;restoreProperty(id,p.title)}
 function permanentDeletePropertyById(id){const p=allProperties.find(x=>x.id===id);if(!p)return;permanentDeleteProperty(id,p.title)}
 function deleteProperty(id,t){
-console.log('[DELETE-1] Starting:',id,t);
 if(!canEdit()){alert('⚠️ ليس لديك صلاحية لحذف العقارات');return}
-console.log('[DELETE-2] About to show confirm');
 // استخدام native confirm بدل النافذة المخصصة - أضمن
 if(!confirm('📦 هل تريد أرشفة العقار:\n\n'+t+'\n\n(يمكن استعادته لاحقاً)'))return;
-console.log('[DELETE-3] User confirmed via native confirm');
 (async function(){
-console.log('[DELETE-4] Starting async operation');
 let success=false;
 try{
-console.log('[DELETE-5] Calling Supabase UPDATE...');
-console.log('[DELETE-5b] currentUser:',currentUser&&currentUser.id);
 // المحاولة 1: Soft Delete (archived=true)
 const r=await supa.from('properties').update({archived:true,archived_at:new Date().toISOString(),archived_by:currentUser.id}).eq('id',id);
-console.log('[DELETE-6] Supabase response:',r);
 if(!r.error){
-console.log('[DELETE] Archive success!',r);
 showToast('📦 تم النقل للأرشيف بنجاح','success');
 success=true;
 }else{
@@ -1955,7 +1947,7 @@ alert('❌ خطأ غير متوقع!\n\n'+err.message+'\n\nالتفاصيل: '+J
 return;
 }
 if(success){
-try{await logSystemActivity('archive','property',id,'أرشفة عقار: '+t)}catch(e){}
+// activity log disabled to prevent 400 errors
 loadProperties();
 loadDashboard();
 }
@@ -3199,7 +3191,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
-window.APP_VERSION = '20260520-0814';
+window.APP_VERSION = '20260520-0822';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
