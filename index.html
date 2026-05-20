@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260520-0702">
+<meta name="app-version" content="20260520-0809">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1904,13 +1904,19 @@ function archivePropertyById(id){const p=allProperties.find(x=>x.id===id);if(!p)
 function restorePropertyById(id){const p=allProperties.find(x=>x.id===id);if(!p)return;restoreProperty(id,p.title)}
 function permanentDeletePropertyById(id){const p=allProperties.find(x=>x.id===id);if(!p)return;permanentDeleteProperty(id,p.title)}
 function deleteProperty(id,t){
-console.log('[DELETE] Starting delete for property:',id,t);
-if(!canEdit()){showToast('⚠️ ليس لديك صلاحية لحذف العقارات','error');return}
+console.log('[DELETE-1] Starting:',id,t);
+console.log('[DELETE-2] canEdit?',canEdit(),'role:',currentProfile&&currentProfile.role);
+if(!canEdit()){alert('⚠️ ليس لديك صلاحية لحذف العقارات\n\nrole: '+(currentProfile&&currentProfile.role));return}
+console.log('[DELETE-3] About to show confirm dialog');
 confirmAction('أرشفة العقار','هل تريد أرشفة <strong>'+escapeHtml(t)+'</strong>؟<br>(يمكن استعادته لاحقاً)','📦',async function(){
+console.log('[DELETE-4] User confirmed, starting database operation');
 let success=false;
 try{
+console.log('[DELETE-5] Calling Supabase UPDATE...');
+console.log('[DELETE-5b] currentUser:',currentUser&&currentUser.id);
 // المحاولة 1: Soft Delete (archived=true)
 const r=await supa.from('properties').update({archived:true,archived_at:new Date().toISOString(),archived_by:currentUser.id}).eq('id',id);
+console.log('[DELETE-6] Supabase response:',r);
 if(!r.error){
 console.log('[DELETE] Archive success!',r);
 showToast('📦 تم النقل للأرشيف بنجاح','success');
@@ -3191,7 +3197,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
-window.APP_VERSION = '20260520-0702';
+window.APP_VERSION = '20260520-0809';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
