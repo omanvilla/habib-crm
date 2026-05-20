@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260519-0637">
+<meta name="app-version" content="20260520-0650">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1869,11 +1869,88 @@ function editProperty(id){const p=allProperties.find(x=>x.id===id);if(!p){showTo
 const sel=$('pOwnerId');if(sel){sel.innerHTML='<option value="">— اختر مالك —</option>';allOwners.forEach(o=>sel.innerHTML+='<option value="'+o.id+'"'+(o.id===p.owner_id?' selected':'')+'>'+escapeHtml(o.name)+'</option>')}currentPropertyImages=p.images||[];renderPropertyImages();$('mProperty').classList.add('on')}
 function setPropArchiveView(archived,btn){showArchivedProperties=archived;btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadProperties()}
 async function restoreProperty(id,t){confirmAction('استعادة العقار','هل تريد استعادة <strong>'+escapeHtml(t)+'</strong>؟','♻️',async function(){let done=false;try{const r=await supa.from('properties').update({archived:false,archived_at:null,archived_by:null}).eq('id',id);if(r.error)throw r.error;done=true;showToast('♻️ تم الاستعادة','success')}catch(err){console.error(err);showToast('خطأ: '+err.message,'error')}if(done){try{await logSystemActivity('edit','property',id,'استعادة العقار: '+t)}catch(e){}loadProperties();loadDashboard()}})}
-async function permanentDeleteProperty(id,t){if(!isOwner()){showToast('⚠️ فقط صاحب الشركة يحذف نهائياً','error');return}confirmAction('⚠️ حذف نهائي','تحذير: سيتم حذف <strong>'+escapeHtml(t)+'</strong> نهائياً!','🗑',async function(){try{await supa.from('deals').delete().eq('property_id',id);const r=await supa.from('properties').delete().eq('id',id);if(r.error)throw r.error;await logSystemActivity('delete','property',id,'حذف نهائي للعقار: '+t);showToast('🗑 تم الحذف النهائي','success');loadProperties();loadDashboard()}catch(err){showToast('خطأ: '+err.message,'error')}})}
+async function permanentDeleteProperty(id,t){
+if(!isOwner()){showToast('⚠️ فقط صاحب الشركة يحذف نهائياً','error');return}
+confirmAction('⚠️ حذف نهائي','<strong style="color:#DC2626">تحذير شديد!</strong><br>سيتم حذف <strong>'+escapeHtml(t)+'</strong> وكل الصفقات والزيارات المرتبطة <strong>نهائياً</strong>!','🗑',async function(){
+try{
+// Cascade delete - حذف كل الجداول المرتبطة بالترتيب
+try{await supa.from('viewings').delete().eq('property_id',id)}catch(e){console.warn('viewings:',e)}
+try{await supa.from('deposits').delete().eq('property_id',id)}catch(e){console.warn('deposits:',e)}
+try{await supa.from('activities').delete().eq('property_id',id)}catch(e){console.warn('activities:',e)}
+try{await supa.from('deals').delete().eq('property_id',id)}catch(e){console.warn('deals:',e)}
+// أخيراً حذف العقار نفسه
+const r=await supa.from('properties').delete().eq('id',id);
+if(r.error){
+const errMsg=(r.error.message||'').toLowerCase();
+if(errMsg.indexOf('permission')>=0||errMsg.indexOf('policy')>=0){
+showToast('🔒 ليس لديك صلاحية - تواصل مع المدير','error');
+}else{
+showToast('❌ خطأ: '+r.error.message,'error');
+}
+console.error('[Permanent Delete]',r.error);
+return;
+}
+try{await logSystemActivity('delete','property',id,'حذف نهائي للعقار: '+t)}catch(e){}
+showToast('🗑 تم الحذف النهائي بنجاح','success');
+loadProperties();
+loadDashboard();
+}catch(err){
+console.error('[Permanent Delete]',err);
+showToast('❌ خطأ غير متوقع: '+err.message,'error');
+}
+})
+}
 function archivePropertyById(id){const p=allProperties.find(x=>x.id===id);if(!p){console.error('Property not found:',id);showToast('⚠️ العقار غير موجود','error');return}deleteProperty(id,p.title)}
 function restorePropertyById(id){const p=allProperties.find(x=>x.id===id);if(!p)return;restoreProperty(id,p.title)}
 function permanentDeletePropertyById(id){const p=allProperties.find(x=>x.id===id);if(!p)return;permanentDeleteProperty(id,p.title)}
-function deleteProperty(id,t){confirmAction('أرشفة العقار','هل تريد أرشفة <strong>'+escapeHtml(t)+'</strong>؟<br>(لن يحذف نهائياً)','📦',async function(){let archived=false;try{const r=await supa.from('properties').update({archived:true,archived_at:new Date().toISOString(),archived_by:currentUser.id}).eq('id',id);if(r.error){if(r.error.message&&(r.error.message.indexOf('archived')>=0||r.error.message.indexOf('column')>=0)){await supa.from('deals').delete().eq('property_id',id);const d=await supa.from('properties').delete().eq('id',id);if(d.error)throw d.error;showToast('🗑 تم الحذف','success');archived=true}else{throw r.error}}else{showToast('📦 تم النقل للأرشيف','success');archived=true}}catch(err){console.error('[Archive Property]',err);showToast('خطأ: '+err.message,'error')}if(archived){try{await logSystemActivity('archive','property',id,'حذف/أرشفة عقار: '+t)}catch(e){console.warn('Log failed:',e)}loadProperties();loadDashboard()}})}
+function deleteProperty(id,t){
+if(!canEdit()){showToast('⚠️ ليس لديك صلاحية لحذف العقارات','error');return}
+confirmAction('أرشفة العقار','هل تريد أرشفة <strong>'+escapeHtml(t)+'</strong>؟<br>(يمكن استعادته لاحقاً)','📦',async function(){
+let success=false;
+try{
+// المحاولة 1: Soft Delete (archived=true)
+const r=await supa.from('properties').update({archived:true,archived_at:new Date().toISOString(),archived_by:currentUser.id}).eq('id',id);
+if(!r.error){
+showToast('📦 تم النقل للأرشيف بنجاح','success');
+success=true;
+}else{
+const errMsg=(r.error.message||'').toLowerCase();
+// إذا عمود archived غير موجود، نعمل Hard Delete مع Cascade
+if(errMsg.indexOf('column')>=0||errMsg.indexOf('archived')>=0){
+console.log('[Property Archive] archived column missing, performing cascade delete...');
+// حذف كل الجداول المرتبطة بالترتيب
+try{await supa.from('viewings').delete().eq('property_id',id)}catch(e){console.warn('viewings:',e)}
+try{await supa.from('deposits').delete().eq('property_id',id)}catch(e){console.warn('deposits:',e)}
+try{await supa.from('activities').delete().eq('property_id',id)}catch(e){console.warn('activities:',e)}
+try{await supa.from('deals').delete().eq('property_id',id)}catch(e){console.warn('deals:',e)}
+const d=await supa.from('properties').delete().eq('id',id);
+if(d.error){
+console.error('[Hard Delete Property]',d.error);
+showToast('❌ خطأ في الحذف: '+d.error.message,'error');
+return;
+}
+showToast('🗑 تم حذف العقار','success');
+success=true;
+}else if(errMsg.indexOf('permission')>=0||errMsg.indexOf('policy')>=0||errMsg.indexOf('rls')>=0){
+showToast('🔒 ليس لديك صلاحية - تواصل مع المدير','error');
+console.error('[RLS Error]',r.error);
+return;
+}else{
+throw r.error;
+}
+}
+}catch(err){
+console.error('[Archive Property]',err);
+showToast('❌ خطأ: '+err.message,'error');
+return;
+}
+if(success){
+try{await logSystemActivity('archive','property',id,'أرشفة عقار: '+t)}catch(e){}
+loadProperties();
+loadDashboard();
+}
+})
+}
 function switchDealView(v){dealView=v;$('viewTable').classList.toggle('active',v==='table');$('viewPipeline').classList.toggle('active',v==='pipeline');renderDeals()}
 async function populateDealSelects(){try{const c=await supa.from('clients').select('id,name').neq('archived',true);const p=await supa.from('properties').select('id,title,status').neq('archived',true);const cs=$('dClient');cs.innerHTML='<option value="">اختر عميلاً</option>';(c.data||[]).forEach(function(i){cs.innerHTML+='<option value="'+i.id+'">'+escapeHtml(i.name)+'</option>'});const ps=$('dProperty');ps.innerHTML='<option value="">اختر عقاراً</option>';(p.data||[]).forEach(function(i){const statusIcon=i.status==='sold'?'🔴 مباع':i.status==='reserved'?'⏳ محجوز':'✅';ps.innerHTML+='<option value="'+i.id+'"'+(i.status==='sold'?' disabled':'')+'>'+statusIcon+' '+escapeHtml(i.title)+'</option>'})}catch(err){console.error(err)}}
 async function loadDeals(){try{const r=await supa.from('deals').select('*, client:clients(name), property:properties(title), agent:profiles!deals_agent_id_fkey(full_name)').order('created_at',{ascending:false});if(r.error)throw r.error;allDeals=r.data||[];$('dealsSub').textContent=allDeals.length+' صفقة';renderDeals()}catch(err){$('dealsContent').innerHTML='<div class="card"><div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(err.message)+'</div></div></div>'}}
@@ -3112,7 +3189,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
-window.APP_VERSION = '20260519-0637';
+window.APP_VERSION = '20260520-0650';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
