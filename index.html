@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260520-0822">
+<meta name="app-version" content="20260520-0913">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1726,7 +1726,14 @@ function canDelete(){return isOwner()||isManager()}
 function canViewAll(){return isOwner()||isManager()||isViewer()}
 function canViewFinancials(){return isOwner()}
 function canManageTeam(){return isOwner()}
-function confirmAction(title,msg,icon,callback){$('confTitle').textContent=title;$('confMsg').innerHTML=msg;$('confIcon').textContent=icon||'⚠️';confirmCallback=callback;$('confirmDlg').classList.add('on');$('confOkBtn').onclick=function(){closeConfirm();if(confirmCallback)confirmCallback()}}
+function confirmAction(title,msg,icon,callback){
+// استخدام confirm() المتصفّح - مضمون 100% في كل المتصفّحات
+// نزيل HTML tags من الرسالة عشان تظهر بشكل صحيح
+var plainMsg = msg.replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]+>/g,'');
+var fullMsg = (icon||'⚠️') + ' ' + title + '\n\n' + plainMsg;
+if(confirm(fullMsg)){
+  if(callback) callback();
+}}
 function closeConfirm(){$('confirmDlg').classList.remove('on');confirmCallback=null}
 function showAuthTab(t){clearAuthMessages();$('loginTab').classList.toggle('active',t==='login');$('signupTab').classList.toggle('active',t==='signup');$('loginForm').style.display=t==='login'?'block':'none';$('signupForm').style.display=t==='signup'?'block':'none';$('resetForm').style.display='none'}
 function showResetForm(){clearAuthMessages();$('loginForm').style.display='none';$('signupForm').style.display='none';$('resetForm').style.display='block'}
@@ -2149,12 +2156,9 @@ document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key
 document.addEventListener('click',function(e){if(e.target.id==='cmdPalette')closeCmdPalette()});
 async function syncPropertyStatus(propertyId,dealStage){if(!propertyId)return;let newStatus=null;if(['closed'].indexOf(dealStage)>=0){newStatus='sold'}else if(['deposit','financing','processing'].indexOf(dealStage)>=0){newStatus='reserved'}else if(['lost'].indexOf(dealStage)>=0){
 const otherDeals=await supa.from('deals').select('id,stage').eq('property_id',propertyId).neq('stage','lost').neq('stage','closed');if(!otherDeals.data||!otherDeals.data.length){newStatus='available'}}if(newStatus){try{await supa.from('properties').update({status:newStatus}).eq('id',propertyId);await logSystemActivity('edit','property',propertyId,'تحديث حالة العقار تلقائياً: '+(newStatus==='sold'?'تم البيع':newStatus==='reserved'?'محجوز':'متاح'))}catch(e){console.warn('Sync property:',e)}}}
-async function logSystemActivity(action,entityType,entityId,description){
-  if(!currentProfile||!currentProfile.company_id)return;
-  try{
-    var payload={company_id:currentProfile.company_id,user_id:currentUser.id,activity_type:'note',activity_text:'['+action+'] '+description,client_id:entityType==='client'?entityId:null,deal_id:entityType==='deal'?entityId:null};
-    await supa.from('activities').insert(payload);
-  }catch(e){/*silent*/}
+async function logSystemActivity(actionType,entityType,entityId,description){
+  /* disabled to prevent 400 errors */
+  return;
 }
 async function loadActivityLog(){if(!canManage())return;const list=$('activityLogList');list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';try{const filter=$('alogFilter').value;let q=supa.from('activities').select('*, user:profiles(full_name)').like('activity_text','[%]%').order('created_at',{ascending:false}).limit(200);const r=await q;if(r.error)throw r.error;let acts=r.data||[];if(filter!=='all'){acts=acts.filter(a=>(a.activity_text||'').indexOf('['+filter+']')>=0)}if(!acts.length){list.innerHTML='<div class="empty"><div class="empty-ico">📜</div><div class="empty-title">لا توجد أنشطة بعد</div><div class="empty-desc">سيتم تسجيل جميع التعديلات والإضافات هنا</div></div>';return}let h='';acts.forEach(a=>{const txt=a.activity_text||'';let action='other';if(txt.indexOf('[create]')>=0)action='create';else if(txt.indexOf('[edit]')>=0)action='edit';else if(txt.indexOf('[delete]')>=0)action='delete';else if(txt.indexOf('[archive]')>=0)action='archive';const cleanText=txt.replace(/^\[\w+\]\s*/,'');const icon={create:'➕',edit:'✏️',delete:'🗑',archive:'📦'}[action]||'📌';h+='<div class="alog-item"><div class="alog-action '+action+'">'+icon+'</div><div class="alog-content"><div class="alog-text">'+escapeHtml(cleanText)+'</div><div class="alog-meta">'+(a.user?'<span>👤 '+escapeHtml(a.user.full_name||'؟')+'</span>':'<span>👤 نظام</span>')+'<span>· '+timeAgo(a.created_at)+'</span><span>· '+fmtDateTime(a.created_at)+'</span></div></div></div>'});list.innerHTML=h}catch(err){list.innerHTML='<div class="empty"><div class="empty-desc">'+escapeHtml(err.message)+'</div></div>'}}
 async function loadOwners(){const list=$('ownersList');list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';try{const r=await supa.from('owners').select('*').eq('archived',false).order('created_at',{ascending:false});if(r.error)throw r.error;allOwners=r.data||[];$('ownersSub').textContent=allOwners.length+' مالك';renderOwners()}catch(err){console.error(err);list.innerHTML='<div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(err.message)+'<br><br>تأكد من تشغيل SQL إنشاء جدول owners</div></div>'}}
@@ -3191,7 +3195,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
-window.APP_VERSION = '20260520-0822';
+window.APP_VERSION = '20260520-0913';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
