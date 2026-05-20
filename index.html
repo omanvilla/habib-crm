@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260520-0650">
+<meta name="app-version" content="20260520-0702">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1904,6 +1904,7 @@ function archivePropertyById(id){const p=allProperties.find(x=>x.id===id);if(!p)
 function restorePropertyById(id){const p=allProperties.find(x=>x.id===id);if(!p)return;restoreProperty(id,p.title)}
 function permanentDeletePropertyById(id){const p=allProperties.find(x=>x.id===id);if(!p)return;permanentDeleteProperty(id,p.title)}
 function deleteProperty(id,t){
+console.log('[DELETE] Starting delete for property:',id,t);
 if(!canEdit()){showToast('⚠️ ليس لديك صلاحية لحذف العقارات','error');return}
 confirmAction('أرشفة العقار','هل تريد أرشفة <strong>'+escapeHtml(t)+'</strong>؟<br>(يمكن استعادته لاحقاً)','📦',async function(){
 let success=false;
@@ -1911,6 +1912,7 @@ try{
 // المحاولة 1: Soft Delete (archived=true)
 const r=await supa.from('properties').update({archived:true,archived_at:new Date().toISOString(),archived_by:currentUser.id}).eq('id',id);
 if(!r.error){
+console.log('[DELETE] Archive success!',r);
 showToast('📦 تم النقل للأرشيف بنجاح','success');
 success=true;
 }else{
@@ -1926,13 +1928,13 @@ try{await supa.from('deals').delete().eq('property_id',id)}catch(e){console.warn
 const d=await supa.from('properties').delete().eq('id',id);
 if(d.error){
 console.error('[Hard Delete Property]',d.error);
-showToast('❌ خطأ في الحذف: '+d.error.message,'error');
+alert('❌ فشل الحذف!\n\nالسبب: '+d.error.message+'\n\nالتفاصيل: '+JSON.stringify(d.error,null,2));
 return;
 }
 showToast('🗑 تم حذف العقار','success');
 success=true;
 }else if(errMsg.indexOf('permission')>=0||errMsg.indexOf('policy')>=0||errMsg.indexOf('rls')>=0){
-showToast('🔒 ليس لديك صلاحية - تواصل مع المدير','error');
+alert('🔒 RLS Policy يمنع الحذف!\n\nالسبب: '+r.error.message+'\n\nيحتاج تشغيل SQL لإصلاح الـ Policies');
 console.error('[RLS Error]',r.error);
 return;
 }else{
@@ -1941,7 +1943,7 @@ throw r.error;
 }
 }catch(err){
 console.error('[Archive Property]',err);
-showToast('❌ خطأ: '+err.message,'error');
+alert('❌ خطأ غير متوقع!\n\n'+err.message+'\n\nالتفاصيل: '+JSON.stringify(err,null,2));
 return;
 }
 if(success){
@@ -3189,7 +3191,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
-window.APP_VERSION = '20260520-0650';
+window.APP_VERSION = '20260520-0702';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
