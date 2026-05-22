@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260522-1724">
+<meta name="app-version" content="20260522-1734">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -131,7 +131,7 @@
 </div>
 <div class="metrics" style="margin-top:14px">
 <div class="metric" style="border-top:3px solid #EC4899" onclick="navigate('viewings',document.querySelector('[onclick*=viewings]'))"><div class="metric-val" id="statViewingsToday" style="color:#EC4899">0</div><div class="metric-lbl">👁 زيارات اليوم</div></div>
-<div class="metric" style="border-top:3px solid #F59E0B" onclick="navigate('deposits',document.querySelector('[onclick*=deposits]'))"><div class="metric-val" id="statPendingDeposits" style="color:#F59E0B">0</div><div class="metric-lbl">💰 عربون معلّق</div></div>
+<div class="metric" style="border-top:3px solid #F59E0B" onclick="navigate('deposits',document.querySelector('[onclick*=deposits]'))"><div class="metric-val" id="statPendingDeposits" style="color:#F59E0B">0</div><div class="metric-lbl">💰 عربون قيد الانتظار</div></div>
 <div class="metric" style="border-top:3px solid #10B981"><div class="metric-val" id="statNewLeadsToday" style="color:#10B981">0</div><div class="metric-lbl">🆕 عملاء اليوم</div></div>
 <div class="metric" style="border-top:3px solid #6366F1"><div class="metric-val" id="statFollowupsToday" style="color:#6366F1">0</div><div class="metric-lbl">📞 متابعات اليوم</div></div>
 </div>
@@ -3253,7 +3253,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
-window.APP_VERSION = '20260522-1724';
+window.APP_VERSION = '20260522-1734';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
