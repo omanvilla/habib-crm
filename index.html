@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260522-1925">
+<meta name="app-version" content="20260522-1936">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -784,11 +784,11 @@
 <option value="commission_collected">💵 العمولة محصلة</option>
 <option value="lost">❌ فشلت الصفقة</option>
 </select></div>
-<div class="fg manager-only-field" id="dCommissionFG"><label class="fl">العمولة الكاملة (ر.ع)</label><input class="fi" type="text" inputmode="decimal" id="dCommission" dir="ltr" style="text-align:left" placeholder="3000"></div>
+<div class="fg manager-only-field" id="dCommissionFG"><label class="fl">العمولة الكاملة (ر.ع)</label><input class="fi" type="text" inputmode="decimal" id="dCommission" dir="ltr" style="text-align:left" placeholder="3000" oninput="calcCompanyShare()"></div>
 <div class="fg manager-only-field" id="dBrokerFG"><label class="fl">🤝 الوسيط/المكتب (إن وُجد)</label><select class="fs" id="dBroker"><option value="">— بدون وسيط —</option></select></div>
-<div class="fg manager-only-field" id="dBrokerCommissionFG"><label class="fl">💰 عمولة الوسيط (ر.ع)</label><input class="fi" type="text" inputmode="decimal" id="dBrokerCommission" dir="ltr" style="text-align:left" placeholder="مثال: 500"><div style="font-size:11px;color:var(--umber);margin-top:4px">المبلغ الذي تدفعه للوسيط في هذه الصفقة</div></div>
-<div class="fg manager-only-field" id="dCompanyShareFG"><label class="fl">نصيب الشركة (ر.ع)</label><input class="fi" type="text" inputmode="decimal" id="dCompanyShare" dir="ltr" style="text-align:left" placeholder="2000"></div>
-<div class="fg manager-only-field" id="dAgentShareFG"><label class="fl">نصيب الموظف (ر.ع)</label><input class="fi" type="text" inputmode="decimal" id="dAgentShare" dir="ltr" style="text-align:left" placeholder="1000"></div>
+<div class="fg manager-only-field" id="dBrokerCommissionFG"><label class="fl">💰 عمولة الوسيط (ر.ع)</label><input class="fi" type="text" inputmode="decimal" id="dBrokerCommission" dir="ltr" style="text-align:left" placeholder="مثال: 500" oninput="calcCompanyShare()"><div style="font-size:11px;color:var(--umber);margin-top:4px">المبلغ الذي تدفعه للوسيط في هذه الصفقة</div></div>
+<div class="fg manager-only-field" id="dCompanyShareFG"><label class="fl">نصيب الشركة (ر.ع) — يُحسب تلقائياً</label><input class="fi" type="text" inputmode="decimal" id="dCompanyShare" dir="ltr" readonly style="text-align:left;background:#F0F4F8;cursor:not-allowed" placeholder="2000"></div>
+<div class="fg manager-only-field" id="dAgentShareFG"><label class="fl">نصيب الموظف (ر.ع)</label><input class="fi" type="text" inputmode="decimal" id="dAgentShare" dir="ltr" style="text-align:left" oninput="calcCompanyShare()" placeholder="1000"></div>
 <div class="fg manager-only-field" id="dCommissionStatusFG"><label class="fl">حالة العمولة</label><select class="fs" id="dCommissionStatus"><option value="pending">⏳ معلّقة</option><option value="received">✅ مستلمة</option></select></div>
 <div class="fg full"><label class="fl">ملاحظات</label><textarea class="fta" id="dNotes" rows="2"></textarea></div>
 </div>
@@ -1798,7 +1798,7 @@ function openModal(id){
     var pn=document.getElementById('pOwnerNet');
     if(pn&&pn.parentElement)pn.parentElement.style.display=isMgr2?'':'none';
   }
-  setTimeout(function(){if(id==='mClient'&&!editingClient&&typeof setupPhoneField==='function'){setupPhoneField('cPhoneCountry','cPhoneLocal','');}if(id==='mOwner'&&!window.editingOwner&&typeof setupPhoneField==='function'){setupPhoneField('oPhoneCountry','oPhoneLocal','');if($('oType'))$('oType').value='owner';}},50);if(id==='mDeal')populateDealSelects();if(id==='mTask'){if(!window.editingTask){$('mTaskTitle').textContent='⏰ مهمة جديدة';['tTitle','tDueDate','tNotes'].forEach(i=>$(i).value='');$('tPriority').value='medium';$('tClient').value='';$('tDeal').value=''}populateTaskSelects()}if(id==='mClient')populateClientForm();if(id==='mProperty'){if(!window.editingProperty){['pTitle','pArea','pPrice','pBeds','pBaths','pLandSize','pBuiltSize','pDesc','pOwnerNet','pWilayat','pExpectedCommission','pCreatedDate'].forEach(i=>{const e=$(i);if(e)e.value=''});if($('pType'))$('pType').value='';if($('pStatus'))$('pStatus').value='available';if($('pSourceType'))$('pSourceType').value='owner';if($('pMarketingStatus'))$('pMarketingStatus').value='ready_to_advertise';currentPropertyImages=[]}const sel=$('pOwnerId');if(sel){sel.innerHTML='<option value="">— اختر مالك —</option>';allOwners.forEach(o=>sel.innerHTML+='<option value="'+o.id+'">'+escapeHtml(o.name)+'</option>')}renderPropertyImages()}if(id==='mExpense'&&!editingExpense){$('exDate').value=toLocalDateStr(new Date())}if(id==='mViewing'&&!editingViewing){populateViewingForm();$('vDate').value=toLocalDateStr(new Date());['vTime','vLocation','vNextStep','vFollowupDate','vNotes'].forEach(i=>{const e=$(i);if(e)e.value=''});$('vStatus').value='scheduled';$('vDuration').value=60;$('vFeedbackFG').style.display='none';$('mViewingTitle').textContent='👁 زيارة جديدة'}if(id==='mDeposit'&&!editingDeposit){populateDepositForm();$('dpPaymentDate').value=toLocalDateStr(new Date());['dpAmount','dpLegalNotes','dpNotes'].forEach(i=>{const e=$(i);if(e)e.value=''});$('dpDuration').value=30;$('mDepositTitle').textContent='💰 عربون جديد'}$(id).classList.add('on')}
+  setTimeout(function(){if(id==='mClient'&&!editingClient&&typeof setupPhoneField==='function'){setupPhoneField('cPhoneCountry','cPhoneLocal','');}if(id==='mOwner'&&!window.editingOwner&&typeof setupPhoneField==='function'){setupPhoneField('oPhoneCountry','oPhoneLocal','');if($('oType'))$('oType').value='owner';}},50);if(id==='mDeal'){populateDealSelects();setTimeout(function(){if(typeof calcCompanyShare==='function')calcCompanyShare();},100);}if(id==='mTask'){if(!window.editingTask){$('mTaskTitle').textContent='⏰ مهمة جديدة';['tTitle','tDueDate','tNotes'].forEach(i=>$(i).value='');$('tPriority').value='medium';$('tClient').value='';$('tDeal').value=''}populateTaskSelects()}if(id==='mClient')populateClientForm();if(id==='mProperty'){if(!window.editingProperty){['pTitle','pArea','pPrice','pBeds','pBaths','pLandSize','pBuiltSize','pDesc','pOwnerNet','pWilayat','pExpectedCommission','pCreatedDate'].forEach(i=>{const e=$(i);if(e)e.value=''});if($('pType'))$('pType').value='';if($('pStatus'))$('pStatus').value='available';if($('pSourceType'))$('pSourceType').value='owner';if($('pMarketingStatus'))$('pMarketingStatus').value='ready_to_advertise';currentPropertyImages=[]}const sel=$('pOwnerId');if(sel){sel.innerHTML='<option value="">— اختر مالك —</option>';allOwners.forEach(o=>sel.innerHTML+='<option value="'+o.id+'">'+escapeHtml(o.name)+'</option>')}renderPropertyImages()}if(id==='mExpense'&&!editingExpense){$('exDate').value=toLocalDateStr(new Date())}if(id==='mViewing'&&!editingViewing){populateViewingForm();$('vDate').value=toLocalDateStr(new Date());['vTime','vLocation','vNextStep','vFollowupDate','vNotes'].forEach(i=>{const e=$(i);if(e)e.value=''});$('vStatus').value='scheduled';$('vDuration').value=60;$('vFeedbackFG').style.display='none';$('mViewingTitle').textContent='👁 زيارة جديدة'}if(id==='mDeposit'&&!editingDeposit){populateDepositForm();$('dpPaymentDate').value=toLocalDateStr(new Date());['dpAmount','dpLegalNotes','dpNotes'].forEach(i=>{const e=$(i);if(e)e.value=''});$('dpDuration').value=30;$('mDepositTitle').textContent='💰 عربون جديد'}$(id).classList.add('on')}
 function closeModal(id){$(id).classList.remove('on');if(id==='mClient'){editingClient=null;$('mClientTitle').textContent='➕ إضافة عميل جديد'}if(id==='mTask'){window.editingTask=null;$('mTaskTitle').textContent='⏰ مهمة جديدة'}if(id==='mProperty'){window.editingProperty=null}if(id==='mViewing'){editingViewing=null}if(id==='mDeposit'){editingDeposit=null}}
 document.querySelectorAll('.modal-ov').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('on')}));
 async function ensureCompany(){let id=currentProfile.company_id;if(!id){
@@ -2064,7 +2064,27 @@ function onDragEnd(e){e.target.classList.remove('dragging');document.querySelect
 function onDragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';e.currentTarget.classList.add('drag-over')}
 function onDragLeave(e){e.currentTarget.classList.remove('drag-over')}
 async function onDrop(e){e.preventDefault();const newStage=e.currentTarget.dataset.stage;const dealId=draggedDealId;if(!dealId||!newStage)return;e.currentTarget.classList.remove('drag-over');const deal=allDeals.find(function(d){return d.id===dealId});if(!deal||deal.stage===newStage)return;const oldStage=deal.stage;deal.stage=newStage;renderPipeline();const r=await supa.from('deals').update({stage:newStage,closed_at:newStage==='closed'?new Date().toISOString():null}).eq('id',dealId);if(r.error){showToast('خطأ: '+r.error.message,'error');loadDeals()}else{showToast('✅ '+dealStageAr(oldStage)+' → '+dealStageAr(newStage),'success');await logActivity('note','تم نقل الصفقة من "'+dealStageAr(oldStage)+'" إلى "'+dealStageAr(newStage)+'"',deal.client_id,dealId);await syncPropertyStatus(deal.property_id,newStage);loadDashboard()}}
-async function saveDeal(){const cl=$('dClient').value;if(!cl){showToast('⚠️ اختر عميلاً','error');return}try{const cid=await ensureCompany();
+function calcCompanyShare(){
+  var total=parseNum($('dCommission')?$('dCommission').value:0)||0;
+  var broker=parseNum($('dBrokerCommission')?$('dBrokerCommission').value:0)||0;
+  var agent=parseNum($('dAgentShare')?$('dAgentShare').value:0)||0;
+  var company=total-broker-agent;
+  if(company<0)company=0;
+  var el=$('dCompanyShare');
+  if(el){
+    el.value=company;
+    // تنبيه بصري لو الأرقام غير منطقية
+    if((broker+agent)>total&&total>0){
+      el.style.background='#FEE2E2';
+      el.style.color='#DC2626';
+    }else{
+      el.style.background='#F0F4F8';
+      el.style.color='';
+    }
+  }
+}
+
+async function saveDeal(){const cl=$('dClient').value;if(!cl){showToast('⚠️ اختر عميلاً','error');return}if(typeof calcCompanyShare==='function')calcCompanyShare();try{const cid=await ensureCompany();
 const propId=$('dProperty').value;if(propId){const pCheck=await supa.from('properties').select('status,title').eq('id',propId).single();if(pCheck.data&&pCheck.data.status==='sold'){showToast('⚠️ هذا العقار مباع بالفعل! لا يمكن إنشاء صفقة جديدة عليه','error');return}}const data={company_id:cid,client_id:cl,property_id:$('dProperty').value||null,agent_id:currentUser.id,deal_value:parseNum($('dValue').value)||null,stage:$('dStage').value,notes:$('dNotes').value.trim()||null,...(canManage()?{commission_total:parseNum($('dCommission').value)||null,company_share:parseNum($('dCompanyShare').value)||null,agent_share:parseNum($('dAgentShare').value)||null,commission_status:$('dCommissionStatus').value||'pending',broker_id:$('dBroker')&&$('dBroker').value?$('dBroker').value:null,broker_commission:parseNum($('dBrokerCommission')?$('dBrokerCommission').value:null)}:{})};const r=await supa.from('deals').insert(data).select().single();if(r.error)throw r.error;await logActivity('note','تم إنشاء صفقة جديدة',cl,r.data.id);await logSystemActivity('create','deal',r.data.id,'صفقة جديدة بقيمة '+fmtMoney(data.deal_value));if(data.property_id)await syncPropertyStatus(data.property_id,data.stage);closeModal('mDeal');showToast('✅ تم حفظ الصفقة','success');['dValue','dNotes','dCommission','dCompanyShare','dAgentShare','dBrokerCommission'].forEach(i=>{var e=$(i);if(e)e.value=''});if($('dBroker'))$('dBroker').value='';loadDeals();loadDashboard()}catch(err){showToast('خطأ: '+err.message,'error')}}
 function deleteDeal(id){
   if(!canEdit()){showToast('⚠️ ليس لديك صلاحية الحذف','error');return}
@@ -3346,7 +3366,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
-window.APP_VERSION = '20260522-1925';
+window.APP_VERSION = '20260522-1936';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
