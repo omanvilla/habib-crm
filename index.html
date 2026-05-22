@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260522-1936">
+<meta name="app-version" content="20260522-1946">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1120,7 +1120,7 @@ const PHONE_COUNTRIES = [
 const SUPABASE_URL='https://dmsckqjkcnsfmnzfjczz.supabase.co';
 const SUPABASE_KEY='sb_publishable_cblz5giFrHdXSCYSG6j0Cw_oaxkmHi4';
 const supa=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-function checkLeadFormMode(){const params=new URLSearchParams(window.location.search);const formId=params.get('form');const companyId=params.get('c');if(formId==='lead'&&companyId){renderLeadForm(companyId);return true}return false}
+function checkLeadFormMode(){try{const params=new URLSearchParams(window.location.search);const formId=params.get('form');const companyId=params.get('c');if(formId==='lead'&&companyId){renderLeadForm(companyId).catch(function(e){console.error('[LeadForm]',e);document.body.innerHTML='<div style=\"max-width:500px;margin:60px auto;padding:30px;text-align:center;font-family:sans-serif;direction:rtl\"><div style=\"font-size:48px\">⚠️</div><h2>تعذّر تحميل النموذج</h2><p>حاول تحديث الصفحة أو تواصل معنا مباشرة</p><button onclick=\"location.reload()\" style=\"background:#C49A4A;color:white;border:none;padding:12px 28px;border-radius:10px;cursor:pointer;font-size:15px\">🔄 إعادة المحاولة</button></div>';});return true}}catch(e){console.error('[checkLeadFormMode]',e);}return false}
 window.leadFormData = {
   serviceType: '',
   step: 1,
@@ -1132,8 +1132,9 @@ window.leadFormState = {
   data: {}
 };
 async function renderLeadForm(companyId){
-  document.getElementById('loaderScreen').style.display='none';
-  document.getElementById('authScreen').style.display='none';
+  var ls=document.getElementById('loaderScreen');if(ls)ls.style.display='none';
+  var as=document.getElementById('authScreen');if(as)as.style.display='none';
+  try{document.documentElement.classList.add('lead-form-mode');}catch(e){}
   let companyName='Habib Sons Real Estate';
   try{
     const r=await supa.from('companies').select('name').eq('id',companyId).single();
@@ -1613,6 +1614,76 @@ async function submitLead(companyId){
     errEl.style.display = 'flex';
   }
 }
+window.setupPhoneField = function(countrySelectId, localInputId, storedValue){
+  var parsed = parsePhoneStored(storedValue);
+  var sel = document.getElementById(countrySelectId);
+  var inp = document.getElementById(localInputId);
+  if(sel) sel.innerHTML = buildPhoneCountryOptions(parsed.country);
+  if(inp){
+    inp.value = parsed.local;
+    var country = PHONE_COUNTRIES.find(function(c){return c.code === parsed.country});
+    if(country) inp.placeholder = country.example;
+  }
+};
+window.updatePhonePlaceholder = function(selectId, inputId){
+  var sel = document.getElementById(selectId);
+  var inp = document.getElementById(inputId);
+  if(sel && inp){
+    var country = PHONE_COUNTRIES.find(function(c){return c.code === sel.value});
+    if(country) inp.placeholder = country.example;
+  }
+};
+window.getFullPhone = function(countrySelectId, localInputId){
+  var sel = document.getElementById(countrySelectId);
+  var inp = document.getElementById(localInputId);
+  if(!sel || !inp) return '';
+  return combinePhone(sel.value, inp.value);
+};
+window.formatPhoneDisplay = function(stored){
+  if(!stored) return '—';
+  var parsed = parsePhoneStored(stored);
+  var country = PHONE_COUNTRIES.find(function(c){return c.code === parsed.country});
+  if(!country) return '<span dir="ltr">' + stored + '</span>';
+  var local = parsed.local;
+  var formatted = local;
+  if(local.length === 8) formatted = local.substring(0,4) + ' ' + local.substring(4);
+  else if(local.length === 9) formatted = local.substring(0,3) + ' ' + local.substring(3,6) + ' ' + local.substring(6);
+  else if(local.length === 10) formatted = local.substring(0,3) + ' ' + local.substring(3,6) + ' ' + local.substring(6);
+  return country.flag + ' <span dir="ltr" style="font-family:monospace">+' + country.code + ' ' + formatted + '</span>';
+};
+function escapeHtml(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function parseNum(val){
+  if(!val&&val!==0)return null;
+  var s=String(val).trim();
+  // تحويل الأرقام العربية إلى إنجليزية
+  s=s.replace(/[٠-٩]/g,function(d){return '٠١٢٣٤٥٦٧٨٩'.indexOf(d)});
+  s=s.replace(/[۰-۹]/g,function(d){return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)});
+  // إزالة كل شي ماعدا الأرقام والنقطة والفاصلة
+  s=s.replace(/[^0-9.,]/g,'');
+  // إزالة الفواصل (آلاف)
+  s=s.replace(/,/g,'');
+  // إذا فيه أكثر من نقطة، نحتفظ بالأولى فقط (تجنب أخطاء)
+  var parts=s.split('.');
+  if(parts.length>2){s=parts[0]+'.'+parts.slice(1).join('')}
+  // إزالة نقاط في البداية
+  s=s.replace(/^\.+/,'');
+  if(s===''||s==='.')return null;
+  var n=parseFloat(s);
+  return isNaN(n)?null:n;
+}
+window.parsePhoneStored = function(stored){
+  if(!stored) return {country:'968', local:''};
+  var s = String(stored).replace(/[^0-9+]/g,'');
+  if(s.indexOf('+') === 0) s = s.substring(1);
+  for(var i = 0; i < PHONE_COUNTRIES.length; i++){
+    var c = PHONE_COUNTRIES[i];
+    if(s.indexOf(c.code) === 0){
+      return {country: c.code, local: s.substring(c.code.length)};
+    }
+  }
+  if(s.length === 8) return {country:'968', local:s};
+  return {country:'968', local:s};
+};
 if(checkLeadFormMode()){throw new Error('LEAD_FORM_MODE')}
 let currentUser=null,currentProfile=null,currentCompany=null;
 let allDeals=[],allClients=[],allProperties=[],allTasks=[],allMembers=[];
@@ -1712,7 +1783,7 @@ function toLocalDateStr(date){const y=date.getFullYear();const m=String(date.get
 function fmtDateTime(d){if(!d)return '—';const dt=new Date(d);const day=dt.getDate();const months=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];const month=months[dt.getMonth()];const year=dt.getFullYear();const hh=String(dt.getHours()).padStart(2,'0');const mm=String(dt.getMinutes()).padStart(2,'0');return '<span dir="ltr" style="display:inline-block">'+day+'</span> '+month+' <span dir="ltr" style="display:inline-block">'+year+'</span> <span dir="ltr" style="display:inline-block">'+hh+':'+mm+'</span>'}
 function timeAgo(d){if(!d)return '—';const sec=Math.floor((new Date()-new Date(d))/1000);if(sec<60)return 'الآن';if(sec<3600)return Math.floor(sec/60)+' دقيقة';if(sec<86400)return Math.floor(sec/3600)+' ساعة';if(sec<604800)return Math.floor(sec/86400)+' يوم';return fmtDate(d)}
 function daysUntil(d){if(!d)return null;const today=new Date();today.setHours(0,0,0,0);const target=new Date(d);target.setHours(0,0,0,0);return Math.round((target-today)/(1000*60*60*24))}
-function escapeHtml(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+
 function getRoles(c){
   const r=[];
   if(c.is_buyer)r.push('buyer');
@@ -1936,25 +2007,7 @@ var subLabel=propViewMode==='archived'?' (مؤرشف)':propViewMode==='sold'?' (
 $('propertiesSub').textContent=allProperties.length+' عقار'+subLabel;if(!allProperties.length){var emptyIco=propViewMode==='archived'?'📦':propViewMode==='sold'?'🔴':'🏠';
 var emptyMsg=propViewMode==='archived'?'لا توجد عقارات مؤرشفة':propViewMode==='sold'?'لا توجد عقارات مباعة':'لا توجد عقارات بعد';
 list.innerHTML='<div class="empty"><div class="empty-ico">'+emptyIco+'</div><div class="empty-title">'+emptyMsg+'</div>'+(canEdit()&&propViewMode==='active'?'<button class="btn-gold" style="margin-top:14px" onclick="openModal(\'mProperty\')">+ إضافة عقار</button>':'')+'</div>';return}let h='<table class="tbl"><thead><tr><th>العنوان</th><th>النوع</th><th>المنطقة</th><th>السعر</th><th>الحالة</th><th></th></tr></thead><tbody>';allProperties.forEach(function(p){const sm={available:'✅ متوفر',reserved:'⏳ محجوز',deposit:'💰 عربون',negotiating:'💬 تفاوض',sold:'🔴 مباع',not_available:'⚪ غير متاح'};h+='<tr'+(p.archived?' style="opacity:0.6;font-style:italic"':'')+' data-id="'+p.id+'"><td>'+(p.archived?'📦 ':'')+'<strong style="color:var(--espresso);cursor:pointer" onclick="editProperty(\''+p.id+'\')">'+escapeHtml(p.title)+'</strong></td><td>'+propTypeAr(p.type)+'</td><td>'+escapeHtml(p.area)+'</td><td style="color:var(--gold);font-weight:700">'+fmtMoney(p.price)+'</td><td>'+(sm[p.status]||p.status)+'</td><td style="font-size:12px;color:var(--umber)" dir="ltr">'+fmtDate(p.created_at)+'</td><td style="display:flex;gap:6px;justify-content:flex-end">'+(canEdit()&&!p.archived?'<span style="cursor:pointer" onclick="editProperty(\''+p.id+'\')" title="تعديل">✏️</span>':'')+(p.archived?'<span style="cursor:pointer" onclick="restorePropertyById(\''+p.id+'\')" title="استعادة">♻️</span>'+(isOwner()?'<span style="cursor:pointer" onclick="permanentDeletePropertyById(\''+p.id+'\')" title="حذف نهائي">🗑</span>':''):'<span style="cursor:pointer" onclick="archivePropertyById(\''+p.id+'\')" title="أرشفة">📦</span>')+'</td></tr>'});list.innerHTML=h+'</tbody></table>'}catch(err){list.innerHTML='<div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(err.message)+'</div></div>'}}
-function parseNum(val){
-  if(!val&&val!==0)return null;
-  var s=String(val).trim();
-  // تحويل الأرقام العربية إلى إنجليزية
-  s=s.replace(/[٠-٩]/g,function(d){return '٠١٢٣٤٥٦٧٨٩'.indexOf(d)});
-  s=s.replace(/[۰-۹]/g,function(d){return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)});
-  // إزالة كل شي ماعدا الأرقام والنقطة والفاصلة
-  s=s.replace(/[^0-9.,]/g,'');
-  // إزالة الفواصل (آلاف)
-  s=s.replace(/,/g,'');
-  // إذا فيه أكثر من نقطة، نحتفظ بالأولى فقط (تجنب أخطاء)
-  var parts=s.split('.');
-  if(parts.length>2){s=parts[0]+'.'+parts.slice(1).join('')}
-  // إزالة نقاط في البداية
-  s=s.replace(/^\.+/,'');
-  if(s===''||s==='.')return null;
-  var n=parseFloat(s);
-  return isNaN(n)?null:n;
-}
+
 
 async function saveProperty(){const t=$('pTitle').value.trim(),a=$('pArea').value.trim(),pr=parseNum($('pPrice').value);if(!t||!a||!pr){showToast('⚠️ العنوان والمنطقة والسعر مطلوبة','error');return}try{const cid=await ensureCompany();const data={title:t,type:$('pType').value,area:a,price:pr,status:$('pStatus').value,bedrooms:parseInt($('pBeds').value)||null,bathrooms:parseInt($('pBaths').value)||null,land_size:parseFloat($('pLandSize').value)||null,built_size:parseFloat($('pBuiltSize').value)||null,description:$('pDesc').value.trim()||null,owner_id:$('pOwnerId').value||null,...(canManage()?{owner_net:parseNum($('pOwnerNet').value)||null}:{}),images:currentPropertyImages.length?currentPropertyImages:null,wilayat:$('pWilayat')?$('pWilayat').value.trim()||null:null,source_type:$('pSourceType')?$('pSourceType').value||null:null,marketing_status:$('pMarketingStatus')?$('pMarketingStatus').value||null:null,...(canManage()?{expected_commission:parseFloat($('pExpectedCommission')?$('pExpectedCommission').value:0)||null}:{})};
 var pDate=$('pCreatedDate').value;if(pDate){data.created_at=new Date(pDate+'T12:00:00').toISOString();}let r;if(window.editingProperty){console.log('[Update Property] id:',window.editingProperty,'data:',data);r=await supa.from('properties').update(data).eq('id',window.editingProperty);console.log('[Update Property] result:',r);if(!r.error)await logSystemActivity('edit','property',window.editingProperty,'تعديل العقار: '+t)}else{data.company_id=cid;data.added_by=currentUser.id;data.archived=false;r=await supa.from('properties').insert(data).select().single();if(!r.error)await logSystemActivity('create','property',r.data.id,'إضافة عقار: '+t)}if(r.error)throw r.error;closeModal('mProperty');showToast('✅ تم الحفظ','success');['pTitle','pArea','pPrice','pBeds','pBaths','pLandSize','pBuiltSize','pDesc','pOwnerNet','pWilayat','pExpectedCommission'].forEach(i=>{var e=$(i);if(e)e.value=''});window.editingProperty=null;currentPropertyImages=[];loadProperties();loadDashboard()}catch(err){console.error('[Save Property]',err);showToast('خطأ: '+err.message,'error')}}
@@ -2924,67 +2977,22 @@ window.buildPhoneCountryOptions = function(selected){
     return '<option value="' + c.code + '" data-example="' + c.example + '"' + s + '>' + c.flag + ' +' + c.code + ' ' + c.name + '</option>';
   }).join('');
 };
-window.parsePhoneStored = function(stored){
-  if(!stored) return {country:'968', local:''};
-  var s = String(stored).replace(/[^0-9+]/g,'');
-  if(s.indexOf('+') === 0) s = s.substring(1);
-  for(var i = 0; i < PHONE_COUNTRIES.length; i++){
-    var c = PHONE_COUNTRIES[i];
-    if(s.indexOf(c.code) === 0){
-      return {country: c.code, local: s.substring(c.code.length)};
-    }
-  }
-  if(s.length === 8) return {country:'968', local:s};
-  return {country:'968', local:s};
-};
+
 window.combinePhone = function(country, local){
   var clean = String(local || '').replace(/[^0-9]/g,'');
   if(!clean) return '';
   return '+' + country + clean;
 };
-window.setupPhoneField = function(countrySelectId, localInputId, storedValue){
-  var parsed = parsePhoneStored(storedValue);
-  var sel = document.getElementById(countrySelectId);
-  var inp = document.getElementById(localInputId);
-  if(sel) sel.innerHTML = buildPhoneCountryOptions(parsed.country);
-  if(inp){
-    inp.value = parsed.local;
-    var country = PHONE_COUNTRIES.find(function(c){return c.code === parsed.country});
-    if(country) inp.placeholder = country.example;
-  }
-};
-window.updatePhonePlaceholder = function(selectId, inputId){
-  var sel = document.getElementById(selectId);
-  var inp = document.getElementById(inputId);
-  if(sel && inp){
-    var country = PHONE_COUNTRIES.find(function(c){return c.code === sel.value});
-    if(country) inp.placeholder = country.example;
-  }
-};
-window.getFullPhone = function(countrySelectId, localInputId){
-  var sel = document.getElementById(countrySelectId);
-  var inp = document.getElementById(localInputId);
-  if(!sel || !inp) return '';
-  return combinePhone(sel.value, inp.value);
-};
+
+
+
 window.phoneCountryFlag = function(phone){
   if(!phone) return '';
   var parsed = parsePhoneStored(phone);
   var country = PHONE_COUNTRIES.find(function(c){return c.code === parsed.country});
   return country ? country.flag : '🌍';
 };
-window.formatPhoneDisplay = function(stored){
-  if(!stored) return '—';
-  var parsed = parsePhoneStored(stored);
-  var country = PHONE_COUNTRIES.find(function(c){return c.code === parsed.country});
-  if(!country) return '<span dir="ltr">' + stored + '</span>';
-  var local = parsed.local;
-  var formatted = local;
-  if(local.length === 8) formatted = local.substring(0,4) + ' ' + local.substring(4);
-  else if(local.length === 9) formatted = local.substring(0,3) + ' ' + local.substring(3,6) + ' ' + local.substring(6);
-  else if(local.length === 10) formatted = local.substring(0,3) + ' ' + local.substring(3,6) + ' ' + local.substring(6);
-  return country.flag + ' <span dir="ltr" style="font-family:monospace">+' + country.code + ' ' + formatted + '</span>';
-};
+
 window.checkDuplicatePhone = async function(){
   var warnEl = document.getElementById('duplicatePhoneWarn');
   if(!warnEl) return;
@@ -3366,7 +3374,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
-window.APP_VERSION = '20260522-1936';
+window.APP_VERSION = '20260522-1946';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
