@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260525-0802">
+<meta name="app-version" content="20260525-0831">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2656,26 +2656,35 @@ async function saveViewing(){
     // إنشاء مهمة متابعة تلقائية إذا حُدّد موعد متابعة
     var fuDate=document.getElementById('vFollowupDate').value;
     var nextStep=document.getElementById('vNextStep').value.trim();
-    if(fuDate&&!editingViewing){
+    console.log('[Followup] fuDate=',fuDate,'editingViewing=',editingViewing);
+    if(fuDate){
       try{
+        // جلب اسم العميل والعقار مباشرة (لا نعتمد على allClients)
         var clientName='العميل';
-        var cObj=allClients.find(function(x){return x.id===cl;});
-        if(cObj)clientName=cObj.name;
+        try{var cr=await supa.from('clients').select('name').eq('id',cl).single();if(cr.data)clientName=cr.data.name;}catch(e){}
         var propTitle='';
-        var pObj=allProperties.find(function(x){return x.id===pr;});
-        if(pObj)propTitle=' - '+pObj.title;
+        try{var pr2=await supa.from('properties').select('title').eq('id',pr).single();if(pr2.data)propTitle=' - '+pr2.data.title;}catch(e){}
         var taskTitle='☎️ متابعة بعد الزيارة: '+clientName+propTitle;
-        await supa.from('tasks').insert({
+        var taskRes=await supa.from('tasks').insert({
           company_id:cid,
           user_id:document.getElementById('vAgent').value||currentUser.id,
           title:taskTitle,
           due_date:fuDate,
           priority:'high',
           client_id:cl,
-          notes:nextStep||'متابعة العميل بخصوص العقار بعد الزيارة',
-          done:false
+          notes:nextStep||'متابعة العميل بخصوص العقار بعد الزيارة'
         });
-      }catch(taskErr){console.warn('Auto follow-up task:',taskErr);}
+        console.log('[Followup] task created:',taskRes);
+        if(taskRes.error){
+          console.error('[Followup] task error:',taskRes.error);
+          showToast('⚠️ الزيارة حُفظت لكن تعذّر إنشاء مهمة المتابعة: '+taskRes.error.message,'error');
+        }else{
+          showToast('✅ تم حفظ الزيارة + إنشاء مهمة متابعة في '+fuDate,'success');
+        }
+      }catch(taskErr){
+        console.error('[Followup] exception:',taskErr);
+        showToast('⚠️ تعذّر إنشاء مهمة المتابعة','error');
+      }
     }
     await logSystemActivity(editingViewing?'edit':'create','viewing',editingViewing||r.data?.id,'زيارة: '+dt);
     closeModal('mViewing');
@@ -3411,7 +3420,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
-window.APP_VERSION = '20260525-0802';
+window.APP_VERSION = '20260525-0831';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
