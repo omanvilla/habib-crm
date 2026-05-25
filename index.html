@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260525-0752">
+<meta name="app-version" content="20260525-0802">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -981,7 +981,7 @@
 </div>
 </div>
 <div class="fg full"><label class="fl">الخطوة القادمة</label><input class="fi" id="vNextStep" placeholder="مثال: التفاوض على السعر، إرسال عقد العربون"></div>
-<div class="fg"><label class="fl">موعد المتابعة</label><input class="fi" type="date" id="vFollowupDate"></div>
+<div class="fg"><label class="fl">📅 موعد المتابعة</label><input class="fi" type="date" id="vFollowupDate" dir="ltr" style="text-align:left"><div style="font-size:11px;color:var(--umber);margin-top:4px">سيتم إنشاء مهمة متابعة تلقائياً في هذا اليوم ⏰</div></div>
 <div class="fg full"><label class="fl">ملاحظات</label><textarea class="fta" id="vNotes" rows="3"></textarea></div>
 </div>
 <div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mViewing')">إلغاء</button><button class="btn-primary" style="width:auto;padding:9px 22px" onclick="saveViewing()">💾 حفظ</button></div>
@@ -2653,6 +2653,30 @@ async function saveViewing(){
     }else if(status==='done'){
       await supa.from('clients').update({pipeline_stage:'viewed'}).eq('id',cl);
     }
+    // إنشاء مهمة متابعة تلقائية إذا حُدّد موعد متابعة
+    var fuDate=document.getElementById('vFollowupDate').value;
+    var nextStep=document.getElementById('vNextStep').value.trim();
+    if(fuDate&&!editingViewing){
+      try{
+        var clientName='العميل';
+        var cObj=allClients.find(function(x){return x.id===cl;});
+        if(cObj)clientName=cObj.name;
+        var propTitle='';
+        var pObj=allProperties.find(function(x){return x.id===pr;});
+        if(pObj)propTitle=' - '+pObj.title;
+        var taskTitle='☎️ متابعة بعد الزيارة: '+clientName+propTitle;
+        await supa.from('tasks').insert({
+          company_id:cid,
+          user_id:document.getElementById('vAgent').value||currentUser.id,
+          title:taskTitle,
+          due_date:fuDate,
+          priority:'high',
+          client_id:cl,
+          notes:nextStep||'متابعة العميل بخصوص العقار بعد الزيارة',
+          done:false
+        });
+      }catch(taskErr){console.warn('Auto follow-up task:',taskErr);}
+    }
     await logSystemActivity(editingViewing?'edit':'create','viewing',editingViewing||r.data?.id,'زيارة: '+dt);
     closeModal('mViewing');
     showToast('✅ تم الحفظ','success');
@@ -3387,7 +3411,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
-window.APP_VERSION = '20260525-0752';
+window.APP_VERSION = '20260525-0802';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
