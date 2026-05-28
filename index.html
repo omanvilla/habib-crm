@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260528-1612">
+<meta name="app-version" content="20260528-1626">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -414,6 +414,15 @@
 <div class="page" id="page-backup">
 <div class="page-header"><div><div class="page-title">🛡 الحماية والنسخ الاحتياطية</div><div class="page-sub">احمِ بياناتك من الضياع</div></div></div>
 <div id="backupContent"><div class="empty"><div class="loader-spinner"></div></div></div>
+</div>
+
+<div class="page" id="page-propertyDetail">
+<div class="page-header"><div><div class="page-title" id="pdTitle">—</div><div class="page-sub" id="pdSub">—</div></div>
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+<button class="btn-secondary" onclick="navigate('properties',document.querySelector('[onclick*=properties]'))">← رجوع</button>
+<button class="btn-secondary" id="pdEditBtn" onclick="editPropertyFromDetail()">✏️ تعديل</button>
+</div></div>
+<div id="propertyDetailContent"><div class="empty"><div class="loader-spinner"></div></div></div>
 </div>
 
 <div class="page" id="page-settings">
@@ -1845,7 +1854,7 @@ async function changePassword(){const p=prompt('كلمة المرور الجدي
 async function loadApp(){$('loaderScreen').style.display='flex';$('authScreen').classList.add('hidden');try{const u=await supa.auth.getUser();if(u.error||!u.data.user)throw new Error('لم يتم العثور على المستخدم');currentUser=u.data.user;const p=await supa.from('profiles').select('*').eq('id',currentUser.id).single();currentProfile=p.data||{id:currentUser.id,email:currentUser.email,full_name:currentUser.email.split('@')[0],role:'viewer'};if(currentProfile.is_active===false){throw new Error('حسابك معطّل. تواصل مع مدير الشركة.')}if(currentProfile.company_id){const c=await supa.from('companies').select('*').eq('id',currentProfile.company_id).single();currentCompany=c.data}updateUserUI();applyRoleVisibility();$('loaderScreen').style.display='none';$('appScreen').classList.add('visible');await loadDashboard();loadNotifications();if(canManage()){try{const mr=await supa.from('profiles').select('*').order('created_at');allMembers=mr.data||[]}catch(e){console.warn('Members load:',e)}}try{const or_=await supa.from('owners').select('id,name').eq('archived',false);allOwners=or_.data||[]}catch(e){}}catch(err){console.error(err);showToast('خطأ: '+err.message,'error');$('loaderScreen').style.display='none';$('authScreen').classList.remove('hidden');await supa.auth.signOut()}}
 function updateUserUI(){if(!currentProfile)return;$('userAv').textContent=roleIcon(currentProfile.role);$('userName').textContent=currentProfile.full_name||currentProfile.email;$('userRole').textContent=roleAr(currentProfile.role);$('welcomeName').textContent=(currentProfile.full_name||'').split(' ')[0]||'بك';$('setName').value=currentProfile.full_name||'';$('setEmail').value=currentProfile.email||'';$('setPhone').value=currentProfile.phone||'';$('setRole').value=roleAr(currentProfile.role);if(currentCompany){$('setCompanyName').value=currentCompany.name||'';$('setCompanyCR').value=currentCompany.cr_number||'';$('setCompanyPhone').value=currentCompany.phone||'';$('setCompanyEmail').value=currentCompany.email||'';$('setCompanyAddress').value=currentCompany.address||''}}
 function applyRoleVisibility(){if(!currentProfile)return;$('navTeam').style.display=canManageTeam()?'':'none';$('navExpenses').style.display=canViewFinancials()?'':'none';$('navActivityLog').style.display=canManage()?'':'none';$('companySettingsCard').style.display=isOwner()?'':'none';if($('repTeamTab'))$('repTeamTab').style.display=canManage()?'':'none';if(typeof refreshLeadFormCard==='function')refreshLeadFormCard();if(isAgent()){$('statClientsLbl').textContent='عملائي';$('welcomeSub').textContent='موظف مبيعات · '+(currentCompany?currentCompany.name:'')}else{$('welcomeSub').textContent=currentCompany?currentCompany.name:'سلطنة عُمان'}}
-function navigate(id,el){if(id==='expenses'&&!canViewFinancials()){showPermissionDenied();return}if(id==='activityLog'&&!canManage()){showPermissionDenied();return}if(id==='team'&&!canManageTeam()){showPermissionDenied();return}if(id==='reports'&&isAgent()&&!canViewFinancials()){/* agents see limited reports */}document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-link').forEach(n=>n.classList.remove('active'));const page=$('page-'+id);if(page)page.classList.add('active');if(el)el.classList.add('active');const t={dash:'لوحة <em>التحكم</em>',daily:'المهام <em>اليومية</em>',clients:'إدارة <em>العملاء</em>',properties:'إدارة <em>العقارات</em>',deals:'إدارة <em>الصفقات</em>',search:'البحث <em>المتقدم</em>',reports:'التقارير <em>والتحليلات</em>',team:'إدارة <em>الفريق</em>',settings:'<em>الإعدادات</em>',clientDetail:'<em>تفاصيل العميل</em>',calendar:'<em>التقويم</em>',ai:'المساعد <em>الذكي</em>',owners:'إدارة <em>الملاك</em>',expenses:'<em>المصاريف والأرباح</em>',activityLog:'سجل <em>النشاط</em>',viewings:'إدارة <em>الزيارات</em>',deposits:'إدارة <em>العربون</em>',backup:'🛡 الحماية <em>والـ Backup</em>'};$('tbTitle').innerHTML=t[id]||id;if(id==='dash')loadDashboard();if(id==='clients')loadClients();if(id==='properties')loadProperties();if(id==='deals')loadDeals();if(id==='daily')loadTasks();if(id==='search')$('searchQ').focus();if(id==='reports')loadReports();if(id==='team')loadTeam();if(id==='calendar')loadCalendar();if(id==='ai')$('aiInput').focus();if(id==='owners')loadOwners();if(id==='expenses')loadExpenses();if(id==='activityLog')loadActivityLog();if(id==='viewings'){populateViewingForm();loadViewings()}if(id==='deposits'){populateDepositForm();loadDeposits()}if(id==='backup'){renderBackupPage()}closeMobile()}
+function navigate(id,el){if(id==='expenses'&&!canViewFinancials()){showPermissionDenied();return}if(id==='activityLog'&&!canManage()){showPermissionDenied();return}if(id==='team'&&!canManageTeam()){showPermissionDenied();return}if(id==='reports'&&isAgent()&&!canViewFinancials()){/* agents see limited reports */}document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-link').forEach(n=>n.classList.remove('active'));const page=$('page-'+id);if(page)page.classList.add('active');if(el)el.classList.add('active');const t={dash:'لوحة <em>التحكم</em>',daily:'المهام <em>اليومية</em>',clients:'إدارة <em>العملاء</em>',properties:'إدارة <em>العقارات</em>',deals:'إدارة <em>الصفقات</em>',search:'البحث <em>المتقدم</em>',reports:'التقارير <em>والتحليلات</em>',team:'إدارة <em>الفريق</em>',settings:'<em>الإعدادات</em>',clientDetail:'<em>تفاصيل العميل</em>',calendar:'<em>التقويم</em>',ai:'المساعد <em>الذكي</em>',owners:'إدارة <em>الملاك</em>',expenses:'<em>المصاريف والأرباح</em>',activityLog:'سجل <em>النشاط</em>',viewings:'إدارة <em>الزيارات</em>',deposits:'إدارة <em>العربون</em>',backup:'🛡 الحماية <em>والـ Backup</em>'};$('tbTitle').innerHTML=t[id]||id;if(id==='dash')loadDashboard();if(id==='clients')loadClients();if(id==='properties')loadProperties();if(id==='deals')loadDeals();if(id==='daily')loadTasks();if(id==='search')$('searchQ').focus();if(id==='reports')loadReports();if(id==='team')loadTeam();if(id==='calendar')loadCalendar();if(id==='ai')$('aiInput').focus();if(id==='owners')loadOwners();if(id==='expenses')loadExpenses();if(id==='activityLog')loadActivityLog();if(id==='viewings'){populateViewingForm();loadViewings()}if(id==='deposits'){populateDepositForm();loadDeposits()}if(id==='backup'){renderBackupPage()}if(id==='propertyDetail'){renderPropertyDetail()}closeMobile()}
 function openMobile(){$('sidebar').classList.add('mob-open');$('mobBg').classList.add('on')}
 function closeMobile(){$('sidebar').classList.remove('mob-open');$('mobBg').classList.remove('on')}
 function openModal(id){
@@ -1999,11 +2008,120 @@ allProperties=allData.filter(p=>p.archived!==true&&p.status!=='sold');
 var subLabel=propViewMode==='archived'?' (مؤرشف)':propViewMode==='sold'?' (مباع)':'';
 $('propertiesSub').textContent=allProperties.length+' عقار'+subLabel;if(!allProperties.length){var emptyIco=propViewMode==='archived'?'📦':propViewMode==='sold'?'🔴':'🏠';
 var emptyMsg=propViewMode==='archived'?'لا توجد عقارات مؤرشفة':propViewMode==='sold'?'لا توجد عقارات مباعة':'لا توجد عقارات بعد';
-list.innerHTML='<div class="empty"><div class="empty-ico">'+emptyIco+'</div><div class="empty-title">'+emptyMsg+'</div>'+(canEdit()&&propViewMode==='active'?'<button class="btn-gold" style="margin-top:14px" onclick="openModal(\'mProperty\')">+ إضافة عقار</button>':'')+'</div>';return}let h='<table class="tbl"><thead><tr><th>العنوان</th><th>النوع</th><th>المنطقة</th><th>السعر</th><th>الحالة</th><th></th></tr></thead><tbody>';allProperties.forEach(function(p){const sm={available:'✅ متوفر',reserved:'⏳ محجوز',deposit:'💰 عربون',negotiating:'💬 تفاوض',sold:'🔴 مباع',not_available:'⚪ غير متاح'};h+='<tr'+(p.archived?' style="opacity:0.6;font-style:italic"':'')+' data-id="'+p.id+'"><td>'+(p.archived?'📦 ':'')+'<strong style="color:var(--espresso);cursor:pointer" onclick="editProperty(\''+p.id+'\')">'+escapeHtml(p.title)+'</strong></td><td>'+propTypeAr(p.type)+'</td><td>'+escapeHtml(p.area)+'</td><td style="color:var(--gold);font-weight:700">'+fmtMoney(p.price)+'</td><td>'+(sm[p.status]||p.status)+'</td><td style="font-size:12px;color:var(--umber)" dir="ltr">'+fmtDate(p.created_at)+'</td><td style="display:flex;gap:6px;justify-content:flex-end">'+(canEdit()&&!p.archived?'<span style="cursor:pointer" onclick="editProperty(\''+p.id+'\')" title="تعديل">✏️</span>':'')+(p.archived?'<span style="cursor:pointer" onclick="restorePropertyById(\''+p.id+'\')" title="استعادة">♻️</span>'+(isOwner()?'<span style="cursor:pointer" onclick="permanentDeletePropertyById(\''+p.id+'\')" title="حذف نهائي">🗑</span>':''):'<span style="cursor:pointer" onclick="archivePropertyById(\''+p.id+'\')" title="أرشفة">📦</span>')+'</td></tr>'});list.innerHTML=h+'</tbody></table>'}catch(err){list.innerHTML='<div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(err.message)+'</div></div>'}}
+list.innerHTML='<div class="empty"><div class="empty-ico">'+emptyIco+'</div><div class="empty-title">'+emptyMsg+'</div>'+(canEdit()&&propViewMode==='active'?'<button class="btn-gold" style="margin-top:14px" onclick="openModal(\'mProperty\')">+ إضافة عقار</button>':'')+'</div>';return}let h='<table class="tbl"><thead><tr><th>العنوان</th><th>النوع</th><th>المنطقة</th><th>السعر</th><th>الحالة</th><th></th></tr></thead><tbody>';allProperties.forEach(function(p){const sm={available:'✅ متوفر',reserved:'⏳ محجوز',deposit:'💰 عربون',negotiating:'💬 تفاوض',sold:'🔴 مباع',not_available:'⚪ غير متاح'};h+='<tr'+(p.archived?' style="opacity:0.6;font-style:italic"':'')+' data-id="'+p.id+'"><td>'+(p.archived?'📦 ':'')+'<strong style="color:var(--espresso);cursor:pointer" onclick="viewProperty(\''+p.id+'\')">'+escapeHtml(p.title)+'</strong></td><td>'+propTypeAr(p.type)+'</td><td>'+escapeHtml(p.area)+'</td><td style="color:var(--gold);font-weight:700">'+fmtMoney(p.price)+'</td><td>'+(sm[p.status]||p.status)+'</td><td style="font-size:12px;color:var(--umber)" dir="ltr">'+fmtDate(p.created_at)+'</td><td style="display:flex;gap:6px;justify-content:flex-end">'+(canEdit()&&!p.archived?'<span style="cursor:pointer" onclick="editProperty(\''+p.id+'\')" title="تعديل">✏️</span>':'')+(p.archived?'<span style="cursor:pointer" onclick="restorePropertyById(\''+p.id+'\')" title="استعادة">♻️</span>'+(isOwner()?'<span style="cursor:pointer" onclick="permanentDeletePropertyById(\''+p.id+'\')" title="حذف نهائي">🗑</span>':''):'<span style="cursor:pointer" onclick="archivePropertyById(\''+p.id+'\')" title="أرشفة">📦</span>')+'</td></tr>'});list.innerHTML=h+'</tbody></table>'}catch(err){list.innerHTML='<div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(err.message)+'</div></div>'}}
 
 
 async function saveProperty(){const t=$('pTitle').value.trim(),a=$('pArea').value.trim(),pr=parseNum($('pPrice').value);if(!t||!a||!pr){showToast('⚠️ العنوان والمنطقة والسعر مطلوبة','error');return}try{const cid=await ensureCompany();const data={title:t,type:$('pType').value,area:a,price:pr,status:$('pStatus').value,bedrooms:parseInt($('pBeds').value)||null,bathrooms:parseInt($('pBaths').value)||null,land_size:parseFloat($('pLandSize').value)||null,built_size:parseFloat($('pBuiltSize').value)||null,description:$('pDesc').value.trim()||null,owner_id:$('pOwnerId').value||null,...(canManage()?{owner_net:parseNum($('pOwnerNet').value)||null}:{}),images:currentPropertyImages.length?currentPropertyImages:null,wilayat:$('pWilayat')?$('pWilayat').value.trim()||null:null,source_type:$('pSourceType')?$('pSourceType').value||null:null,marketing_status:$('pMarketingStatus')?$('pMarketingStatus').value||null:null,...(canManage()?{expected_commission:parseFloat($('pExpectedCommission')?$('pExpectedCommission').value:0)||null}:{})};
 var pDate=$('pCreatedDate').value;if(pDate){data.created_at=new Date(pDate+'T12:00:00').toISOString();}let r;if(window.editingProperty){console.log('[Update Property] id:',window.editingProperty,'data:',data);r=await supa.from('properties').update(data).eq('id',window.editingProperty);console.log('[Update Property] result:',r);if(!r.error)await logSystemActivity('edit','property',window.editingProperty,'تعديل العقار: '+t)}else{data.company_id=cid;data.added_by=currentUser.id;data.archived=false;r=await supa.from('properties').insert(data).select().single();if(!r.error)await logSystemActivity('create','property',r.data.id,'إضافة عقار: '+t)}if(r.error)throw r.error;closeModal('mProperty');showToast('✅ تم الحفظ','success');['pTitle','pArea','pPrice','pBeds','pBaths','pLandSize','pBuiltSize','pDesc','pOwnerNet','pWilayat','pExpectedCommission'].forEach(i=>{var e=$(i);if(e)e.value=''});window.editingProperty=null;currentPropertyImages=[];loadProperties();loadDashboard()}catch(err){console.error('[Save Property]',err);showToast('خطأ: '+err.message,'error')}}
+window.viewingProperty = null;
+async function viewProperty(id){
+  try{
+    const r=await supa.from('properties').select('*').eq('id',id).single();
+    if(r.error)throw r.error;
+    window.viewingProperty=r.data;
+    navigate('propertyDetail',null);
+    renderPropertyDetail();
+  }catch(err){showToast('خطأ: '+err.message,'error');}
+}
+
+async function renderPropertyDetail(){
+  if(!window.viewingProperty)return;
+  const p=window.viewingProperty;
+  const isMgr=(typeof canManage==='function')&&canManage();
+  
+  // Header
+  var statusLabels={available:'✅ متوفر',reserved:'⏳ محجوز',deposit:'💰 عربون',negotiating:'💬 تفاوض',sold:'🔴 مباع',not_available:'⚪ غير متاح'};
+  $('pdTitle').textContent=p.title||'عقار';
+  $('pdSub').textContent=(propTypeAr(p.type)||p.type||'')+' · '+(p.area||'')+' · '+(statusLabels[p.status]||p.status||'');
+  
+  // Edit button visibility
+  var editBtn=$('pdEditBtn');
+  if(editBtn)editBtn.style.display=(typeof canEdit==='function'&&canEdit())?'':'none';
+  
+  var html='';
+  
+  // Images gallery
+  var imgs=[];
+  try{if(p.images){imgs=typeof p.images==='string'?JSON.parse(p.images):p.images;}}catch(e){imgs=[];}
+  if(imgs&&imgs.length){
+    html+='<div class="card"><div style="display:flex;gap:8px;overflow-x:auto;padding:12px">';
+    imgs.forEach(function(im){html+='<img src="'+im+'" style="height:180px;border-radius:10px;object-fit:cover" onclick="window.open(this.src)">';});
+    html+='</div></div>';
+  }
+  
+  // Main info card
+  html+='<div class="card"><div class="card-head"><div class="card-title"><span>🏠</span>معلومات العقار</div></div><div style="padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px">';
+  html+=pdField('💵 السعر المعروض', p.price?fmtMoney(p.price):'—');
+  html+=pdField('🏷 النوع', propTypeAr(p.type)||p.type||'—');
+  html+=pdField('📍 المنطقة', p.area||'—');
+  if(p.wilayat)html+=pdField('🗺 الولاية', p.wilayat);
+  html+=pdField('📊 الحالة', statusLabels[p.status]||p.status||'—');
+  if(p.bedrooms)html+=pdField('🛏 غرف النوم', p.bedrooms);
+  if(p.bathrooms)html+=pdField('🚿 الحمامات', p.bathrooms);
+  if(p.land_size)html+=pdField('📐 مساحة الأرض', p.land_size+' م²');
+  if(p.built_size)html+=pdField('🏗 المساحة المبنية', p.built_size+' م²');
+  html+=pdField('📅 تاريخ التسجيل', fmtDate(p.created_at));
+  html+='</div></div>';
+  
+  // Description
+  if(p.description){
+    html+='<div class="card"><div class="card-head"><div class="card-title"><span>📝</span>الوصف</div></div><div style="padding:18px;line-height:1.8;color:var(--espresso)">'+escapeHtml(p.description)+'</div></div>';
+  }
+  
+  // Financial (manager only)
+  if(isMgr&&(p.owner_net||p.expected_commission)){
+    html+='<div class="card" style="border:1px solid rgba(196,154,74,0.3);background:linear-gradient(135deg,rgba(196,154,74,0.05),white)"><div class="card-head"><div class="card-title"><span>💰</span>البيانات المالية <span style="font-size:10px;background:#FFD700;color:#7A5C00;padding:2px 8px;border-radius:8px">👑 خاص بالمدير</span></div></div><div style="padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px">';
+    if(p.owner_net)html+=pdField('صافي المالك', fmtMoney(p.owner_net));
+    if(p.expected_commission)html+=pdField('العمولة المتوقعة', fmtMoney(p.expected_commission));
+    html+='</div></div>';
+  }
+  
+  $('propertyDetailContent').innerHTML=html;
+  
+  // Load related deals and viewings
+  loadPropertyRelations(p.id);
+}
+
+function pdField(label, value){
+  return '<div><div style="font-size:12px;color:var(--umber);margin-bottom:4px">'+label+'</div><div style="font-size:15px;font-weight:600;color:var(--espresso)" dir="auto">'+value+'</div></div>';
+}
+
+async function loadPropertyRelations(propId){
+  try{
+    var deals=await supa.from('deals').select('*, client:clients(name)').eq('property_id',propId).order('created_at',{ascending:false});
+    var viewings=await supa.from('viewings').select('*, client:clients(name)').eq('property_id',propId).order('viewing_date',{ascending:false});
+    
+    var extra='';
+    // Related deals
+    var dl=deals.data||[];
+    extra+='<div class="card"><div class="card-head"><div class="card-title"><span>🤝</span>الصفقات المرتبطة ('+dl.length+')</div></div>';
+    if(dl.length){
+      extra+='<table class="tbl"><thead><tr><th>العميل</th><th>القيمة</th><th>المرحلة</th><th>التاريخ</th></tr></thead><tbody>';
+      dl.forEach(function(d){extra+='<tr><td>'+escapeHtml(d.client?d.client.name:'—')+'</td><td dir="ltr">'+fmtMoney(d.deal_value)+'</td><td>'+dealStageAr(d.stage)+'</td><td>'+fmtDate(d.created_at)+'</td></tr>';});
+      extra+='</tbody></table>';
+    }else{extra+='<div class="empty" style="padding:24px"><div class="empty-desc">لا توجد صفقات على هذا العقار</div></div>';}
+    extra+='</div>';
+    
+    // Related viewings
+    var vl=viewings.data||[];
+    extra+='<div class="card"><div class="card-head"><div class="card-title"><span>👁</span>الزيارات ('+vl.length+')</div></div>';
+    if(vl.length){
+      extra+='<table class="tbl"><thead><tr><th>العميل</th><th>التاريخ</th><th>الحالة</th></tr></thead><tbody>';
+      var vsm={scheduled:'📅 مجدولة',done:'✅ تمت',no_show:'❌ لم تتم'};
+      vl.forEach(function(v){extra+='<tr><td>'+escapeHtml(v.client?v.client.name:'—')+'</td><td dir="ltr">'+fmtDate(v.viewing_date)+'</td><td>'+(vsm[v.status]||v.status)+'</td></tr>';});
+      extra+='</tbody></table>';
+    }else{extra+='<div class="empty" style="padding:24px"><div class="empty-desc">لا توجد زيارات على هذا العقار</div></div>';}
+    extra+='</div>';
+    
+    $('propertyDetailContent').innerHTML+=extra;
+  }catch(err){console.warn('Property relations:',err);}
+}
+
+function editPropertyFromDetail(){
+  if(window.viewingProperty)editProperty(window.viewingProperty.id);
+}
+
+
 function editProperty(id){const p=allProperties.find(x=>x.id===id);if(!p){showToast('⚠️ العقار غير موجود','error');return}window.editingProperty=id;$('pTitle').value=p.title||'';$('pType').value=p.type||'apartment';$('pArea').value=p.area||'';$('pPrice').value=p.price||'';$('pStatus').value=p.status||'available';$('pBeds').value=p.bedrooms||'';$('pBaths').value=p.bathrooms||'';$('pLandSize').value=p.land_size||'';$('pBuiltSize').value=p.built_size||'';$('pDesc').value=p.description||'';if($('pCreatedDate'))$('pCreatedDate').value=p.created_at?p.created_at.slice(0,10):'';if(canManage())$('pOwnerNet').value=p.owner_net||'';else $('pOwnerNet').value='';if($('pWilayat'))$('pWilayat').value=p.wilayat||'';if($('pSourceType'))$('pSourceType').value=p.source_type||'owner';if($('pMarketingStatus'))$('pMarketingStatus').value=p.marketing_status||'ready_to_advertise';if($('pExpectedCommission'))$('pExpectedCommission').value=canManage()?(p.expected_commission||''):'';
 const sel=$('pOwnerId');if(sel){sel.innerHTML='<option value="">— اختر مالك —</option>';allOwners.forEach(o=>sel.innerHTML+='<option value="'+o.id+'"'+(o.id===p.owner_id?' selected':'')+'>'+escapeHtml(o.name)+'</option>')}currentPropertyImages=p.images||[];renderPropertyImages();$('mProperty').classList.add('on')}
 function setPropArchiveView(archived,btn){showArchivedProperties=archived;btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadProperties()}
@@ -3409,7 +3527,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
-window.APP_VERSION = '20260528-1612';
+window.APP_VERSION = '20260528-1626';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
