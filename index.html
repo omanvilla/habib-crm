@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260528-1829">
+<meta name="app-version" content="20260528-1843">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3880,8 +3880,26 @@ async function runImport(){
   
   // ابدأ الاستيراد
   var stats={
-    newClients:0, existingClients:0, properties:0, deals:0, errors:0, errorDetails:[]
+    newClients:0, existingClients:0, properties:0, deals:0, errors:0, errorDetails:[],
+    skipped:0, skipReasons:[]
   };
+  
+  // تشخيص: اطبع الأعمدة المكتشفة
+  console.log('═══ تشخيص الاستيراد ═══');
+  console.log('عدد الصفوف:', window.impParsedRows.length);
+  console.log('العناوين:', h);
+  console.log('الأعمدة المكتشفة:');
+  console.log('  - sellerName:', col.sellerName, '=', h[col.sellerName]);
+  console.log('  - sellerPhone:', col.sellerPhone, '=', h[col.sellerPhone]);
+  console.log('  - propType:', col.propType, '=', h[col.propType]);
+  console.log('  - propArea:', col.propArea, '=', h[col.propArea]);
+  console.log('  - sellPrice:', col.sellPrice, '=', h[col.sellPrice]);
+  console.log('  - sellCommission:', col.sellCommission, '=', h[col.sellCommission]);
+  console.log('  - sellDate:', col.sellDate, '=', h[col.sellDate]);
+  console.log('  - buyerNameCol:', buyerNameCol, '=', h[buyerNameCol]);
+  console.log('  - buyerPhoneCol:', buyerPhoneCol, '=', h[buyerPhoneCol]);
+  console.log('  - buyPriceCol:', buyPriceCol, '=', h[buyPriceCol]);
+  console.log('السطر الأول من البيانات:', window.impParsedRows[0]);
   
   // قاموس العملاء حسب الهاتف (لتجنب التكرار)
   var clientsByPhone={};
@@ -3919,8 +3937,13 @@ async function runImport(){
       // 1. بيانات البائع
       var sName=col.sellerName>=0?(row[col.sellerName]||'').trim():'';
       var sPhone=col.sellerPhone>=0?String(row[col.sellerPhone]||'').trim():'';
-      if(!sName)continue;
+      if(!sName){
+        stats.skipped++;
+        if(stats.skipReasons.length<3)stats.skipReasons.push('صف '+(ri+2)+': لا يوجد اسم بائع (العمود '+col.sellerName+'='+JSON.stringify(row[col.sellerName])+')');
+        continue;
+      }
       
+      if(ri===0)console.log('أول صف - sName:', JSON.stringify(sName), 'sPhone:', JSON.stringify(sPhone), 'pType:', JSON.stringify(row[col.propType]));
       var sellerId=null;
       var sPhoneClean=cleanPhone(sPhone);
       if(sPhoneClean&&clientsByPhone[sPhoneClean]){
@@ -4036,6 +4059,11 @@ async function runImport(){
     stats.errorDetails.forEach(function(e){html+='<div style="color:#7F1D1D;margin:3px 0">• '+escapeHtml(e)+'</div>';});
     html+='</div>';
   }
+  if(stats.skipped){
+    html+='<div style="margin-top:14px;padding:12px;background:#FFFBEB;border-radius:8px;font-size:12px"><div style="font-weight:700;color:#92400E;margin-bottom:6px">⚠️ '+stats.skipped+' صف متجاهَل:</div>';
+    stats.skipReasons.forEach(function(e){html+='<div style="color:#78350F;margin:3px 0">• '+escapeHtml(e)+'</div>';});
+    html+='<div style="margin-top:8px;color:#78350F">💡 افتح F12 → Console لرؤية تشخيص الأعمدة الكامل</div></div>';
+  }
   
   html+='<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">';
   html+='<button class="btn-primary" style="width:auto;padding:10px 20px" onclick="navigate(\'clients\',document.querySelector(\'[onclick*=clients]\'))">👥 عرض العملاء</button>';
@@ -4047,7 +4075,7 @@ async function runImport(){
   resultEl.innerHTML=html;
 }
 
-window.APP_VERSION = '20260528-1829';
+window.APP_VERSION = '20260528-1843';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
