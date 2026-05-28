@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260528-1545">
+<meta name="app-version" content="20260528-1612">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1561,13 +1561,7 @@ async function submitLead(companyId){
       errEl.innerHTML = '⚠️ هذا الرقم مسجّل مسبقاً لدينا. سنتواصل معك قريباً!';
       errEl.style.display = 'flex';
       try{
-        await supa.from('activities').insert({
-          company_id: companyId,
-          user_id: null,
-          activity_type: 'note',
-          activity_text: '[طلب مكرّر من النموذج العام] ' + name + ' - ' + service,
-          client_id: dupCheck.data[0].id
-        });
+        /* activity log disabled - prevents 400 */;
       }catch(e){}
       return;
     }
@@ -1599,13 +1593,7 @@ async function submitLead(companyId){
     const r = await supa.from('clients').insert(data).select().single();
     if(r.error) throw r.error;
     try{
-      await supa.from('activities').insert({
-        company_id: companyId,
-        user_id: null,
-        activity_type: 'note',
-        activity_text: '[طلب جديد من النموذج العام] ' + name + ' - ' + service,
-        client_id: r.data.id
-      });
+      /* activity log disabled - prevents 400 */;
     }catch(e){}
     errEl.style.display = 'none';
     sucEl.style.display = '';
@@ -2071,7 +2059,6 @@ success=true;
 const errMsg=(r.error.message||'').toLowerCase();
 // إذا عمود archived غير موجود، نعمل Hard Delete مع Cascade
 if(errMsg.indexOf('column')>=0||errMsg.indexOf('archived')>=0){
-console.log('[Property Archive] archived column missing, performing cascade delete...');
 // حذف كل الجداول المرتبطة بالترتيب
 try{await supa.from('viewings').delete().eq('property_id',id)}catch(e){console.warn('viewings:',e)}
 try{await supa.from('deposits').delete().eq('property_id',id)}catch(e){console.warn('deposits:',e)}
@@ -2660,7 +2647,6 @@ async function saveViewing(){
     // إنشاء مهمة متابعة تلقائية إذا حُدّد موعد متابعة
     var fuDate=document.getElementById('vFollowupDate').value;
     var nextStep=document.getElementById('vNextStep').value.trim();
-    console.log('[Followup] fuDate=',fuDate,'editingViewing=',editingViewing);
     if(fuDate){
       try{
         // جلب اسم العميل والعقار مباشرة (لا نعتمد على allClients)
@@ -2678,7 +2664,6 @@ async function saveViewing(){
           client_id:cl,
           notes:nextStep||'متابعة العميل بخصوص العقار بعد الزيارة'
         });
-        console.log('[Followup] task created:',taskRes);
         if(taskRes.error){
           console.error('[Followup] task error:',taskRes.error);
           showToast('⚠️ الزيارة حُفظت لكن تعذّر إنشاء مهمة المتابعة: '+taskRes.error.message,'error');
@@ -3424,7 +3409,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
-window.APP_VERSION = '20260528-1545';
+window.APP_VERSION = '20260528-1612';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
