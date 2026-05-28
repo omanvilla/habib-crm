@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260528-1901">
+<meta name="app-version" content="20260528-1917">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -460,6 +460,12 @@
 <div>
 <label class="fl" style="margin-bottom:6px;display:block">📁 ملف CSV</label>
 <input type="file" id="impFile" accept=".csv,.txt" onchange="handleImportFile(event)" style="padding:10px;border:2px dashed var(--sand);border-radius:10px;background:var(--cream-dark);width:100%;cursor:pointer">
+</div>
+
+<div style="background:#FEF2F2;border:1px solid #FCA5A5;padding:14px;border-radius:10px">
+<div style="font-weight:700;color:#991B1B;margin-bottom:6px">⚠️ هل تريد حذف استيراد سابق؟</div>
+<div style="font-size:12px;color:#7F1D1D;margin-bottom:10px">إذا استوردت الملف قبل بأخطاء، تقدر تحذف كل البيانات المستوردة سابقاً (عملاء + عقارات + صفقات) قبل إعادة الاستيراد.</div>
+<button class="btn-secondary" style="background:#DC2626;color:white;padding:8px 16px" onclick="deletePreviousImport()">🗑 حذف الاستيراد السابق</button>
 </div>
 
 <div id="impPreview" style="display:none">
@@ -3771,7 +3777,6 @@ function handleImportFile(event){
         if(score>bestScore){bestScore=score;bestRow=ri;}
       }
       
-      console.log('🎯 كاشف العناوين: الصف #'+(bestRow+1)+' فيه '+bestScore+' عناوين معروفة');
       
       if(bestScore<3){
         showToast('⚠️ لم أتعرّف على العناوين! تأكد من إن الملف فيه أعمدة: الاسم، رقم الهاتف، نوع العقار...','error');
@@ -3842,6 +3847,56 @@ function cleanPhone(p){
 }
 
 // تنفيذ الاستيراد
+
+async function deletePreviousImport(){
+  if(!canManage()){showToast('⚠️ المدير فقط','error');return;}
+  if(!confirm('سيتم حذف كل العملاء والعقارات والصفقات اللي أُنشئت عبر الاستيراد السابق.\n\nهذا الحذف نهائي ولا يمكن التراجع عنه.\n\nهل أنت متأكد؟'))return;
+  if(!confirm('تأكيد أخير: هل فعلاً تريد المتابعة؟'))return;
+  
+  showToast('⏳ جاري الحذف...','success');
+  
+  try{
+    // 1. حذف الصفقات اللي ملاحظتها تبدأ بـ "مستورد من الملف القديم"
+    var deals=await supa.from('deals').select('id,property_id,client_id,notes').like('notes','مستورد من الملف القديم%');
+    var dealIds=(deals.data||[]).map(function(d){return d.id});
+    var propIds=(deals.data||[]).map(function(d){return d.property_id}).filter(function(x){return x});
+    
+    if(dealIds.length){
+      await supa.from('deals').delete().in('id',dealIds);
+    }
+    
+    // 2. حذف العقارات المرتبطة (اللي عناوينها تحتوي " - " - النمط اللي ولّدناه)
+    if(propIds.length){
+      await supa.from('properties').delete().in('id',propIds);
+    }
+    
+    // 3. العملاء أصعب - نلقي اللي ما عندهم أي صفقة أخرى ولا زيارة ولا مهمة
+    // نجلب كل العملاء، ونشيك على كل واحد
+    var allCli=await supa.from('clients').select('id,name,created_at');
+    var deletedClients=0;
+    for(var i=0;i<(allCli.data||[]).length;i++){
+      var c=allCli.data[i];
+      // نحذف فقط العملاء بدون أي ارتباطات
+      var hasD=await supa.from('deals').select('id',{count:'exact',head:true}).eq('client_id',c.id);
+      var hasV=await supa.from('viewings').select('id',{count:'exact',head:true}).eq('client_id',c.id);
+      var hasT=await supa.from('tasks').select('id',{count:'exact',head:true}).eq('client_id',c.id);
+      if((hasD.count||0)===0&&(hasV.count||0)===0&&(hasT.count||0)===0){
+        // مرشّح للحذف - لكن فقط لو ما عنده بيانات طلب كاملة (يعني مستورد بسيط)
+        var details=await supa.from('clients').select('preferred_area,property_type,budget_min,budget_max,email,notes').eq('id',c.id).single();
+        if(details.data&&!details.data.preferred_area&&!details.data.property_type&&!details.data.budget_min&&!details.data.email){
+          await supa.from('clients').delete().eq('id',c.id);
+          deletedClients++;
+        }
+      }
+    }
+    
+    showToast('✅ تم الحذف: '+dealIds.length+' صفقة، '+propIds.length+' عقار، '+deletedClients+' عميل','success');
+  }catch(err){
+    showToast('❌ خطأ: '+err.message,'error');
+    console.error(err);
+  }
+}
+
 async function runImport(){
   if(!window.impParsedRows||!window.impParsedRows.length){
     showToast('⚠️ لا توجد بيانات للاستيراد','error');
@@ -3860,44 +3915,79 @@ async function runImport(){
   
   var h=window.impHeaders;
   
-  // التعرّف على الأعمدة - بائع
+  // التعرّف الذكي على أعمدة البائع: نبحث من نهاية المصفوفة (يمين الجدول = البائع في RTL)
+  function findColFromEnd(headers, keywords){
+    for(var k=0;k<keywords.length;k++){
+      for(var i=headers.length-1;i>=0;i--){
+        if((headers[i]||'').indexOf(keywords[k])>=0)return i;
+      }
+    }
+    return -1;
+  }
+  
   var col={
-    sellerName:findCol(h,['الاسم','اسم البائع','بائع']),
-    sellerPhone:findCol(h,['رقم الهاتف','هاتف','رقم']),
-    propType:findCol(h,['نوع العقار','نوع']),
-    propArea:findCol(h,['المنطقة','منطقة']),
-    sellPrice:findCol(h,['المبلغ','السعر','مبلغ']),
-    sellCommission:findCol(h,['العمولة','عموله','عمولة']),
-    listDate:findCol(h,['تاريخ العرض','تاريخ']),
+    sellerName:findColFromEnd(h,['الاسم','اسم البائع','بائع']),
+    sellerPhone:findColFromEnd(h,['رقم الهاتف','هاتف','رقم']),
+    propType:findColFromEnd(h,['نوع العقار','نوع']),
+    propArea:findColFromEnd(h,['المنطقة','منطقة']),
+    sellPrice:findColFromEnd(h,['المبلغ','السعر','مبلغ']),
+    sellCommission:findColFromEnd(h,['العمولة','عموله','عمولة']),
+    listDate:findCol(h,['تاريخ العرض']),
     sellDate:findCol(h,['تاريخ البيع','تاريخ بيع']),
     clearDate:findCol(h,['تاريخ التخليص','تخليص']),
     notes:findCol(h,['ملاحظات','ملاحظة'])
   };
   
-  // أعمدة المشتري (تكون باسم مكرر، نلقاها من اليسار)
-  // البحث عن "اسم المشتري" و"رقم الهاتف" الثاني
+  // أعمدة المشتري - تكون في الطرف الآخر (يسار الجدول في RTL = بداية المصفوفة)
   var buyerNameCol=-1, buyerPhoneCol=-1, buyPriceCol=-1, buyCommissionCol=-1, buyDateCol=-1;
+  // اسم المشتري - يحتوي كلمة "المشتري"
   for(var i=0;i<h.length;i++){
-    if((h[i]||'').indexOf('المشتري')>=0)buyerNameCol=i;
+    if((h[i]||'').indexOf('المشتري')>=0){buyerNameCol=i;break;}
   }
-  // رقم الهاتف الثاني = آخر "رقم الهاتف" أو "رقم"
-  for(var i=h.length-1;i>=0;i--){
-    if(((h[i]||'').indexOf('رقم الهاتف')>=0||(h[i]||'').indexOf('هاتف')>=0)&&i!==col.sellerPhone){
-      buyerPhoneCol=i;break;
+  // المشتري في الجهة المعاكسة للبائع، فنبحث في النصف الآخر
+  // إذا البائع في النصف اليمين (high indices)، المشتري في النصف اليسار (low indices)
+  var sellerInRight = col.sellerName>=h.length/2;
+  
+  // رقم هاتف المشتري - أول "رقم الهاتف" في الطرف المعاكس
+  if(sellerInRight){
+    for(var i=0;i<h.length;i++){
+      if(((h[i]||'').indexOf('رقم الهاتف')>=0||(h[i]||'').indexOf('هاتف')>=0)&&i!==col.sellerPhone){
+        buyerPhoneCol=i;break;
+      }
+    }
+  }else{
+    for(var i=h.length-1;i>=0;i--){
+      if(((h[i]||'').indexOf('رقم الهاتف')>=0||(h[i]||'').indexOf('هاتف')>=0)&&i!==col.sellerPhone){
+        buyerPhoneCol=i;break;
+      }
     }
   }
-  // المبلغ والعمولة الثانية (للمشتري)
-  var moneyIndexes=[];
-  for(var i=0;i<h.length;i++){
-    if((h[i]||'').indexOf('المبلغ')>=0||(h[i]||'').indexOf('السعر')>=0)moneyIndexes.push(i);
-  }
-  if(moneyIndexes.length>=2)buyPriceCol=moneyIndexes[moneyIndexes.length-1];
   
-  var commIndexes=[];
-  for(var i=0;i<h.length;i++){
-    if((h[i]||'').indexOf('العمولة')>=0||(h[i]||'').indexOf('عمول')>=0)commIndexes.push(i);
+  // المبلغ والعمولة للمشتري - في الطرف المعاكس للبائع
+  if(sellerInRight){
+    // المشتري في اليسار، نبحث من البداية
+    for(var i=0;i<h.length;i++){
+      if(((h[i]||'').indexOf('المبلغ')>=0||(h[i]||'').indexOf('السعر')>=0)&&i!==col.sellPrice){
+        buyPriceCol=i;break;
+      }
+    }
+    for(var i=0;i<h.length;i++){
+      if(((h[i]||'').indexOf('العمولة')>=0||(h[i]||'').indexOf('عمول')>=0)&&i!==col.sellCommission){
+        buyCommissionCol=i;break;
+      }
+    }
+  }else{
+    for(var i=h.length-1;i>=0;i--){
+      if(((h[i]||'').indexOf('المبلغ')>=0||(h[i]||'').indexOf('السعر')>=0)&&i!==col.sellPrice){
+        buyPriceCol=i;break;
+      }
+    }
+    for(var i=h.length-1;i>=0;i--){
+      if(((h[i]||'').indexOf('العمولة')>=0||(h[i]||'').indexOf('عمول')>=0)&&i!==col.sellCommission){
+        buyCommissionCol=i;break;
+      }
+    }
   }
-  if(commIndexes.length>=2)buyCommissionCol=commIndexes[commIndexes.length-1];
   
   var dateIndexes=[];
   for(var i=0;i<h.length;i++){
@@ -3912,21 +4002,6 @@ async function runImport(){
   };
   
   // تشخيص: اطبع الأعمدة المكتشفة
-  console.log('═══ تشخيص الاستيراد ═══');
-  console.log('عدد الصفوف:', window.impParsedRows.length);
-  console.log('العناوين:', h);
-  console.log('الأعمدة المكتشفة:');
-  console.log('  - sellerName:', col.sellerName, '=', h[col.sellerName]);
-  console.log('  - sellerPhone:', col.sellerPhone, '=', h[col.sellerPhone]);
-  console.log('  - propType:', col.propType, '=', h[col.propType]);
-  console.log('  - propArea:', col.propArea, '=', h[col.propArea]);
-  console.log('  - sellPrice:', col.sellPrice, '=', h[col.sellPrice]);
-  console.log('  - sellCommission:', col.sellCommission, '=', h[col.sellCommission]);
-  console.log('  - sellDate:', col.sellDate, '=', h[col.sellDate]);
-  console.log('  - buyerNameCol:', buyerNameCol, '=', h[buyerNameCol]);
-  console.log('  - buyerPhoneCol:', buyerPhoneCol, '=', h[buyerPhoneCol]);
-  console.log('  - buyPriceCol:', buyPriceCol, '=', h[buyPriceCol]);
-  console.log('السطر الأول من البيانات:', window.impParsedRows[0]);
   
   // قاموس العملاء حسب الهاتف (لتجنب التكرار)
   var clientsByPhone={};
@@ -3970,7 +4045,6 @@ async function runImport(){
         continue;
       }
       
-      if(ri===0)console.log('أول صف - sName:', JSON.stringify(sName), 'sPhone:', JSON.stringify(sPhone), 'pType:', JSON.stringify(row[col.propType]));
       var sellerId=null;
       var sPhoneClean=cleanPhone(sPhone);
       if(sPhoneClean&&clientsByPhone[sPhoneClean]){
@@ -4104,7 +4178,7 @@ async function runImport(){
   resultEl.innerHTML=html;
 }
 
-window.APP_VERSION = '20260528-1901';
+window.APP_VERSION = '20260528-1917';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
