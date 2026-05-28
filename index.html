@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260528-1710">
+<meta name="app-version" content="20260528-1738">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2171,8 +2171,29 @@ async function loadPropertyRelations(propId){
   try{
     var deals=await supa.from('deals').select('*, client:clients(name)').eq('property_id',propId).order('created_at',{ascending:false});
     var viewings=await supa.from('viewings').select('*, client:clients(name)').eq('property_id',propId).order('viewing_date',{ascending:false});
+    // مطابقة العملاء المهتمين بهذا العقار
+    var matches=window.viewingProperty?await findClientsForProperty(window.viewingProperty):[];
     
     var extra='';
+    
+    // 🎯 العملاء المطابقون (أهم بطاقة - تظهر أولاً)
+    if(matches.length){
+      extra+='<div class="card" style="border:2px solid #2E7D5C;background:linear-gradient(135deg,rgba(46,125,92,0.05),white)"><div class="card-head"><div class="card-title"><span>🎯</span>عملاء مهتمون بهذا العقار ('+matches.length+') <span style="font-size:11px;background:#2E7D5C;color:white;padding:2px 8px;border-radius:8px;margin-right:6px">فرصة بيع!</span></div></div>';
+      extra+='<table class="tbl"><thead><tr><th>العميل</th><th>الهاتف</th><th>سبب المطابقة</th><th>التطابق</th><th></th></tr></thead><tbody>';
+      matches.slice(0,10).forEach(function(c){
+        var scoreColor=c.score>=80?'#10B981':c.score>=60?'#F59E0B':'#6B7280';
+        var phone=c.phone?(typeof formatPhoneDisplay==='function'?formatPhoneDisplay(c.phone):c.phone):'—';
+        extra+='<tr style="cursor:pointer" onclick="viewClient(\''+c.id+'\')">';
+        extra+='<td><strong>'+escapeHtml(c.name)+'</strong></td>';
+        extra+='<td dir="ltr">'+phone+'</td>';
+        extra+='<td style="font-size:12px">'+(c.matchReasons||[]).join(' · ')+'</td>';
+        extra+='<td><span style="background:'+scoreColor+';color:white;padding:3px 10px;border-radius:8px;font-size:12px;font-weight:700">'+c.score+'%</span></td>';
+        extra+='<td><a href="https://api.whatsapp.com/send?phone='+(c.phone||'').replace(/[^0-9]/g,'')+'" target="_blank" onclick="event.stopPropagation()" style="text-decoration:none;font-size:18px">💚</a></td>';
+        extra+='</tr>';
+      });
+      extra+='</tbody></table></div>';
+    }
+    
     // Related deals
     var dl=deals.data||[];
     extra+='<div class="card"><div class="card-head"><div class="card-title"><span>🤝</span>الصفقات المرتبطة ('+dl.length+')</div></div>';
@@ -2391,6 +2412,39 @@ function editMember(id){const m=allMembers.find(function(x){return x.id===id});i
 async function saveMemberChanges(){if(!editingMember)return;const newRole=$('emRole').value,newActive=$('emActive').value==='true';try{const r=await supa.from('profiles').update({role:newRole,is_active:newActive}).eq('id',editingMember.id);if(r.error)throw r.error;await logActivity('note','تم تحديث صلاحيات: '+editingMember.full_name+' → '+roleAr(newRole)+(newActive?' (نشط)':' (معطّل)'));closeModal('mEditMember');showToast('✅ تم تحديث الصلاحيات','success');editingMember=null;loadTeam()}catch(err){showToast('خطأ: '+err.message,'error')}}
 function reassignMember(id,name){const others=allMembers.filter(function(m){return m.id!==id&&m.is_active!==false});if(!others.length){showToast('⚠️ لا يوجد موظفون آخرون','error');return}let opts=others.map(function(m){return m.full_name+' ('+m.email+')'}).join('\n');const choice=prompt('نقل عملاء وصفقات '+name+' إلى:\n\n'+opts+'\n\nاكتب اسم الموظف الجديد:');if(!choice)return;const target=others.find(function(m){return m.full_name.indexOf(choice)>=0||m.email.indexOf(choice)>=0});if(!target){showToast('⚠️ لم يتم العثور على الموظف','error');return}confirmAction('نقل البيانات','سيتم نقل كل عملاء وصفقات <strong>'+escapeHtml(name)+'</strong> إلى <strong>'+escapeHtml(target.full_name)+'</strong>.','🔄',async function(){try{await supa.from('clients').update({assigned_to:target.id}).eq('assigned_to',id);await supa.from('deals').update({agent_id:target.id}).eq('agent_id',id);await logActivity('note','تم نقل عملاء وصفقات '+name+' إلى '+target.full_name);showToast('✅ تم النقل','success');loadTeam()}catch(err){showToast('خطأ: '+err.message,'error')}})}
 function removeMember(id,name){confirmAction('إزالة الموظف','هل تريد إزالة <strong>'+escapeHtml(name)+'</strong> من الفريق؟<br><br>سيتم تعطيل حسابه وفقدانه الوصول للمنصة. لن يتم حذف بياناته (العملاء والصفقات تظل).','⚠️',async function(){try{const r=await supa.from('profiles').update({is_active:false,company_id:null}).eq('id',id);if(r.error)throw r.error;await logActivity('note','تم إزالة الموظف: '+name);showToast('✅ تم إزالة الموظف','success');loadTeam()}catch(err){showToast('خطأ: '+err.message,'error')}})}
+async function findClientsForProperty(p){
+  try{
+    // نجلب كل العملاء المشترين أو المستثمرين (هم اللي يطابقون عقار للبيع)
+    const r=await supa.from('clients').select('*').eq('archived',false);
+    const clients=r.data||[];
+    return clients.map(c=>{
+      // فلترة: العميل لازم يكون مشتري/مستثمر/مستأجر
+      var isBuyer=c.is_buyer||c.client_type==='buyer';
+      var isInvestor=c.is_investor||c.client_type==='investor';
+      var isTenant=c.is_tenant||c.client_type==='tenant';
+      if(!isBuyer&&!isInvestor&&!isTenant)return null;
+      
+      let score=0;
+      let reasons=[];
+      // مطابقة المنطقة (40 نقطة)
+      if(c.preferred_area&&p.area&&(p.area.indexOf(c.preferred_area)>=0||c.preferred_area.indexOf(p.area)>=0)){
+        score+=40;reasons.push('📍 المنطقة');
+      }
+      // مطابقة النوع (30 نقطة)
+      if(c.property_type&&p.type===c.property_type){
+        score+=30;reasons.push('🏷 النوع');
+      }
+      // مطابقة الميزانية - سعر العقار ضمن نطاق ميزانية العميل
+      if(p.price){
+        if(c.budget_max&&p.price<=c.budget_max){score+=20;reasons.push('💰 الميزانية');}
+        if(c.budget_min&&p.price>=c.budget_min*0.8){score+=10;}
+      }
+      return Object.assign({},c,{score:score,matchReasons:reasons});
+    }).filter(c=>c&&c.score>=30).sort((a,b)=>b.score-a.score);
+  }catch(e){console.warn('findClientsForProperty:',e);return[]}
+}
+
+
 async function findSmartMatches(){if(!viewingClient)return;const c=viewingClient;const roles=getRoles(c);const container=$('cdSmartMatches');let html='';
 if(roles.indexOf('buyer')>=0||roles.indexOf('tenant')>=0){const matches=await findPropertiesForBuyer(c);const sellerMatches=await findSellersForBuyer(c);if(matches.length||sellerMatches.length){html+='<div class="match-card"><div class="match-header"><span class="match-icon">🎯</span><span>عقارات مطابقة لمتطلباته</span></div>';if(matches.length){html+='<div class="match-list">';matches.slice(0,5).forEach(m=>{const score=m.score>=80?'high':m.score>=50?'medium':'';html+='<div class="match-item"><div class="match-info"><div class="match-name">🏠 '+escapeHtml(m.title)+'</div><div class="match-detail">'+propTypeAr(m.type)+' · '+escapeHtml(m.area)+' · '+fmtMoney(m.price)+'</div></div><div class="match-score '+score+'">'+m.score+'% مطابقة</div></div>'});html+='</div>'}if(sellerMatches.length){html+='<div style="margin-top:12px;font-size:12px;font-weight:700;color:var(--umber);padding:8px 0">👥 بائعون عندهم ما يبحث عنه:</div><div class="match-list">';sellerMatches.slice(0,3).forEach(s=>{html+='<div class="match-item" onclick="viewClient(\''+s.id+'\')"><div class="match-info"><div class="match-name">👤 '+escapeHtml(s.name)+'</div><div class="match-detail">'+(s.phone||'')+' · '+escapeHtml(s.preferred_area||'')+'</div></div><div class="match-score">📞 تواصل</div></div>'});html+='</div>'}html+='</div>'}}
 if(roles.indexOf('seller')>=0||roles.indexOf('landlord')>=0){const buyers=await findBuyersForSeller(c);if(buyers.length){html+='<div class="match-card"><div class="match-header"><span class="match-icon">🔥</span><span>مشترون مهتمون بمنطقته</span></div><div class="match-list">';buyers.slice(0,5).forEach(b=>{const score=b.score>=80?'high':b.score>=50?'medium':'';html+='<div class="match-item" onclick="viewClient(\''+b.id+'\')"><div class="match-info"><div class="match-name">🛒 '+escapeHtml(b.name)+'</div><div class="match-detail">ميزانية: '+(b.budget_max?fmtMoney(b.budget_max):'—')+' · '+escapeHtml(b.preferred_area||'—')+'</div></div><div class="match-score '+score+'">'+b.score+'% مطابقة</div></div>'});html+='</div></div>'}}
@@ -3608,7 +3662,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
-window.APP_VERSION = '20260528-1710';
+window.APP_VERSION = '20260528-1738';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
