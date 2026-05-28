@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260528-1925">
+<meta name="app-version" content="20260528-1934">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3986,7 +3986,7 @@ async function runImport(){
   
   var col={
     sellerName:findColFromEnd(h,['الاسم','اسم البائع','بائع']),
-    sellerPhone:findColFromEnd(h,['رقم الهاتف','هاتف','رقم']),
+    sellerPhone:findColFromEnd(h,['رقم الهاتف','هاتف']),
     propType:findColFromEnd(h,['نوع العقار','نوع']),
     propArea:findColFromEnd(h,['المنطقة','منطقة']),
     sellPrice:findColFromEnd(h,['المبلغ','السعر','مبلغ']),
@@ -4097,7 +4097,13 @@ async function runImport(){
     try{
       // 1. بيانات البائع
       var sName=col.sellerName>=0?(row[col.sellerName]||'').trim():'';
-      var sPhone=col.sellerPhone>=0?String(row[col.sellerPhone]||'').trim():'';
+      var sPhoneRaw=col.sellerPhone>=0?String(row[col.sellerPhone]||'').trim():'';
+      // التحقق: إذا القيمة ما تحتوي 7 أرقام على الأقل، فهي مش رقم هاتف صحيح
+      var sPhoneDigits=sPhoneRaw.replace(/[^0-9]/g,'');
+      var sPhone=(sPhoneDigits.length>=7)?sPhoneRaw:'';
+      if(ri<3){
+        console.log('صف '+(ri+2)+': sName='+JSON.stringify(sName)+' | sPhoneRaw='+JSON.stringify(sPhoneRaw)+' | sPhoneClean='+sPhoneDigits+' | accepted='+(sPhone!==''));
+      }
       if(!sName){
         stats.skipped++;
         if(stats.skipReasons.length<3)stats.skipReasons.push('صف '+(ri+2)+': لا يوجد اسم بائع (العمود '+col.sellerName+'='+JSON.stringify(row[col.sellerName])+')');
@@ -4126,7 +4132,12 @@ async function runImport(){
       // 2. بيانات المشتري
       var buyerId=null;
       var bName=buyerNameCol>=0?(row[buyerNameCol]||'').trim():'';
-      var bPhone=buyerPhoneCol>=0?String(row[buyerPhoneCol]||'').trim():'';
+      var bPhoneRaw=buyerPhoneCol>=0?String(row[buyerPhoneCol]||'').trim():'';
+      var bPhoneDigits=bPhoneRaw.replace(/[^0-9]/g,'');
+      var bPhone=(bPhoneDigits.length>=7)?bPhoneRaw:'';
+      if(ri<3){
+        console.log('صف '+(ri+2)+': bName='+JSON.stringify(bName)+' | bPhoneRaw='+JSON.stringify(bPhoneRaw)+' | bPhoneClean='+bPhoneDigits+' | accepted='+(bPhone!==''));
+      }
       var bPhoneClean=cleanPhone(bPhone);
       if(bName){
         if(bPhoneClean&&clientsByPhone[bPhoneClean]){
@@ -4237,7 +4248,7 @@ async function runImport(){
   resultEl.innerHTML=html;
 }
 
-window.APP_VERSION = '20260528-1925';
+window.APP_VERSION = '20260528-1934';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
