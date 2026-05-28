@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260528-1843">
+<meta name="app-version" content="20260528-1852">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3755,11 +3755,38 @@ function handleImportFile(event){
       // تنظيف الصفوف الفارغة في النهاية
       while(rows.length&&!rows[rows.length-1].some(function(c){return c&&c.trim()}))rows.pop();
       
-      window.impHeaders=rows[0].map(function(h){return (h||'').trim()});
-      window.impParsedRows=rows.slice(1).filter(function(r){
-        // استبعاد الصفوف الفارغة تماماً
+      // 🎯 كاشف العناوين الذكي: يبحث في أول 10 صفوف عن الصف اللي فيه عناوين معروفة
+      var knownKeywords=['الاسم','رقم الهاتف','هاتف','نوع العقار','المنطقة','المبلغ','العمولة','تاريخ','المشتري','البائع','السعر','الولاية','العقار'];
+      var bestRow=0, bestScore=0;
+      var maxCheck=Math.min(10,rows.length);
+      for(var ri=0;ri<maxCheck;ri++){
+        var score=0;
+        rows[ri].forEach(function(cell){
+          var c=(cell||'').trim();
+          if(!c)return;
+          knownKeywords.forEach(function(kw){
+            if(c.indexOf(kw)>=0)score++;
+          });
+        });
+        if(score>bestScore){bestScore=score;bestRow=ri;}
+      }
+      
+      console.log('🎯 كاشف العناوين: الصف #'+(bestRow+1)+' فيه '+bestScore+' عناوين معروفة');
+      
+      if(bestScore<3){
+        showToast('⚠️ لم أتعرّف على العناوين! تأكد من إن الملف فيه أعمدة: الاسم، رقم الهاتف، نوع العقار...','error');
+        return;
+      }
+      
+      window.impHeaders=rows[bestRow].map(function(h){return (h||'').trim()});
+      window.impParsedRows=rows.slice(bestRow+1).filter(function(r){
         return r.some(function(c){return c&&c.trim()});
       });
+      
+      // عرض رسالة للمستخدم لو تخطّى صفوف
+      if(bestRow>0){
+        showToast('💡 تم تخطّي '+bestRow+' صف قبل العناوين تلقائياً','success');
+      }
       
       renderImportPreview();
       document.getElementById('impPreview').style.display='';
@@ -4075,7 +4102,7 @@ async function runImport(){
   resultEl.innerHTML=html;
 }
 
-window.APP_VERSION = '20260528-1843';
+window.APP_VERSION = '20260528-1852';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
