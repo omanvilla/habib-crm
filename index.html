@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260528-1917">
+<meta name="app-version" content="20260528-1925">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3853,47 +3853,106 @@ async function deletePreviousImport(){
   if(!confirm('سيتم حذف كل العملاء والعقارات والصفقات اللي أُنشئت عبر الاستيراد السابق.\n\nهذا الحذف نهائي ولا يمكن التراجع عنه.\n\nهل أنت متأكد؟'))return;
   if(!confirm('تأكيد أخير: هل فعلاً تريد المتابعة؟'))return;
   
-  showToast('⏳ جاري الحذف...','success');
+  // مؤشر تقدم بصري
+  var resultEl=document.getElementById('impResult');
+  resultEl.style.display='';
+  resultEl.innerHTML='<div class="card" style="padding:20px;text-align:center"><div class="loader-spinner" style="margin:0 auto 12px"></div>⏳ جاري الحذف الشامل...</div>';
   
   try{
-    // 1. حذف الصفقات اللي ملاحظتها تبدأ بـ "مستورد من الملف القديم"
-    var deals=await supa.from('deals').select('id,property_id,client_id,notes').like('notes','مستورد من الملف القديم%');
-    var dealIds=(deals.data||[]).map(function(d){return d.id});
-    var propIds=(deals.data||[]).map(function(d){return d.property_id}).filter(function(x){return x});
+    // ═══ الخطوة 1: جلب كل الصفقات المستوردة ═══
+    resultEl.innerHTML='<div class="card" style="padding:20px;text-align:center"><div class="loader-spinner" style="margin:0 auto 12px"></div>📊 الخطوة 1/4: جلب الصفقات المستوردة...</div>';
+    var deals=await supa.from('deals').select('id,property_id,client_id').like('notes','مستورد من الملف القديم%');
+    if(deals.error)throw new Error('فشل جلب الصفقات: '+deals.error.message);
     
-    if(dealIds.length){
-      await supa.from('deals').delete().in('id',dealIds);
+    var dealsList=deals.data||[];
+    var dealIds=dealsList.map(function(d){return d.id}).filter(Boolean);
+    var propIds=Array.from(new Set(dealsList.map(function(d){return d.property_id}).filter(Boolean)));
+    var clientIds=Array.from(new Set(dealsList.map(function(d){return d.client_id}).filter(Boolean)));
+    
+    if(!dealIds.length){
+      resultEl.innerHTML='<div class="card" style="padding:20px;text-align:center;color:#92400E">⚠️ لا توجد بيانات مستوردة لحذفها</div>';
+      return;
     }
     
-    // 2. حذف العقارات المرتبطة (اللي عناوينها تحتوي " - " - النمط اللي ولّدناه)
+    // ═══ الخطوة 2: حذف الصفقات (دفعة واحدة) ═══
+    resultEl.innerHTML='<div class="card" style="padding:20px;text-align:center"><div class="loader-spinner" style="margin:0 auto 12px"></div>🗑 الخطوة 2/4: حذف '+dealIds.length+' صفقة...</div>';
+    var delDeals=await supa.from('deals').delete().in('id',dealIds);
+    if(delDeals.error)throw new Error('فشل حذف الصفقات: '+delDeals.error.message);
+    
+    // ═══ الخطوة 3: حذف العقارات (دفعة واحدة) ═══
+    resultEl.innerHTML='<div class="card" style="padding:20px;text-align:center"><div class="loader-spinner" style="margin:0 auto 12px"></div>🗑 الخطوة 3/4: حذف '+propIds.length+' عقار...</div>';
+    var delProps=0;
     if(propIds.length){
-      await supa.from('properties').delete().in('id',propIds);
+      var delPr=await supa.from('properties').delete().in('id',propIds);
+      if(delPr.error){console.warn('Properties delete:',delPr.error);}
+      else{delProps=propIds.length;}
     }
     
-    // 3. العملاء أصعب - نلقي اللي ما عندهم أي صفقة أخرى ولا زيارة ولا مهمة
-    // نجلب كل العملاء، ونشيك على كل واحد
-    var allCli=await supa.from('clients').select('id,name,created_at');
+    // ═══ الخطوة 4: حذف العملاء المستوردين (نوازي الاستعلامات) ═══
+    resultEl.innerHTML='<div class="card" style="padding:20px;text-align:center"><div class="loader-spinner" style="margin:0 auto 12px"></div>🗑 الخطوة 4/4: فحص '+clientIds.length+' عميل...</div>';
+    
     var deletedClients=0;
-    for(var i=0;i<(allCli.data||[]).length;i++){
-      var c=allCli.data[i];
-      // نحذف فقط العملاء بدون أي ارتباطات
-      var hasD=await supa.from('deals').select('id',{count:'exact',head:true}).eq('client_id',c.id);
-      var hasV=await supa.from('viewings').select('id',{count:'exact',head:true}).eq('client_id',c.id);
-      var hasT=await supa.from('tasks').select('id',{count:'exact',head:true}).eq('client_id',c.id);
-      if((hasD.count||0)===0&&(hasV.count||0)===0&&(hasT.count||0)===0){
-        // مرشّح للحذف - لكن فقط لو ما عنده بيانات طلب كاملة (يعني مستورد بسيط)
-        var details=await supa.from('clients').select('preferred_area,property_type,budget_min,budget_max,email,notes').eq('id',c.id).single();
-        if(details.data&&!details.data.preferred_area&&!details.data.property_type&&!details.data.budget_min&&!details.data.email){
-          await supa.from('clients').delete().eq('id',c.id);
-          deletedClients++;
+    var keptClients=0;
+    
+    if(clientIds.length){
+      // جلب كل ارتباطات هؤلاء العملاء دفعة وحدة (موازي)
+      var [remainingDeals,viewings,tasks,clientDetails]=await Promise.all([
+        supa.from('deals').select('client_id').in('client_id',clientIds),
+        supa.from('viewings').select('client_id').in('client_id',clientIds),
+        supa.from('tasks').select('client_id').in('client_id',clientIds),
+        supa.from('clients').select('id,preferred_area,property_type,budget_min,email').in('id',clientIds)
+      ]);
+      
+      // بناء قواميس سريعة للتحقق
+      var hasDeal={},hasView={},hasTask={};
+      (remainingDeals.data||[]).forEach(function(d){if(d.client_id)hasDeal[d.client_id]=true;});
+      (viewings.data||[]).forEach(function(v){if(v.client_id)hasView[v.client_id]=true;});
+      (tasks.data||[]).forEach(function(t){if(t.client_id)hasTask[t.client_id]=true;});
+      
+      var detailsMap={};
+      (clientDetails.data||[]).forEach(function(c){detailsMap[c.id]=c;});
+      
+      // جمع IDs المرشّحين للحذف
+      var safeToDelete=[];
+      clientIds.forEach(function(cid){
+        if(hasDeal[cid]||hasView[cid]||hasTask[cid]){keptClients++;return;}
+        var d=detailsMap[cid];
+        if(!d){keptClients++;return;}
+        // لو ما عنده بيانات إضافية = مرشّح للحذف
+        if(!d.preferred_area&&!d.property_type&&!d.budget_min&&!d.email){
+          safeToDelete.push(cid);
+        }else{
+          keptClients++;
         }
+      });
+      
+      // حذف دفعة واحدة
+      if(safeToDelete.length){
+        var delCli=await supa.from('clients').delete().in('id',safeToDelete);
+        if(delCli.error){console.warn('Clients delete:',delCli.error);}
+        else{deletedClients=safeToDelete.length;}
       }
     }
     
-    showToast('✅ تم الحذف: '+dealIds.length+' صفقة، '+propIds.length+' عقار، '+deletedClients+' عميل','success');
+    // ═══ التقرير النهائي ═══
+    var html='<div class="card" style="padding:20px;border:2px solid #10B981">';
+    html+='<div style="font-size:18px;font-weight:700;color:#065F46;margin-bottom:14px">✅ تم الحذف بنجاح!</div>';
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">';
+    html+='<div style="background:#FEE2E2;padding:12px;border-radius:8px"><div style="font-size:12px;color:#991B1B">🗑 صفقات</div><div style="font-size:24px;font-weight:700;color:#991B1B">'+dealIds.length+'</div></div>';
+    html+='<div style="background:#FEF3C7;padding:12px;border-radius:8px"><div style="font-size:12px;color:#92400E">🏠 عقارات</div><div style="font-size:24px;font-weight:700;color:#92400E">'+delProps+'</div></div>';
+    html+='<div style="background:#DBEAFE;padding:12px;border-radius:8px"><div style="font-size:12px;color:#1E40AF">👤 عملاء محذوفون</div><div style="font-size:24px;font-weight:700;color:#1E40AF">'+deletedClients+'</div></div>';
+    if(keptClients){
+      html+='<div style="background:#D1FAE5;padding:12px;border-radius:8px"><div style="font-size:12px;color:#065F46">👥 عملاء محفوظون<br>(لديهم بيانات)</div><div style="font-size:24px;font-weight:700;color:#065F46">'+keptClients+'</div></div>';
+    }
+    html+='</div>';
+    html+='<div style="margin-top:14px;font-size:13px;color:var(--umber);background:#F3F4F6;padding:10px;border-radius:8px">💡 العملاء المحفوظون عندهم بيانات إضافية (منطقة/ميزانية/مهام)، لذا ما اتحذفوا للأمان.</div>';
+    html+='<div style="margin-top:12px"><button class="btn-primary" style="width:auto;padding:10px 20px" onclick="cancelImport();document.getElementById(\'impResult\').style.display=\'none\'">✅ استمر للاستيراد الجديد</button></div>';
+    html+='</div>';
+    resultEl.innerHTML=html;
+    
   }catch(err){
-    showToast('❌ خطأ: '+err.message,'error');
-    console.error(err);
+    resultEl.innerHTML='<div class="card" style="padding:20px;border:2px solid #DC2626;background:#FEE2E2"><div style="font-weight:700;color:#991B1B;margin-bottom:8px">❌ فشل الحذف</div><div style="color:#7F1D1D">'+escapeHtml(err.message)+'</div></div>';
+    console.error('Delete error:',err);
   }
 }
 
@@ -4178,7 +4237,7 @@ async function runImport(){
   resultEl.innerHTML=html;
 }
 
-window.APP_VERSION = '20260528-1917';
+window.APP_VERSION = '20260528-1925';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
