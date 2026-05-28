@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260525-0831">
+<meta name="app-version" content="20260528-1545">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1120,6 +1120,10 @@ const PHONE_COUNTRIES = [
 ];
 const SUPABASE_URL='https://dmsckqjkcnsfmnzfjczz.supabase.co';
 const SUPABASE_KEY='sb_publishable_cblz5giFrHdXSCYSG6j0Cw_oaxkmHi4';
+if(!window.supabase||!window.supabase.createClient){
+  document.body.innerHTML='<div style="max-width:480px;margin:60px auto;padding:30px;text-align:center;font-family:sans-serif;direction:rtl"><div style="font-size:48px">📡</div><h2>تعذّر الاتصال</h2><p>يبدو أن الاتصال بالإنترنت ضعيف أو محجوب. تأكد من اتصالك وحاول مرة أخرى.</p><button onclick="location.reload()" style="background:#C49A4A;color:white;border:none;padding:12px 28px;border-radius:10px;cursor:pointer;font-size:15px">🔄 إعادة المحاولة</button></div>';
+  throw new Error('Supabase library not loaded');
+}
 const supa=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 function checkLeadFormMode(){try{const params=new URLSearchParams(window.location.search);const formId=params.get('form');const companyId=params.get('c');if(formId==='lead'&&companyId){renderLeadForm(companyId).catch(function(e){console.error('[LeadForm]',e);document.body.innerHTML='<div style=\"max-width:500px;margin:60px auto;padding:30px;text-align:center;font-family:sans-serif;direction:rtl\"><div style=\"font-size:48px\">⚠️</div><h2>تعذّر تحميل النموذج</h2><p>حاول تحديث الصفحة أو تواصل معنا مباشرة</p><button onclick=\"location.reload()\" style=\"background:#C49A4A;color:white;border:none;padding:12px 28px;border-radius:10px;cursor:pointer;font-size:15px\">🔄 إعادة المحاولة</button></div>';});return true}}catch(e){console.error('[checkLeadFormMode]',e);}return false}
 window.leadFormData = {
@@ -3420,7 +3424,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
-window.APP_VERSION = '20260525-0831';
+window.APP_VERSION = '20260528-1545';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
