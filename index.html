@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260528-1852">
+<meta name="app-version" content="20260528-1901">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3981,7 +3981,8 @@ async function runImport(){
         var sellerRes=await supa.from('clients').insert({
           company_id:cid, name:sName, phone:sPhone||null,
           client_type:'seller', is_seller:true,
-          status:'lead'
+          status:'warm',
+          lead_temperature:'warm'
         }).select().single();
         if(sellerRes.error)throw sellerRes.error;
         sellerId=sellerRes.data.id;
@@ -4002,7 +4003,8 @@ async function runImport(){
           var buyerRes=await supa.from('clients').insert({
             company_id:cid, name:bName, phone:bPhone||null,
             client_type:'buyer', is_buyer:true,
-            status:'lead'
+            status:'warm',
+            lead_temperature:'warm'
           }).select().single();
           if(buyerRes.error)throw buyerRes.error;
           buyerId=buyerRes.data.id;
@@ -4102,7 +4104,7 @@ async function runImport(){
   resultEl.innerHTML=html;
 }
 
-window.APP_VERSION = '20260528-1852';
+window.APP_VERSION = '20260528-1901';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
