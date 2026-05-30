@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260530-1017">
+<meta name="app-version" content="20260530-1144">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -808,9 +808,9 @@
   <div id="dClientDropdown" class="dropdown-list" style="display:none;position:absolute;top:100%;right:0;left:0;background:white;border:1.5px solid var(--gold);border-radius:10px;max-height:280px;overflow-y:auto;z-index:1000;box-shadow:0 6px 20px rgba(0,0,0,0.15);margin-top:4px"></div>
 </div>
 </div>
-<div class="fg"><label class="fl">العقار</label>
+<div class="fg"><label class="fl">العقار <span style="color:var(--umber);font-weight:400;font-size:11px">(اختياري - تقدر تتركه فاضي إذا لسّا ما حددت العقار)</span></label>
 <div class="searchable-select" style="position:relative">
-  <input type="text" class="fi" id="dPropertySearch" placeholder="🔍 ابحث بعنوان العقار..." autocomplete="off" oninput="filterPropertyDropdown(this.value)" onfocus="showPropertyDropdown()">
+  <input type="text" class="fi" id="dPropertySearch" placeholder="🔍 ابحث أو اتركه فارغ..." autocomplete="off" oninput="filterPropertyDropdown(this.value)" onfocus="showPropertyDropdown()">
   <input type="hidden" id="dProperty">
   <div id="dPropertySelected" style="margin-top:4px;font-size:12px;color:#2E7D5C;font-weight:700;display:none"></div>
   <div id="dPropertyDropdown" class="dropdown-list" style="display:none;position:absolute;top:100%;right:0;left:0;background:white;border:1.5px solid var(--gold);border-radius:10px;max-height:280px;overflow-y:auto;z-index:1000;box-shadow:0 6px 20px rgba(0,0,0,0.15);margin-top:4px"></div>
@@ -4245,7 +4245,7 @@ window.addEventListener('error', function(e){
   console.error('🚨 Runtime error:', e.message, 'at', e.filename, ':', e.lineno);
 });
 
-window.APP_VERSION = '20260530-1017';
+window.APP_VERSION = '20260530-1144';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
