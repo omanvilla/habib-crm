@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260528-1954">
+<meta name="app-version" content="20260530-0730">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4258,7 +4258,8 @@ async function runImport(){
       var pPrice=col.sellPrice>=0?parseNum(row[col.sellPrice]):null;
       var propType=typeMap[pType]||'villa';
       
-      var propRes=await supa.from('properties').insert({
+      // العقار بتاريخ الصفقة نفسه
+      var propInsert={
         company_id:cid,
         title:sName+' - '+pType+' '+pArea,
         type:propType,
@@ -4266,14 +4267,23 @@ async function runImport(){
         price:pPrice||0,
         status:'sold',
         added_by:currentUser.id
-      }).select().single();
+      };
+      var propRes=await supa.from('properties').insert(propInsert).select().single();
       if(propRes.error)throw propRes.error;
       var propId=propRes.data.id;
       stats.properties++;
       
       // 4. الصفقة
       var commission=col.sellCommission>=0?parseNum(row[col.sellCommission]):null;
-      var sellDate=col.sellDate>=0?parseDateValue(row[col.sellDate]):null;
+      var sellDateRaw=col.sellDate>=0?(row[col.sellDate]||'').trim():'';
+      var sellDate=parseDateValue(sellDateRaw);
+      var listDateRaw=col.listDate>=0?(row[col.listDate]||'').trim():'';
+      var listDate=parseDateValue(listDateRaw);
+      
+      // التاريخ الفعلي للصفقة (الأولوية لتاريخ البيع، ثم العرض)
+      var dealDate=sellDate||listDate||null;
+      var dealDateISO=dealDate?dealDate+'T12:00:00.000Z':null;
+      
       var dealData={
         company_id:cid,
         client_id:buyerId||sellerId,
@@ -4284,14 +4294,33 @@ async function runImport(){
         company_share:commission||0,
         stage:'commission_collected',
         commission_status:'received',
-        notes:'مستورد من الملف القديم. البائع: '+sName+(bName?'، المشتري: '+bName:''),
-        created_at:sellDate?sellDate+'T12:00:00Z':null
+        notes:'مستورد من الملف القديم. البائع: '+sName+(bName?'، المشتري: '+bName:'')+(sellDateRaw?'. تاريخ البيع الفعلي: '+sellDateRaw:'')
       };
-      // إزالة created_at إذا null عشان نتركه default
-      if(!dealData.created_at)delete dealData.created_at;
       
-      var dealRes=await supa.from('deals').insert(dealData);
+      // أضف التواريخ فقط لو موجودة
+      if(dealDateISO){
+        dealData.created_at=dealDateISO;
+        dealData.closed_at=dealDateISO;
+      }
+      
+      var dealRes=await supa.from('deals').insert(dealData).select().single();
       if(dealRes.error)throw dealRes.error;
+      
+      // تحقق: إذا created_at رجع باليوم بدل تاريخ الصفقة، نحاول نحدّثه
+      if(dealDateISO&&dealRes.data){
+        var savedDate=dealRes.data.created_at;
+        if(savedDate&&savedDate.substring(0,10)!==dealDate){
+          // قاعدة البيانات تجاهلت created_at - نحدّثه يدوياً
+          await supa.from('deals').update({created_at:dealDateISO,closed_at:dealDateISO}).eq('id',dealRes.data.id);
+        }
+      }
+      
+      // تحديث تاريخ العقار أيضاً ليطابق تاريخ البيع
+      if(dealDateISO){
+        try{
+          await supa.from('properties').update({created_at:dealDateISO}).eq('id',propId);
+        }catch(e){console.warn('Property date update:',e);}
+      }
       stats.deals++;
       
     }catch(err){
@@ -4343,7 +4372,7 @@ async function runImport(){
   resultEl.innerHTML=html;
 }
 
-window.APP_VERSION = '20260528-1954';
+window.APP_VERSION = '20260530-0730';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
