@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260530-0804">
+<meta name="app-version" content="20260530-0820">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -233,6 +233,12 @@
 <button class="period-btn" onclick="setReportPeriod('year',this)">السنة</button>
 <button class="period-btn" onclick="setReportPeriod('all',this)">الكل</button>
 </div>
+<div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap;padding:0 10px">
+<label style="font-size:13px;color:var(--umber);font-weight:600">📅 أو اختر شهراً محدداً:</label>
+<input type="month" id="reportMonthPicker" onchange="setReportMonth(this.value)" style="padding:6px 10px;border:1px solid var(--cream-deeper);border-radius:8px;background:white" dir="ltr">
+<button class="btn-secondary" style="padding:6px 14px;font-size:12px" onclick="clearReportMonth()">✖ مسح</button>
+<span id="reportMonthLabel" style="font-size:13px;color:var(--gold);font-weight:700"></span>
+</div>
 </div>
 
 <div class="report-tabs">
@@ -277,7 +283,7 @@
 <div class="kpi-card" style="border-top:3px solid #3B82F6"><div class="kpi-label">👤 نصيب الموظفين</div><div class="kpi-value" id="commAgents" style="color:#3B82F6">0</div></div>
 <div class="kpi-card" style="border-top:3px solid #F59E0B"><div class="kpi-label">🤝 عمولات الوسطاء</div><div class="kpi-value" id="commBrokers" style="color:#F59E0B">0</div></div>
 </div>
-<div class="chart-card"><div class="chart-title">📋 تفصيل العمولات لكل صفقة مغلقة</div><div id="commissionTable"><div class="empty" style="padding:20px"><div class="loader-spinner"></div></div></div></div>
+<div class="chart-card"><div class="chart-title">📋 تفصيل العمولات لكل صفقة مغلقة <button class="btn-secondary" style="padding:5px 12px;font-size:11px;margin-right:10px;float:left" onclick="recalculateOldCommissions()">🔧 إعادة حساب العمولات القديمة</button></div><div id="commissionTable"><div class="empty" style="padding:20px"><div class="loader-spinner"></div></div></div></div>
 </div>
 </div>
 
@@ -2471,6 +2477,13 @@ async function saveDeal(){
     // قراءة التاريخ
     var dateVal=$('dCreatedDate')?$('dCreatedDate').value:'';
     
+    // احسب نصيب الشركة من المعادلة (مضمون حتى لو الحقل ما حُدّث)
+    var commTotal=parseNum($('dCommission').value)||0;
+    var brokerComm=parseNum($('dBrokerCommission')?$('dBrokerCommission').value:null)||0;
+    var agentShare=parseNum($('dAgentShare').value)||0;
+    var calcedCompany=commTotal-brokerComm-agentShare;
+    if(calcedCompany<0)calcedCompany=0;
+    
     const data={
       company_id:cid,
       client_id:cl,
@@ -2480,12 +2493,12 @@ async function saveDeal(){
       stage:$('dStage').value,
       notes:$('dNotes').value.trim()||null,
       ...(canManage()?{
-        commission_total:parseNum($('dCommission').value)||null,
-        company_share:parseNum($('dCompanyShare').value)||null,
-        agent_share:parseNum($('dAgentShare').value)||null,
+        commission_total:commTotal||null,
+        company_share:commTotal>0?calcedCompany:null,
+        agent_share:agentShare||null,
         commission_status:$('dCommissionStatus').value||'pending',
         broker_id:$('dBroker')&&$('dBroker').value?$('dBroker').value:null,
-        broker_commission:parseNum($('dBrokerCommission')?$('dBrokerCommission').value:null)
+        broker_commission:brokerComm||null
       }:{})
     };
     
@@ -2555,12 +2568,13 @@ async function editDeal(dealId){
       // الحقول المالية (للمدير فقط)
       if(canManage()){
         if($('dCommission'))$('dCommission').value=d.commission_total||'';
-        if($('dCompanyShare'))$('dCompanyShare').value=d.company_share||'';
         if($('dAgentShare'))$('dAgentShare').value=d.agent_share||'';
-        if($('dCommissionStatus'))$('dCommissionStatus').value=d.commission_status||'pending';
         if($('dBroker'))$('dBroker').value=d.broker_id||'';
         if($('dBrokerCommission'))$('dBrokerCommission').value=d.broker_commission||'';
+        if($('dCommissionStatus'))$('dCommissionStatus').value=d.commission_status||'pending';
+        // احسب نصيب الشركة من المعادلة (مش من قاعدة البيانات اللي قد تكون خطأ من قبل)
         if(typeof calcCompanyShare==='function')calcCompanyShare();
+        // إذا الحساب اللي طلع مختلف عن المحفوظ، نعرضه (المعادلة أهم)
       }
     },150);
   }catch(err){
@@ -2820,8 +2834,102 @@ async function saveExpense(){const desc=$('exDesc').value.trim(),amount=parseFlo
 function archiveExpense(id,desc){confirmAction('حذف المصروف','هل تريد حذف <strong>'+escapeHtml(desc)+'</strong>؟','🗑',async function(){try{const r=await supa.from('expenses').update({archived:true}).eq('id',id);if(r.error)throw r.error;await logSystemActivity('delete','expense',id,'حذف مصروف: '+desc);showToast('🗑 تم','success');loadExpenses()}catch(err){showToast('خطأ: '+err.message,'error')}})}
 function setReportPeriod(p,el){reportPeriod=p;document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');loadReports()}
 function switchReportTab(tab,el){reportTab=tab;document.querySelectorAll('.report-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['Overview','Revenue','Team','Funnel','Heatmap'].forEach(t=>{const e=$('report'+t);if(e)e.style.display=tab===t.toLowerCase()?'':'none'});loadReports()}
-function getPeriodDate(){const now=new Date();if(reportPeriod==='day'){const d=new Date(now);d.setHours(0,0,0,0);return d}if(reportPeriod==='week'){const d=new Date(now);d.setDate(d.getDate()-7);d.setHours(0,0,0,0);return d}if(reportPeriod==='month'){const d=new Date(now);d.setDate(1);d.setHours(0,0,0,0);return d}if(reportPeriod==='quarter'){const d=new Date(now);d.setMonth(d.getMonth()-3);return d}if(reportPeriod==='year'){const d=new Date(now);d.setMonth(d.getMonth()-12);return d}return new Date(2020,0,1)}
-function getPreviousPeriodDate(){const now=new Date();if(reportPeriod==='day'){const d=new Date(now);d.setDate(d.getDate()-1);d.setHours(0,0,0,0);return d}if(reportPeriod==='week'){const d=new Date(now);d.setDate(d.getDate()-14);d.setHours(0,0,0,0);return d}if(reportPeriod==='month'){const start=new Date(now);start.setMonth(start.getMonth()-1);start.setDate(1);start.setHours(0,0,0,0);return start}if(reportPeriod==='quarter'){const d=new Date(now);d.setMonth(d.getMonth()-6);return d}if(reportPeriod==='year'){const d=new Date(now);d.setMonth(d.getMonth()-24);return d}return new Date(2010,0,1)}
+function getPeriodRange(){
+  // إذا اختار شهر محدد، نستخدمه
+  if(window.specificMonth){
+    var parts=window.specificMonth.split('-');
+    var year=parseInt(parts[0]),month=parseInt(parts[1])-1;
+    var start=new Date(year,month,1,0,0,0,0);
+    var end=new Date(year,month+1,1,0,0,0,0);
+    return {start:start,end:end};
+  }
+  var now=new Date();
+  var end=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1,0,0,0,0); // غداً 00:00 = نهاية اليوم
+  if(reportPeriod==='day'){
+    var d=new Date(now);d.setHours(0,0,0,0);
+    return {start:d,end:end};
+  }
+  if(reportPeriod==='week'){
+    var d=new Date(now);d.setDate(d.getDate()-6);d.setHours(0,0,0,0);
+    return {start:d,end:end};
+  }
+  if(reportPeriod==='month'){
+    var d=new Date(now.getFullYear(),now.getMonth(),1,0,0,0,0);
+    return {start:d,end:end};
+  }
+  if(reportPeriod==='quarter'){
+    var d=new Date(now);d.setMonth(d.getMonth()-3);d.setHours(0,0,0,0);
+    return {start:d,end:end};
+  }
+  if(reportPeriod==='year'){
+    var d=new Date(now.getFullYear(),0,1,0,0,0,0);
+    return {start:d,end:end};
+  }
+  return {start:new Date(2020,0,1),end:end};
+}
+
+// للتوافق مع الكود القديم
+function getPeriodDate(){return getPeriodRange().start;}
+function getPreviousPeriodRange(){
+  if(window.specificMonth){
+    var parts=window.specificMonth.split('-');
+    var year=parseInt(parts[0]),month=parseInt(parts[1])-1;
+    var start=new Date(year,month-1,1,0,0,0,0);
+    var end=new Date(year,month,1,0,0,0,0);
+    return {start:start,end:end};
+  }
+  var range=getPeriodRange();
+  var duration=range.end-range.start;
+  return {start:new Date(range.start.getTime()-duration),end:range.start};
+}
+function getPreviousPeriodDate(){return getPreviousPeriodRange().start;}
+
+async function recalculateOldCommissions(){
+  if(!isOwner()){showToast('⚠️ المدير فقط','error');return;}
+  if(!confirm('سيتم إعادة حساب نصيب الشركة لكل الصفقات بناءً على المعادلة:\n\nنصيب الشركة = العمولة الكاملة - عمولة الوسيط - نصيب الموظف\n\nهل تريد المتابعة؟'))return;
+  
+  try{
+    showToast('⏳ جاري إعادة الحساب...','success');
+    var r=await supa.from('deals').select('id,commission_total,broker_commission,agent_share,company_share');
+    if(r.error)throw r.error;
+    
+    var fixed=0,skipped=0;
+    var updates=[];
+    
+    (r.data||[]).forEach(function(d){
+      var total=parseFloat(d.commission_total)||0;
+      var broker=parseFloat(d.broker_commission)||0;
+      var agent=parseFloat(d.agent_share)||0;
+      
+      if(total<=0){skipped++;return;}
+      
+      var correctShare=total-broker-agent;
+      if(correctShare<0)correctShare=0;
+      
+      var currentShare=parseFloat(d.company_share)||0;
+      
+      // إذا الرقم المخزّن يختلف عن المحسوب
+      if(Math.abs(currentShare-correctShare)>0.01){
+        updates.push({id:d.id,newShare:correctShare});
+      }
+    });
+    
+    // تحديث دفعة دفعة
+    for(var i=0;i<updates.length;i++){
+      var u=updates[i];
+      var ur=await supa.from('deals').update({company_share:u.newShare}).eq('id',u.id);
+      if(!ur.error)fixed++;
+    }
+    
+    showToast('✅ تم إصلاح '+fixed+' صفقة. تخطّى '+skipped+' (بدون عمولة)','success');
+    if(fixed>0){
+      setTimeout(function(){loadReports();},500);
+    }
+  }catch(err){
+    showToast('❌ '+err.message,'error');
+  }
+}
+
 function renderCommissionTable(deals){
   var el=document.getElementById('commissionTable');
   if(!el)return;
@@ -2846,16 +2954,62 @@ function renderCommissionTable(deals){
   el.innerHTML=h;
 }
 
-async function loadReports(){try{const periodStart=getPeriodDate();const prevStart=getPreviousPeriodDate();
+
+window.specificMonth = null;
+
+function setReportMonth(val){
+  if(!val){window.specificMonth=null;return;}
+  window.specificMonth=val;
+  // إلغاء تفعيل أزرار الفترة
+  document.querySelectorAll('.period-btn').forEach(function(b){b.classList.remove('active');});
+  // عرض الشهر المختار
+  var parts=val.split('-');
+  var months=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  var label=months[parseInt(parts[1])-1]+' '+parts[0];
+  var labelEl=document.getElementById('reportMonthLabel');
+  if(labelEl)labelEl.textContent='📊 يعرض: '+label;
+  loadReports();
+}
+
+function clearReportMonth(){
+  window.specificMonth=null;
+  var input=document.getElementById('reportMonthPicker');
+  if(input)input.value='';
+  var labelEl=document.getElementById('reportMonthLabel');
+  if(labelEl)labelEl.textContent='';
+  // إعادة تفعيل زر "الشهر" الافتراضي
+  document.querySelectorAll('.period-btn').forEach(function(b){
+    b.classList.remove('active');
+    if(b.textContent.trim()==='الشهر')b.classList.add('active');
+  });
+  if(typeof reportPeriod!=='undefined')reportPeriod='month';
+  loadReports();
+}
+
+// Patch setReportPeriod to clear specific month
+var _originalSetReportPeriod = window.setReportPeriod;
+if(typeof setReportPeriod==='function'){
+  var __origSRP=setReportPeriod;
+  setReportPeriod=function(p,el){
+    window.specificMonth=null;
+    var input=document.getElementById('reportMonthPicker');
+    if(input)input.value='';
+    var labelEl=document.getElementById('reportMonthLabel');
+    if(labelEl)labelEl.textContent='';
+    return __origSRP(p,el);
+  };
+}
+
+async function loadReports(){try{const periodRange=getPeriodRange();const periodStart=periodRange.start;const prevStart=getPreviousPeriodDate();
 const[cR,dR,pR]=await Promise.all([supa.from('clients').select('*').neq('archived',true),supa.from('deals').select('*, agent:profiles!deals_agent_id_fkey(full_name), property:properties(title,type,area)'),supa.from('properties').select('*').neq('archived',true)]);const clients=cR.data||[],deals=dR.data||[],properties=pR.data||[];
-const periodDeals=deals.filter(d=>new Date(d.created_at)>=periodStart);const prevDeals=deals.filter(d=>{const dt=new Date(d.created_at);return dt>=prevStart&&dt<periodStart});const periodClients=clients.filter(c=>new Date(c.created_at)>=periodStart);const prevClients=clients.filter(c=>{const dt=new Date(c.created_at);return dt>=prevStart&&dt<periodStart});
+const periodDeals=deals.filter(d=>{var dt=new Date(d.created_at);return dt>=periodRange.start&&dt<periodRange.end;});const prevRange=getPreviousPeriodRange();const prevDeals=deals.filter(function(d){var dt=new Date(d.created_at);return dt>=prevRange.start&&dt<prevRange.end;});const periodClients=clients.filter(function(c){var dt=new Date(c.created_at);return dt>=periodRange.start&&dt<periodRange.end;});const prevClients=clients.filter(function(c){var dt=new Date(c.created_at);return dt>=prevRange.start&&dt<prevRange.end;});
 const revenue=periodDeals.filter(d=>d.stage==='closed'||d.stage==='commission_collected').reduce((s,d)=>s+(parseFloat(d.deal_value)||0),0);const prevRevenue=prevDeals.filter(d=>d.stage==='closed'||d.stage==='commission_collected').reduce((s,d)=>s+(parseFloat(d.deal_value)||0),0);const revChange=prevRevenue?((revenue-prevRevenue)/prevRevenue*100):0;const closedCount=periDealsClosed=periodDeals.filter(d=>d.stage==='closed'||d.stage==='commission_collected').length;const prevClosed=prevDeals.filter(d=>d.stage==='closed'||d.stage==='commission_collected').length;const closedChange=prevClosed?((closedCount-prevClosed)/prevClosed*100):0;const conversion=periodDeals.length?(closedCount/periodDeals.length*100):0;const prevConv=prevDeals.length?(prevDeals.filter(d=>d.stage==='closed'||d.stage==='commission_collected').length/prevDeals.length*100):0;
 $('kpiRevenue').textContent=fmtMoneyShort(revenue);$('kpiClosed').textContent=closedCount;$('kpiNewClients').textContent=periodClients.length;$('kpiConversion').innerHTML=conversion.toFixed(0)+'<sup style="font-size:18px">%</sup>';
 $('kpiRevenueChange').innerHTML=revChange?'<span class="'+(revChange>=0?'up">↑':'down">↓')+' '+Math.abs(revChange).toFixed(0)+'%</span>':'';$('kpiRevenueChange').className='kpi-change '+(revChange>=0?'up':'down');const cliChange=prevClients.length?((periodClients.length-prevClients.length)/prevClients.length*100):0;$('kpiClientsChange').innerHTML=cliChange?'<span class="'+(cliChange>=0?'up">↑':'down">↓')+' '+Math.abs(cliChange).toFixed(0)+'%</span>':'';$('kpiClientsChange').className='kpi-change '+(cliChange>=0?'up':'down');$('kpiClosedChange').innerHTML=closedChange?'<span class="'+(closedChange>=0?'up">↑':'down">↓')+' '+Math.abs(closedChange).toFixed(0)+'%</span>':'';$('kpiClosedChange').className='kpi-change '+(closedChange>=0?'up':'down');
 if(reportTab==='overview'){renderRevenueLineChart(deals);renderClientStatusChart(clients);renderPropTypesChart(properties);renderClientSourcesChart(periodClients)}else if(reportTab==='revenue'){renderRevenueDetails(deals,properties)}else if(reportTab==='team'&&canManage()){renderLeaderboard(periodDeals,periodClients)}else if(reportTab==='funnel'){renderFunnel(clients,deals)}else if(reportTab==='heatmap'){renderHeatmap(deals)}
 $('reportsSub').textContent=({day:'اليوم',week:'آخر 7 أيام',month:'هذا الشهر',quarter:'آخر 3 أشهر',year:'آخر سنة',all:'كل الفترات'})[reportPeriod]}catch(err){console.error(err);showToast('خطأ في التقارير: '+err.message,'error')}}
 function renderRevenueLineChart(deals){const months=[];const today=new Date();for(let i=11;i>=0;i--){const d=new Date(today.getFullYear(),today.getMonth()-i,1);months.push({label:d.toLocaleDateString('ar-OM',{month:'short'}),year:d.getFullYear(),month:d.getMonth(),value:0})}deals.forEach(d=>{if(d.stage!=='closed'||!d.deal_value)return;const dt=new Date(d.closed_at||d.created_at);const m=months.find(x=>x.year===dt.getFullYear()&&x.month===dt.getMonth());if(m)m.value+=parseFloat(d.deal_value)});const maxVal=Math.max.apply(null,months.map(m=>m.value).concat([1]));const w=100,h=200,pad=20;const stepX=w/(months.length-1);let pathStroke='',pathArea='',dots='',labels='';months.forEach((m,i)=>{const x=i*stepX;const y=h-(m.value/maxVal)*(h-pad)-10;if(i===0){pathStroke='M '+x+' '+y;pathArea='M '+x+' '+h}else{pathStroke+=' L '+x+' '+y;pathArea+=' L '+x+' '+y}dots+='<circle class="line-dot" cx="'+x+'" cy="'+y+'" r="4"><title>'+m.label+': '+fmtMoney(m.value)+'</title></circle>';labels+='<text x="'+x+'" y="'+(h+15)+'" text-anchor="middle">'+m.label+'</text>'});pathArea+=' L '+(stepX*(months.length-1))+' '+h+' Z';let yAxis='';for(let i=0;i<=4;i++){const y=h-(i/4)*(h-pad)-10;const val=(maxVal*i/4);yAxis+='<line x1="0" y1="'+y+'" x2="'+w+'" y2="'+y+'" stroke="#E0D9CC" stroke-width="0.3" stroke-dasharray="1,1"/>';yAxis+='<text x="-2" y="'+(y+3)+'" text-anchor="end" style="font-size:5px;fill:#6B5A3E">'+fmtMoneyShort(val)+'</text>'}$('revenueLineChart').innerHTML='<svg class="line-svg" viewBox="-15 -5 '+(w+20)+' '+(h+25)+'" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="goldGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C4963A" stop-opacity="0.5"/><stop offset="100%" stop-color="#C4963A" stop-opacity="0"/></linearGradient></defs>'+yAxis+'<path class="line-area" d="'+pathArea+'"/><path class="line-stroke" d="'+pathStroke+'"/>'+dots+'<g class="line-axis">'+labels+'</g></svg>'}
-function renderRevenueDetails(deals,properties){const closedDeals=deals.filter(d=>d.stage==='closed'||d.stage==='commission_collected');const total=closedDeals.reduce((s,d)=>s+(parseFloat(d.deal_value)||0),0);const received=closedDeals.filter(d=>d.stage==='commission_collected'||d.commission_status==='received').reduce((s,d)=>s+(parseFloat(d.company_share||d.deal_value)||0),0);const pending=closedDeals.filter(d=>d.stage!=='commission_collected'&&d.commission_status!=='received').reduce((s,d)=>s+(parseFloat(d.company_share||d.deal_value)||0),0);const net=received;$('revTotal').textContent=fmtMoneyShort(total);$('revReceived').textContent=fmtMoneyShort(received);$('revPending').textContent=fmtMoneyShort(pending);$('revNet').textContent=fmtMoneyShort(net);
+function renderRevenueDetails(deals,properties){const closedDeals=deals.filter(d=>d.stage==='closed'||d.stage==='commission_collected');const total=closedDeals.reduce((s,d)=>s+(parseFloat(d.deal_value)||0),0);const received=closedDeals.filter(d=>d.stage==='commission_collected'||d.commission_status==='received').reduce((s,d)=>s+(parseFloat(d.company_share)||0),0);const pending=closedDeals.filter(d=>d.stage!=='commission_collected'&&d.commission_status!=='received').reduce((s,d)=>s+(parseFloat(d.company_share)||0),0);const net=received;$('revTotal').textContent=fmtMoneyShort(total);$('revReceived').textContent=fmtMoneyShort(received);$('revPending').textContent=fmtMoneyShort(pending);$('revNet').textContent=fmtMoneyShort(net);
 // ═══ تقرير العمولات (للمدير فقط) ═══
 if(typeof isOwner==='function'&&isOwner()){
   var crs=document.getElementById('commissionReportSection');if(crs)crs.style.display='';
@@ -3879,7 +4033,7 @@ function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
 
-window.APP_VERSION = '20260530-0804';
+window.APP_VERSION = '20260530-0820';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
