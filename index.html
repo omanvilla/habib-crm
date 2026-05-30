@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260530-1144">
+<meta name="app-version" content="20260530-1207">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -819,7 +819,6 @@
 <div class="fg"><label class="fl">قيمة البيع (ر.ع) *</label><input class="fi" type="text" inputmode="decimal" id="dValue" dir="ltr" style="text-align:left" placeholder="100000"></div>
 <div class="fg"><label class="fl">📅 تاريخ الصفقة</label><input class="fi" type="date" id="dCreatedDate" dir="ltr" style="text-align:left"><div style="font-size:11px;color:var(--umber);margin-top:4px">اتركه فارغ ليأخذ تاريخ اليوم تلقائياً</div></div>
 <div class="fg"><label class="fl">المرحلة</label><select class="fs" id="dStage">
-<option value="new">🆕 عميل مهتم</option>
 <option value="visit">👁 تمت المعاينة</option>
 <option value="negotiation">💬 تفاوض</option>
 <option value="deposit">💰 عربون</option>
@@ -2513,7 +2512,7 @@ function renderDealTable(){let h='<div class="card"><table class="tbl"><thead><t
 function renderPipeline(){
   // 6 مجموعات مبسّطة (كل مجموعة تشمل مراحل ذات صلة)
   const stageGroups=[
-    {key:'lead',label:'🆕 جديد',stages:['new','visit'],color:'#3B82F6'},
+    {key:'visit',label:'👁 معاينة',stages:['new','visit'],color:'#3B82F6'},
     {key:'negotiation',label:'💬 تفاوض',stages:['negotiation'],color:'#F97316'},
     {key:'deposit',label:'💰 عربون/تمويل',stages:['deposit','awaiting_finance','finance_approved'],color:'#14B8A6'},
     {key:'clearance',label:'📋 تخليص/نقل',stages:['awaiting_clearance','ownership_transfer'],color:'#F59E0B'},
@@ -2758,7 +2757,7 @@ async function editDeal(dealId){
         }
       }
       if($('dValue'))$('dValue').value=d.deal_value||'';
-      if($('dStage'))$('dStage').value=d.stage||'new';
+      if($('dStage'))$('dStage').value=d.stage||'visit';
       if($('dNotes'))$('dNotes').value=d.notes||'';
       
       // التاريخ
@@ -3464,9 +3463,43 @@ async function saveViewing(){
     }
     if(r.error)throw r.error;
     if(status==='scheduled'){
-      await supa.from('clients').update({pipeline_stage:'viewing_scheduled'}).eq('id',cl);
+      try{await supa.from('clients').update({pipeline_stage:'viewing_scheduled'}).eq('id',cl);}catch(e){}
     }else if(status==='done'){
-      await supa.from('clients').update({pipeline_stage:'viewed'}).eq('id',cl);
+      try{await supa.from('clients').update({pipeline_stage:'viewed'}).eq('id',cl);}catch(e){}
+      
+      // 🎯 ربط ذكي مع Pipeline الصفقات
+      try{
+        // ابحث عن صفقة موجودة لنفس العميل + نفس العقار
+        var existingDeal=await supa.from('deals').select('id,stage').eq('client_id',cl).eq('property_id',pr).maybeSingle();
+        
+        // المراحل المتقدمة - لا نرجعها للخلف
+        var advancedStages=['negotiation','deposit','awaiting_finance','finance_approved','awaiting_clearance','ownership_transfer','closed','commission_collected'];
+        
+        if(existingDeal.data){
+          // فيه صفقة - حدّثها فقط إذا كانت في مرحلة سابقة لـ visit
+          if(!advancedStages.includes(existingDeal.data.stage)&&existingDeal.data.stage!=='visit'&&existingDeal.data.stage!=='lost'){
+            await supa.from('deals').update({stage:'visit'}).eq('id',existingDeal.data.id);
+            showToast('🎯 تم نقل الصفقة لمرحلة "تمت المعاينة" في Pipeline','success');
+          }
+        }else{
+          // ما فيه صفقة - أنشئ جديدة بمرحلة visit
+          var newDeal=await supa.from('deals').insert({
+            company_id:cid,
+            client_id:cl,
+            property_id:pr,
+            agent_id:document.getElementById('vAgent').value||currentUser.id,
+            stage:'visit',
+            notes:'تم إنشاؤها تلقائياً من زيارة بتاريخ '+dt+(document.getElementById('vFeedback').value?'. الملاحظات: '+document.getElementById('vFeedback').value:'')
+          });
+          if(!newDeal.error){
+            showToast('🎯 تم إنشاء صفقة جديدة في Pipeline (مرحلة المعاينة)','success');
+          }else{
+            console.warn('[Auto-deal] error:',newDeal.error);
+          }
+        }
+      }catch(dealErr){
+        console.warn('[Auto-deal] exception:',dealErr);
+      }
     }
     // إنشاء مهمة متابعة تلقائية إذا حُدّد موعد متابعة
     var fuDate=document.getElementById('vFollowupDate').value;
@@ -4245,7 +4278,7 @@ window.addEventListener('error', function(e){
   console.error('🚨 Runtime error:', e.message, 'at', e.filename, ':', e.lineno);
 });
 
-window.APP_VERSION = '20260530-1144';
+window.APP_VERSION = '20260530-1207';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
