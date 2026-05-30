@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260530-0902">
+<meta name="app-version" content="20260530-1000">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -800,8 +800,22 @@
 <div class="modal-ov" id="mDeal"><div class="modal-box lg">
 <div class="modal-title" id="mDealTitle">🤝 إضافة صفقة جديدة</div>
 <div class="fgrid">
-<div class="fg"><label class="fl">العميل *</label><select class="fs" id="dClient" required><option value="">اختر عميلاً</option></select></div>
-<div class="fg"><label class="fl">العقار</label><select class="fs" id="dProperty"><option value="">اختر عقاراً</option></select></div>
+<div class="fg"><label class="fl">العميل *</label>
+<div class="searchable-select" style="position:relative">
+  <input type="text" class="fi" id="dClientSearch" placeholder="🔍 ابحث بالاسم أو الهاتف..." autocomplete="off" oninput="filterClientDropdown(this.value)" onfocus="showClientDropdown()">
+  <input type="hidden" id="dClient" required>
+  <div id="dClientSelected" style="margin-top:4px;font-size:12px;color:#2E7D5C;font-weight:700;display:none"></div>
+  <div id="dClientDropdown" class="dropdown-list" style="display:none;position:absolute;top:100%;right:0;left:0;background:white;border:1.5px solid var(--gold);border-radius:10px;max-height:280px;overflow-y:auto;z-index:1000;box-shadow:0 6px 20px rgba(0,0,0,0.15);margin-top:4px"></div>
+</div>
+</div>
+<div class="fg"><label class="fl">العقار</label>
+<div class="searchable-select" style="position:relative">
+  <input type="text" class="fi" id="dPropertySearch" placeholder="🔍 ابحث بعنوان العقار..." autocomplete="off" oninput="filterPropertyDropdown(this.value)" onfocus="showPropertyDropdown()">
+  <input type="hidden" id="dProperty">
+  <div id="dPropertySelected" style="margin-top:4px;font-size:12px;color:#2E7D5C;font-weight:700;display:none"></div>
+  <div id="dPropertyDropdown" class="dropdown-list" style="display:none;position:absolute;top:100%;right:0;left:0;background:white;border:1.5px solid var(--gold);border-radius:10px;max-height:280px;overflow-y:auto;z-index:1000;box-shadow:0 6px 20px rgba(0,0,0,0.15);margin-top:4px"></div>
+</div>
+</div>
 <div class="fg"><label class="fl">قيمة البيع (ر.ع) *</label><input class="fi" type="text" inputmode="decimal" id="dValue" dir="ltr" style="text-align:left" placeholder="100000"></div>
 <div class="fg"><label class="fl">📅 تاريخ الصفقة</label><input class="fi" type="date" id="dCreatedDate" dir="ltr" style="text-align:left"><div style="font-size:11px;color:var(--umber);margin-top:4px">اتركه فارغ ليأخذ تاريخ اليوم تلقائياً</div></div>
 <div class="fg"><label class="fl">المرحلة</label><select class="fs" id="dStage">
@@ -1895,7 +1909,13 @@ function openModal(id){
     if(pn&&pn.parentElement)pn.parentElement.style.display=isMgr2?'':'none';
   }
   setTimeout(function(){if(id==='mClient'&&!editingClient&&typeof setupPhoneField==='function'){setupPhoneField('cPhoneCountry','cPhoneLocal','');}if(id==='mOwner'&&!window.editingOwner&&typeof setupPhoneField==='function'){setupPhoneField('oPhoneCountry','oPhoneLocal','');if($('oType'))$('oType').value='owner';}},50);if(id==='mDeal'){var dt=document.getElementById('mDealTitle');if(dt)dt.textContent=window.editingDealId?'✏️ تعديل الصفقة':'➕ صفقة جديدة';populateDealSelects();setTimeout(function(){if(typeof calcCompanyShare==='function')calcCompanyShare();},100);}if(id==='mTask'){if(!window.editingTask){$('mTaskTitle').textContent='⏰ مهمة جديدة';['tTitle','tDueDate','tNotes'].forEach(i=>$(i).value='');$('tPriority').value='medium';$('tClient').value='';$('tDeal').value=''}populateTaskSelects()}if(id==='mClient')populateClientForm();if(id==='mProperty'){if(!window.editingProperty){['pTitle','pArea','pPrice','pBeds','pBaths','pLandSize','pBuiltSize','pDesc','pOwnerNet','pWilayat','pExpectedCommission','pCreatedDate'].forEach(i=>{const e=$(i);if(e)e.value=''});if($('pType'))$('pType').value='';if($('pStatus'))$('pStatus').value='available';if($('pSourceType'))$('pSourceType').value='owner';if($('pMarketingStatus'))$('pMarketingStatus').value='ready_to_advertise';currentPropertyImages=[]}const sel=$('pOwnerId');if(sel){sel.innerHTML='<option value="">— اختر مالك —</option>';allOwners.forEach(o=>sel.innerHTML+='<option value="'+o.id+'">'+escapeHtml(o.name)+'</option>')}renderPropertyImages()}if(id==='mExpense'&&!editingExpense){$('exDate').value=toLocalDateStr(new Date())}if(id==='mViewing'&&!editingViewing){populateViewingForm();$('vDate').value=toLocalDateStr(new Date());['vTime','vLocation','vNextStep','vFollowupDate','vNotes'].forEach(i=>{const e=$(i);if(e)e.value=''});$('vStatus').value='scheduled';$('vDuration').value=60;$('vFeedbackFG').style.display='none';$('mViewingTitle').textContent='👁 زيارة جديدة'}if(id==='mDeposit'&&!editingDeposit){populateDepositForm();$('dpPaymentDate').value=toLocalDateStr(new Date());['dpAmount','dpLegalNotes','dpNotes'].forEach(i=>{const e=$(i);if(e)e.value=''});$('dpDuration').value=30;$('mDepositTitle').textContent='💰 عربون جديد'}$(id).classList.add('on')}
-function closeModal(id){$(id).classList.remove('on');if(id==='mClient'){editingClient=null;$('mClientTitle').textContent='➕ إضافة عميل جديد'}if(id==='mDeal'){window.editingDealId=null;}if(id==='mTask'){window.editingTask=null;$('mTaskTitle').textContent='⏰ مهمة جديدة'}if(id==='mProperty'){window.editingProperty=null}if(id==='mViewing'){editingViewing=null;clearViewingForm()}if(id==='mDeposit'){editingDeposit=null}}
+function closeModal(id){$(id).classList.remove('on');if(id==='mClient'){editingClient=null;$('mClientTitle').textContent='➕ إضافة عميل جديد'}if(id==='mDeal'){
+  window.editingDealId=null;
+  // مسح حقول البحث الذكي
+  ['dClientSearch','dPropertySearch'].forEach(function(i){var e=$(i);if(e){e.value='';e.placeholder=i==='dClientSearch'?'🔍 ابحث بالاسم أو الهاتف...':'🔍 ابحث بعنوان العقار...';}});
+  ['dClientSelected','dPropertySelected'].forEach(function(i){var e=document.getElementById(i);if(e){e.textContent='';e.style.display='none';}});
+  ['dClientDropdown','dPropertyDropdown'].forEach(function(i){var e=document.getElementById(i);if(e)e.style.display='none';});
+}if(id==='mTask'){window.editingTask=null;$('mTaskTitle').textContent='⏰ مهمة جديدة'}if(id==='mProperty'){window.editingProperty=null}if(id==='mViewing'){editingViewing=null;clearViewingForm()}if(id==='mDeposit'){editingDeposit=null}}
 document.querySelectorAll('.modal-ov').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('on')}));
 async function ensureCompany(){let id=currentProfile.company_id;if(!id){
 const owners=await supa.from('profiles').select('company_id').eq('role','owner').not('company_id','is',null).limit(1);if(owners.data&&owners.data.length&&owners.data[0].company_id){id=owners.data[0].company_id;await supa.from('profiles').update({company_id:id}).eq('id',currentUser.id);currentProfile.company_id=id;const cmp=await supa.from('companies').select('*').eq('id',id).single();currentCompany=cmp.data;updateUserUI();applyRoleVisibility()}else{
@@ -2324,12 +2344,169 @@ loadDashboard();
 })();
 }
 function switchDealView(v){dealView=v;$('viewTable').classList.toggle('active',v==='table');$('viewPipeline').classList.toggle('active',v==='pipeline');renderDeals()}
-async function populateDealSelects(){try{const c=await supa.from('clients').select('id,name').neq('archived',true);const p=await supa.from('properties').select('id,title,status').neq('archived',true);const cs=$('dClient');cs.innerHTML='<option value="">اختر عميلاً</option>';(c.data||[]).forEach(function(i){cs.innerHTML+='<option value="'+i.id+'">'+escapeHtml(i.name)+'</option>'});const ps=$('dProperty');ps.innerHTML='<option value="">اختر عقاراً</option>';(p.data||[]).forEach(function(i){const statusIcon=i.status==='sold'?'🔴 مباع':i.status==='reserved'?'⏳ محجوز':'✅';ps.innerHTML+='<option value="'+i.id+'"'+(i.status==='sold'?' disabled':'')+'>'+statusIcon+' '+escapeHtml(i.title)+'</option>'});
-// تعبئة قائمة الوسطاء والمكاتب
-const br=await supa.from('owners').select('id,name,owner_type').eq('archived',false).in('owner_type',['broker','agency']);
-const bs=$('dBroker');
-if(bs){bs.innerHTML='<option value="">— بدون وسيط —</option>';(br.data||[]).forEach(function(i){var icon=i.owner_type==='agency'?'🏢':'🤝';bs.innerHTML+='<option value="'+i.id+'">'+icon+' '+escapeHtml(i.name)+'</option>'});}
-}catch(err){console.error(err)}}
+async function populateDealSelects(){
+  try{
+    const c=await supa.from('clients').select('id,name,phone,client_type').neq('archived',true).order('name');
+    const p=await supa.from('properties').select('id,title,status,type,area,price').neq('archived',true).order('created_at',{ascending:false});
+    
+    // تخزين البيانات في الذاكرة للبحث السريع
+    window.dealClientsList=(c.data||[]);
+    window.dealPropertiesList=(p.data||[]);
+    
+    // تعبئة قائمة الوسطاء (هذي قائمة قصيرة - تبقى select عادي)
+    const br=await supa.from('owners').select('id,name,owner_type').eq('archived',false).in('owner_type',['broker','agency']);
+    const bs=$('dBroker');
+    if(bs){
+      bs.innerHTML='<option value="">— بدون وسيط —</option>';
+      (br.data||[]).forEach(function(i){
+        var icon=i.owner_type==='agency'?'🏢':'🤝';
+        bs.innerHTML+='<option value="'+i.id+'">'+icon+' '+escapeHtml(i.name)+'</option>';
+      });
+    }
+    
+    // عرض أول 50 في القائمة كافتراضي
+    filterClientDropdown('');
+    filterPropertyDropdown('');
+  }catch(err){console.error(err)}
+}
+
+// ═══════════════════════════════════════════════════
+// بحث ذكي للعميل
+// ═══════════════════════════════════════════════════
+function filterClientDropdown(q){
+  var list=window.dealClientsList||[];
+  q=(q||'').toLowerCase().trim();
+  var filtered=q?list.filter(function(c){
+    var name=(c.name||'').toLowerCase();
+    var phone=(c.phone||'').replace(/[^0-9]/g,'');
+    var qDigits=q.replace(/[^0-9]/g,'');
+    return name.indexOf(q)>=0||(qDigits&&phone.indexOf(qDigits)>=0);
+  }):list;
+  
+  var dd=document.getElementById('dClientDropdown');
+  if(!dd)return;
+  
+  if(!filtered.length){
+    dd.innerHTML='<div style="padding:14px;text-align:center;color:var(--umber);font-size:13px">😕 لا يوجد عملاء مطابقون</div>';
+  }else{
+    var html='';
+    filtered.slice(0,100).forEach(function(c){
+      var typeIcon=c.client_type==='buyer'?'🛒':c.client_type==='seller'?'🏠':c.client_type==='investor'?'💼':c.client_type==='tenant'?'🔑':'👤';
+      var phone=c.phone?formatPhoneDisplay(c.phone):'';
+      html+='<div class="dd-item" data-client-id="'+c.id+'" data-client-name="'+escapeHtml(c.name)+'" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--cream-deeper)">';
+      html+='<div style="font-weight:700;color:var(--espresso);font-size:13px">'+typeIcon+' '+escapeHtml(c.name)+'</div>';
+      if(phone)html+='<div style="font-size:11px;color:var(--umber);margin-top:2px" dir="ltr">'+phone+'</div>';
+      html+='</div>';
+    });
+    if(filtered.length>100){
+      html+='<div style="padding:8px;text-align:center;font-size:11px;color:var(--umber);background:var(--cream-light)">... + '+(filtered.length-100)+' عميل آخر (اكتب لتضييق البحث)</div>';
+    }
+    dd.innerHTML=html;
+    // ربط النقر بكل عنصر (أنظف من inline onclick)
+    dd.querySelectorAll('.dd-item').forEach(function(el){
+      el.addEventListener('mouseenter',function(){this.style.background='var(--cream-light)'});
+      el.addEventListener('mouseleave',function(){this.style.background='white'});
+      el.addEventListener('click',function(){
+        selectClientForDeal(this.dataset.clientId,this.dataset.clientName);
+      });
+    });
+  }
+  dd.style.display='';
+}
+
+function showClientDropdown(){
+  filterClientDropdown(document.getElementById('dClientSearch').value);
+}
+
+function selectClientForDeal(id,name){
+  document.getElementById('dClient').value=id;
+  document.getElementById('dClientSearch').value='';
+  document.getElementById('dClientSearch').placeholder='✓ تم اختيار: '+name;
+  var sel=document.getElementById('dClientSelected');
+  sel.textContent='✅ العميل المختار: '+name;
+  sel.style.display='';
+  document.getElementById('dClientDropdown').style.display='none';
+}
+
+// ═══════════════════════════════════════════════════
+// بحث ذكي للعقار
+// ═══════════════════════════════════════════════════
+function filterPropertyDropdown(q){
+  var list=window.dealPropertiesList||[];
+  q=(q||'').toLowerCase().trim();
+  var filtered=q?list.filter(function(p){
+    var title=(p.title||'').toLowerCase();
+    var area=(p.area||'').toLowerCase();
+    return title.indexOf(q)>=0||area.indexOf(q)>=0;
+  }):list;
+  
+  var dd=document.getElementById('dPropertyDropdown');
+  if(!dd)return;
+  
+  if(!filtered.length){
+    dd.innerHTML='<div style="padding:14px;text-align:center;color:var(--umber);font-size:13px">😕 لا يوجد عقارات مطابقة</div>';
+  }else{
+    var html='';
+    if(!q){
+      html+='<div class="dd-item" data-prop-id="" data-prop-title="بدون عقار" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--cream-deeper);background:var(--cream-light);font-style:italic;color:var(--umber)">— بدون عقار —</div>';
+    }
+    filtered.slice(0,100).forEach(function(p){
+      var statusIcon=p.status==='sold'?'🔴':p.status==='reserved'?'⏳':'✅';
+      var disabled=p.status==='sold';
+      var bg=disabled?'#FEE2E2':'white';
+      html+='<div class="dd-item" data-prop-id="'+p.id+'" data-prop-title="'+escapeHtml(p.title)+'" data-disabled="'+(disabled?'1':'0')+'" style="padding:10px 14px;cursor:'+(disabled?'not-allowed':'pointer')+';border-bottom:1px solid var(--cream-deeper);background:'+bg+'">';
+      html+='<div style="font-weight:700;color:var(--espresso);font-size:13px">'+statusIcon+' '+escapeHtml(p.title)+'</div>';
+      var meta=[];
+      if(p.area)meta.push('📍 '+escapeHtml(p.area));
+      if(p.price)meta.push('💰 '+fmtMoneyShort(p.price));
+      if(meta.length)html+='<div style="font-size:11px;color:var(--umber);margin-top:2px">'+meta.join(' · ')+'</div>';
+      html+='</div>';
+    });
+    if(filtered.length>100){
+      html+='<div style="padding:8px;text-align:center;font-size:11px;color:var(--umber);background:var(--cream-light)">... + '+(filtered.length-100)+' عقار آخر</div>';
+    }
+    dd.innerHTML=html;
+    dd.querySelectorAll('.dd-item').forEach(function(el){
+      var disabled=el.dataset.disabled==='1';
+      if(!disabled){
+        el.addEventListener('mouseenter',function(){this.style.background='var(--cream-light)'});
+        el.addEventListener('mouseleave',function(){this.style.background='white'});
+      }
+      el.addEventListener('click',function(){
+        if(this.dataset.disabled==='1'){
+          showToast('⚠️ هذا العقار مباع','error');
+          return;
+        }
+        selectPropertyForDeal(this.dataset.propId,this.dataset.propTitle);
+      });
+    });
+  }
+  dd.style.display='';
+}
+
+function showPropertyDropdown(){
+  filterPropertyDropdown(document.getElementById('dPropertySearch').value);
+}
+
+function selectPropertyForDeal(id,title){
+  document.getElementById('dProperty').value=id;
+  document.getElementById('dPropertySearch').value='';
+  document.getElementById('dPropertySearch').placeholder=id?('✓ تم اختيار: '+title):'🔍 ابحث بعنوان العقار...';
+  var sel=document.getElementById('dPropertySelected');
+  sel.textContent=id?('✅ العقار المختار: '+title):'';
+  sel.style.display=id?'':'none';
+  document.getElementById('dPropertyDropdown').style.display='none';
+}
+
+// إغلاق القائمة عند الضغط خارجها
+document.addEventListener('click',function(e){
+  if(!e.target.closest('.searchable-select')){
+    var cd=document.getElementById('dClientDropdown');
+    var pd=document.getElementById('dPropertyDropdown');
+    if(cd)cd.style.display='none';
+    if(pd)pd.style.display='none';
+  }
+});
 async function loadDeals(){try{const r=await supa.from('deals').select('*, client:clients(name), property:properties(title), agent:profiles!deals_agent_id_fkey(full_name)').order('created_at',{ascending:false});if(r.error)throw r.error;allDeals=r.data||[];$('dealsSub').textContent=allDeals.length+' صفقة';renderDeals()}catch(err){$('dealsContent').innerHTML='<div class="card"><div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(err.message)+'</div></div></div>'}}
 function renderDeals(){if(!allDeals.length){$('dealsContent').innerHTML='<div class="card"><div class="empty"><div class="empty-ico">🤝</div><div class="empty-title">لا توجد صفقات بعد</div><div class="empty-desc">أضف عميلاً وعقاراً ثم أنشئ صفقة</div>'+(canEdit()?'<button class="btn-primary" style="margin-top:14px;width:auto;padding:10px 22px" onclick="openModal(\'mDeal\')">+ إضافة صفقة</button>':'')+'</div></div>';return}if(dealView==='pipeline')renderPipeline();else renderDealTable()}
 function renderDealTable(){let h='<div class="card"><table class="tbl"><thead><tr><th>العميل</th><th>العقار</th><th>القيمة</th><th>المرحلة</th>'+(canManage()?'<th>الموظف</th>':'')+'<th></th></tr></thead><tbody>';allDeals.forEach(function(d){h+='<tr class="row-clickable" onclick="editDeal(\''+d.id+'\')"><td><strong>'+escapeHtml(d.client&&d.client.name||'—')+'</strong></td><td>'+escapeHtml(d.property&&d.property.title||'—')+'</td><td style="color:var(--gold);font-weight:700">'+fmtMoney(d.deal_value)+'</td><td>'+dealStageAr(d.stage)+'</td>'+(canManage()?'<td>'+escapeHtml(d.agent&&d.agent.full_name||'—')+'</td>':'')+'<td onclick="event.stopPropagation()">'+'<span style="cursor:pointer" onclick="deleteDeal(\''+d.id+'\')">🗑</span>'+'</td></tr>'});$('dealsContent').innerHTML=h+'</tbody></table></div>'}
@@ -2531,7 +2708,7 @@ async function saveDeal(){
     
     // إعادة تعيين الحالة وتنظيف النموذج
     window.editingDealId=null;
-    ['dValue','dNotes','dCommission','dCompanyShare','dAgentShare','dBrokerCommission','dCreatedDate'].forEach(function(i){var e=$(i);if(e)e.value=''});
+    ['dValue','dNotes','dCommission','dCompanyShare','dAgentShare','dBrokerCommission','dCreatedDate','dClient','dProperty','dClientSearch','dPropertySearch'].forEach(function(i){var e=$(i);if(e)e.value=''});['dClientSelected','dPropertySelected'].forEach(function(i){var e=document.getElementById(i);if(e){e.textContent='';e.style.display='none';}});if($('dClientSearch'))$('dClientSearch').placeholder='🔍 ابحث بالاسم أو الهاتف...';if($('dPropertySearch'))$('dPropertySearch').placeholder='🔍 ابحث بعنوان العقار...';
     if($('dBroker'))$('dBroker').value='';
     
     loadDeals();
@@ -2555,8 +2732,31 @@ async function editDeal(dealId){
     
     setTimeout(function(){
       // الحقول الأساسية
-      if($('dClient'))$('dClient').value=d.client_id||'';
-      if($('dProperty'))$('dProperty').value=d.property_id||'';
+      if($('dClient')){
+        $('dClient').value=d.client_id||'';
+        // عرض اسم العميل في حقل البحث
+        if(d.client_id){
+          var clientObj=(window.dealClientsList||[]).find(function(x){return x.id===d.client_id});
+          if(clientObj){
+            $('dClientSearch').placeholder='✓ تم اختيار: '+clientObj.name;
+            $('dClientSearch').value='';
+            var sel=document.getElementById('dClientSelected');
+            if(sel){sel.textContent='✅ العميل الحالي: '+clientObj.name;sel.style.display='';}
+          }
+        }
+      }
+      if($('dProperty')){
+        $('dProperty').value=d.property_id||'';
+        if(d.property_id){
+          var propObj=(window.dealPropertiesList||[]).find(function(x){return x.id===d.property_id});
+          if(propObj){
+            $('dPropertySearch').placeholder='✓ تم اختيار: '+propObj.title;
+            $('dPropertySearch').value='';
+            var ps=document.getElementById('dPropertySelected');
+            if(ps){ps.textContent='✅ العقار الحالي: '+propObj.title;ps.style.display='';}
+          }
+        }
+      }
       if($('dValue'))$('dValue').value=d.deal_value||'';
       if($('dStage'))$('dStage').value=d.stage||'new';
       if($('dNotes'))$('dNotes').value=d.notes||'';
@@ -4045,7 +4245,7 @@ window.addEventListener('error', function(e){
   console.error('🚨 Runtime error:', e.message, 'at', e.filename, ':', e.lineno);
 });
 
-window.APP_VERSION = '20260530-0902';
+window.APP_VERSION = '20260530-1000';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
