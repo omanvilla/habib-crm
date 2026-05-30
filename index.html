@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260530-1000">
+<meta name="app-version" content="20260530-1017">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1798,7 +1798,7 @@ function propertyTypeAr(t){return({
 }[t]||t||'—');}
 function propStatusAr(s){var m={available:'✅ متوفر',reserved:'⏳ محجوز',deposit:'💰 عربون',negotiating:'💬 تفاوض',sold:'🔴 مباع',not_available:'⚪ غير متاح'};return m[s]||s;}
 
-function propTypeAr(t){return{villa:'فيلا',apartment:'شقة',land:'أرض',office:'مكتب',shop:'محل'}[t]||t}
+function propTypeAr(t){var m={villa:'فيلا',house:'منزل',twin_villa:'توين فيلا',townhouse:'تاون هاوس',apartment:'شقة',penthouse:'بنتهاوس',building:'عمارة',residential_building:'بناية سكنية',commercial_building:'مبنى تجاري',income_property:'عقار دخل',land:'أرض',land_residential:'أرض سكنية',land_commercial:'أرض تجارية',land_mixed:'أرض سكني تجاري',farm:'مزرعة',resthouse:'استراحة',chalet:'شاليه',office:'مكتب',shop:'محل تجاري',warehouse:'مستودع',not_sure:'لم يحدد',other:'أخرى'};return m[t]||t;}
 function dealStageAr(s){return({
   new:'🆕 عميل مهتم',
   visit:'👁 تمت المعاينة',
@@ -4245,7 +4245,7 @@ window.addEventListener('error', function(e){
   console.error('🚨 Runtime error:', e.message, 'at', e.filename, ':', e.lineno);
 });
 
-window.APP_VERSION = '20260530-1000';
+window.APP_VERSION = '20260530-1017';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
