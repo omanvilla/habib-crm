@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260530-0820">
+<meta name="app-version" content="20260530-0830">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2896,6 +2896,19 @@ async function recalculateOldCommissions(){
     var fixed=0,skipped=0;
     var updates=[];
     
+    // تشخيص: اطبع أول 5 صفقات بقيمها الحقيقية من القاعدة
+    console.log('🔍 أول 5 صفقات في القاعدة:');
+    (r.data||[]).slice(0,5).forEach(function(d,i){
+      console.log('صفقة '+(i+1)+':',{
+        id:d.id.substring(0,8),
+        commission_total:d.commission_total,
+        broker_commission:d.broker_commission,
+        agent_share:d.agent_share,
+        company_share:d.company_share,
+        محسوب:parseFloat(d.commission_total||0)-parseFloat(d.broker_commission||0)-parseFloat(d.agent_share||0)
+      });
+    });
+    
     (r.data||[]).forEach(function(d){
       var total=parseFloat(d.commission_total)||0;
       var broker=parseFloat(d.broker_commission)||0;
@@ -3006,7 +3019,7 @@ const periodDeals=deals.filter(d=>{var dt=new Date(d.created_at);return dt>=peri
 const revenue=periodDeals.filter(d=>d.stage==='closed'||d.stage==='commission_collected').reduce((s,d)=>s+(parseFloat(d.deal_value)||0),0);const prevRevenue=prevDeals.filter(d=>d.stage==='closed'||d.stage==='commission_collected').reduce((s,d)=>s+(parseFloat(d.deal_value)||0),0);const revChange=prevRevenue?((revenue-prevRevenue)/prevRevenue*100):0;const closedCount=periDealsClosed=periodDeals.filter(d=>d.stage==='closed'||d.stage==='commission_collected').length;const prevClosed=prevDeals.filter(d=>d.stage==='closed'||d.stage==='commission_collected').length;const closedChange=prevClosed?((closedCount-prevClosed)/prevClosed*100):0;const conversion=periodDeals.length?(closedCount/periodDeals.length*100):0;const prevConv=prevDeals.length?(prevDeals.filter(d=>d.stage==='closed'||d.stage==='commission_collected').length/prevDeals.length*100):0;
 $('kpiRevenue').textContent=fmtMoneyShort(revenue);$('kpiClosed').textContent=closedCount;$('kpiNewClients').textContent=periodClients.length;$('kpiConversion').innerHTML=conversion.toFixed(0)+'<sup style="font-size:18px">%</sup>';
 $('kpiRevenueChange').innerHTML=revChange?'<span class="'+(revChange>=0?'up">↑':'down">↓')+' '+Math.abs(revChange).toFixed(0)+'%</span>':'';$('kpiRevenueChange').className='kpi-change '+(revChange>=0?'up':'down');const cliChange=prevClients.length?((periodClients.length-prevClients.length)/prevClients.length*100):0;$('kpiClientsChange').innerHTML=cliChange?'<span class="'+(cliChange>=0?'up">↑':'down">↓')+' '+Math.abs(cliChange).toFixed(0)+'%</span>':'';$('kpiClientsChange').className='kpi-change '+(cliChange>=0?'up':'down');$('kpiClosedChange').innerHTML=closedChange?'<span class="'+(closedChange>=0?'up">↑':'down">↓')+' '+Math.abs(closedChange).toFixed(0)+'%</span>':'';$('kpiClosedChange').className='kpi-change '+(closedChange>=0?'up':'down');
-if(reportTab==='overview'){renderRevenueLineChart(deals);renderClientStatusChart(clients);renderPropTypesChart(properties);renderClientSourcesChart(periodClients)}else if(reportTab==='revenue'){renderRevenueDetails(deals,properties)}else if(reportTab==='team'&&canManage()){renderLeaderboard(periodDeals,periodClients)}else if(reportTab==='funnel'){renderFunnel(clients,deals)}else if(reportTab==='heatmap'){renderHeatmap(deals)}
+if(reportTab==='overview'){renderRevenueLineChart(deals);renderClientStatusChart(clients);renderPropTypesChart(properties);renderClientSourcesChart(periodClients)}else if(reportTab==='revenue'){renderRevenueDetails(periodDeals,properties)}else if(reportTab==='team'&&canManage()){renderLeaderboard(periodDeals,periodClients)}else if(reportTab==='funnel'){renderFunnel(clients,deals)}else if(reportTab==='heatmap'){renderHeatmap(deals)}
 $('reportsSub').textContent=({day:'اليوم',week:'آخر 7 أيام',month:'هذا الشهر',quarter:'آخر 3 أشهر',year:'آخر سنة',all:'كل الفترات'})[reportPeriod]}catch(err){console.error(err);showToast('خطأ في التقارير: '+err.message,'error')}}
 function renderRevenueLineChart(deals){const months=[];const today=new Date();for(let i=11;i>=0;i--){const d=new Date(today.getFullYear(),today.getMonth()-i,1);months.push({label:d.toLocaleDateString('ar-OM',{month:'short'}),year:d.getFullYear(),month:d.getMonth(),value:0})}deals.forEach(d=>{if(d.stage!=='closed'||!d.deal_value)return;const dt=new Date(d.closed_at||d.created_at);const m=months.find(x=>x.year===dt.getFullYear()&&x.month===dt.getMonth());if(m)m.value+=parseFloat(d.deal_value)});const maxVal=Math.max.apply(null,months.map(m=>m.value).concat([1]));const w=100,h=200,pad=20;const stepX=w/(months.length-1);let pathStroke='',pathArea='',dots='',labels='';months.forEach((m,i)=>{const x=i*stepX;const y=h-(m.value/maxVal)*(h-pad)-10;if(i===0){pathStroke='M '+x+' '+y;pathArea='M '+x+' '+h}else{pathStroke+=' L '+x+' '+y;pathArea+=' L '+x+' '+y}dots+='<circle class="line-dot" cx="'+x+'" cy="'+y+'" r="4"><title>'+m.label+': '+fmtMoney(m.value)+'</title></circle>';labels+='<text x="'+x+'" y="'+(h+15)+'" text-anchor="middle">'+m.label+'</text>'});pathArea+=' L '+(stepX*(months.length-1))+' '+h+' Z';let yAxis='';for(let i=0;i<=4;i++){const y=h-(i/4)*(h-pad)-10;const val=(maxVal*i/4);yAxis+='<line x1="0" y1="'+y+'" x2="'+w+'" y2="'+y+'" stroke="#E0D9CC" stroke-width="0.3" stroke-dasharray="1,1"/>';yAxis+='<text x="-2" y="'+(y+3)+'" text-anchor="end" style="font-size:5px;fill:#6B5A3E">'+fmtMoneyShort(val)+'</text>'}$('revenueLineChart').innerHTML='<svg class="line-svg" viewBox="-15 -5 '+(w+20)+' '+(h+25)+'" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="goldGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C4963A" stop-opacity="0.5"/><stop offset="100%" stop-color="#C4963A" stop-opacity="0"/></linearGradient></defs>'+yAxis+'<path class="line-area" d="'+pathArea+'"/><path class="line-stroke" d="'+pathStroke+'"/>'+dots+'<g class="line-axis">'+labels+'</g></svg>'}
 function renderRevenueDetails(deals,properties){const closedDeals=deals.filter(d=>d.stage==='closed'||d.stage==='commission_collected');const total=closedDeals.reduce((s,d)=>s+(parseFloat(d.deal_value)||0),0);const received=closedDeals.filter(d=>d.stage==='commission_collected'||d.commission_status==='received').reduce((s,d)=>s+(parseFloat(d.company_share)||0),0);const pending=closedDeals.filter(d=>d.stage!=='commission_collected'&&d.commission_status!=='received').reduce((s,d)=>s+(parseFloat(d.company_share)||0),0);const net=received;$('revTotal').textContent=fmtMoneyShort(total);$('revReceived').textContent=fmtMoneyShort(received);$('revPending').textContent=fmtMoneyShort(pending);$('revNet').textContent=fmtMoneyShort(net);
@@ -4033,7 +4046,7 @@ function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
 
-window.APP_VERSION = '20260530-0820';
+window.APP_VERSION = '20260530-0830';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
