@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260530-0830">
+<meta name="app-version" content="20260530-0836">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1802,7 +1802,7 @@ function sourceAr(s){return{whatsapp:'💚 واتساب',instagram:'📸 إنس�
 function activityIcon(t){return{note:'📝',call:'📞',whatsapp:'💚',meeting:'🤝',visit:'🏠',email:'📧',system:'⚙️'}[t]||'📌'}
 function activityLabel(t){return{note:'ملاحظة',call:'مكالمة',whatsapp:'واتساب',meeting:'اجتماع',visit:'زيارة',email:'إيميل',system:'نظام'}[t]||t}
 function fmtMoney(n){if(!n&&n!==0)return '—';return '<span dir="ltr" style="display:inline-block">'+parseFloat(n).toLocaleString('en-US')+'</span> ر.ع'}
-function fmtMoneyShort(n){if(!n&&n!==0)return '0';n=parseFloat(n);if(n>=1000000)return (n/1000000).toFixed(1)+'M';if(n>=1000)return (n/1000).toFixed(0)+'K';return Math.round(n).toString()}
+function fmtMoneyShort(n){if(!n&&n!==0)return '0';n=parseFloat(n);if(n>=1000000)return (n/1000000).toFixed(2).replace(/\.?0+$/,'')+'M';if(n>=10000)return (n/1000).toFixed(0)+'K';if(n>=1000)return (n/1000).toFixed(1).replace(/\.0$/,'')+'K';return Math.round(n).toString()}
 function fmtDate(d){if(!d)return '—';const dt=new Date(d);const day=dt.getDate();const months=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];const month=months[dt.getMonth()];const year=dt.getFullYear();return '<span dir="ltr" style="display:inline-block">'+day+'</span> '+month+' <span dir="ltr" style="display:inline-block">'+year+'</span>'}
 function toLocalDateStr(date){const y=date.getFullYear();const m=String(date.getMonth()+1).padStart(2,'0');const d=String(date.getDate()).padStart(2,'0');return y+'-'+m+'-'+d}
 function fmtDateTime(d){if(!d)return '—';const dt=new Date(d);const day=dt.getDate();const months=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];const month=months[dt.getMonth()];const year=dt.getFullYear();const hh=String(dt.getHours()).padStart(2,'0');const mm=String(dt.getMinutes()).padStart(2,'0');return '<span dir="ltr" style="display:inline-block">'+day+'</span> '+month+' <span dir="ltr" style="display:inline-block">'+year+'</span> <span dir="ltr" style="display:inline-block">'+hh+':'+mm+'</span>'}
@@ -2895,19 +2895,6 @@ async function recalculateOldCommissions(){
     
     var fixed=0,skipped=0;
     var updates=[];
-    
-    // تشخيص: اطبع أول 5 صفقات بقيمها الحقيقية من القاعدة
-    console.log('🔍 أول 5 صفقات في القاعدة:');
-    (r.data||[]).slice(0,5).forEach(function(d,i){
-      console.log('صفقة '+(i+1)+':',{
-        id:d.id.substring(0,8),
-        commission_total:d.commission_total,
-        broker_commission:d.broker_commission,
-        agent_share:d.agent_share,
-        company_share:d.company_share,
-        محسوب:parseFloat(d.commission_total||0)-parseFloat(d.broker_commission||0)-parseFloat(d.agent_share||0)
-      });
-    });
     
     (r.data||[]).forEach(function(d){
       var total=parseFloat(d.commission_total)||0;
@@ -4046,7 +4033,7 @@ function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
 
-window.APP_VERSION = '20260530-0830';
+window.APP_VERSION = '20260530-0836';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
