@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260829-1935">
+<meta name="app-version" content="20260829-2132">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1196,8 +1196,8 @@ async function renderLeadForm(companyId){
   try{document.documentElement.classList.add('lead-form-mode');}catch(e){}
   let companyName='Habib Sons Real Estate';
   try{
-    const r=await supa.from('companies').select('name').eq('id',companyId).single();
-    if(r.data)companyName=r.data.name;
+    const r=await supa.rpc('get_public_company_name',{p_company_id:companyId});
+    if(r.data)companyName=r.data;
   }catch(e){}
   var countryOptions = PHONE_COUNTRIES.map(function(c){
     var sel = c.code === '968' ? ' selected' : '';
@@ -1610,15 +1610,6 @@ async function submitLead(companyId){
   if(whatsapp !== phone) notesBlocks.push('رقم واتساب مختلف: ' + whatsapp);
   if(v('lfNotes')) notesBlocks.push('\nملاحظات العميل:\n' + v('lfNotes'));
   try{
-    const dupCheck = await supa.from('clients').select('id,name').eq('phone', phone).eq('company_id', companyId).limit(1);
-    if(dupCheck.data && dupCheck.data.length > 0){
-      errEl.innerHTML = '⚠️ هذا الرقم مسجّل مسبقاً لدينا. سنتواصل معك قريباً!';
-      errEl.style.display = 'flex';
-      try{
-        /* activity log disabled - prevents 400 */;
-      }catch(e){}
-      return;
-    }
     const data = {
       company_id: companyId,
       name: name,
@@ -1644,11 +1635,14 @@ async function submitLead(companyId){
       source: 'website',
       pipeline_stage: 'new'
     };
-    const r = await supa.from('clients').insert(data).select().single();
+    const r = await supa.rpc('submit_public_lead',{p_company_id:companyId,p_payload:data});
     if(r.error) throw r.error;
-    try{
-      /* activity log disabled - prevents 400 */;
-    }catch(e){}
+    if(r.data && r.data.duplicate){
+      errEl.innerHTML = '⚠️ هذا الرقم مسجّل مسبقاً لدينا. سنتواصل معك قريباً!';
+      errEl.style.display = 'flex';
+      return;
+    }
+    if(!r.data || r.data.ok !== true) throw new Error('تعذّر إرسال الطلب');
     errEl.style.display = 'none';
     sucEl.style.display = '';
     document.getElementById('lfStep1').style.display = 'none';
@@ -4336,7 +4330,7 @@ window.addEventListener('error', function(e){
   console.error('🚨 Runtime error:', e.message, 'at', e.filename, ':', e.lineno);
 });
 
-window.APP_VERSION = '20260829-1935';
+window.APP_VERSION = '20260829-2132';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
