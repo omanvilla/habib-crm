@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260830-1045">
+<meta name="app-version" content="20260830-1418">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1034,10 +1034,16 @@
 <option value="price">السعر</option>
 <option value="location">الموقع</option>
 <option value="area">المساحة</option>
+<option value="room_layout">تقسيم الغرف</option>
 <option value="design">التصميم</option>
+<option value="finishing">التشطيب</option>
+<option value="parking">المواقف / الحوش</option>
 <option value="financing">التمويل</option>
+<option value="found_other">وجد عقاراً آخر</option>
 <option value="not_interested">لم يعجبه العقار</option>
 <option value="not_serious">غير جاد</option>
+<option value="no_response">لم يرد بعد المعاينة</option>
+<option value="other">سبب آخر</option>
 </select>
 </div>
 </div>
@@ -1073,6 +1079,42 @@
 <div class="fg full"><label class="fl">ملاحظات</label><textarea class="fta" id="dpNotes" rows="2"></textarea></div>
 </div>
 <div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mDeposit')">إلغاء</button><button class="btn-primary" style="width:auto;padding:9px 22px" onclick="saveDeposit()">💾 حفظ</button></div>
+</div></div>
+
+
+<!-- Phase 4: Property inquiry / marketing history -->
+<div class="modal-ov" id="mPropertyInquiry"><div class="modal-box lg">
+<div class="modal-title" id="mPropertyInquiryTitle">💬 تسجيل استفسار عن العقار</div>
+<div class="fgrid">
+<div class="fg full"><label class="fl">العميل *</label><select class="fs" id="piClient"><option value="">اختر عميلاً</option></select></div>
+<div class="fg"><label class="fl">مصدر الاستفسار *</label><select class="fs" id="piSource">
+<option value="whatsapp">واتساب</option><option value="instagram">إنستغرام</option><option value="oman_reel">Oman Reel</option><option value="youtube">يوتيوب</option><option value="signboard">اللوحة</option><option value="referral">إحالة / شخص آخر</option><option value="website">الموقع</option><option value="other">أخرى</option>
+</select></div>
+<div class="fg"><label class="fl">الحالة</label><select class="fs" id="piStatus">
+<option value="inquiry">استفسار</option><option value="followup">تحت المتابعة</option><option value="viewing_scheduled">معاينة محددة</option><option value="viewed">تمت المعاينة</option><option value="negotiation">تفاوض</option><option value="reserved">حجز / عربون</option><option value="deal">صفقة</option><option value="not_suitable">لم يناسبه</option><option value="no_response">لا يرد</option><option value="closed">مغلق</option>
+</select></div>
+<div class="fg"><label class="fl">تاريخ آخر استفسار</label><input class="fi" type="datetime-local" id="piLastAt"></div>
+<div class="fg"><label class="fl">تفصيل المصدر</label><input class="fi" id="piSourceDetail" placeholder="مثال: رابط ريل / اسم الشخص المحيل"></div>
+<div class="fg full"><label class="fl">سبب عدم المناسبة</label><select class="fs" id="piRejectReason">
+<option value="">— بدون —</option><option value="price">السعر</option><option value="location">الموقع</option><option value="area">المساحة</option><option value="room_layout">تقسيم الغرف</option><option value="design">التصميم</option><option value="finishing">التشطيب</option><option value="parking">المواقف / الحوش</option><option value="financing">التمويل</option><option value="found_other">وجد عقاراً آخر</option><option value="not_interested">لم يعجبه العقار</option><option value="not_serious">غير جاد</option><option value="no_response">لم يرد بعد المعاينة</option><option value="other">سبب آخر</option>
+</select></div>
+<div class="fg full"><label class="fl">تفاصيل السبب / ملاحظات</label><textarea class="fta" id="piRejectNotes" rows="2" placeholder="لا نكتفي بـ «ما ناسبه»؛ اكتب السبب الفعلي أو أنه لم يرد"></textarea></div>
+<div class="fg full"><label class="fl">آخر رسالة / ملاحظة عن الاستفسار</label><textarea class="fta" id="piLastMessage" rows="2"></textarea></div>
+</div>
+<div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mPropertyInquiry')">إلغاء</button><button class="btn-primary" style="width:auto;padding:9px 22px" onclick="savePropertyInquiry()">💾 حفظ</button></div>
+</div></div>
+
+<div class="modal-ov" id="mPropertyMarketing"><div class="modal-box lg">
+<div class="modal-title">📣 تسجيل نشاط تسويقي للعقار</div>
+<div class="fgrid">
+<div class="fg"><label class="fl">القناة *</label><select class="fs" id="pmChannel"><option value="instagram">إنستغرام</option><option value="oman_reel">Oman Reel</option><option value="youtube">يوتيوب</option><option value="signboard">اللوحة</option><option value="referral">إحالات</option><option value="other">أخرى</option></select></div>
+<div class="fg"><label class="fl">نوع النشاط</label><select class="fs" id="pmEventType"><option value="publish">نشر إعلان</option><option value="update">تحديث مشاهدات / أداء</option><option value="install">تركيب لوحة</option><option value="remove">إزالة لوحة</option><option value="other">أخرى</option></select></div>
+<div class="fg"><label class="fl">تاريخ النشر / النشاط</label><input class="fi" type="datetime-local" id="pmPublishedAt"></div>
+<div class="fg"><label class="fl">إجمالي المشاهدات حتى الآن</label><input class="fi" type="number" min="0" id="pmViews" placeholder="مثال: 309"></div>
+<div class="fg full"><label class="fl">الرابط</label><input class="fi" id="pmUrl" dir="ltr" placeholder="https://..."></div>
+<div class="fg full"><label class="fl">ملاحظات</label><textarea class="fta" id="pmNotes" rows="2" placeholder="مثال: إعادة تصوير 4K / تم تعليق اللوحة"></textarea></div>
+</div>
+<div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mPropertyMarketing')">إلغاء</button><button class="btn-primary" style="width:auto;padding:9px 22px" onclick="savePropertyMarketingEvent()">💾 حفظ</button></div>
 </div></div>
 
 <div class="confirm-dlg" id="confirmDlg"><div class="confirm-box">
@@ -2204,10 +2246,11 @@ async function renderPropertyDetail(){
     html+='</div></div>';
   }
   
-  html+='<div id="pdRelations"></div>';
+  html+='<div id="pdPerformance"></div><div id="pdRelations"></div>';
   $('propertyDetailContent').innerHTML=html;
   
-  // Load related deals and viewings
+  // Phase 4: property performance/history + existing relations
+  loadPropertyPerformance(p.id);
   loadPropertyRelations(p.id);
 }
 
@@ -2266,6 +2309,85 @@ async function loadPropertyRelations(propId){
     var relEl=$('pdRelations');if(relEl)relEl.innerHTML=extra;
   }catch(err){console.warn('Property relations:',err);}
 }
+
+
+// ==================== PHASE 4 — PROPERTY HISTORY & INQUIRIES ====================
+var editingPropertyInquiry=null;
+var PROPERTY_REMARKETING_DAYS=21;
+function propertyInquiryStatusAr(v){return ({inquiry:'💬 استفسار',followup:'☎️ متابعة',viewing_scheduled:'📅 معاينة محددة',viewed:'✅ تمت المعاينة',negotiation:'🤝 تفاوض',reserved:'💰 حجز / عربون',deal:'🏁 صفقة',not_suitable:'❌ لم يناسبه',no_response:'📵 لا يرد',closed:'⚪ مغلق'})[v]||v||'—'}
+function propertyInquirySourceAr(v){return ({whatsapp:'واتساب',instagram:'إنستغرام',oman_reel:'Oman Reel',youtube:'يوتيوب',signboard:'اللوحة',referral:'إحالة',website:'الموقع',other:'أخرى'})[v]||v||'—'}
+function propertyRejectReasonAr(v){return ({price:'السعر',location:'الموقع',area:'المساحة',room_layout:'تقسيم الغرف',design:'التصميم',finishing:'التشطيب',parking:'المواقف / الحوش',financing:'التمويل',found_other:'وجد عقاراً آخر',not_interested:'لم يعجبه العقار',not_serious:'غير جاد',no_response:'لم يرد بعد المعاينة',other:'سبب آخر'})[v]||v||'—'}
+function marketingChannelAr(v){return ({instagram:'إنستغرام',oman_reel:'Oman Reel',youtube:'يوتيوب',signboard:'اللوحة',referral:'إحالات',other:'أخرى'})[v]||v||'—'}
+function localDateTimeValue(d){var x=d?new Date(d):new Date();if(isNaN(x))x=new Date();var z=n=>String(n).padStart(2,'0');return x.getFullYear()+'-'+z(x.getMonth()+1)+'-'+z(x.getDate())+'T'+z(x.getHours())+':'+z(x.getMinutes())}
+function daysSince(d){if(!d)return null;var x=new Date(d);if(isNaN(x))return null;return Math.floor((Date.now()-x.getTime())/86400000)}
+
+async function loadPropertyPerformance(propId){
+  var el=$('pdPerformance');if(!el)return;
+  el.innerHTML='<div class="card"><div class="empty" style="padding:24px"><div class="loader-spinner"></div></div></div>';
+  try{
+    var iq=await supa.from('property_inquiries').select('*, client:clients(id,name,phone,assigned_to)').eq('property_id',propId).order('last_inquiry_at',{ascending:false});
+    if(iq.error)throw iq.error;
+    var mk=await supa.from('property_marketing_events').select('*').eq('property_id',propId).order('created_at',{ascending:false});
+    if(mk.error)throw mk.error;
+    var inquiries=iq.data||[], marketing=mk.data||[];
+    var totalPeople=inquiries.length,totalTouches=inquiries.reduce((a,x)=>a+(Number(x.inquiry_count)||1),0);
+    var lastInquiry=inquiries.length?inquiries.map(x=>x.last_inquiry_at).filter(Boolean).sort().reverse()[0]:null;
+    var counts={};inquiries.forEach(x=>counts[x.status]=(counts[x.status]||0)+1);
+    var sourceCounts={};inquiries.forEach(x=>sourceCounts[x.source]=(sourceCounts[x.source]||0)+1);
+    var latestByChannel={};marketing.forEach(function(m){if(!latestByChannel[m.channel])latestByChannel[m.channel]=m;});
+    var pubEvents=marketing.filter(m=>m.event_type==='publish'&&m.published_at);
+    var lastAd=pubEvents.length?pubEvents.map(x=>x.published_at).sort().reverse()[0]:null;
+    var adDays=daysSince(lastAd),needsRemarketing=!lastAd||adDays>=PROPERTY_REMARKETING_DAYS;
+    var instagram=latestByChannel.instagram||{},oman=latestByChannel.oman_reel||{},youtube=latestByChannel.youtube||{};
+    var btns=(typeof canEdit==='function'&&canEdit())?'<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-gold" onclick="openPropertyInquiryModal()">+ استفسار</button><button class="btn-secondary" onclick="openPropertyMarketingModal()">📣 تحديث التسويق</button><button class="btn-secondary" onclick="exportPropertyOwnerReport()">📤 تقرير المالك CSV</button></div>':'';
+    var h='<div class="card" style="margin-bottom:16px"><div class="card-head"><div class="card-title"><span>📈</span>أداء وتاريخ العقار</div>'+btns+'</div>';
+    if(needsRemarketing)h+='<div style="margin:14px 18px 0;background:#FFF4E5;border:1px solid #F0B44D;border-radius:10px;padding:12px 14px;font-size:13px;color:#7A5310">🔔 <strong>تنبيه إعادة التسويق:</strong> '+(lastAd?'مرّ '+adDays+' يومًا على آخر إعلان.':'لا يوجد إعلان مسجل لهذا العقار حتى الآن.')+' الحد الحالي '+PROPERTY_REMARKETING_DAYS+' يومًا.</div>';
+    h+='<div style="padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">';
+    h+=pdField('👥 العملاء المستفسرون',totalPeople);h+=pdField('💬 مرات التواصل',totalTouches);h+=pdField('🕐 آخر استفسار',lastInquiry?fmtDate(lastInquiry):'—');h+=pdField('📅 آخر إعلان',lastAd?fmtDate(lastAd):'—');
+    h+=pdField('📱 مشاهدات Instagram',instagram.views!=null?Number(instagram.views).toLocaleString('en-US'):'—');h+=pdField('🎬 مشاهدات Oman Reel',oman.views!=null?Number(oman.views).toLocaleString('en-US'):'—');h+=pdField('▶️ مشاهدات YouTube',youtube.views!=null?Number(youtube.views).toLocaleString('en-US'):'—');h+=pdField('🪧 من اللوحة',sourceCounts.signboard||0);h+=pdField('🤝 من الإحالات',sourceCounts.referral||0);h+='</div></div>';
+    h+='<div class="card" style="margin-bottom:16px"><div class="card-head"><div class="card-title"><span>🧭</span>حركة العملاء على العقار</div></div><div style="padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">';
+    [['inquiry','استفسار'],['followup','متابعة'],['viewing_scheduled','معاينة محددة'],['viewed','تمت المعاينة'],['negotiation','تفاوض'],['reserved','حجز'],['not_suitable','لم يناسبه'],['no_response','لا يرد']].forEach(function(x){h+='<div style="background:var(--cream);border:1px solid var(--cream-deeper);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:800;color:var(--espresso)">'+(counts[x[0]]||0)+'</div><div style="font-size:11px;color:var(--umber)">'+x[1]+'</div></div>';});
+    h+='</div></div>';
+    h+='<div class="card" style="margin-bottom:16px"><div class="card-head"><div class="card-title"><span>💬</span>العملاء والاستفسارات ('+totalPeople+')</div></div>';
+    if(inquiries.length){h+='<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>العميل</th><th>المصدر</th><th>الحالة</th><th>مرات التواصل</th><th>آخر استفسار</th><th>سبب عدم المناسبة</th><th></th></tr></thead><tbody>';inquiries.forEach(function(x){h+='<tr><td><strong style="cursor:pointer" onclick="viewClient(\''+x.client_id+'\')">'+escapeHtml(x.client&&x.client.name||'—')+'</strong></td><td>'+propertyInquirySourceAr(x.source)+'</td><td>'+propertyInquiryStatusAr(x.status)+'</td><td>'+x.inquiry_count+'</td><td>'+fmtDate(x.last_inquiry_at)+'</td><td>'+escapeHtml(x.rejection_reason?propertyRejectReasonAr(x.rejection_reason)+(x.rejection_notes?' — '+x.rejection_notes:''):'—')+'</td><td>'+(typeof canEdit==='function'&&canEdit()?'<span style="cursor:pointer" onclick="openPropertyInquiryModal(\''+x.id+'\')">✏️</span>':'')+'</td></tr>';});h+='</tbody></table></div>';}else h+='<div class="empty" style="padding:24px"><div class="empty-desc">لا توجد استفسارات مسجلة على هذا العقار بعد</div></div>';
+    h+='</div>';
+    h+='<div class="card" style="margin-bottom:16px"><div class="card-head"><div class="card-title"><span>🕓</span>سجل التسويق</div></div>';
+    if(marketing.length){h+='<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>القناة</th><th>النشاط</th><th>التاريخ</th><th>المشاهدات</th><th>ملاحظات</th></tr></thead><tbody>';marketing.slice(0,30).forEach(function(m){var et={publish:'نشر',update:'تحديث',install:'تركيب',remove:'إزالة',other:'أخرى'};h+='<tr><td>'+marketingChannelAr(m.channel)+'</td><td>'+(et[m.event_type]||m.event_type)+'</td><td>'+fmtDate(m.published_at||m.created_at)+'</td><td>'+(m.views!=null?Number(m.views).toLocaleString('en-US'):'—')+'</td><td>'+escapeHtml(m.notes||'—')+'</td></tr>';});h+='</tbody></table></div>';}else h+='<div class="empty" style="padding:24px"><div class="empty-desc">لا يوجد نشاط تسويقي مسجل بعد</div></div>';
+    h+='</div>';
+    el.innerHTML=h;
+  }catch(err){console.error('[Property Performance]',err);el.innerHTML='<div class="card"><div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(err.message)+'</div></div></div>';}
+}
+
+async function openPropertyInquiryModal(id){
+  if(!window.viewingProperty)return;editingPropertyInquiry=id||null;
+  var cid=await ensureCompany();
+  var cr=await supa.from('clients').select('id,name,phone,assigned_to').eq('company_id',cid).order('name');
+  if(cr.error){showToast('خطأ: '+cr.error.message,'error');return;}
+  var sel=$('piClient');sel.innerHTML='<option value="">اختر عميلاً</option>'+(cr.data||[]).map(c=>'<option value="'+c.id+'">'+escapeHtml(c.name)+(c.phone?' — '+escapeHtml(c.phone):'')+'</option>').join('');
+  $('piSource').value='whatsapp';$('piStatus').value='inquiry';$('piLastAt').value=localDateTimeValue();$('piSourceDetail').value='';$('piRejectReason').value='';$('piRejectNotes').value='';$('piLastMessage').value='';sel.disabled=false;
+  $('mPropertyInquiryTitle').textContent=id?'✏️ تحديث اهتمام العميل بالعقار':'💬 تسجيل استفسار عن العقار';
+  if(id){var r=await supa.from('property_inquiries').select('*').eq('id',id).single();if(r.error){showToast('خطأ: '+r.error.message,'error');return;}var x=r.data;sel.value=x.client_id;sel.disabled=true;$('piSource').value=x.source||'other';$('piStatus').value=x.status||'inquiry';$('piLastAt').value=localDateTimeValue(x.last_inquiry_at);$('piSourceDetail').value=x.source_detail||'';$('piRejectReason').value=x.rejection_reason||'';$('piRejectNotes').value=x.rejection_notes||'';$('piLastMessage').value=x.last_message||'';}
+  $('mPropertyInquiry').classList.add('on');
+}
+async function savePropertyInquiry(){
+  if(!window.viewingProperty)return;var clientId=$('piClient').value;if(!clientId){showToast('اختر العميل','error');return;}
+  var status=$('piStatus').value,reason=$('piRejectReason').value,notes=$('piRejectNotes').value.trim();
+  if(status==='not_suitable'&&!reason&&!notes){showToast('⚠️ لازم نسجل سبب عدم مناسبة العقار للعميل','error');return;}
+  try{var cid=await ensureCompany();var cl=await supa.from('clients').select('assigned_to').eq('id',clientId).single();if(cl.error)throw cl.error;var lastAt=$('piLastAt').value?new Date($('piLastAt').value).toISOString():new Date().toISOString();var base={source:$('piSource').value,source_detail:$('piSourceDetail').value.trim()||null,status:status,last_inquiry_at:lastAt,rejection_reason:reason||null,rejection_notes:notes||null,last_message:$('piLastMessage').value.trim()||null,assigned_to:cl.data.assigned_to||((typeof isAgent==='function'&&isAgent())?currentUser.id:null)};
+    var r;if(editingPropertyInquiry){r=await supa.from('property_inquiries').update(base).eq('id',editingPropertyInquiry);}else{var ex=await supa.from('property_inquiries').select('id,inquiry_count,first_inquiry_at').eq('company_id',cid).eq('client_id',clientId).eq('property_id',window.viewingProperty.id).maybeSingle();if(ex.error)throw ex.error;if(ex.data){base.inquiry_count=(Number(ex.data.inquiry_count)||1)+1;r=await supa.from('property_inquiries').update(base).eq('id',ex.data.id);}else{r=await supa.from('property_inquiries').insert(Object.assign(base,{company_id:cid,client_id:clientId,property_id:window.viewingProperty.id,first_inquiry_at:lastAt,inquiry_count:1,created_by:currentUser.id}));}}
+    if(r.error)throw r.error;closeModal('mPropertyInquiry');editingPropertyInquiry=null;showToast('✅ تم حفظ الاستفسار','success');loadPropertyPerformance(window.viewingProperty.id);
+  }catch(err){console.error(err);showToast('خطأ: '+err.message,'error');}
+}
+function openPropertyMarketingModal(){if(!window.viewingProperty)return;$('pmChannel').value='instagram';$('pmEventType').value='publish';$('pmPublishedAt').value=localDateTimeValue();$('pmViews').value='';$('pmUrl').value='';$('pmNotes').value='';$('mPropertyMarketing').classList.add('on')}
+async function savePropertyMarketingEvent(){if(!window.viewingProperty)return;try{var cid=await ensureCompany();var data={company_id:cid,property_id:window.viewingProperty.id,channel:$('pmChannel').value,event_type:$('pmEventType').value,published_at:$('pmPublishedAt').value?new Date($('pmPublishedAt').value).toISOString():null,views:$('pmViews').value===''?null:Math.max(0,parseInt($('pmViews').value)||0),url:$('pmUrl').value.trim()||null,notes:$('pmNotes').value.trim()||null,created_by:currentUser.id};var r=await supa.from('property_marketing_events').insert(data);if(r.error)throw r.error;closeModal('mPropertyMarketing');showToast('✅ تم تسجيل النشاط التسويقي','success');loadPropertyPerformance(window.viewingProperty.id);}catch(err){console.error(err);showToast('خطأ: '+err.message,'error')}}
+
+async function syncInquiryFromViewing(clientId,propertyId,status,feedback,rejectionReason,notes,agentId){
+  try{var cid=await ensureCompany();var mapped=status==='scheduled'?'viewing_scheduled':status==='done'?'viewed':'followup';if(status==='done'&&feedback==='wants_negotiate')mapped='negotiation';if(status==='done'&&feedback==='disliked')mapped='not_suitable';if(status==='no_show')mapped='no_response';var ex=await supa.from('property_inquiries').select('id').eq('company_id',cid).eq('client_id',clientId).eq('property_id',propertyId).maybeSingle();if(ex.error)throw ex.error;var data={status:mapped,last_inquiry_at:new Date().toISOString(),assigned_to:agentId||currentUser.id,rejection_reason:rejectionReason||null,rejection_notes:(feedback==='disliked'?(notes||null):null)};if(ex.data){await supa.from('property_inquiries').update(data).eq('id',ex.data.id);}else{await supa.from('property_inquiries').insert(Object.assign(data,{company_id:cid,client_id:clientId,property_id:propertyId,source:'other',source_detail:'تم إنشاؤه تلقائياً من المعاينة',first_inquiry_at:new Date().toISOString(),inquiry_count:1,created_by:currentUser.id}));}}
+  catch(e){console.warn('[Viewing→Inquiry sync]',e)}
+}
+async function exportPropertyOwnerReport(){
+  if(!window.viewingProperty)return;try{var p=window.viewingProperty;var iq=await supa.from('property_inquiries').select('*').eq('property_id',p.id);if(iq.error)throw iq.error;var mk=await supa.from('property_marketing_events').select('*').eq('property_id',p.id).order('created_at',{ascending:false});if(mk.error)throw mk.error;var inquiries=iq.data||[],marketing=mk.data||[];var rows=[];rows.push(['العقار',p.title]);rows.push(['المنطقة',p.area||'']);rows.push(['السعر',p.price||'']);rows.push(['تاريخ استلام/تسجيل العقار',fmtDate(p.created_at)]);rows.push(['عدد العملاء المستفسرين',inquiries.length]);rows.push(['إجمالي مرات التواصل',inquiries.reduce((a,x)=>a+(Number(x.inquiry_count)||1),0)]);rows.push(['المعاينات المحددة',inquiries.filter(x=>x.status==='viewing_scheduled').length]);rows.push(['تمت المعاينة',inquiries.filter(x=>x.status==='viewed').length]);rows.push(['في التفاوض',inquiries.filter(x=>x.status==='negotiation').length]);rows.push(['حجز/عربون',inquiries.filter(x=>x.status==='reserved').length]);rows.push(['لم يناسبه',inquiries.filter(x=>x.status==='not_suitable').length]);rows.push(['لا يرد',inquiries.filter(x=>x.status==='no_response').length]);rows.push([]);rows.push(['أسباب عدم المناسبة','العدد']);var rc={};inquiries.filter(x=>x.rejection_reason).forEach(x=>rc[propertyRejectReasonAr(x.rejection_reason)]=(rc[propertyRejectReasonAr(x.rejection_reason)]||0)+1);Object.keys(rc).forEach(k=>rows.push([k,rc[k]]));rows.push([]);rows.push(['سجل التسويق']);rows.push(['القناة','النشاط','التاريخ','المشاهدات','ملاحظات']);marketing.forEach(m=>rows.push([marketingChannelAr(m.channel),({publish:'نشر',update:'تحديث',install:'تركيب',remove:'إزالة',other:'أخرى'})[m.event_type]||m.event_type,fmtDate(m.published_at||m.created_at),m.views==null?'':m.views,m.notes||'']));downloadCSV('تقرير-أداء-'+(p.title||'العقار'),[],rows);}catch(err){showToast('خطأ: '+err.message,'error')}}
+// ==================== END PHASE 4 ====================
 
 function editPropertyFromDetail(){
   if(window.viewingProperty)editProperty(window.viewingProperty.id);
@@ -3520,6 +3642,9 @@ async function saveViewing(){
   try{
     const cid=await ensureCompany();
     const status=document.getElementById('vStatus').value;
+    const feedback=document.getElementById('vFeedback').value||null;
+    const rejectionReason=document.getElementById('vRejectionReason').value||null;
+    if(status==='done'&&feedback==='disliked'&&!rejectionReason){showToast('⚠️ إذا لم يناسبه العقار لازم تختار سبب الرفض','error');return;}
     const data={
       company_id:cid,
       client_id:cl,
@@ -3531,8 +3656,8 @@ async function saveViewing(){
       location:document.getElementById('vLocation').value.trim()||null,
       status:status,
       attendance:document.getElementById('vAttendance').value||null,
-      client_feedback:document.getElementById('vFeedback').value||null,
-      rejection_reason:document.getElementById('vRejectionReason').value||null,
+      client_feedback:feedback,
+      rejection_reason:rejectionReason,
       next_step:document.getElementById('vNextStep').value.trim()||null,
       followup_date:document.getElementById('vFollowupDate').value||null,
       notes:document.getElementById('vNotes').value.trim()||null,
@@ -3546,6 +3671,7 @@ async function saveViewing(){
       r=await supa.from('viewings').insert(data).select().single();
     }
     if(r.error)throw r.error;
+    await syncInquiryFromViewing(cl,pr,status,feedback,rejectionReason,document.getElementById('vNotes').value.trim()||null,document.getElementById('vAgent').value||currentUser.id);
     if(status==='scheduled'){
       try{await supa.from('clients').update({pipeline_stage:'viewing_scheduled'}).eq('id',cl);}catch(e){}
     }else if(status==='done'){
@@ -4362,7 +4488,7 @@ window.addEventListener('error', function(e){
   console.error('🚨 Runtime error:', e.message, 'at', e.filename, ':', e.lineno);
 });
 
-window.APP_VERSION = '20260830-1045';
+window.APP_VERSION = '20260830-1418';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
