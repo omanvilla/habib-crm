@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260830-1535">
+<meta name="app-version" content="20260909-1220">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -953,7 +953,8 @@
 <div class="wa-templates" id="waTemplatesGrid"></div>
 <div class="fg"><label class="fl">الرسالة</label><textarea class="fta" id="waMsgArea" rows="6" placeholder="رسالتك هنا..."></textarea></div>
 <div class="wa-msg-preview" id="waPreview" style="display:none"></div>
-<div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mWATemplate')">إلغاء</button><button class="btn-gold" onclick="sendWAMessage()" style="background:#25D366;border-color:#25D366">📲 إرسال على واتساب</button></div>
+<div style="font-size:11px;color:var(--umber);line-height:1.6;background:rgba(37,211,102,0.07);padding:9px 11px;border-radius:8px;margin-top:8px">💡 الإرسال المباشر متاح للعميل الذي راسل رقم واتساب المرتبط خلال آخر 24 ساعة. خارج هذه المدة نحتاج قالب WhatsApp معتمد.</div>
+<div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mWATemplate')">إلغاء</button><button class="btn-gold" id="waSendBtn" onclick="sendWAMessage()" style="background:#25D366;border-color:#25D366">💚 إرسال مباشرة</button></div>
 </div></div>
 
 <div class="modal-ov" id="mTagFilter"><div class="modal-box">
@@ -3108,7 +3109,96 @@ const WA_TEMPLATES=[
 ];
 function openWATemplates(){if(!viewingClient){showToast('⚠️ افتح عميلاً أولاً','error');return}waTemplateClient=viewingClient;const grid=$('waTemplatesGrid');grid.innerHTML='';WA_TEMPLATES.forEach(t=>{const btn=document.createElement('button');btn.className='wa-tmpl';btn.onclick=function(){applyWATemplate(t.id)};btn.innerHTML='<div class="wa-tmpl-title">'+t.title+'</div><div class="wa-tmpl-preview">'+t.template.substring(0,60).replace(/\n/g,' ')+'...</div>';grid.appendChild(btn)});$('waMsgArea').value='';$('waPreview').style.display='none';$('mWATemplate').classList.add('on')}
 function applyWATemplate(id){const tmpl=WA_TEMPLATES.find(t=>t.id===id);if(!tmpl||!waTemplateClient)return;const c=waTemplateClient;let msg=tmpl.template;msg=msg.replace(/{name}/g,c.name||'').replace(/{agent}/g,currentProfile.full_name||'').replace(/{company}/g,(currentCompany&&currentCompany.name)||'Habib Sons').replace(/{area}/g,c.preferred_area||'—').replace(/{price}/g,c.budget_max?fmtMoney(c.budget_max):'—');$('waMsgArea').value=msg;$('waPreview').textContent=msg;$('waPreview').style.display='block'}
-function sendWAMessage(){if(!waTemplateClient)return;const msg=$('waMsgArea').value.trim();if(!msg){showToast('⚠️ اكتب رسالة','error');return}let phone=(waTemplateClient.phone||'').replace(/[^0-9+]/g,'');if(!phone){showToast('⚠️ لا يوجد رقم هاتف','error');return}phone=String(phone).replace(/[^0-9]/g,'');if(!phone){showToast('⚠️ رقم هاتف غير صالح','error');return}if(!phone.startsWith('968'))phone='968'+phone;const url='https://api.whatsapp.com/send?phone='+phone+'&text='+encodeURIComponent(msg);window.open(url,'_blank');logActivity('whatsapp','إرسال رسالة واتساب: '+msg.substring(0,80)+(msg.length>80?'...':''),waTemplateClient.id);closeModal('mWATemplate');showToast('✅ تم فتح واتساب','success');setTimeout(()=>{loadClientActivities();renderClientDetail()},500)}
+async function sendWAMessage(){
+  if(!waTemplateClient)return;
+
+  const msg=$('waMsgArea').value.trim();
+  if(!msg){
+    showToast('⚠️ اكتب رسالة','error');
+    return;
+  }
+
+  if(!waTemplateClient.id){
+    showToast('⚠️ تعذّر تحديد العميل','error');
+    return;
+  }
+
+  if(!(waTemplateClient.phone||'').trim()){
+    showToast('⚠️ لا يوجد رقم هاتف للعميل','error');
+    return;
+  }
+
+  const btn=$('waSendBtn');
+  const oldBtnText=btn?btn.textContent:'';
+  if(btn){
+    btn.disabled=true;
+    btn.textContent='⏳ جاري الإرسال...';
+  }
+
+  try{
+    const result=await supa.functions.invoke('whatsapp-send',{
+      body:{
+        client_id:waTemplateClient.id,
+        body:msg
+      }
+    });
+
+    if(result.error){
+      let detail=result.error.message||'تعذّر إرسال رسالة واتساب';
+
+      try{
+        const ctx=result.error.context;
+        if(ctx&&typeof ctx.clone==='function'){
+          const payload=await ctx.clone().json();
+          if(payload){
+            detail=payload.message||payload.error||detail;
+          }
+        }else if(ctx&&typeof ctx.json==='function'){
+          const payload=await ctx.json();
+          if(payload){
+            detail=payload.message||payload.error||detail;
+          }
+        }
+      }catch(_){}
+
+      throw new Error(detail);
+    }
+
+    if(!result.data||result.data.ok!==true){
+      throw new Error((result.data&&(
+        result.data.message||
+        result.data.error
+      ))||'تعذّر إرسال رسالة واتساب');
+    }
+
+    closeModal('mWATemplate');
+    showToast('✅ تم إرسال الرسالة مباشرة عبر واتساب','success');
+
+    setTimeout(function(){
+      if(typeof loadClientActivities==='function')loadClientActivities();
+      if(typeof renderClientDetail==='function')renderClientDetail();
+    },600);
+
+  }catch(err){
+    console.error('[Direct WhatsApp Send]',err);
+    let message=(err&&err.message)?err.message:String(err||'تعذّر الإرسال');
+
+    if(message==='no_whatsapp_conversation'){
+      message='لا توجد محادثة واتساب لهذا العميل على رقم الإرسال الحالي.';
+    }else if(message==='outside_customer_service_window'){
+      message='آخر رسالة من العميل أقدم من 24 ساعة. نحتاج قالب واتساب معتمد أو رسالة جديدة من العميل.';
+    }else if(message==='invalid_auth'||message==='missing_auth'){
+      message='انتهت جلسة الدخول. حدّث الصفحة وسجّل الدخول مرة أخرى.';
+    }
+
+    showToast('⚠️ '+message,'error');
+  }finally{
+    if(btn){
+      btn.disabled=false;
+      btn.textContent=oldBtnText||'💚 إرسال مباشرة';
+    }
+  }
+}
 function toggleNotifPanel(e){e&&e.stopPropagation();const p=$('notifPanel');p.classList.toggle('on');if(p.classList.contains('on'))loadNotifications()}
 document.addEventListener('click',function(e){if(!e.target.closest('.bell-wrapper')&&!e.target.closest('.notif-panel')){$('notifPanel').classList.remove('on')}});
 async function loadNotifications(){if(!currentProfile.company_id)return;const notifs=[];try{
@@ -4519,7 +4609,7 @@ window.addEventListener('error', function(e){
   console.error('🚨 Runtime error:', e.message, 'at', e.filename, ':', e.lineno);
 });
 
-window.APP_VERSION = '20260830-1535';
+window.APP_VERSION = '20260909-1220';
 window.checkForUpdates = async function(){
   try{
     var r = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
