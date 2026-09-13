@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260913-sales-focus-v3">
+<meta name="app-version" content="20260913-social-link-match-v4">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1200,7 +1200,7 @@ window.fbAsyncInit = function(){
 <div class="fg"><label class="fl">تاريخ النشر / النشاط</label><input class="fi" type="datetime-local" id="pmPublishedAt"></div>
 <div class="fg"><label class="fl">المشاهدات (اختياري)</label><input class="fi" type="number" min="0" id="pmViews" placeholder="اتركها فارغة لإنستغرام بعد الربط"></div>
 <div class="fg full"><label class="fl">رابط الإعلان / الفيديو</label><input class="fi" id="pmUrl" dir="ltr" placeholder="https://www.instagram.com/reel/..." oninput="updatePropertyMarketingHint()"></div>
-<div class="fg full" id="pmAutoHint" style="background:#F3F8F5;border:1px solid #BFD8C9;border-radius:10px;padding:11px 13px;font-size:12px;color:#285C43;line-height:1.7">🤖 <strong>إنستغرام:</strong> الصق رابط الريل فقط. بعد توصيل Meta API سيجلب النظام المشاهدات والوصول والتفاعلات تلقائيًا. الإدخال اليدوي يبقى احتياطيًا فقط.</div>
+<div class="fg full" id="pmAutoHint" style="background:#F3F8F5;border:1px solid #BFD8C9;border-radius:10px;padding:11px 13px;font-size:12px;color:#285C43;line-height:1.7">🔗 <strong>مهم:</strong> الصق رابط الـReel أو المنشور هنا. من الآن يستخدم CRM هذا الرابط للتعرّف على العقار تلقائيًا إذا أرسله عميل في واتساب، حتى لو أرسل الرابط فقط بدون أي نص. ويمكن لاحقًا جلب المشاهدات والتفاعلات تلقائيًا بعد توصيل Instagram API.</div>
 <div class="fg full"><label class="fl">ملاحظات</label><textarea class="fta" id="pmNotes" rows="2" placeholder="مثال: إعادة تصوير 4K / تم تعليق اللوحة"></textarea></div>
 </div>
 <div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mPropertyMarketing')">إلغاء</button><button class="btn-primary" style="width:auto;padding:9px 22px" onclick="savePropertyMarketingEvent()">💾 حفظ</button></div>
@@ -2592,7 +2592,7 @@ async function loadPropertyPerformance(propId){
     h+='<div class="card" style="margin-bottom:16px"><div class="card-head"><div class="card-title"><span>🧭</span>حركة العملاء على العقار</div></div><div style="padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">';[['inquiry','استفسار'],['followup','متابعة'],['viewing_scheduled','معاينة محددة'],['viewed','تمت المعاينة'],['negotiation','تفاوض'],['reserved','حجز'],['not_suitable','لم يناسبه'],['no_response','لا يرد']].forEach(function(x){h+='<div style="background:var(--cream);border:1px solid var(--cream-deeper);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:800;color:var(--espresso)">'+(counts[x[0]]||0)+'</div><div style="font-size:11px;color:var(--umber)">'+x[1]+'</div></div>';});h+='</div></div>';
     h+='<div class="card" style="margin-bottom:16px"><div class="card-head"><div class="card-title"><span>⚠️</span>أسباب الرفض والعقبات المتكررة</div></div><div style="padding:16px">';if(reasons.length){reasons.forEach(z=>{var pct=totalPeople?Math.round(z.count/totalPeople*100):0;h+='<div style="display:grid;grid-template-columns:minmax(150px,1fr) 60px 60px;gap:8px;align-items:center;border-bottom:1px solid var(--cream-deeper);padding:8px 0"><div><strong style="font-size:12px">'+escapeHtml(z.label)+'</strong>'+(z.notes.length?'<div style="font-size:10px;color:var(--umber);margin-top:3px">'+escapeHtml(z.notes.slice(0,2).join(' · '))+'</div>':'')+'</div><div style="font-weight:800">'+z.count+'</div><div style="font-size:11px;color:var(--umber)">'+pct+'%</div></div>'})}else h+='<div class="empty" style="padding:16px"><div class="empty-desc">لا توجد أسباب رفض منظمة بعد. سجّل الأسباب من استفسار العميل أو المتابعة.</div></div>';h+='</div></div>';
     h+='<div class="card" style="margin-bottom:16px"><div class="card-head"><div class="card-title"><span>💬</span>العملاء والاستفسارات ('+totalPeople+')</div></div>';if(allRelations.length){h+='<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>العميل</th><th>العلاقة</th><th>الحالة</th><th>الطلب</th><th>آخر تواصل</th><th>سبب/ملاحظة</th><th></th></tr></thead><tbody>';allRelations.forEach(function(x){h+='<tr><td><strong style="cursor:pointer" onclick="viewClient(\''+x.client_id+'\')">'+escapeHtml(x.client&&x.client.name||'—')+'</strong></td><td>'+(x.shown_by_agent?'📨 أُرسل له':x.has_inbound_inquiry!==false?'💬 استفسار':propertyInquirySourceAr(x.source))+'</td><td>'+propertyInquiryStatusAr(x.status)+'</td><td>'+escapeHtml(x.request?requestTypeAr(x.request.request_type)+' · '+requestSearchAr(x.request.search_status):'—')+'</td><td>'+fmtDate(x.last_inquiry_at)+'</td><td>'+escapeHtml(x.rejection_notes||x.rejection_reason&&propertyRejectReasonAr(x.rejection_reason)||x.match_notes||'—')+'</td><td>'+(typeof canEdit==='function'&&canEdit()?'<span style="cursor:pointer" onclick="openPropertyInquiryModal(\''+x.id+'\')">✏️</span>':'')+'</td></tr>'});h+='</tbody></table></div>'}else h+='<div class="empty" style="padding:24px"><div class="empty-desc">لا توجد استفسارات مسجلة على هذا العقار بعد</div></div>';h+='</div>';
-    h+='<div class="card" style="margin-bottom:16px"><div class="card-head"><div class="card-title"><span>🕓</span>سجل التسويق</div></div>';if(marketing.length){h+='<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>القناة</th><th>النشاط</th><th>التاريخ</th><th>المشاهدات</th><th>الوصول</th><th>التفاعلات</th><th>المزامنة</th><th>الرابط</th><th>ملاحظات</th></tr></thead><tbody>';marketing.slice(0,30).forEach(function(m){var et={publish:'نشر',update:'تحديث',install:'تركيب',remove:'إزالة',other:'أخرى'};var ss=m.channel==='instagram'?(m.sync_status==='synced'?'✅ '+(m.last_synced_at?fmtDate(m.last_synced_at):'تمت'):m.sync_status==='error'?'⚠️ خطأ':m.auto_sync?'⏳ بانتظار الربط':'يدوي'):'—';h+='<tr><td>'+marketingChannelAr(m.channel)+'</td><td>'+(et[m.event_type]||m.event_type)+'</td><td>'+fmtDate(m.published_at||m.created_at)+'</td><td>'+(m.views!=null?Number(m.views).toLocaleString('en-US'):'—')+'</td><td>'+(m.reach!=null?Number(m.reach).toLocaleString('en-US'):'—')+'</td><td>'+(m.total_interactions!=null?Number(m.total_interactions).toLocaleString('en-US'):'—')+'</td><td title="'+escapeHtml(m.sync_error||'')+'">'+ss+'</td><td>'+(m.url?'<a href="'+escapeHtml(m.url)+'" target="_blank" rel="noopener">فتح ↗</a>':'—')+'</td><td>'+escapeHtml(m.notes||'—')+'</td></tr>'});h+='</tbody></table></div>'}else h+='<div class="empty" style="padding:24px"><div class="empty-desc">لا يوجد نشاط تسويقي مسجل بعد</div></div>';h+='</div>';el.innerHTML=h;
+    h+='<div class="card" style="margin-bottom:16px"><div class="card-head"><div class="card-title"><span>🕓</span>سجل التسويق</div></div>';if(marketing.length){h+='<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>القناة</th><th>النشاط</th><th>التاريخ</th><th>المشاهدات</th><th>الوصول</th><th>التفاعلات</th><th>المزامنة</th><th>التعرّف</th><th>الرابط</th><th>ملاحظات</th></tr></thead><tbody>';marketing.slice(0,30).forEach(function(m){var et={publish:'نشر',update:'تحديث',install:'تركيب',remove:'إزالة',other:'أخرى'};var ss=m.channel==='instagram'?(m.sync_status==='synced'?'✅ '+(m.last_synced_at?fmtDate(m.last_synced_at):'تمت'):m.sync_status==='error'?'⚠️ خطأ':m.auto_sync?'⏳ بانتظار الربط':'يدوي'):'—';h+='<tr><td>'+marketingChannelAr(m.channel)+'</td><td>'+(et[m.event_type]||m.event_type)+'</td><td>'+fmtDate(m.published_at||m.created_at)+'</td><td>'+(m.views!=null?Number(m.views).toLocaleString('en-US'):'—')+'</td><td>'+(m.reach!=null?Number(m.reach).toLocaleString('en-US'):'—')+'</td><td>'+(m.total_interactions!=null?Number(m.total_interactions).toLocaleString('en-US'):'—')+'</td><td title="'+escapeHtml(m.sync_error||'')+'">'+ss+'</td><td>'+(m.link_key?'✅ مربوط':'—')+'</td><td>'+(m.url?'<a href="'+escapeHtml(m.url)+'" target="_blank" rel="noopener">فتح ↗</a>':'—')+'</td><td>'+escapeHtml(m.notes||'—')+'</td></tr>'});h+='</tbody></table></div>'}else h+='<div class="empty" style="padding:24px"><div class="empty-desc">لا يوجد نشاط تسويقي مسجل بعد</div></div>';h+='</div>';el.innerHTML=h;
   }catch(err){console.error('[Property Performance]',err);el.innerHTML='<div class="card"><div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(err.message)+'</div></div></div>'}
 }
 async function openPropertyInquiryModal(id){
@@ -2628,7 +2628,7 @@ async function savePropertyInquiry(){
   }catch(err){console.error(err);showToast('خطأ: '+err.message,'error');}
 }
 function openPropertyMarketingModal(){if(!window.viewingProperty)return;$('pmChannel').value='instagram';$('pmEventType').value='publish';$('pmPublishedAt').value=localDateTimeValue();$('pmViews').value='';$('pmUrl').value='';$('pmNotes').value='';updatePropertyMarketingHint();$('mPropertyMarketing').classList.add('on')}
-async function savePropertyMarketingEvent(){if(!window.viewingProperty)return;try{var cid=await ensureCompany();var channel=$('pmChannel').value,url=$('pmUrl').value.trim()||null,isInstagramAuto=(channel==='instagram'&&$('pmEventType').value==='publish'&&!!url);var data={company_id:cid,property_id:window.viewingProperty.id,channel:channel,event_type:$('pmEventType').value,published_at:$('pmPublishedAt').value?new Date($('pmPublishedAt').value).toISOString():null,views:$('pmViews').value===''?null:Math.max(0,parseInt($('pmViews').value)||0),url:url,notes:$('pmNotes').value.trim()||null,created_by:currentUser.id,auto_sync:isInstagramAuto,sync_status:isInstagramAuto?'pending':'manual'};var r=await supa.from('property_marketing_events').insert(data);if(r.error)throw r.error;closeModal('mPropertyMarketing');showToast(isInstagramAuto?'✅ تم الحفظ — جاهز للمزامنة التلقائية':'✅ تم تسجيل النشاط التسويقي','success');loadPropertyPerformance(window.viewingProperty.id);}catch(err){console.error(err);showToast('خطأ: '+err.message,'error')}}
+async function savePropertyMarketingEvent(){if(!window.viewingProperty)return;try{var cid=await ensureCompany();var channel=$('pmChannel').value,url=$('pmUrl').value.trim()||null,isInstagramAuto=(channel==='instagram'&&$('pmEventType').value==='publish'&&!!url);var data={company_id:cid,property_id:window.viewingProperty.id,channel:channel,event_type:$('pmEventType').value,published_at:$('pmPublishedAt').value?new Date($('pmPublishedAt').value).toISOString():null,views:$('pmViews').value===''?null:Math.max(0,parseInt($('pmViews').value)||0),url:url,notes:$('pmNotes').value.trim()||null,created_by:currentUser.id,auto_sync:isInstagramAuto,sync_status:isInstagramAuto?'pending':'manual'};var r=await supa.from('property_marketing_events').insert(data);if(r.error)throw r.error;closeModal('mPropertyMarketing');showToast(url?'✅ تم حفظ رابط التسويق — سيُستخدم للتعرّف على العقار من واتساب':'✅ تم تسجيل النشاط التسويقي','success');loadPropertyPerformance(window.viewingProperty.id);}catch(err){console.error(err);showToast('خطأ: '+err.message,'error')}}
 async function syncInstagramForCurrentProperty(){if(!window.viewingProperty)return;if(!(typeof canManage==='function'&&canManage())){showToast('⚠️ المزامنة للمالك/المدير','error');return;}try{showToast('🔄 جاري طلب مزامنة Instagram...','info');var r=await supa.functions.invoke('instagram-insights-sync',{body:{property_id:window.viewingProperty.id}});if(r.error)throw r.error;var d=r.data||{};if(d.error)throw new Error(d.error);showToast('✅ تمت المزامنة: '+(d.synced||0)+' فيديو','success');await loadPropertyPerformance(window.viewingProperty.id);}catch(err){console.error('[Instagram sync]',err);var msg=(err&&err.message)||String(err);if(/not configured|non-2xx|Failed to send|FunctionsHttpError/i.test(msg))showToast('ℹ️ واجهة Instagram جاهزة في CRM، وباقي توصيل Meta داخل Supabase','error');else showToast('خطأ مزامنة Instagram: '+msg,'error');}}
 
 async function syncInquiryFromViewing(clientId,propertyId,status,feedback,rejectionReason,notes,agentId){
@@ -4969,7 +4969,7 @@ function renderFollowUpSection(containerId){
   const c=document.getElementById(containerId);if(!c)return;
   const actionable=(fueData.alerts||[]).filter(a=>a.priority==='urgent'||a.priority==='warning');
   if(!actionable.length){c.innerHTML='<div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:11px;padding:10px 13px;margin-bottom:12px;font-size:12px;color:#166534">✅ لا توجد متابعة عاجلة أو متأخرة الآن.</div>';return;}
-  const order={urgent:1,warning:2};const sorted=[...actionable].sort((a,b)=>order[a.priority]-order[b.priority]).slice(0,6);const total=actionable.reduce((n,a)=>n+a.count,0);let h='<div class="fue-section"><div class="fue-section-title">🚨 يحتاج تدخل الآن <span style="font-size:11px;color:var(--umber);font-weight:600;margin-right:auto">'+total+' عنصر</span></div><div class="fue-rules-grid">';sorted.forEach(alert=>{const countCls=alert.priority==='urgent'?'':'warn';h+='<div class="fue-rule-card '+alert.priority+'"><div class="fue-rule-header"><div class="fue-rule-title">'+alert.title+'</div><div class="fue-rule-count '+countCls+'">'+alert.count+'</div></div><div class="fue-rule-items">';alert.items.forEach(item=>{const action=item.action==='viewClient'?'viewClient(\''+item.id+'\')':item.action==='navigateViewings'?'openDashboardViewings(\'today\')':item.action==='navigateDeposits'?'goToEndingDeposits()':item.action==='navigateProperties'?'navigate(\'properties\',null)':item.action==='navigateOwners'?'navigate(\'owners\',null)':'';const phoneCleaned=item.phone?item.phone.replace(/[^0-9+]/g,'').replace(/^\+/,''):'';h+='<div class="fue-rule-item"><span class="fue-rule-item-name" onclick="'+action+'">'+escapeHtml(item.name||'—')+'</span><div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><span class="fue-rule-item-meta">'+item.meta+'</span>';if(phoneCleaned)h+='<div class="fue-quick-actions" onclick="event.stopPropagation()"><a class="fue-qa-btn wa" href="https://api.whatsapp.com/send?phone='+phoneCleaned+'" target="_blank" title="واتساب">💚</a><a class="fue-qa-btn call" href="tel:+'+phoneCleaned+'" title="اتصال">📞</a></div>';h+='</div></div>'});h+='</div></div>'});h+='</div></div>';c.innerHTML=h;}
+  const order={urgent:1,warning:2};const sorted=[...actionable].sort((a,b)=>order[a.priority]-order[b.priority]).slice(0,6);const total=actionable.reduce((n,a)=>n+a.count,0);let h='<div class="fue-section"><div class="fue-section-title">🚨 يحتاج تدخل الآن <span style="font-size:11px;color:var(--umber);font-weight:600;margin-right:auto">'+total+' عنصر</span></div><div class="fue-rules-grid">';sorted.forEach(alert=>{const countCls=alert.priority==='urgent'?'':'warn';h+='<div class="fue-rule-card '+alert.priority+'"><div class="fue-rule-header"><div class="fue-rule-title">'+alert.title+'</div><div class="fue-rule-count '+countCls+'">'+alert.count+'</div></div><div class="fue-rule-items">';alert.items.forEach(item=>{const action=item.action==='resolveUnknownLink'?'openUnknownPropertyLinkResolver(\''+item.id+'\')':item.action==='viewClient'?'viewClient(\''+item.id+'\')':item.action==='navigateViewings'?'openDashboardViewings(\'today\')':item.action==='navigateDeposits'?'goToEndingDeposits()':item.action==='navigateProperties'?'navigate(\'properties\',null)':item.action==='navigateOwners'?'navigate(\'owners\',null)':'';const phoneCleaned=item.phone?item.phone.replace(/[^0-9+]/g,'').replace(/^\+/,''):'';h+='<div class="fue-rule-item"><span class="fue-rule-item-name" onclick="'+action+'">'+escapeHtml(item.name||'—')+'</span><div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><span class="fue-rule-item-meta">'+item.meta+'</span>';if(phoneCleaned)h+='<div class="fue-quick-actions" onclick="event.stopPropagation()"><a class="fue-qa-btn wa" href="https://api.whatsapp.com/send?phone='+phoneCleaned+'" target="_blank" title="واتساب">💚</a><a class="fue-qa-btn call" href="tel:+'+phoneCleaned+'" title="اتصال">📞</a></div>';h+='</div></div>'});h+='</div></div>'});h+='</div></div>';c.innerHTML=h;}
 function renderFollowUpBanner(){
   const urgentCount=fueData.alerts.filter(a=>a.priority==='urgent').reduce((s,a)=>s+a.count,0);
   const totalCount=fueData.alerts.filter(a=>a.priority==='urgent'||a.priority==='warning').reduce((s,a)=>s+a.count,0);
@@ -5016,7 +5016,7 @@ window.addEventListener('error', function(e){
   console.error('🚨 Runtime error:', e.message, 'at', e.filename, ':', e.lineno);
 });
 
-window.APP_VERSION = '20260913-sales-focus-v3';
+window.APP_VERSION = '20260913-social-link-match-v4';
 window.checkForUpdates = async function(){
   try{
     if(sessionStorage.getItem('crm_update_checked')==='1')return;
@@ -5435,6 +5435,155 @@ window.clearBackupHistory = function(){
   showToast('✅ تم مسح السجل','success');
 };
 
+
+
+// ==================== SOCIAL LINK -> PROPERTY MATCHING V4 ====================
+let unknownPropertyLinkCurrent=null;
+
+function ensureUnknownPropertyLinkModal(){
+  if(document.getElementById('mUnknownPropertyLink'))return;
+  const wrap=document.createElement('div');
+  wrap.innerHTML=`
+  <div class="modal" id="mUnknownPropertyLink">
+    <div class="modal-box" style="max-width:700px">
+      <div class="modal-head">
+        <div class="modal-title">🔗 ربط رابط العقار</div>
+        <button class="modal-close" onclick="closeModal('mUnknownPropertyLink')">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="uplClientBox" style="background:var(--cream);border:1px solid var(--cream-deeper);padding:12px 14px;border-radius:10px;margin-bottom:12px"></div>
+        <div style="font-size:11px;color:var(--umber);margin-bottom:5px">الرابط الذي أرسله العميل</div>
+        <div id="uplRawUrl" dir="ltr" style="font-size:11px;word-break:break-all;background:#F8FAFC;border:1px solid #E2E8F0;padding:10px;border-radius:8px;margin-bottom:12px"></div>
+        <div class="fg">
+          <label class="fl">اختر العقار الصحيح *</label>
+          <select class="fs" id="uplPropertySelect"><option value="">— اختر العقار —</option></select>
+        </div>
+        <div style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E3A8A;padding:10px 12px;border-radius:9px;font-size:11px;line-height:1.7;margin-top:10px">
+          💡 الربط مرة واحدة فقط. بعد الحفظ، أي عميل يرسل نفس Reel/الرابط سيتعرف CRM على العقار تلقائيًا، كما سيتم ربط كل النسخ السابقة المعلقة من نفس الرابط.
+        </div>
+      </div>
+      <div class="modal-foot" style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-secondary" onclick="openUnknownPropertyLinkUrl()">فتح الرابط ↗</button>
+        <button class="btn-secondary" style="color:var(--ruby)" onclick="ignoreUnknownPropertyLink()">ليس رابط عقار</button>
+        <button class="btn-primary" style="width:auto;padding:9px 22px;margin-right:auto" onclick="resolveUnknownPropertyLink()">✅ ربط العقار</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(wrap.firstElementChild);
+}
+
+async function openUnknownPropertyLinkResolver(id){
+  ensureUnknownPropertyLinkModal();
+  try{
+    const r=await supa.from('unmatched_property_links')
+      .select('*,client:clients(id,name,phone)')
+      .eq('id',id).single();
+    if(r.error)throw r.error;
+    unknownPropertyLinkCurrent=r.data;
+    const c=r.data.client||{};
+    document.getElementById('uplClientBox').innerHTML=
+      '<div style="font-weight:800;color:var(--espresso)">👤 '+escapeHtml(c.name||'عميل')+'</div>'+
+      '<div style="font-size:11px;color:var(--umber);margin-top:3px">'+escapeHtml(c.phone||'')+' · '+escapeHtml((r.data.provider||'رابط').toUpperCase())+'</div>';
+    document.getElementById('uplRawUrl').textContent=r.data.raw_url||'';
+    let pr=await supa.from('properties')
+      .select('id,title,property_code,internal_name,area,price,status,archived')
+      .eq('company_id',currentProfile.company_id)
+      .eq('archived',false)
+      .order('created_at',{ascending:false});
+    if(pr.error)throw pr.error;
+    const sel=document.getElementById('uplPropertySelect');
+    sel.innerHTML='<option value="">— اختر العقار —</option>'+
+      (pr.data||[]).map(p=>{
+        const nm=p.internal_name||p.title||p.property_code||'عقار';
+        return '<option value="'+p.id+'">'+escapeHtml(nm)+(p.area?' — '+escapeHtml(p.area):'')+(p.price?' — '+fmtMoney(p.price).replace(/<[^>]+>/g,''):'')+'</option>';
+      }).join('');
+    document.getElementById('mUnknownPropertyLink').classList.add('on');
+  }catch(e){
+    console.error('[Unknown property link]',e);
+    showToast('تعذر فتح الرابط: '+e.message,'error');
+  }
+}
+
+function openUnknownPropertyLinkUrl(){
+  if(unknownPropertyLinkCurrent&&unknownPropertyLinkCurrent.raw_url)
+    window.open(unknownPropertyLinkCurrent.raw_url,'_blank','noopener');
+}
+
+async function resolveUnknownPropertyLink(){
+  if(!unknownPropertyLinkCurrent)return;
+  const propertyId=(document.getElementById('uplPropertySelect')||{}).value;
+  if(!propertyId){showToast('اختر العقار الصحيح أولاً','error');return;}
+  try{
+    const r=await supa.rpc('resolve_unmatched_property_link',{
+      p_unmatched_id:unknownPropertyLinkCurrent.id,
+      p_property_id:propertyId
+    });
+    if(r.error)throw r.error;
+    const n=Number(r.data&&r.data.resolved_occurrences||1);
+    closeModal('mUnknownPropertyLink');
+    unknownPropertyLinkCurrent=null;
+    showToast('✅ تم ربط الرابط بالعقار'+(n>1?' وحل '+n+' استفسارات معلقة من نفس الرابط':''),'success');
+    if(typeof refreshFollowUpEngine==='function')await refreshFollowUpEngine();
+    if(document.getElementById('page-dash')?.classList.contains('active'))await loadDashboard();
+  }catch(e){
+    console.error('[Resolve property link]',e);
+    showToast('خطأ في ربط العقار: '+e.message,'error');
+  }
+}
+
+async function ignoreUnknownPropertyLink(){
+  if(!unknownPropertyLinkCurrent)return;
+  try{
+    const r=await supa.rpc('ignore_unmatched_property_link',{p_unmatched_id:unknownPropertyLinkCurrent.id});
+    if(r.error)throw r.error;
+    closeModal('mUnknownPropertyLink');
+    unknownPropertyLinkCurrent=null;
+    showToast('تم تجاهل الرابط','success');
+    if(typeof refreshFollowUpEngine==='function')await refreshFollowUpEngine();
+    if(document.getElementById('page-dash')?.classList.contains('active'))await loadDashboard();
+  }catch(e){showToast('خطأ: '+e.message,'error');}
+}
+
+// Add unresolved social links to the manager's actionable dashboard.
+// This deliberately shows only pending links allowed by RLS for the logged-in user.
+const _runFollowUpEngineBeforeSocialLinks=runFollowUpEngine;
+runFollowUpEngine=async function(){
+  const result=await _runFollowUpEngineBeforeSocialLinks();
+  try{
+    const q=await supa.from('unmatched_property_links')
+      .select('id,raw_url,provider,created_at,client:clients(id,name,phone)')
+      .eq('status','pending')
+      .order('created_at',{ascending:false})
+      .limit(30);
+    if(q.error)throw q.error;
+    const rows=q.data||[];
+    if(rows.length){
+      fueData.alerts.unshift({
+        rule:'unknownPropertyLinks',
+        priority:'urgent',
+        title:'🔗 روابط عقارات تحتاج ربط',
+        count:rows.length,
+        items:rows.slice(0,10).map(x=>({
+          id:x.id,
+          name:(x.client&&x.client.name)||'عميل',
+          phone:x.client&&x.client.phone||null,
+          meta:(x.provider==='instagram'?'Instagram':x.provider==='youtube'?'YouTube':'رابط')+' · ربط الآن',
+          action:'resolveUnknownLink'
+        }))
+      });
+      fueData.totalCount=(fueData.alerts||[]).reduce((n,a)=>n+Number(a.count||0),0);
+    }
+  }catch(e){console.warn('[Social link queue]',e);}
+  return result;
+};
+
+// Ensure the dashboard refreshes its action queue whenever it is opened.
+const _loadDashboardBeforeSocialLinks=loadDashboard;
+loadDashboard=async function(){
+  await _loadDashboardBeforeSocialLinks();
+  try{await refreshFollowUpEngine();}catch(e){console.warn('[Dashboard social links]',e);}
+};
+// ==================== END SOCIAL LINK -> PROPERTY MATCHING V4 ====================
 
 async function init(){setupInviteSignup();const s=await supa.auth.getSession();if(s.data.session)await loadApp();else{$('loaderScreen').style.display='none';$('authScreen').classList.remove('hidden')}}
 supa.auth.onAuthStateChange(function(e,s){if(e==='SIGNED_IN'&&s&&!currentUser)loadApp();if(e==='SIGNED_OUT'){currentUser=null;currentProfile=null}});
