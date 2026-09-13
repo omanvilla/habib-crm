@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260913-social-link-match-v4">
+<meta name="app-version" content="20260913-social-link-match-v5">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1196,7 +1196,7 @@ window.fbAsyncInit = function(){
 <div class="modal-title">📣 تسجيل نشاط تسويقي للعقار</div>
 <div class="fgrid">
 <div class="fg"><label class="fl">القناة *</label><select class="fs" id="pmChannel" onchange="updatePropertyMarketingHint()"><option value="instagram">إنستغرام</option><option value="oman_reel">Oman Reel</option><option value="youtube">يوتيوب</option><option value="signboard">اللوحة</option><option value="referral">إحالات</option><option value="other">أخرى</option></select></div>
-<div class="fg"><label class="fl">نوع النشاط</label><select class="fs" id="pmEventType"><option value="publish">نشر إعلان</option><option value="update">تحديث مشاهدات / أداء</option><option value="install">تركيب لوحة</option><option value="remove">إزالة لوحة</option><option value="other">أخرى</option></select></div>
+<div class="fg"><label class="fl">نوع النشاط</label><select class="fs" id="pmEventType" onchange="updatePropertyMarketingHint()"><option value="publish">نشر إعلان</option><option value="update">تحديث مشاهدات / أداء</option><option value="install">تركيب لوحة</option><option value="remove">إزالة لوحة</option><option value="other">أخرى</option></select></div>
 <div class="fg"><label class="fl">تاريخ النشر / النشاط</label><input class="fi" type="datetime-local" id="pmPublishedAt"></div>
 <div class="fg"><label class="fl">المشاهدات (اختياري)</label><input class="fi" type="number" min="0" id="pmViews" placeholder="اتركها فارغة لإنستغرام بعد الربط"></div>
 <div class="fg full"><label class="fl">رابط الإعلان / الفيديو</label><input class="fi" id="pmUrl" dir="ltr" placeholder="https://www.instagram.com/reel/..." oninput="updatePropertyMarketingHint()"></div>
@@ -2627,7 +2627,38 @@ async function savePropertyInquiry(){
     closeModal('mPropertyInquiry');editingPropertyInquiry=null;showToast('✅ تم حفظ الاستفسار وأسباب العميل','success');loadPropertyPerformance(window.viewingProperty.id);loadPropertyDecisionPanel(window.viewingProperty.id);loadPropertyActionQueue('dashboard');loadPropertyActionQueue('properties');
   }catch(err){console.error(err);showToast('خطأ: '+err.message,'error');}
 }
-function openPropertyMarketingModal(){if(!window.viewingProperty)return;$('pmChannel').value='instagram';$('pmEventType').value='publish';$('pmPublishedAt').value=localDateTimeValue();$('pmViews').value='';$('pmUrl').value='';$('pmNotes').value='';updatePropertyMarketingHint();$('mPropertyMarketing').classList.add('on')}
+function updatePropertyMarketingHint(){
+  var hint=$('pmAutoHint');if(!hint)return;
+  var channel=$('pmChannel')?$('pmChannel').value:'instagram';
+  var eventType=$('pmEventType')?$('pmEventType').value:'publish';
+  var url=$('pmUrl')?$('pmUrl').value.trim():'';
+  if(channel==='instagram'){
+    hint.style.background='#F3F8F5';hint.style.borderColor='#BFD8C9';hint.style.color='#285C43';
+    if(eventType==='publish'){
+      hint.innerHTML=url
+        ? '✅ <strong>رابط Instagram جاهز للربط:</strong> عند الحفظ سيستخدم CRM هذا الرابط للتعرّف على العقار تلقائيًا إذا أرسله العميل في واتساب.'
+        : '🔗 <strong>مهم:</strong> الصق رابط الـReel أو المنشور هنا. يستخدم CRM الرابط للتعرّف على العقار تلقائيًا إذا أرسله العميل في واتساب، حتى لو أرسل الرابط فقط بدون أي نص.';
+    }else{
+      hint.innerHTML='ℹ️ يمكنك إضافة رابط منشور Instagram المرتبط بهذا التحديث إن وجد. الربط التلقائي مع واتساب يعتمد على رابط محفوظ للعقار.';
+    }
+  }else{
+    hint.style.background='#F8FAFC';hint.style.borderColor='#CBD5E1';hint.style.color='#475569';
+    hint.innerHTML='ℹ️ يمكنك حفظ رابط المحتوى التسويقي لهذه القناة. التعرّف التلقائي من روابط العملاء مفعّل حاليًا لروابط Instagram.';
+  }
+}
+function openPropertyMarketingModal(){
+  if(!window.viewingProperty){showToast('⚠️ افتح عقارًا أولاً','error');return;}
+  var modal=$('mPropertyMarketing');
+  if(!modal){showToast('⚠️ نافذة تسجيل التسويق غير موجودة في هذه النسخة','error');return;}
+  if($('pmChannel'))$('pmChannel').value='instagram';
+  if($('pmEventType'))$('pmEventType').value='publish';
+  if($('pmPublishedAt'))$('pmPublishedAt').value=localDateTimeValue();
+  if($('pmViews'))$('pmViews').value='';
+  if($('pmUrl'))$('pmUrl').value='';
+  if($('pmNotes'))$('pmNotes').value='';
+  updatePropertyMarketingHint();
+  modal.classList.add('on');
+}
 async function savePropertyMarketingEvent(){if(!window.viewingProperty)return;try{var cid=await ensureCompany();var channel=$('pmChannel').value,url=$('pmUrl').value.trim()||null,isInstagramAuto=(channel==='instagram'&&$('pmEventType').value==='publish'&&!!url);var data={company_id:cid,property_id:window.viewingProperty.id,channel:channel,event_type:$('pmEventType').value,published_at:$('pmPublishedAt').value?new Date($('pmPublishedAt').value).toISOString():null,views:$('pmViews').value===''?null:Math.max(0,parseInt($('pmViews').value)||0),url:url,notes:$('pmNotes').value.trim()||null,created_by:currentUser.id,auto_sync:isInstagramAuto,sync_status:isInstagramAuto?'pending':'manual'};var r=await supa.from('property_marketing_events').insert(data);if(r.error)throw r.error;closeModal('mPropertyMarketing');showToast(url?'✅ تم حفظ رابط التسويق — سيُستخدم للتعرّف على العقار من واتساب':'✅ تم تسجيل النشاط التسويقي','success');loadPropertyPerformance(window.viewingProperty.id);}catch(err){console.error(err);showToast('خطأ: '+err.message,'error')}}
 async function syncInstagramForCurrentProperty(){if(!window.viewingProperty)return;if(!(typeof canManage==='function'&&canManage())){showToast('⚠️ المزامنة للمالك/المدير','error');return;}try{showToast('🔄 جاري طلب مزامنة Instagram...','info');var r=await supa.functions.invoke('instagram-insights-sync',{body:{property_id:window.viewingProperty.id}});if(r.error)throw r.error;var d=r.data||{};if(d.error)throw new Error(d.error);showToast('✅ تمت المزامنة: '+(d.synced||0)+' فيديو','success');await loadPropertyPerformance(window.viewingProperty.id);}catch(err){console.error('[Instagram sync]',err);var msg=(err&&err.message)||String(err);if(/not configured|non-2xx|Failed to send|FunctionsHttpError/i.test(msg))showToast('ℹ️ واجهة Instagram جاهزة في CRM، وباقي توصيل Meta داخل Supabase','error');else showToast('خطأ مزامنة Instagram: '+msg,'error');}}
 
@@ -5016,7 +5047,7 @@ window.addEventListener('error', function(e){
   console.error('🚨 Runtime error:', e.message, 'at', e.filename, ':', e.lineno);
 });
 
-window.APP_VERSION = '20260913-social-link-match-v4';
+window.APP_VERSION = '20260913-social-link-match-v5';
 window.checkForUpdates = async function(){
   try{
     if(sessionStorage.getItem('crm_update_checked')==='1')return;
