@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260913-pipeline-audit-v8">
+<meta name="app-version" content="20260913-whatsapp-automation-ready-v10">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3456,6 +3456,7 @@ let waInboxConversations=[];
 let waInboxActiveId=null;
 let waInboxActiveConversation=null;
 let waInboxMessages=[];
+let waAutomationEvents=[];
 let waInboxRequests=[];
 let waInboxSelectedRequestId=null;
 let waInboxLoading=false;
@@ -3508,8 +3509,8 @@ function renderWhatsAppConversations(){
   if($('waInboxTotal'))$('waInboxTotal').textContent=rows.length;
   if(!rows.length){el.innerHTML='<div class="empty"><div class="empty-ico">💬</div><div class="empty-title">لا توجد محادثات</div><div class="empty-desc">أول رسالة واتساب واردة ستظهر هنا تلقائياً.</div></div>';return}
   el.innerHTML=rows.map(c=>{
-    const cl=c.client||{};const name=cl.name||c.customer_name||c.customer_phone||'عميل واتساب';const u=Number(c.unread_count||0);const lm=c.last_message||{};const preview=lm.body||c.ai_summary||('رسالة '+(lm.message_type||''));const arrow=lm.direction==='outbound'?'↗':'↙';
-    return '<div class="wa-conv-item '+(c.id===waInboxActiveId?'active':'')+'" onclick="openWhatsAppConversation(\''+c.id+'\')"><div class="wa-conv-top"><span class="wa-status-dot"></span><div class="wa-conv-name">'+escapeHtml(name)+'</div>'+(u?'<span class="wa-unread">'+u+'</span>':'')+'</div><div class="wa-conv-meta"><span dir="ltr">'+escapeHtml(c.customer_phone||cl.phone||'')+'</span> · '+escapeHtml(waRouteLabel(c.route_key))+' · <span dir="ltr">'+escapeHtml(c.inbound_number||'')+'</span></div><div class="wa-conv-preview">'+arrow+' '+escapeHtml(preview||'')+' <span style="float:left">'+escapeHtml(waInboxTime(c.last_message_at))+'</span></div></div>';
+    const cl=c.client||{};const name=cl.name||c.customer_name||c.customer_phone||'عميل واتساب';const u=Number(c.unread_count||0);const lm=c.last_message||{};const preview=lm.body||lm.transcript||c.ai_summary||('رسالة '+(lm.message_type||''));const arrow=lm.direction==='outbound'?'↗':'↙';const handoff=c.human_handoff_required?'<span style="background:#FEE2E2;color:#991B1B;border:1px solid #FECACA;border-radius:999px;padding:2px 6px;font-size:9px">⚠️ تدخل بشري</span>':'';
+    return '<div class="wa-conv-item '+(c.id===waInboxActiveId?'active':'')+'" onclick="openWhatsAppConversation(\''+c.id+'\')"><div class="wa-conv-top"><span class="wa-status-dot"></span><div class="wa-conv-name">'+escapeHtml(name)+'</div>'+handoff+(u?'<span class="wa-unread">'+u+'</span>':'')+'</div><div class="wa-conv-meta"><span dir="ltr">'+escapeHtml(c.customer_phone||cl.phone||'')+'</span> · '+escapeHtml(waRouteLabel(c.route_key))+' · <span dir="ltr">'+escapeHtml(c.inbound_number||'')+'</span></div><div class="wa-conv-preview">'+arrow+' '+escapeHtml(preview||'')+' <span style="float:left">'+escapeHtml(waInboxTime(c.last_message_at))+'</span></div></div>';
   }).join('');
 }
 async function openWhatsAppConversation(id){
@@ -3518,7 +3519,7 @@ async function openWhatsAppConversation(id){
   try{
     const d=await waInboxInvoke({action:'messages',conversation_id:id});
     waInboxActiveConversation=d.conversation||waInboxConversations.find(x=>x.id===id)||null;
-    waInboxMessages=d.messages||[];waInboxRequests=d.requests||[];waInboxSelectedRequestId=null;const activeReqs=waInboxRequests.filter(r=>r.status==='active'||r.status==='paused');if(activeReqs.length===1)waInboxSelectedRequestId=activeReqs[0].id;
+    waInboxMessages=d.messages||[];waAutomationEvents=d.automation_events||[];waInboxRequests=d.requests||[];waInboxSelectedRequestId=null;const activeReqs=waInboxRequests.filter(r=>r.status==='active'||r.status==='paused');if(activeReqs.length===1)waInboxSelectedRequestId=activeReqs[0].id;
     if(waInboxActiveConversation&&d.client)waInboxActiveConversation.client=d.client;
     renderWhatsAppChat();
     const row=waInboxConversations.find(x=>x.id===id);if(row)row.unread_count=0;
@@ -3526,11 +3527,39 @@ async function openWhatsAppConversation(id){
     updateWhatsAppBadge(waInboxConversations.reduce((s,x)=>s+Number(x.unread_count||0),0));
   }catch(err){body.innerHTML='<div class="wa-inbox-error">⚠️ '+escapeHtml(err.message)+'</div>';showToast('⚠️ '+err.message,'error')}
 }
+function waAutomationBadge(m){
+  var a=m&&m.automation_result&&m.automation_result.action;if(!a)return '';
+  var action=a.action||'';var result=m.automation_result.result||{};var label='';
+  if(action==='schedule_viewing')label='📅 زيارة سُجلت تلقائياً';
+  else if(action==='reschedule_viewing')label='🔄 الزيارة عُدلت تلقائياً';
+  else if(action==='cancel_viewing')label='🚫 الزيارة ألغيت تلقائياً';
+  else if(action==='start_negotiation')label='💬 انتقل للتفاوض';
+  else if(action==='post_visit_feedback')label=(a.pipeline_outcome==='lost'?'❌ نتيجة الزيارة سُجلت':'📝 رأي الزيارة سُجل');
+  else if(action==='property_details')label='🏠 طلب تفاصيل العقار';
+  else if(action==='human_handoff'||result.status==='pending_review')label='⚠️ يحتاج تدخل بشري';
+  if(!label)return '';
+  var isWarn=(action==='human_handoff'||result.status==='pending_review');
+  return '<div style="margin-top:5px;font-size:9px;display:inline-block;padding:2px 6px;border-radius:999px;background:'+(isWarn?'#FEE2E2':'#ECFDF5')+';color:'+(isWarn?'#991B1B':'#166534')+';border:1px solid '+(isWarn?'#FECACA':'#A7F3D0')+'">'+label+'</div>';
+}
+function waMessageText(m){
+  if(m.message_type==='audio'){
+    if(m.transcript)return '🎙️ صوتية — '+m.transcript;
+    if(m.transcription_status==='failed')return '🎙️ صوتية — تعذر تحويلها إلى نص';
+    return '🎙️ رسالة صوتية';
+  }
+  return m.body||m.transcript||('['+(m.message_type||'رسالة')+']');
+}
+async function clearWhatsAppHandoff(){
+  if(!waInboxActiveConversation)return;
+  try{await waInboxInvoke({action:'clear_handoff',conversation_id:waInboxActiveConversation.id});waInboxActiveConversation.human_handoff_required=false;waInboxActiveConversation.handoff_reason=null;var row=waInboxConversations.find(x=>x.id===waInboxActiveConversation.id);if(row){row.human_handoff_required=false;row.handoff_reason=null}renderWhatsAppChat();renderWhatsAppConversations();showToast('✅ تم إنهاء تنبيه التدخل البشري','success')}catch(e){showToast('⚠️ '+e.message,'error')}
+}
 function renderWhatsAppChat(){
   const c=waInboxActiveConversation;if(!c)return;const cl=c.client||{};
   const head=$('waChatHeader');head.style.display='flex';head.innerHTML='<div style="flex:1"><div class="wa-chat-title">'+escapeHtml(cl.name||c.customer_name||c.customer_phone||'عميل واتساب')+'</div><div class="wa-chat-sub"><span dir="ltr">'+escapeHtml(c.customer_phone||cl.phone||'')+'</span> · يستقبل عبر <span dir="ltr">'+escapeHtml(c.inbound_number||'')+'</span></div></div><span class="wa-route-chip">'+escapeHtml(waRouteLabel(c.route_key))+'</span>'+(c.client_id?'<button class="btn-secondary" style="padding:6px 10px;font-size:10px" onclick="viewClient(\''+c.client_id+'\')">👤 ملف العميل</button>':'');
-  const strip=$('waClientStrip');strip.style.display='flex';let sh='<strong>اربط الرد بطلب:</strong> ';if(waInboxRequests.length){sh+=waInboxRequests.slice(0,8).map(r=>'<span class="wa-request-pill '+(r.id===waInboxSelectedRequestId?'selected':'')+'" onclick="selectWhatsAppRequest(\''+r.id+'\')">'+escapeHtml(waRequestSummary(r))+' · '+escapeHtml(requestStatusAr(r.status))+'</span>').join('')}else sh+='<span style="color:var(--sand-dark)">لا توجد طلبات مسجلة</span>';strip.innerHTML=sh;
-  const body=$('waChatBody');if(!waInboxMessages.length){body.innerHTML='<div class="wa-empty-chat">لا توجد رسائل بعد.</div>'}else{body.innerHTML=waInboxMessages.map(m=>'<div class="wa-bubble '+(m.direction==='outbound'?'out':'in')+'">'+escapeHtml(m.body||('['+(m.message_type||'رسالة')+']'))+'<span class="wa-msg-time">'+escapeHtml(waInboxTime(m.message_timestamp))+(m.direction==='outbound'&&m.delivery_status?' · '+escapeHtml(m.delivery_status):'')+'</span></div>').join('');setTimeout(()=>{body.scrollTop=body.scrollHeight},20)}
+  const strip=$('waClientStrip');strip.style.display='flex';let sh='';
+  if(c.human_handoff_required){sh+='<div style="width:100%;background:#FFF1F2;border:1px solid #FECDD3;color:#9F1239;padding:8px 10px;border-radius:9px;margin-bottom:7px;display:flex;gap:8px;justify-content:space-between;align-items:center"><span>⚠️ <strong>يحتاج تدخل بشري:</strong> '+escapeHtml(c.handoff_reason||'مراجعة المحادثة واتخاذ إجراء')+'</span><button class="btn-secondary" style="padding:4px 8px;font-size:9px" onclick="clearWhatsAppHandoff()">✓ تمت المعالجة</button></div>';}
+  sh+='<strong>اربط الرد بطلب:</strong> ';if(waInboxRequests.length){sh+=waInboxRequests.slice(0,8).map(r=>'<span class="wa-request-pill '+(r.id===waInboxSelectedRequestId?'selected':'')+'" onclick="selectWhatsAppRequest(\''+r.id+'\')">'+escapeHtml(waRequestSummary(r))+' · '+escapeHtml(requestStatusAr(r.status))+'</span>').join('')}else sh+='<span style="color:var(--sand-dark)">لا توجد طلبات مسجلة</span>';strip.innerHTML=sh;
+  const body=$('waChatBody');if(!waInboxMessages.length){body.innerHTML='<div class="wa-empty-chat">لا توجد رسائل بعد.</div>'}else{body.innerHTML=waInboxMessages.map(m=>'<div class="wa-bubble '+(m.direction==='outbound'?'out':'in')+'">'+escapeHtml(waMessageText(m))+waAutomationBadge(m)+'<span class="wa-msg-time">'+escapeHtml(waInboxTime(m.message_timestamp))+(m.direction==='outbound'&&m.delivery_status?' · '+escapeHtml(m.delivery_status):'')+'</span></div>').join('');setTimeout(()=>{body.scrollTop=body.scrollHeight},20)}
   $('waChatCompose').style.display='flex';$('waInboxMessage').value='';
 }
 function selectWhatsAppRequest(id){waInboxSelectedRequestId=(waInboxSelectedRequestId===id?null:id);renderWhatsAppChat()}
@@ -4623,15 +4652,17 @@ async function runFollowUpEngine(){
   if(!currentProfile||!currentProfile.company_id)return fueData;
   try{
     const todayStr=toLocalDateStr(new Date()),yesterdayStr=toLocalDateStr(new Date(Date.now()-86400000));
-    const [contactR,clientsR,requestsR,viewingsR,depositsR]=await Promise.all([
+    const [contactR,clientsR,requestsR,viewingsR,depositsR,handoffR]=await Promise.all([
       supa.rpc('crm_client_contact_queue',{p_limit:2000}),
       supa.from('clients').select('id,name,phone,lead_temperature,pipeline_stage,status,created_at,human_contact_at,last_contact_at,next_followup,followup_suppressed').neq('archived',true).limit(2000),
       supa.from('client_requests').select('id,client_id,status,lead_temperature,pipeline_stage,created_at,next_followup,first_human_response_at,last_mutual_contact_at').eq('status','active').limit(2500),
       supa.from('viewings').select('id,viewing_date,viewing_time,status,client_id,property_id,pipeline_outcome,followup_date,client:clients(name,phone),property:properties(title)').neq('archived',true).gte('viewing_date',yesterdayStr),
-      supa.from('deposits').select('id,amount,expiry_date,status,deal_id,client:clients(name,phone)').neq('status','applied').neq('status','refunded')
-    ]);[contactR,clientsR,requestsR,viewingsR,depositsR].forEach(x=>{if(x.error)throw x.error});
-    const contactQueue=contactR.data||[],clients=clientsR.data||[],requests=requestsR.data||[],viewings=viewingsR.data||[],deposits=depositsR.data||[];const cmap=new Map(clients.map(c=>[c.id,c]));
+      supa.from('deposits').select('id,amount,expiry_date,status,deal_id,client:clients(name,phone)').neq('status','applied').neq('status','refunded'),
+      supa.from('whatsapp_conversations').select('id,client_id,customer_name,customer_phone,handoff_reason,handoff_updated_at').eq('human_handoff_required',true).order('handoff_updated_at',{ascending:false}).limit(100)
+    ]);[contactR,clientsR,requestsR,viewingsR,depositsR,handoffR].forEach(x=>{if(x.error)throw x.error});
+    const contactQueue=contactR.data||[],clients=clientsR.data||[],requests=requestsR.data||[],viewings=viewingsR.data||[],deposits=depositsR.data||[],handoffs=handoffR.data||[];const cmap=new Map(clients.map(c=>[c.id,c]));
     if(contactQueue.length){fueData.alerts.push({rule:'uncontacted',priority:'urgent',title:'📞 عملاء لم يتم التواصل معهم',count:contactQueue.length,items:contactQueue.slice(0,5).map(x=>({id:x.client_id,name:x.client_name,phone:x.phone,meta:'منذ '+Math.max(0,Math.floor((Date.now()-new Date(x.oldest_pending_at||x.created_at).getTime())/86400000))+' يوم',action:'viewClient'}))});}
+    if(handoffs.length){fueData.alerts.push({rule:'whatsappHandoff',priority:'urgent',title:'💚 محادثات واتساب تحتاج تدخل',count:handoffs.length,items:handoffs.slice(0,5).map(x=>({id:x.id,name:x.customer_name||'عميل واتساب',phone:x.customer_phone,meta:x.handoff_reason||'تدخل بشري مطلوب',action:'openWhatsAppConversation'}))});}
     const dueByClient=new Map();requests.forEach(r=>{if(!r.next_followup||r.next_followup>todayStr)return;const old=dueByClient.get(r.client_id);if(!old||r.next_followup<old.next_followup)dueByClient.set(r.client_id,r)});const overdue=[...dueByClient.values()].map(r=>({r,c:cmap.get(r.client_id)})).filter(x=>x.c);if(overdue.length)fueData.alerts.push({rule:'followupOverdue',priority:'urgent',title:'📅 متابعات اليوم / متأخرة',count:overdue.length,items:overdue.slice(0,5).map(x=>({id:x.c.id,name:x.c.name,phone:x.c.phone,meta:x.r.next_followup<todayStr?'متأخرة':'اليوم',action:'viewClient'}))});
     const hotByClient=new Map();requests.forEach(r=>{if(r.lead_temperature!=='hot')return;if(!withinDays(r.created_at,30)&&!r.next_followup&&!withinDays(r.last_mutual_contact_at,30))return;if(!hotByClient.has(r.client_id))hotByClient.set(r.client_id,r)});const hotFocus=[...hotByClient.values()].map(r=>({r,c:cmap.get(r.client_id)})).filter(x=>x.c&&!dueByClient.has(x.c.id));if(hotFocus.length)fueData.alerts.push({rule:'hotLeadStale',priority:'warning',title:'🔥 فرص حارة تحتاج متابعة',count:hotFocus.length,items:hotFocus.slice(0,5).map(x=>({id:x.c.id,name:x.c.name,phone:x.c.phone,meta:x.r.last_mutual_contact_at?'آخر حوار '+timeAgo(x.r.last_mutual_contact_at):'بدون حوار متبادل',action:'viewClient'}))});
     const viewFollow=viewings.filter(v=>(v.status==='done'&&(!v.pipeline_outcome||v.pipeline_outcome==='followup')&&(!v.followup_date||v.followup_date<=todayStr))||v.status==='no_show'||v.status==='cancelled');if(viewFollow.length)fueData.alerts.push({rule:'viewingAfter',priority:'warning',title:'📅 زيارات تحتاج نتيجة / إجراء',count:viewFollow.length,items:viewFollow.slice(0,5).map(v=>({id:v.id,name:(v.client?v.client.name:'')+(v.property?' - '+v.property.title:''),phone:v.client?v.client.phone:null,meta:v.status==='no_show'?'لم يحضر':v.status==='cancelled'?'ألغيت':'نتيجة الزيارة مطلوبة',action:'navigateViewings'}))});
@@ -4643,7 +4674,7 @@ function renderFollowUpSection(containerId){
   const c=document.getElementById(containerId);if(!c)return;
   const actionable=(fueData.alerts||[]).filter(a=>a.priority==='urgent'||a.priority==='warning');
   if(!actionable.length){c.innerHTML='<div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:11px;padding:10px 13px;margin-bottom:12px;font-size:12px;color:#166534">✅ لا توجد متابعة عاجلة أو متأخرة الآن.</div>';return;}
-  const order={urgent:1,warning:2};const sorted=[...actionable].sort((a,b)=>order[a.priority]-order[b.priority]).slice(0,4);const total=actionable.reduce((n,a)=>n+a.count,0);let h='<div class="fue-section"><div class="fue-section-title">🚨 يحتاج تدخل الآن <span style="font-size:11px;color:var(--umber);font-weight:600;margin-right:auto">'+total+' عنصر</span></div><div class="fue-rules-grid">';sorted.forEach(alert=>{const countCls=alert.priority==='urgent'?'':'warn';h+='<div class="fue-rule-card '+alert.priority+'"><div class="fue-rule-header"><div class="fue-rule-title">'+alert.title+'</div><div class="fue-rule-count '+countCls+'">'+alert.count+'</div></div><div class="fue-rule-items">';alert.items.forEach(item=>{const action=item.action==='resolveUnknownLink'?'openUnknownPropertyLinkResolver(\''+item.id+'\')':item.action==='viewClient'?'viewClient(\''+item.id+'\')':item.action==='navigateViewings'?'openDashboardViewings(\'today\')':item.action==='navigateDeposits'?'goToEndingDeposits()':item.action==='navigateProperties'?'navigate(\'properties\',null)':item.action==='navigateOwners'?'navigate(\'owners\',null)':'';const phoneCleaned=item.phone?item.phone.replace(/[^0-9+]/g,'').replace(/^\+/,''):'';h+='<div class="fue-rule-item"><span class="fue-rule-item-name" onclick="'+action+'">'+escapeHtml(item.name||'—')+'</span><div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><span class="fue-rule-item-meta">'+item.meta+'</span>';if(phoneCleaned)h+='<div class="fue-quick-actions" onclick="event.stopPropagation()"><a class="fue-qa-btn wa" href="https://api.whatsapp.com/send?phone='+phoneCleaned+'" target="_blank" title="واتساب">💚</a><a class="fue-qa-btn call" href="tel:+'+phoneCleaned+'" title="اتصال">📞</a></div>';h+='</div></div>'});h+='</div></div>'});h+='</div></div>';c.innerHTML=h;}
+  const order={urgent:1,warning:2};const sorted=[...actionable].sort((a,b)=>order[a.priority]-order[b.priority]).slice(0,4);const total=actionable.reduce((n,a)=>n+a.count,0);let h='<div class="fue-section"><div class="fue-section-title">🚨 يحتاج تدخل الآن <span style="font-size:11px;color:var(--umber);font-weight:600;margin-right:auto">'+total+' عنصر</span></div><div class="fue-rules-grid">';sorted.forEach(alert=>{const countCls=alert.priority==='urgent'?'':'warn';h+='<div class="fue-rule-card '+alert.priority+'"><div class="fue-rule-header"><div class="fue-rule-title">'+alert.title+'</div><div class="fue-rule-count '+countCls+'">'+alert.count+'</div></div><div class="fue-rule-items">';alert.items.forEach(item=>{const action=item.action==='resolveUnknownLink'?'openUnknownPropertyLinkResolver(\''+item.id+'\')':item.action==='viewClient'?'viewClient(\''+item.id+'\')':item.action==='navigateViewings'?'openDashboardViewings(\'today\')':item.action==='navigateDeposits'?'goToEndingDeposits()':item.action==='navigateProperties'?'navigate(\'properties\',null)':item.action==='navigateOwners'?'navigate(\'owners\',null)':item.action==='openWhatsAppConversation'?'openDashboardWhatsAppConversation(\''+item.id+'\')':'';const phoneCleaned=item.phone?item.phone.replace(/[^0-9+]/g,'').replace(/^\+/,''):'';h+='<div class="fue-rule-item"><span class="fue-rule-item-name" onclick="'+action+'">'+escapeHtml(item.name||'—')+'</span><div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><span class="fue-rule-item-meta">'+item.meta+'</span>';if(phoneCleaned)h+='<div class="fue-quick-actions" onclick="event.stopPropagation()"><a class="fue-qa-btn wa" href="https://api.whatsapp.com/send?phone='+phoneCleaned+'" target="_blank" title="واتساب">💚</a><a class="fue-qa-btn call" href="tel:+'+phoneCleaned+'" title="اتصال">📞</a></div>';h+='</div></div>'});h+='</div></div>'});h+='</div></div>';c.innerHTML=h;}
 function renderFollowUpBanner(){
   const urgentCount=fueData.alerts.filter(a=>a.priority==='urgent').reduce((s,a)=>s+a.count,0);
   const totalCount=fueData.alerts.filter(a=>a.priority==='urgent'||a.priority==='warning').reduce((s,a)=>s+a.count,0);
@@ -4681,6 +4712,7 @@ function navigateViewings(){navigate('viewings',null)}
 function navigateDeposits(){navigate('deposits',null)}
 function navigateProperties(){navigate('properties',null)}
 function navigateOwners(){navigate('owners',null)}
+function openDashboardWhatsAppConversation(id){navigate('whatsapp',null);setTimeout(function(){openWhatsAppConversation(id)},220)}
 
 // التقاط الأخطاء غير المعالجة للتشخيص (بدون إزعاج المستخدم)
 window.addEventListener('unhandledrejection', function(e){
@@ -4693,7 +4725,7 @@ window.addEventListener('error', function(e){
   console.error('🚨 Runtime error:', e.message, 'at', e.filename, ':', e.lineno);
 });
 
-window.APP_VERSION = '20260913-pipeline-simple-v9';
+window.APP_VERSION = '20260913-whatsapp-automation-ready-v10';
 window.checkForUpdates = async function(){
   try{
     if(sessionStorage.getItem('crm_update_checked')==='1')return;
@@ -4760,7 +4792,7 @@ async function downloadFullBackup(){
   
   try{
     const cid = currentProfile.company_id;
-    const tables = ['clients','client_requests','client_request_events','properties','property_inquiries','appointments','appointment_properties','rejection_reasons','property_rejection_reasons','property_action_reviews','deals','owners','tasks','activities','viewings','deposits','whatsapp_conversations','whatsapp_messages','whatsapp_message_requests','measurement_periods','measurement_targets','company_lead_routes','companies','profiles'];
+    const tables = ['clients','client_requests','client_request_events','properties','property_inquiries','appointments','appointment_properties','rejection_reasons','property_rejection_reasons','property_action_reviews','deals','owners','tasks','activities','viewings','deposits','whatsapp_conversations','whatsapp_messages','whatsapp_automation_events','whatsapp_message_requests','measurement_periods','measurement_targets','company_lead_routes','companies','profiles'];
     const backup = {
       version: BACKUP_VERSION,
       created_at: new Date().toISOString(),
