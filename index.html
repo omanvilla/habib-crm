@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="20260914-mobile-app-v14">
+<meta name="app-version" content="20260914-backup-reminder-v15">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4893,7 +4893,7 @@ window.addEventListener('error', function(e){
   console.error('🚨 Runtime error:', e.message, 'at', e.filename, ':', e.lineno);
 });
 
-window.APP_VERSION = '20260914-mobile-app-v14';
+window.APP_VERSION = '20260914-backup-reminder-v15';
 window.checkForUpdates = async function(){
   try{
     if(sessionStorage.getItem('crm_update_checked')==='1')return;
@@ -5146,29 +5146,37 @@ async function restoreFromBackup(){
 // Auto-backup check (runs daily)
 async function checkAutoBackup(){
   if(!isOwner())return;
-  
-  const lastKey = 'last_backup_check_' + (currentProfile.company_id || 'default');
-  const lastBackup = localStorage.getItem(lastKey);
+
+  const companyKey = currentProfile.company_id || 'default';
+  const lastCheckKey = 'last_backup_check_' + companyKey;
+  const reminderKey = 'last_backup_reminder_shown_' + companyKey;
   const now = Date.now();
-  
-  // Check every 24 hours
-  if(lastBackup && (now - parseInt(lastBackup)) < 24*60*60*1000) return;
-  
-  localStorage.setItem(lastKey, String(now));
-  
-  // Show reminder if no backup in last 7 days
+  const DAY = 24*60*60*1000;
+  const WEEK = 7*DAY;
+
+  // Do the lightweight check at most once a day.
+  const lastCheck = Number(localStorage.getItem(lastCheckKey) || 0);
+  if(lastCheck && (now - lastCheck) < DAY) return;
+  localStorage.setItem(lastCheckKey, String(now));
+
+  // Never annoy the user with the backup reminder more than once per week.
+  const lastReminder = Number(localStorage.getItem(reminderKey) || 0);
+  if(lastReminder && (now - lastReminder) < WEEK) return;
+
   const history = getBackupHistory();
   if(history.length === 0){
+    localStorage.setItem(reminderKey, String(now));
     setTimeout(()=>{
-      showToast('💡 لم تأخذ نسخة احتياطية بعد! يُنصح بأخذ واحدة أسبوعياً','info');
+      showToast('💡 تذكير: لم تأخذ نسخة احتياطية بعد — يكفي أخذ نسخة أسبوعياً','info');
     }, 3000);
     return;
   }
-  
+
   const lastBackupDate = new Date(history[0].created_at);
-  const daysSince = Math.floor((now - lastBackupDate.getTime()) / (1000*60*60*24));
-  
+  const daysSince = Math.floor((now - lastBackupDate.getTime()) / DAY);
+
   if(daysSince > 7){
+    localStorage.setItem(reminderKey, String(now));
     setTimeout(()=>{
       showBackupReminder(daysSince);
     }, 3000);
