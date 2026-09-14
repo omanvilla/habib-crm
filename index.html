@@ -3,27 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="app-version" content="20260914-modern-ui-v17-live">
+<meta name="app-version" content="20260914-liquid-glass-v18-live">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Habib Sons Real Estate — CRM</title>
-<style>html,body{margin:0;min-height:100%;background:#f4f2ed;font-family:Arial,sans-serif}.boot{min-height:100vh;display:flex;align-items:center;justify-content:center;color:#5f554b;direction:rtl}.boot div{text-align:center}.spin{width:42px;height:42px;border:3px solid #ddd5c8;border-top-color:#b98a32;border-radius:50%;margin:0 auto 14px;animation:s .8s linear infinite}@keyframes s{to{transform:rotate(360deg)}}</style>
+<style>html,body{margin:0;min-height:100%;background:#eef3f2;font-family:Arial,sans-serif}.boot{min-height:100vh;display:flex;align-items:center;justify-content:center;color:#5f554b;direction:rtl}.boot div{text-align:center}.spin{width:42px;height:42px;border:3px solid rgba(255,255,255,.8);border-top-color:#b98a32;border-radius:50%;margin:0 auto 14px;animation:s .8s linear infinite}@keyframes s{to{transform:rotate(360deg)}}</style>
 </head>
 <body>
 <div class="boot"><div><div class="spin"></div><strong>جاري تشغيل Habib CRM…</strong></div></div>
 <script>
-(async function(){
-  try{
-    var r=await fetch('app-base-v15.html?v=20260914v17',{cache:'no-store'});
-    if(!r.ok)throw new Error('تعذر تحميل قاعدة النظام');
-    var h=await r.text();
-    h=h.replace(/<meta name="app-version" content="[^"]+">/,'<meta name="app-version" content="20260914-modern-ui-v17-live">');
-    h=h.replace('</head>','<link rel="stylesheet" href="modern-v17.css?v=20260914v17"></head>');
-    h=h.replace('</body>','<script src="crm-v17-patch.js?v=20260914v17"><\/script><script src="modern-v17.js?v=20260914v17"><\/script></body>');
-    document.open();document.write(h);document.close();
-  }catch(e){document.body.innerHTML='<div class="boot"><div><strong>تعذر تشغيل النظام</strong><br><small>'+String(e.message||e)+'</small><br><br><button onclick="location.reload()">إعادة المحاولة</button></div></div>';}
-})();
+(async function(){try{var r=await fetch('app-base-v15.html?v=20260914v18',{cache:'no-store'});if(!r.ok)throw new Error('تعذر تحميل قاعدة النظام');var h=await r.text();h=h.replace(/<meta name="app-version" content="[^"]+">/,'<meta name="app-version" content="20260914-liquid-glass-v18-live">');h=h.replace('</head>','<link rel="stylesheet" href="modern-v17.css?v=20260914v18"></head>');h=h.replace('</body>','<script src="crm-v17-patch.js?v=20260914v18"><\/script><script src="modern-v17.js?v=20260914v18"><\/script></body>');document.open();document.write(h);document.close()}catch(e){document.body.innerHTML='<div class="boot"><div><strong>تعذر تشغيل النظام</strong><br><small>'+String(e.message||e)+'</small><br><br><button onclick="location.reload()">إعادة المحاولة</button></div></div>'}})();
 </script>
 </body>
 </html>
