@@ -1,12 +1,27 @@
 (function(){
-  var VERSION='v6-official-es-new-config';
-  var FALLBACK_CONFIG_ID='1790225632111798';
+  var VERSION='v7-direct-existing-waba';
   var installed=false;
   function logMeta(status,details){
     try{
       if(typeof supa==='undefined'||!supa.functions)return;
       supa.functions.invoke('whatsapp-meta-login-log',{body:{route_key:'muscat',status:status||'failed',details:details||{}}}).catch(function(){});
     }catch(_e){}
+  }
+  async function bindWithUserToken(token){
+    showToast('جاري التحقق من حساب واتساب وربط التطبيق...','info');
+    try{
+      var r=await supa.functions.invoke('whatsapp-direct-bind',{body:{route_key:'muscat',user_access_token:token}});
+      if(r.error)throw r.error;
+      var d=r.data||{};
+      if(!d.ok)throw new Error(d.message||d.error||'فشل الربط المباشر');
+      showToast('تم ربط رقم مسقط بالتطبيق والـWebhook بنجاح','success');
+      try{if(typeof loadLeadRouting==='function')await loadLeadRouting();}catch(_e){}
+      logMeta('completed',{phase:'direct_bind_completed',waba_id:d.waba_id||null,phone_number_id:d.phone_number_id||null});
+    }catch(e){
+      var msg=String(e&&e.message||e);
+      logMeta('failed',{phase:'direct_bind_failed',error:msg});
+      showToast('تعذر الربط المباشر: '+msg,'error');
+    }
   }
   function install(){
     if(installed)return;
@@ -20,70 +35,34 @@
       var routePhone=String((input&&input.value)||row.whatsapp_number||'').trim();
       if(!routePhone){showToast('اكتب رقم واتساب للمسار واحفظه أولاً','error');return;}
       if(typeof FB==='undefined'||!FB.login){showToast('Meta SDK لم يكتمل تحميله بعد. حدّث الصفحة وحاول مرة أخرى.','error');return;}
-      var configId=String(row.meta_login_configuration_id||FALLBACK_CONFIG_ID).trim();
-      try{
-        waEmbeddedRouteKey=routeKey;
-        waEmbeddedCode=null;
-        waEmbeddedSessionInfo=null;
-        waEmbeddedFinalizing=false;
-      }catch(_e){}
-      showToast('ستفتح نافذة Meta الرسمية لربط '+routePhone,'info');
+      showToast('سيفتح تفويض Meta للوصول إلى حساب واتساب الحالي بدون نقل الرقم أو حذفه','info');
       FB.login(function(response){
         var auth=response&&response.authResponse;
-        var code=auth&&auth.code;
-        var details={
-          phase:'fb_callback',
+        var token=auth&&auth.accessToken;
+        logMeta(token?'started':'failed',{
+          phase:'direct_user_login',
           fb_status:response&&response.status||null,
           has_auth_response:!!auth,
-          has_code:!!code,
+          has_code:false,
           granted_scopes:auth&&auth.grantedScopes||null,
           denied_scopes:auth&&auth.deniedScopes||null,
           error:response&&response.error||null,
           error_reason:response&&response.error_reason||null,
           error_code:response&&response.error_code||null,
-          error_description:response&&response.error_description||null,
-          config_id:configId
-        };
-        logMeta(code?'started':'failed',details);
-        if(!code){
-          showToast('Meta أنهى النافذة لكنه لم يرجع رمز الربط. تم تسجيل السبب داخل النظام للفحص.','error');
-          return;
-        }
-        try{
-          waEmbeddedCode=code;
-          scheduleEmbeddedSignupFinalize(1800);
-        }catch(e){
-          logMeta('failed',{phase:'schedule_finalize',error:String(e&&e.message||e),config_id:configId});
-          showToast('تعذر إكمال الربط بعد موافقة Meta','error');
-        }
+          error_description:response&&response.error_description||null
+        });
+        if(!token){showToast('Meta لم يرجع صلاحية الوصول. تم تسجيل السبب للفحص.','error');return;}
+        bindWithUserToken(token);
       },{
-        config_id:configId,
-        response_type:'code',
-        override_default_response_type:true,
-        extras:{setup:{},featureType:'whatsapp_business_app_onboarding',sessionInfoVersion:'3'}
+        scope:'business_management,whatsapp_business_management,whatsapp_business_messaging',
+        return_scopes:true,
+        auth_type:'rerequest'
       });
     }
-    launch.__officialEmbeddedSignupV6Installed=true;
+    launch.__directExistingWabaV7Installed=true;
     window.launchWhatsAppEmbeddedSignup=launch;
-    window.addEventListener('message',function(event){
-      var origin=String(event.origin||'');
-      if(origin.indexOf('facebook.com')<0&&origin.indexOf('facebook.net')<0)return;
-      var data=event.data;
-      if(typeof data==='string'){try{data=JSON.parse(data);}catch(_e){return;}}
-      if(!data||data.type!=='WA_EMBEDDED_SIGNUP')return;
-      var d=data.data||{};
-      logMeta(String(data.event||'')==='ERROR'?'failed':'started',{
-        phase:'wa_embedded_event',
-        wa_event:String(data.event||''),
-        wa_error_message:d.error_message||d.error||null,
-        current_step:d.current_step||null,
-        waba_id:d.waba_id||d.wabaID||null,
-        phone_number_id:d.phone_number_id||d.phoneNumberId||null,
-        config_id:((typeof leadRouteData!=='undefined'&&leadRouteData&&leadRouteData.muscat&&leadRouteData.muscat.meta_login_configuration_id)||FALLBACK_CONFIG_ID)
-      });
-    });
     installed=true;
-    console.info('[WhatsApp Meta] official Embedded Signup '+VERSION+' installed');
+    console.info('[WhatsApp Meta] '+VERSION+' installed');
   }
   function boot(){install();if(!installed)setTimeout(install,500);if(!installed)setTimeout(install,1400);}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
