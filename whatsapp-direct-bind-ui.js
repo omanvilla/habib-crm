@@ -1,6 +1,6 @@
 (function(){
-  var VERSION='v5-official-es';
-  var FALLBACK_CONFIG_ID='1790044758792788';
+  var VERSION='v6-official-es-new-config';
+  var FALLBACK_CONFIG_ID='1790225632111798';
   var installed=false;
   function logMeta(status,details){
     try{
@@ -63,7 +63,7 @@
         extras:{setup:{},featureType:'whatsapp_business_app_onboarding',sessionInfoVersion:'3'}
       });
     }
-    launch.__officialEmbeddedSignupV5Installed=true;
+    launch.__officialEmbeddedSignupV6Installed=true;
     window.launchWhatsAppEmbeddedSignup=launch;
     window.addEventListener('message',function(event){
       var origin=String(event.origin||'');
