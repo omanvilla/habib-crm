@@ -1,5 +1,6 @@
 (function(){
-  var V='v4';
+  var V='v4.1';
+  var DESIRED='تفويض وربط رقم مسقط';
   function muscatButton(){
     var buttons=[].slice.call(document.querySelectorAll('button[onclick*="launchWhatsAppEmbeddedSignup"]'));
     return buttons.find(function(b){return (b.getAttribute('onclick')||'').indexOf("'muscat'")>=0;})||null;
@@ -7,9 +8,10 @@
   function markButton(){
     var b=muscatButton();
     if(!b)return;
-    b.textContent='تفويض وربط رقم مسقط';
-    b.setAttribute('data-meta-bind-version',V);
-    b.title='ربط مباشر مع Meta — '+V;
+    if(b.textContent!==DESIRED)b.textContent=DESIRED;
+    if(b.getAttribute('data-meta-bind-version')!==V)b.setAttribute('data-meta-bind-version',V);
+    var title='ربط مباشر مع Meta — '+V;
+    if(b.title!==title)b.title=title;
   }
   async function bindWithToken(token){
     showToast('جاري تثبيت ربط رقم مسقط مع Meta...','info');
@@ -23,7 +25,7 @@
   }
   function installDirectBind(){
     var oldLaunch=window.launchWhatsAppEmbeddedSignup;
-    if(!oldLaunch||oldLaunch.__directBindV4Installed){markButton();return;}
+    if(!oldLaunch||oldLaunch.__directBindV41Installed){markButton();return;}
     function directBind(routeKey){
       if(routeKey!=='muscat')return oldLaunch(routeKey);
       if(typeof isOwner==='function'&&!isOwner()){showToast('فقط صاحب الشركة يمكنه ربط رقم مسقط','error');return;}
@@ -34,18 +36,27 @@
         var token=response&&response.authResponse&&response.authResponse.accessToken;
         if(!token){showToast('لم يكتمل تفويض Meta أو تم إغلاق النافذة','error');return;}
         bindWithToken(token).catch(function(e){
-          console.error('[whatsapp direct bind v4]',e);
+          console.error('[whatsapp direct bind v4.1]',e);
           showToast('تعذّر ربط رقم مسقط: '+(e&&e.message?e.message:String(e)),'error');
         });
       },{scope:'business_management,whatsapp_business_management,whatsapp_business_messaging',auth_type:'rerequest',return_scopes:true});
     }
-    directBind.__directBindV4Installed=true;
+    directBind.__directBindV41Installed=true;
     window.launchWhatsAppEmbeddedSignup=directBind;
     markButton();
   }
-  function boot(){installDirectBind();markButton();new MutationObserver(function(){markButton();installDirectBind();}).observe(document.body,{childList:true,subtree:true});}
+  var queued=false;
+  function scheduleInstall(){
+    if(queued)return;
+    queued=true;
+    requestAnimationFrame(function(){queued=false;installDirectBind();markButton();});
+  }
+  function boot(){
+    installDirectBind();markButton();
+    new MutationObserver(scheduleInstall).observe(document.body,{childList:true,subtree:true});
+  }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
-  window.addEventListener('load',function(){installDirectBind();markButton();});
-  setTimeout(function(){installDirectBind();markButton();},700);
-  setTimeout(function(){installDirectBind();markButton();},1600);
+  window.addEventListener('load',scheduleInstall);
+  setTimeout(scheduleInstall,700);
+  setTimeout(scheduleInstall,1600);
 })();
