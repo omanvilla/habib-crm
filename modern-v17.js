@@ -13,3 +13,30 @@ function observeChrome(){var queued=false;new MutationObserver(function(){if(que
 function boot(){installToastPolish();apply();observeChrome();setTimeout(apply,500);setTimeout(apply,1600)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();window.addEventListener('load',apply);
 })();
+(function(){
+function installMuscatMetaBind(){
+  if(window.__muscatMetaBindInstalled)return;
+  if(typeof window.launchWhatsAppEmbeddedSignup!=='function'||typeof window.FB==='undefined'||!window.supa){setTimeout(installMuscatMetaBind,500);return}
+  window.__muscatMetaBindInstalled=true;
+  var legacy=window.launchWhatsAppEmbeddedSignup;
+  window.launchWhatsAppEmbeddedSignup=function(routeKey){
+    if(routeKey!=='muscat')return legacy(routeKey);
+    if(typeof isOwner==='function'&&!isOwner()){showToast('فقط صاحب الشركة يمكنه ربط رقم واتساب','error');return}
+    showToast('سيظهر تفويض Meta لإكمال ربط رقم مسقط','info');
+    FB.login(async function(response){
+      var token=response&&response.authResponse&&response.authResponse.accessToken;
+      if(!token){showToast('لم يكتمل تفويض Meta','error');return}
+      try{
+        showToast('جاري ربط رقم مسقط بحساب واتساب الحقيقي...','info');
+        var r=await supa.functions.invoke('whatsapp-direct-bind',{body:{route_key:'muscat',user_access_token:token}});
+        if(r.error)throw r.error;
+        var d=r.data||{};
+        if(!d.ok)throw new Error(d.message||d.error||'فشل الربط');
+        showToast('تم ربط رقم مسقط بالـCRM بنجاح','success');
+        if(typeof loadLeadRouting==='function')await loadLeadRouting();
+      }catch(e){console.error('[muscat meta bind]',e);showToast('تعذر إكمال الربط: '+(e&&e.message?e.message:String(e)),'error')}
+    },{scope:'business_management,whatsapp_business_management,whatsapp_business_messaging',auth_type:'rerequest',return_scopes:true});
+  };
+}
+installMuscatMetaBind();
+})();
