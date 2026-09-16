@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ربط واتساب بركاء — Habib CRM</title>
+<style>
+body{margin:0;background:#eef3f2;font-family:Arial,sans-serif;color:#2A2118;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:20px;box-sizing:border-box}.card{width:min(520px,100%);background:white;border:1px solid #ddd7cb;border-radius:20px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.08)}h1{font-size:22px;margin:0 0 8px}.sub{font-size:13px;color:#6B5A3E;line-height:1.8;margin-bottom:18px}.status{padding:12px 14px;border-radius:12px;background:#f7f4ee;border:1px solid #e5ded2;font-size:13px;line-height:1.7;margin-bottom:14px;white-space:pre-wrap}.ok{background:#eef8f2;border-color:#b8dec5;color:#1B4D3E}.err{background:#fff1f1;border-color:#efc2c2;color:#8B2635}.btn{width:100%;border:0;border-radius:12px;padding:13px 16px;font-size:15px;font-weight:700;cursor:pointer;background:#2A2118;color:white}.btn:disabled{opacity:.55;cursor:not-allowed}.back{display:block;text-align:center;margin-top:12px;color:#6B5A3E;text-decoration:none;font-size:13px}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const META_APP_ID='1639659247753419';
+window.fbAsyncInit=function(){FB.init({appId:META_APP_ID,cookie:true,xfbml:false,version:'v25.0'});setStatus('Meta جاهز. اضغط زر الربط.');enableButton();};
+(function(d,s,id){if(d.getElementById(id))return;const js=d.createElement(s);js.id=id;js.async=true;js.defer=true;js.src='https://connect.facebook.net/en_US/sdk.js';const f=d.getElementsByTagName(s)[0];f.parentNode.insertBefore(js,f)})(document,'script','facebook-jssdk');
+</script>
+</head>
+<body>
+<div class="card">
+  <h1>ربط رقم بركاء مع Meta</h1>
+  <div class="sub">هذه صفحة ربط مستقلة لتجاوز مشكلة زر الإعدادات. لن تنقل الرقم ولن تلغي WhatsApp Business على الهاتف.</div>
+  <div id="status" class="status">جاري فحص جلسة CRM وتهيئة Meta…</div>
+  <button id="connectBtn" class="btn" type="button" disabled>ربط رقم بركاء الآن</button>
+  <a class="back" href="./">العودة إلى CRM</a>
+</div>
+<script>
+const SUPABASE_URL='https://dmsckqjkcnsfmnzfjczz.supabase.co';
+const SUPABASE_KEY='sb_publishable_cblz5giFrHdXSCYSG6j0Cw_oaxkmHi4';
+const supa=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let sessionReady=false,metaReady=false,busy=false;
+function setStatus(msg,kind){const el=document.getElementById('status');el.textContent=msg;el.className='status'+(kind==='ok'?' ok':kind==='err'?' err':'');}
+function enableButton(){metaReady=true;const b=document.getElementById('connectBtn');if(sessionReady&&!busy)b.disabled=false;}
+(async()=>{try{const {data,error}=await supa.auth.getSession();if(error)throw error;if(!data.session){setStatus('جلسة CRM غير موجودة. ارجع للنظام وسجل الدخول أولاً، وبعدها افتح هذه الصفحة مرة ثانية.','err');return;}sessionReady=true;if(metaReady)document.getElementById('connectBtn').disabled=false;else setStatus('جلسة CRM موجودة. ننتظر اكتمال تحميل Meta…');}catch(e){setStatus('تعذر قراءة جلسة CRM: '+String(e.message||e),'err')}})();
+document.getElementById('connectBtn').addEventListener('click',function(){
+  if(busy)return;if(typeof FB==='undefined'||!FB.login){setStatus('Meta لم يكتمل تحميله بعد. حدّث الصفحة وحاول مرة ثانية.','err');return;}
+  busy=true;this.disabled=true;setStatus('جاري فتح تفويض Meta…');
+  FB.login(async function(response){
+    try{
+      const auth=response&&response.authResponse;if(!auth||!auth.accessToken)throw new Error('Meta لم يرجع صلاحية الوصول');
+      setStatus('تم التفويض. جاري البحث عن رقم بركاء وربطه بالـCRM…');
+      const {data,error}=await supa.functions.invoke('whatsapp-direct-bind',{body:{route_key:'barka',user_access_token:auth.accessToken}});
+      if(error)throw error;if(!data||!data.ok)throw new Error((data&&data.message)||(data&&data.error)||'فشل الربط');
+      setStatus('تم ربط رقم بركاء بنجاح.\nالرقم: '+(data.display_phone_number||'+96892344273')+'\nيمكنك العودة إلى CRM الآن.','ok');
+      document.getElementById('connectBtn').textContent='تم الربط بنجاح';
+    }catch(e){const m=String(e&&e.message||e);if(m.includes('ROUTE_PHONE_NOT_FOUND_IN_BUSINESS_ASSETS'))setStatus('Meta أعطى الصلاحية، لكن رقم بركاء غير ظاهر بعد ضمن أصول WhatsApp Business لهذا الحساب. لا تعيد المحاولة الآن؛ سنكمل ربط الأصل من إعدادات Meta.','err');else setStatus('تعذر الربط: '+m,'err');busy=false;document.getElementById('connectBtn').disabled=false;}
+  },{scope:'business_management,whatsapp_business_management,whatsapp_business_messaging',return_scopes:true,auth_type:'rerequest'});
+});
+</script>
+</body>
+</html>
