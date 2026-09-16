@@ -84,7 +84,33 @@
     };
   }
 
-  function run(){hideLegacyLeadForm();stripLegacyShareLinks()}
+  function addPasswordVisibility(){
+    var auth=el('authScreen')||document.querySelector('.auth-screen');
+    if(!auth)return;
+    auth.querySelectorAll('input[type="password"]').forEach(function(input){
+      if(input.dataset.passwordEyeReady==='1')return;
+      input.dataset.passwordEyeReady='1';
+      var host=input.parentElement;if(!host)return;
+      var cs=getComputedStyle(host);if(cs.position==='static')host.style.position='relative';
+      input.style.paddingLeft='48px';
+      var btn=document.createElement('button');
+      btn.type='button';btn.className='crm-password-eye';btn.setAttribute('aria-label','إظهار كلمة المرور');btn.setAttribute('title','إظهار كلمة المرور');
+      btn.style.cssText='position:absolute;left:8px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:0;background:transparent;color:#6B5A3E;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:8px;padding:0;z-index:3';
+      function paint(show){
+        btn.innerHTML=show?'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"></path><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"></path><path d="M9.9 4.2A10.8 10.8 0 0 1 12 4c5.5 0 9.5 4.5 10 8a11.8 11.8 0 0 1-2.1 4.3"></path><path d="M6.6 6.6C4.6 8 2.7 10 2 12c.8 3.5 4.7 8 10 8 1.3 0 2.5-.3 3.6-.7"></path></svg>':'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+      }
+      paint(false);
+      btn.addEventListener('click',function(){
+        var show=input.type==='password';input.type=show?'text':'password';
+        btn.setAttribute('aria-label',show?'إخفاء كلمة المرور':'إظهار كلمة المرور');
+        btn.setAttribute('title',show?'إخفاء كلمة المرور':'إظهار كلمة المرور');paint(show);input.focus();
+      });
+      host.appendChild(btn);
+    });
+  }
+
+  function run(){hideLegacyLeadForm();stripLegacyShareLinks();addPasswordVisibility()}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run);else run();
+  setTimeout(run,300);
   setTimeout(run,1200);
 })();
