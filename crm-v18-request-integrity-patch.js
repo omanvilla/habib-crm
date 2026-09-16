@@ -2,7 +2,13 @@
   function el(id){return document.getElementById(id)}
   function money(v,short){
     if(v===null||v===undefined||v==='')return '';
-    try{return short&&typeof fmtMoneyShort==='function'?fmtMoneyShort(v):(typeof fmtMoney==='function'?fmtMoney(v):Number(v).toLocaleString('en-US')+' ر.ع')}catch(_e){return String(v)}
+    var n=Number(v);if(!Number.isFinite(n))return String(v);
+    if(short){
+      if(n>=1000000)return (Math.round(n/100000)/10)+'م';
+      if(n>=1000)return (Math.round(n/100)/10)+'ألف';
+      return n.toLocaleString('en-US');
+    }
+    return n.toLocaleString('en-US')+' ر.ع';
   }
   function budgetText(min,max,short){
     var hasMin=min!==null&&min!==undefined&&min!==''&&Number(min)>0;
