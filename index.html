@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="app-version" content="20260916-client-info-v18-20-live">
+<meta name="app-version" content="20260916-geo-routing-v18-21-live">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Habib Sons Real Estate — CRM</title>
-<style>html,body{margin:0;min-height:100%;background:#eef3f2;font-family:Arial,sans-serif}.boot{min-height:100vh;display:flex;align-items:center;justify-content:center;color:#5f554b;direction:rtl}.boot div{text-align:center}.spin{width:42px;height:42px;border:3px solid rgba(255,255,255,.8);border-top-color:#b98a32;border-radius:50%;margin:0 auto 14px;animation:s .8s linear infinite}@keyframes s{to{transform:rotate(360deg)}}.legacy-off{max-width:520px;background:#fff;border:1px solid #ddd4c8;border-radius:18px;padding:28px;box-shadow:0 16px 40px rgba(0,0,0,.08);line-height:1.9}.legacy-off strong{display:block;font-size:20px;margin-bottom:8px;color:#2a2118}.legacy-off span{font-size:14px;color:#6b5a3e}</style>
+<style>html,body{margin:0;min-height:100%;background:#eef3f2;font-family:Arial,sans-serif}.boot{min-height:100vh;display:flex;align-items:center;justify-content:center;color:#5f554b;direction:rtl}.boot div{text-align:center}.spin{width:42px;height:42px;border:3px solid rgba(255,255,255,.8);border-top-color:#b98a32;border-radius:50%;margin:0 auto 14px;animation:s .8s linear infinite}@keyframes s{to{transform:rotate(360deg)}}</style>
 </head>
 <body>
 <div class="boot"><div><div class="spin"></div><strong>جاري تشغيل Habib CRM…</strong></div></div>
@@ -16,10 +16,11 @@
 (function(){
   var q=new URLSearchParams(location.search);
   if(q.get('form')==='lead'){
-    document.body.innerHTML='<div class="boot"><div class="legacy-off"><strong>تم إلغاء نموذج الطلبات</strong><span>هذا الرابط لم يعد مستخدمًا. يتم استقبال طلبات العملاء الآن مباشرة عبر قنوات المكتب المعتمدة.</span></div></div>';
-    return;
+    q.delete('form');q.delete('r');
+    var clean=location.pathname+(q.toString()?'?'+q.toString():'')+location.hash;
+    history.replaceState(null,'',clean);
   }
-  (async function(){try{var currentVersion='20260916-client-info-v18-20-live';var r=await fetch('app-base-v15.html?v=20260916v1820',{cache:'no-store'});if(!r.ok)throw new Error('تعذر تحميل قاعدة النظام');var h=await r.text();h=h.replace(/<meta name="app-version" content="[^"]+">/,'<meta name="app-version" content="'+currentVersion+'">');h=h.replace('</head>','<link rel="stylesheet" href="modern-v17.css?v=20260916v1820"></head>');h=h.replace('</body>','<script src="crm-v17-patch.js?v=20260916v1820"><\/script><script src="modern-v17.js?v=20260916v1820"><\/script><script src="whatsapp-direct-bind-ui.js?v=20260916v1820"><\/script><script src="crm-v18-routing-patch.js?v=20260916v1820"><\/script><script src="crm-v18-request-integrity-patch.js?v=20260916v1820"><\/script><script src="crm-v18-client-info-patch.js?v=20260916v1820"><\/script><script>window.APP_VERSION=(document.querySelector(\'meta[name="app-version"]\')||{}).content||\''+currentVersion+'\';<\/script></body>');document.open();document.write(h);document.close()}catch(e){document.body.innerHTML='<div class="boot"><div><strong>تعذر تشغيل النظام</strong><br><small>'+String(e.message||e)+'</small><br><br><button onclick="location.reload()">إعادة المحاولة</button></div></div>'}})();
+  (async function(){try{var currentVersion='20260916-geo-routing-v18-21-live';var r=await fetch('app-base-v15.html?v=20260916v1821',{cache:'no-store'});if(!r.ok)throw new Error('تعذر تحميل قاعدة النظام');var h=await r.text();h=h.replace(/<meta name="app-version" content="[^"]+">/,'<meta name="app-version" content="'+currentVersion+'">');h=h.replace('</head>','<link rel="stylesheet" href="modern-v17.css?v=20260916v1821"></head>');h=h.replace('</body>','<script src="crm-v17-patch.js?v=20260916v1821"><\/script><script src="modern-v17.js?v=20260916v1821"><\/script><script src="whatsapp-direct-bind-ui.js?v=20260916v1821"><\/script><script src="crm-v18-routing-patch.js?v=20260916v1821"><\/script><script src="crm-v18-request-integrity-patch.js?v=20260916v1821"><\/script><script src="crm-v18-client-info-patch.js?v=20260916v1821"><\/script><script>window.APP_VERSION=(document.querySelector(\'meta[name="app-version"]\')||{}).content||\''+currentVersion+'\';<\/script></body>');document.open();document.write(h);document.close()}catch(e){document.body.innerHTML='<div class="boot"><div><strong>تعذر تشغيل النظام</strong><br><small>'+String(e.message||e)+'</small><br><br><button onclick="location.reload()">إعادة المحاولة</button></div></div>'}})();
 })();
 </script>
 </body>
