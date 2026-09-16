@@ -1,12 +1,29 @@
 (function(){
-  var VERSION='v8-direct-waba-permanent-token';
+  var VERSION='v9-barka-coexistence-v4';
+  var META_CONFIG_V4='1790225632111798';
   var installed=false;
-  function logMeta(status,details){
+  var pendingEmbeddedRoute=null;
+  var embeddedSessionByRoute={};
+
+  function logMeta(routeKey,status,details){
     try{
       if(typeof supa==='undefined'||!supa.functions)return;
-      supa.functions.invoke('whatsapp-meta-login-log',{body:{route_key:'muscat',status:status||'failed',details:details||{}}}).catch(function(){});
+      supa.functions.invoke('whatsapp-meta-login-log',{body:{route_key:routeKey||'muscat',status:status||'failed',details:details||{}}}).catch(function(){});
     }catch(_e){}
   }
+
+  window.addEventListener('message',function(event){
+    try{
+      var data=event.data;
+      if(typeof data==='string'){try{data=JSON.parse(data)}catch(_e){return}}
+      if(!data||data.type!=='WA_EMBEDDED_SIGNUP')return;
+      var route=pendingEmbeddedRoute||'barka';
+      var info=(data.data&&typeof data.data==='object')?data.data:{};
+      embeddedSessionByRoute[route]=Object.assign({},embeddedSessionByRoute[route]||{},info,{event:data.event||null,version:data.version||null});
+      logMeta(route,'started',{phase:'embedded_signup_event',event:data.event||null,version:data.version||null,has_waba_id:!!(info.waba_id||info.wabaID),has_phone_number_id:!!(info.phone_number_id||info.phoneNumberId)});
+    }catch(_e){}
+  });
+
   async function bindWithUserToken(token){
     showToast('جاري التحقق من حساب واتساب وربط التطبيق...','info');
     try{
@@ -16,13 +33,69 @@
       if(!d.ok)throw new Error(d.message||d.error||'فشل الربط المباشر');
       showToast('تم ربط رقم مسقط بالتطبيق والـWebhook بنجاح','success');
       try{if(typeof loadLeadRouting==='function')await loadLeadRouting();}catch(_e){}
-      logMeta('completed',{phase:'direct_bind_completed',waba_id:d.waba_id||null,phone_number_id:d.phone_number_id||null});
+      logMeta('muscat','completed',{phase:'direct_bind_completed',waba_id:d.waba_id||null,phone_number_id:d.phone_number_id||null});
     }catch(e){
       var msg=String(e&&e.message||e);
-      logMeta('failed',{phase:'direct_bind_failed',error:msg});
+      logMeta('muscat','failed',{phase:'direct_bind_failed',error:msg});
       showToast('تعذر الربط المباشر: '+msg,'error');
     }
   }
+
+  async function completeEmbeddedSignup(routeKey,code){
+    showToast('جاري إكمال ربط '+(routeKey==='barka'?'بركاء':'واتساب')+' مع الخادم...','info');
+    try{
+      await new Promise(function(resolve){setTimeout(resolve,900)});
+      var sessionInfo=embeddedSessionByRoute[routeKey]||{};
+      var r=await supa.functions.invoke('whatsapp-embedded-signup',{body:{route_key:routeKey,code:code,configuration_id:META_CONFIG_V4,session_info:sessionInfo}});
+      if(r.error)throw r.error;
+      var d=r.data||{};
+      if(!d.ok)throw new Error(d.message||d.error||'فشل إكمال ربط واتساب');
+      showToast('تم ربط رقم '+(routeKey==='barka'?'بركاء':'واتساب')+' مع Meta والـCRM بنجاح','success');
+      logMeta(routeKey,'completed',{phase:'embedded_signup_v4_completed',waba_id:d.waba_id||null,phone_number_id:d.phone_number_id||null,display_phone_number:d.display_phone_number||null});
+      try{if(typeof loadLeadRouting==='function')await loadLeadRouting();}catch(_e){}
+    }catch(e){
+      var msg=String(e&&e.message||e);
+      logMeta(routeKey,'failed',{phase:'embedded_signup_v4_backend_failed',error:msg});
+      showToast('تعذر إكمال ربط واتساب: '+msg,'error');
+    }finally{
+      pendingEmbeddedRoute=null;
+    }
+  }
+
+  function launchCoexistenceV4(routeKey){
+    if(typeof isOwner==='function'&&!isOwner()){showToast('فقط صاحب الشركة يمكنه ربط أرقام واتساب','error');return;}
+    var row=(typeof leadRouteData!=='undefined'&&leadRouteData&&leadRouteData[routeKey])||{};
+    var input=typeof $==='function'?$('routePhone_'+routeKey):null;
+    var routePhone=String((input&&input.value)||row.whatsapp_number||'').trim();
+    if(!routePhone){showToast('اكتب رقم واتساب للمسار واحفظه أولاً','error');return;}
+    if(typeof FB==='undefined'||!FB.login){showToast('Meta SDK لم يكتمل تحميله بعد. حدّث الصفحة وحاول مرة أخرى.','error');return;}
+    pendingEmbeddedRoute=routeKey;
+    embeddedSessionByRoute[routeKey]={};
+    showToast('سيفتح ربط Meta الحديث مع الحفاظ على WhatsApp Business على الهاتف','info');
+    logMeta(routeKey,'started',{phase:'embedded_signup_v4_launch',configuration_id:META_CONFIG_V4,route_phone:routePhone});
+    FB.login(function(response){
+      var auth=response&&response.authResponse;
+      var code=auth&&auth.code;
+      if(!code){
+        logMeta(routeKey,'failed',{phase:'embedded_signup_v4_no_code',fb_status:response&&response.status||null,error:response&&response.error||null,error_reason:response&&response.error_reason||null,error_code:response&&response.error_code||null,error_description:response&&response.error_description||null});
+        showToast('لم يكتمل ربط Meta. أغلق النافذة وحاول مرة أخرى.','error');
+        pendingEmbeddedRoute=null;
+        return;
+      }
+      completeEmbeddedSignup(routeKey,code);
+    },{
+      config_id:META_CONFIG_V4,
+      response_type:'code',
+      override_default_response_type:true,
+      extras:{
+        setup:{},
+        featureType:'whatsapp_business_app_onboarding',
+        sessionInfoVersion:'3',
+        version:'v4'
+      }
+    });
+  }
+
   async function savePermanentSystemToken(){
     var input=document.getElementById('waPermanentSystemTokenInput');
     var btn=document.getElementById('waPermanentSystemTokenSave');
@@ -46,6 +119,7 @@
       if(btn){btn.disabled=false;btn.textContent='تحقق وحفظ';}
     }
   }
+
   function installPermanentTokenUI(){
     try{
       if(typeof isOwner==='function'&&!isOwner())return;
@@ -61,11 +135,13 @@
       document.getElementById('waPermanentSystemTokenSave').addEventListener('click',savePermanentSystemToken);
     }catch(_e){}
   }
+
   function install(){
     if(!installed){
       var oldLaunch=window.launchWhatsAppEmbeddedSignup;
       if(typeof oldLaunch!=='function')return;
       function launch(routeKey){
+        if(routeKey==='barka')return launchCoexistenceV4('barka');
         if(routeKey!=='muscat')return oldLaunch(routeKey);
         if(typeof isOwner==='function'&&!isOwner()){showToast('فقط صاحب الشركة يمكنه ربط أرقام واتساب','error');return;}
         var row=(typeof leadRouteData!=='undefined'&&leadRouteData&&leadRouteData[routeKey])||{};
@@ -77,33 +153,19 @@
         FB.login(function(response){
           var auth=response&&response.authResponse;
           var token=auth&&auth.accessToken;
-          logMeta(token?'started':'failed',{
-            phase:'direct_user_login',
-            fb_status:response&&response.status||null,
-            has_auth_response:!!auth,
-            has_code:false,
-            granted_scopes:auth&&auth.grantedScopes||null,
-            denied_scopes:auth&&auth.deniedScopes||null,
-            error:response&&response.error||null,
-            error_reason:response&&response.error_reason||null,
-            error_code:response&&response.error_code||null,
-            error_description:response&&response.error_description||null
-          });
+          logMeta('muscat',token?'started':'failed',{phase:'direct_user_login',fb_status:response&&response.status||null,has_auth_response:!!auth,granted_scopes:auth&&auth.grantedScopes||null,denied_scopes:auth&&auth.deniedScopes||null,error:response&&response.error||null,error_reason:response&&response.error_reason||null,error_code:response&&response.error_code||null,error_description:response&&response.error_description||null});
           if(!token){showToast('Meta لم يرجع صلاحية الوصول. تم تسجيل السبب للفحص.','error');return;}
           bindWithUserToken(token);
-        },{
-          scope:'business_management,whatsapp_business_management,whatsapp_business_messaging',
-          return_scopes:true,
-          auth_type:'rerequest'
-        });
+        },{scope:'business_management,whatsapp_business_management,whatsapp_business_messaging',return_scopes:true,auth_type:'rerequest'});
       }
-      launch.__directExistingWabaV8Installed=true;
+      launch.__directExistingWabaV9Installed=true;
       window.launchWhatsAppEmbeddedSignup=launch;
       installed=true;
       console.info('[WhatsApp Meta] '+VERSION+' installed');
     }
     installPermanentTokenUI();
   }
+
   function boot(){install();setTimeout(install,500);setTimeout(install,1400);setTimeout(install,3000);}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
   window.addEventListener('load',install);
