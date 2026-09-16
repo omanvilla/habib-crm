@@ -1,172 +1,36 @@
 (function(){
-  var VERSION='v9-barka-coexistence-v4';
-  var META_CONFIG_V4='1790225632111798';
   var installed=false;
-  var pendingEmbeddedRoute=null;
-  var embeddedSessionByRoute={};
-
-  function logMeta(routeKey,status,details){
-    try{
-      if(typeof supa==='undefined'||!supa.functions)return;
-      supa.functions.invoke('whatsapp-meta-login-log',{body:{route_key:routeKey||'muscat',status:status||'failed',details:details||{}}}).catch(function(){});
-    }catch(_e){}
-  }
-
-  window.addEventListener('message',function(event){
-    try{
-      var data=event.data;
-      if(typeof data==='string'){try{data=JSON.parse(data)}catch(_e){return}}
-      if(!data||data.type!=='WA_EMBEDDED_SIGNUP')return;
-      var route=pendingEmbeddedRoute||'barka';
-      var info=(data.data&&typeof data.data==='object')?data.data:{};
-      embeddedSessionByRoute[route]=Object.assign({},embeddedSessionByRoute[route]||{},info,{event:data.event||null,version:data.version||null});
-      logMeta(route,'started',{phase:'embedded_signup_event',event:data.event||null,version:data.version||null,has_waba_id:!!(info.waba_id||info.wabaID),has_phone_number_id:!!(info.phone_number_id||info.phoneNumberId)});
-    }catch(_e){}
-  });
-
-  async function bindWithUserToken(token){
-    showToast('جاري التحقق من حساب واتساب وربط التطبيق...','info');
-    try{
-      var r=await supa.functions.invoke('whatsapp-direct-bind',{body:{route_key:'muscat',user_access_token:token}});
-      if(r.error)throw r.error;
-      var d=r.data||{};
-      if(!d.ok)throw new Error(d.message||d.error||'فشل الربط المباشر');
-      showToast('تم ربط رقم مسقط بالتطبيق والـWebhook بنجاح','success');
-      try{if(typeof loadLeadRouting==='function')await loadLeadRouting();}catch(_e){}
-      logMeta('muscat','completed',{phase:'direct_bind_completed',waba_id:d.waba_id||null,phone_number_id:d.phone_number_id||null});
-    }catch(e){
-      var msg=String(e&&e.message||e);
-      logMeta('muscat','failed',{phase:'direct_bind_failed',error:msg});
-      showToast('تعذر الربط المباشر: '+msg,'error');
-    }
-  }
-
-  async function completeEmbeddedSignup(routeKey,code){
-    showToast('جاري إكمال ربط '+(routeKey==='barka'?'بركاء':'واتساب')+' مع الخادم...','info');
-    try{
-      await new Promise(function(resolve){setTimeout(resolve,900)});
-      var sessionInfo=embeddedSessionByRoute[routeKey]||{};
-      var r=await supa.functions.invoke('whatsapp-embedded-signup',{body:{route_key:routeKey,code:code,configuration_id:META_CONFIG_V4,session_info:sessionInfo}});
-      if(r.error)throw r.error;
-      var d=r.data||{};
-      if(!d.ok)throw new Error(d.message||d.error||'فشل إكمال ربط واتساب');
-      showToast('تم ربط رقم '+(routeKey==='barka'?'بركاء':'واتساب')+' مع Meta والـCRM بنجاح','success');
-      logMeta(routeKey,'completed',{phase:'embedded_signup_v4_completed',waba_id:d.waba_id||null,phone_number_id:d.phone_number_id||null,display_phone_number:d.display_phone_number||null});
-      try{if(typeof loadLeadRouting==='function')await loadLeadRouting();}catch(_e){}
-    }catch(e){
-      var msg=String(e&&e.message||e);
-      logMeta(routeKey,'failed',{phase:'embedded_signup_v4_backend_failed',error:msg});
-      showToast('تعذر إكمال ربط واتساب: '+msg,'error');
-    }finally{
-      pendingEmbeddedRoute=null;
-    }
-  }
-
-  function launchCoexistenceV4(routeKey){
-    if(typeof isOwner==='function'&&!isOwner()){showToast('فقط صاحب الشركة يمكنه ربط أرقام واتساب','error');return;}
-    var row=(typeof leadRouteData!=='undefined'&&leadRouteData&&leadRouteData[routeKey])||{};
-    var input=typeof $==='function'?$('routePhone_'+routeKey):null;
-    var routePhone=String((input&&input.value)||row.whatsapp_number||'').trim();
-    if(!routePhone){showToast('اكتب رقم واتساب للمسار واحفظه أولاً','error');return;}
-    if(typeof FB==='undefined'||!FB.login){showToast('Meta SDK لم يكتمل تحميله بعد. حدّث الصفحة وحاول مرة أخرى.','error');return;}
-    pendingEmbeddedRoute=routeKey;
-    embeddedSessionByRoute[routeKey]={};
-    showToast('سيفتح ربط Meta الحديث مع الحفاظ على WhatsApp Business على الهاتف','info');
-    logMeta(routeKey,'started',{phase:'embedded_signup_v4_launch',configuration_id:META_CONFIG_V4,route_phone:routePhone});
-    FB.login(function(response){
-      var auth=response&&response.authResponse;
-      var code=auth&&auth.code;
-      if(!code){
-        logMeta(routeKey,'failed',{phase:'embedded_signup_v4_no_code',fb_status:response&&response.status||null,error:response&&response.error||null,error_reason:response&&response.error_reason||null,error_code:response&&response.error_code||null,error_description:response&&response.error_description||null});
-        showToast('لم يكتمل ربط Meta. أغلق النافذة وحاول مرة أخرى.','error');
-        pendingEmbeddedRoute=null;
-        return;
-      }
-      completeEmbeddedSignup(routeKey,code);
-    },{
-      config_id:META_CONFIG_V4,
-      response_type:'code',
-      override_default_response_type:true,
-      extras:{
-        setup:{},
-        featureType:'whatsapp_business_app_onboarding',
-        sessionInfoVersion:'3',
-        version:'v4'
-      }
-    });
-  }
-
-  async function savePermanentSystemToken(){
-    var input=document.getElementById('waPermanentSystemTokenInput');
-    var btn=document.getElementById('waPermanentSystemTokenSave');
-    if(!input)return;
-    var token=String(input.value||'').trim();
-    if(!token){showToast('ألصق System User token الدائم أولاً','error');return;}
-    if(btn){btn.disabled=true;btn.textContent='جاري التحقق...';}
-    showToast('جاري التحقق من المفتاح الدائم وحفظه بشكل مشفّر...','info');
-    try{
-      var r=await supa.functions.invoke('whatsapp-save-system-token',{body:{route_key:'muscat',system_access_token:token}});
-      if(r.error)throw r.error;
-      var d=r.data||{};
-      if(!d.ok)throw new Error(d.message||d.error||'فشل حفظ المفتاح الدائم');
-      input.value='';
-      var status=document.getElementById('waPermanentSystemTokenStatus');
-      if(status)status.textContent='مفتاح الخادم الدائم مثبت';
-      showToast('تم تثبيت مفتاح واتساب الدائم لمسقط بنجاح','success');
-    }catch(e){
-      showToast('تعذر تثبيت المفتاح الدائم: '+String(e&&e.message||e),'error');
-    }finally{
-      if(btn){btn.disabled=false;btn.textContent='تحقق وحفظ';}
-    }
-  }
-
-  function installPermanentTokenUI(){
-    try{
-      if(typeof isOwner==='function'&&!isOwner())return;
-      if(document.getElementById('waPermanentSystemTokenBox'))return;
-      var routeInput=document.getElementById('routePhone_muscat');
-      if(!routeInput)return;
-      var anchor=routeInput.closest('.field')||routeInput.parentElement||routeInput;
-      var box=document.createElement('div');
-      box.id='waPermanentSystemTokenBox';
-      box.style.cssText='margin-top:10px;padding:12px;border:1px solid rgba(34,80,70,.16);border-radius:14px;background:rgba(255,255,255,.72);backdrop-filter:blur(10px);';
-      box.innerHTML='<div style="font-weight:700;margin-bottom:5px">مفتاح واتساب الدائم للخادم</div><div id="waPermanentSystemTokenStatus" style="font-size:12px;opacity:.72;margin-bottom:8px">يُستخدم مرة واحدة فقط لتثبيت الإرسال الدائم بدون تجديد كل 60 يوم</div><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="waPermanentSystemTokenInput" type="password" autocomplete="off" spellcheck="false" placeholder="ألصق System User token هنا" style="flex:1;min-width:240px;padding:10px 12px;border:1px solid rgba(0,0,0,.14);border-radius:10px"><button id="waPermanentSystemTokenSave" type="button" style="padding:10px 14px;border:0;border-radius:10px;cursor:pointer">تحقق وحفظ</button></div><div style="font-size:11px;opacity:.62;margin-top:6px">لا ترسل المفتاح في المحادثة. أدخله هنا فقط، وسيُحفظ مشفّرًا في الخادم.</div>';
-      anchor.insertAdjacentElement('afterend',box);
-      document.getElementById('waPermanentSystemTokenSave').addEventListener('click',savePermanentSystemToken);
-    }catch(_e){}
-  }
-
+  function label(k){return k==='barka'?'بركاء':'مسقط'}
   function install(){
-    if(!installed){
-      var oldLaunch=window.launchWhatsAppEmbeddedSignup;
-      if(typeof oldLaunch!=='function')return;
-      function launch(routeKey){
-        if(routeKey==='barka')return launchCoexistenceV4('barka');
-        if(routeKey!=='muscat')return oldLaunch(routeKey);
-        if(typeof isOwner==='function'&&!isOwner()){showToast('فقط صاحب الشركة يمكنه ربط أرقام واتساب','error');return;}
-        var row=(typeof leadRouteData!=='undefined'&&leadRouteData&&leadRouteData[routeKey])||{};
-        var input=typeof $==='function'?$('routePhone_'+routeKey):null;
-        var routePhone=String((input&&input.value)||row.whatsapp_number||'').trim();
-        if(!routePhone){showToast('اكتب رقم واتساب للمسار واحفظه أولاً','error');return;}
-        if(typeof FB==='undefined'||!FB.login){showToast('Meta SDK لم يكتمل تحميله بعد. حدّث الصفحة وحاول مرة أخرى.','error');return;}
-        showToast('سيفتح تفويض Meta للوصول إلى حساب واتساب الحالي بدون نقل الرقم أو حذفه','info');
-        FB.login(function(response){
+    if(installed)return;
+    var oldLaunch=window.launchWhatsAppEmbeddedSignup;
+    if(typeof oldLaunch!=='function')return;
+    window.launchWhatsAppEmbeddedSignup=function(routeKey){
+      if(routeKey!=='muscat'&&routeKey!=='barka')return oldLaunch(routeKey);
+      if(typeof isOwner==='function'&&!isOwner()){showToast('فقط صاحب الشركة يمكنه ربط أرقام واتساب','error');return;}
+      if(typeof FB==='undefined'||!FB.login){showToast('Meta لم يكتمل تحميله بعد. حدّث الصفحة وحاول مرة أخرى.','error');return;}
+      var name=label(routeKey);
+      showToast('سيفتح تفويض Meta للوصول إلى رقم '+name+' الحالي بدون نقل الرقم أو إلغاء WhatsApp Business','info');
+      FB.login(async function(response){
+        try{
           var auth=response&&response.authResponse;
-          var token=auth&&auth.accessToken;
-          logMeta('muscat',token?'started':'failed',{phase:'direct_user_login',fb_status:response&&response.status||null,has_auth_response:!!auth,granted_scopes:auth&&auth.grantedScopes||null,denied_scopes:auth&&auth.deniedScopes||null,error:response&&response.error||null,error_reason:response&&response.error_reason||null,error_code:response&&response.error_code||null,error_description:response&&response.error_description||null});
-          if(!token){showToast('Meta لم يرجع صلاحية الوصول. تم تسجيل السبب للفحص.','error');return;}
-          bindWithUserToken(token);
-        },{scope:'business_management,whatsapp_business_management,whatsapp_business_messaging',return_scopes:true,auth_type:'rerequest'});
-      }
-      launch.__directExistingWabaV9Installed=true;
-      window.launchWhatsAppEmbeddedSignup=launch;
-      installed=true;
-      console.info('[WhatsApp Meta] '+VERSION+' installed');
-    }
-    installPermanentTokenUI();
+          if(!auth||!auth.accessToken)throw new Error('لم يرجع Meta صلاحية الوصول');
+          var r=await supa.functions.invoke('whatsapp-direct-bind',{body:{route_key:routeKey,user_access_token:auth.accessToken}});
+          if(r.error)throw r.error;
+          var d=r.data||{};
+          if(!d.ok)throw new Error(d.message||d.error||'فشل الربط');
+          showToast('تم ربط رقم '+name+' مع Meta والـCRM بنجاح','success');
+          if(typeof loadLeadRouting==='function')await loadLeadRouting();
+        }catch(e){
+          var m=String(e&&e.message||e);
+          if(m.indexOf('ROUTE_PHONE_NOT_FOUND_IN_BUSINESS_ASSETS')>=0)showToast('رقم '+name+' غير ظاهر بعد ضمن أصول واتساب في Meta. لا تعيد المحاولة الآن.','error');
+          else showToast('تعذر ربط '+name+': '+m,'error');
+        }
+      },{scope:'business_management,whatsapp_business_management,whatsapp_business_messaging',return_scopes:true,auth_type:'rerequest'});
+    };
+    installed=true;
   }
-
-  function boot(){install();setTimeout(install,500);setTimeout(install,1400);setTimeout(install,3000);}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
   window.addEventListener('load',install);
+  setTimeout(install,700);setTimeout(install,1800);
 })();
