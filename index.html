@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="app-version" content="20260915-liquid-glass-v18-11-live">
+<meta name="app-version" content="20260916-whatsapp-first-v18-12-live">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -13,7 +13,17 @@
 <body>
 <div class="boot"><div><div class="spin"></div><strong>جاري تشغيل Habib CRM…</strong></div></div>
 <script>
-(async function(){try{var currentVersion='20260915-liquid-glass-v18-11-live';var r=await fetch('app-base-v15.html?v=20260915v1811',{cache:'no-store'});if(!r.ok)throw new Error('تعذر تحميل قاعدة النظام');var h=await r.text();h=h.replace(/<meta name="app-version" content="[^"]+">/,'<meta name="app-version" content="'+currentVersion+'">');h=h.replace('</head>','<link rel="stylesheet" href="modern-v17.css?v=20260915v1811"></head>');h=h.replace('</body>','<script src="crm-v17-patch.js?v=20260915v1811"><\/script><script src="modern-v17.js?v=20260915v1811"><\/script><script src="whatsapp-direct-bind-ui.js?v=20260915v1811"><\/script><script>window.APP_VERSION=(document.querySelector(\'meta[name="app-version"]\')||{}).content||\''+currentVersion+'\';<\/script></body>');document.open();document.write(h);document.close()}catch(e){document.body.innerHTML='<div class="boot"><div><strong>تعذر تشغيل النظام</strong><br><small>'+String(e.message||e)+'</small><br><br><button onclick="location.reload()">إعادة المحاولة</button></div></div>'}})();
+(function(){
+  var q=new URLSearchParams(location.search);
+  if(q.get('form')==='lead'){
+    var route=(q.get('r')||'muscat').toLowerCase();
+    var number=route==='barka'?'96892344273':route==='investment'?'96890944469':'96871770030';
+    var text='السلام عليكم، أرغب بتسجيل طلب عقاري.';
+    location.replace('https://wa.me/'+number+'?text='+encodeURIComponent(text));
+    return;
+  }
+  (async function(){try{var currentVersion='20260916-whatsapp-first-v18-12-live';var r=await fetch('app-base-v15.html?v=20260916v1812',{cache:'no-store'});if(!r.ok)throw new Error('تعذر تحميل قاعدة النظام');var h=await r.text();h=h.replace(/<meta name="app-version" content="[^"]+">/,'<meta name="app-version" content="'+currentVersion+'">');h=h.replace('</head>','<link rel="stylesheet" href="modern-v17.css?v=20260916v1812"></head>');h=h.replace('</body>','<script src="crm-v17-patch.js?v=20260916v1812"><\/script><script src="modern-v17.js?v=20260916v1812"><\/script><script src="whatsapp-direct-bind-ui.js?v=20260916v1812"><\/script><script src="crm-v18-routing-patch.js?v=20260916v1812"><\/script><script>window.APP_VERSION=(document.querySelector(\'meta[name="app-version"]\')||{}).content||\''+currentVersion+'\';<\/script></body>');document.open();document.write(h);document.close()}catch(e){document.body.innerHTML='<div class="boot"><div><strong>تعذر تشغيل النظام</strong><br><small>'+String(e.message||e)+'</small><br><br><button onclick="location.reload()">إعادة المحاولة</button></div></div>'}})();
+})();
 </script>
 </body>
 </html>
