@@ -27,6 +27,29 @@
   function missingLabel(k){
     return ({location:'المنطقة',property_type:'نوع العقار',budget:'الميزانية',payment_method:'طريقة الدفع',purchase_timing:'موعد الشراء',bedrooms:'عدد الغرف'})[k]||k;
   }
+  async function showActiveChatMissingRequirements(){
+    try{
+      if(typeof waInboxActiveConversation==='undefined'||!waInboxActiveConversation||!waInboxActiveConversation.client_id)return;
+      var conversationId=waInboxActiveConversation.id,clientId=waInboxActiveConversation.client_id;
+      var q=await supa.from('client_requests').select('id,missing_required_fields,status,updated_at').eq('client_id',clientId).in('status',['active','paused']).order('updated_at',{ascending:false}).limit(20);
+      if(q.error)throw q.error;
+      if(typeof waInboxActiveConversation==='undefined'||!waInboxActiveConversation||waInboxActiveConversation.id!==conversationId)return;
+      var rows=(q.data||[]).filter(function(r){return Array.isArray(r.missing_required_fields)&&r.missing_required_fields.length});
+      var old=el('waMissingRequirements');if(old)old.remove();
+      if(!rows.length)return;
+      var fields=[];rows.forEach(function(r){r.missing_required_fields.forEach(function(f){if(fields.indexOf(f)<0)fields.push(f)})});
+      var strip=el('waClientStrip');if(!strip)return;
+      var box=document.createElement('div');box.id='waMissingRequirements';
+      box.style.cssText='width:100%;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;padding:8px 10px;border-radius:9px;margin-bottom:7px;font-size:11px;line-height:1.7';
+      box.innerHTML='<strong>بيانات ناقصة في الطلب:</strong> '+fields.map(function(f){return escapeHtml(missingLabel(f))}).join('، ');
+      strip.insertBefore(box,strip.firstChild);
+    }catch(e){console.warn('[WhatsApp missing requirements]',e)}
+  }
+  var oldRenderWhatsApp=window.renderWhatsAppChat;
+  if(typeof oldRenderWhatsApp==='function'){
+    window.renderWhatsAppChat=function(){var r=oldRenderWhatsApp.apply(this,arguments);setTimeout(showActiveChatMissingRequirements,0);return r};
+  }
+
   var oldFollowUp=window.runFollowUpEngine;
   if(typeof oldFollowUp==='function'){
     window.runFollowUpEngine=async function(){
