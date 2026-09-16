@@ -82,4 +82,21 @@
   }
   var oldDashHot=window.renderDashHot;
   if(typeof oldDashHot==='function')window.renderDashHot=function(clients){var r=oldDashHot.apply(this,arguments);fixDashHot(clients);return r};
+
+  // Never let staff accidentally send from the physical WhatsApp thread when a client has
+  // multiple active requests. They must select the exact request so the server can choose
+  // the correct Muscat/Barka route.
+  var oldSend=window.sendWhatsAppInboxMessage;
+  if(typeof oldSend==='function'){
+    window.sendWhatsAppInboxMessage=async function(){
+      try{
+        if(typeof waInboxRequests!=='undefined'&&Array.isArray(waInboxRequests)&&waInboxRequests.length>1&&
+           (typeof waInboxSelectedRequestId==='undefined'||!waInboxSelectedRequestId)){
+          if(typeof showToast==='function')showToast('اختر الطلب الذي يخص هذا الرد أولاً حتى نرسل من رقم المكتب الصحيح','warning');
+          return;
+        }
+      }catch(e){console.warn('[request route send guard]',e)}
+      return oldSend.apply(this,arguments);
+    };
+  }
 })();
