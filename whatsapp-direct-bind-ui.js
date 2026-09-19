@@ -32,8 +32,10 @@
       if(typeof loadLeadRouting==='function')await loadLeadRouting();
     }catch(e){
       var m=String(e&&e.message||e);
-      if(m.indexOf('ROUTE_PHONE_NOT_FOUND_IN_BUSINESS_ASSETS')>=0||m.indexOf('SYSTEM_USER_NOT_ASSIGNED_TO_WABA')>=0){
-        toast('رقم المستثمر غير متاح لتفويض الشركة. تحقق من إضافته في حسابات واتساب في Meta وإسناد حسابه لمستخدم النظام، ثم أعد الربط.','error');
+      if(m.indexOf('ROUTE_PHONE_NOT_FOUND_IN_BUSINESS_ASSETS')>=0){
+        toast('اكتمل الفحص: رقم المستثمر غير ظاهر في أي حساب واتساب تملكه الشركة في Meta. يلزم إكمال إعداد الرقم عبر Meta أو تحرير ملكيته القديمة أولاً.','error');
+      }else if(m.indexOf('SYSTEM_USER_NOT_ASSIGNED_TO_WABA')>=0){
+        toast('الرقم ظاهر في Meta، لكن مستخدم النظام غير مسند إلى حساب واتساب الخاص به.','error');
       }else if(m.indexOf('invalid_auth')>=0||m.indexOf('missing_auth')>=0){
         toast('انتهت جلسة CRM. سجّل الدخول بحساب صاحب الشركة ثم أعد الربط.','error');
       }else{
@@ -56,7 +58,7 @@
     var btn=document.createElement('button');
     btn.id='investmentSavedMetaBind';btn.type='button';btn.className='btn-secondary';
     btn.style.cssText='width:auto;padding:8px 14px';
-    btn.textContent='🔗 ربط رقم المستثمر المسجّل في Meta';
+    btn.textContent='🔎 فحص ظهور رقم المستثمر في Meta';
     btn.disabled=investmentBinding;
     btn.addEventListener('click',bindInvestmentWithSavedAuthorization);
     existing.parentElement.insertBefore(btn,existing);
