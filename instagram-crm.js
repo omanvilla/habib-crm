@@ -90,21 +90,44 @@
   async function connectInstagram() {
     if (igConnecting) return;
     if (typeof isOwner === 'function' && !isOwner()) { showToast('⚠️ فقط صاحب الشركة يمكنه ربط Instagram', 'error'); return; }
-    if (typeof FB === 'undefined' || !FB.login) { showToast('⏳ Meta SDK لم يكتمل تحميله بعد. حدّث الصفحة وحاول مرة أخرى.', 'error'); return; }
     igConnecting = true;
-    showToast('🔗 ستفتح نافذة Meta لاختيار صفحة Omanvilla ومنح صلاحيات Instagram', 'info');
-    FB.login(async function (response) {
-      try {
-        var token = response && response.authResponse && response.authResponse.accessToken;
-        if (!token) throw new Error('تم إلغاء الربط أو لم تكتمل موافقة Meta');
-        showToast('⏳ جاري تثبيت ربط Instagram داخل CRM...', 'info');
-        var data = await invoke({ action: 'connect', access_token: token, instagram_user_id: '17841444560608289' });
-        showToast(data.webhook_subscribed ? '✅ تم ربط @' + (data.username || 'omanvilla') + ' والرسائل بالـCRM' : '✅ تم ربط الحساب. بقي تفعيل Webhook من لوحة Meta.', 'success');
-        await loadStatus();
-        await loadInstagramInbox(true);
-      } catch (error) { showToast('⚠️ تعذّر ربط Instagram: ' + (error.message || error), 'error'); }
-      finally { igConnecting = false; }
-    }, { scope: 'pages_show_list,pages_read_engagement,business_management,instagram_basic,instagram_manage_messages,instagram_manage_insights', auth_type: 'rerequest', return_scopes: true });
+    var stateBytes = new Uint8Array(16);
+    crypto.getRandomValues(stateBytes);
+    var state = Array.from(stateBytes).map(function (value) { return value.toString(16).padStart(2, '0'); }).join('');
+    sessionStorage.setItem('instagram_oauth_state', state);
+    var redirect = 'https://omanvilla.github.io/habib-crm/';
+    var scope = 'pages_show_list,pages_read_engagement,business_management,instagram_basic,instagram_manage_insights,instagram_manage_messages';
+    var url = 'https://www.facebook.com/v25.0/dialog/oauth?client_id=1639659247753419&redirect_uri=' + encodeURIComponent(redirect) + '&response_type=token&auth_type=rerequest&return_scopes=true&scope=' + encodeURIComponent(scope) + '&state=' + encodeURIComponent(state);
+    showToast('🔗 جاري فتح موافقة Meta لربط @omanvilla', 'info');
+    location.assign(url);
+  }
+
+  async function handleInstagramOAuthReturn() {
+    var params = new URLSearchParams(location.hash.replace(/^#/, ''));
+    var token = params.get('access_token');
+    var returnedState = params.get('state');
+    if (!token) return false;
+    var expectedState = sessionStorage.getItem('instagram_oauth_state');
+    history.replaceState(null, '', location.pathname + location.search);
+    if (!expectedState || returnedState !== expectedState) {
+      sessionStorage.removeItem('instagram_oauth_state');
+      showToast('⚠️ تعذّر التحقق من جلسة ربط Meta. حاول مرة أخرى.', 'error');
+      return false;
+    }
+    sessionStorage.removeItem('instagram_oauth_state');
+    try {
+      showToast('⏳ جاري تثبيت ربط Instagram داخل CRM...', 'info');
+      var data = await invoke({ action: 'connect', access_token: token, instagram_user_id: '17841444560608289' });
+      showToast(data.webhook_subscribed ? '✅ تم ربط @' + (data.username || 'omanvilla') + ' والرسائل بالـCRM' : '✅ تم ربط الحساب. بقي تفعيل Webhook من لوحة Meta.', 'success');
+      var nav = Array.from(document.querySelectorAll('.nav-link')).find(function (item) { return item.textContent.indexOf('إنستغرام') >= 0; });
+      if (typeof navigate === 'function' && nav) navigate('instagram', nav);
+      await loadStatus();
+      await loadInstagramInbox(true);
+      return true;
+    } catch (error) {
+      showToast('⚠️ تعذّر ربط Instagram: ' + (error.message || error), 'error');
+      return false;
+    } finally { igConnecting = false; }
   }
 
   async function loadInstagramInbox(force) {
@@ -170,15 +193,33 @@
   async function syncInstagramForCurrentProperty() {
     if (!window.viewingProperty) return;
     try {
-      var query = await supa.from('property_marketing_events').select('id,url').eq('company_id', currentProfile.company_id).eq('property_id', window.viewingProperty.id).eq('channel', 'instagram').not('url', 'is', null).order('published_at', { ascending: false }).limit(1).maybeSingle();
+      var query = await supa.from('property_marketing_events').select('id,url').eq('company_id', currentProfile.company_id).eq('property_id', window.viewingProperty.id).eq('channel', 'instagram').not('url', 'is', null).order('published_at', { ascending: false });
       if (query.error) throw query.error;
-      if (!query.data) throw new Error('أضف رابط منشور أو Reel للعقار أولاً');
-      showToast('⏳ جاري جلب أرقام Instagram...', 'info');
-      var result = await invoke({ action: 'sync_property', event_id: query.data.id });
-      showToast('✅ تمت مزامنة أداء المنشور من Instagram', 'success');
+      if (!query.data || !query.data.length) throw new Error('أضف رابط منشور أو Reel للعقار أولاً');
+      showToast('⏳ جاري تحليل ' + query.data.length + ' رابط Instagram للعقار...', 'info');
+      var result = await invoke({ action: 'sync_property', property_id: window.viewingProperty.id });
+      var views = Number((result.totals || {}).views || 0).toLocaleString('ar-OM');
+      showToast('✅ تمت مزامنة ' + result.synced_count + ' من ' + result.link_count + ' رابط · إجمالي المشاهدات ' + views, result.failed_count ? 'info' : 'success');
       if (typeof loadPropertyPerformance === 'function') loadPropertyPerformance(window.viewingProperty.id);
       return result;
     } catch (error) { showToast('⚠️ تعذرت مزامنة Instagram: ' + (error.message || error), 'error'); }
+  }
+
+  async function maybeSyncInstagramProperty(propertyId, refreshPerformance) {
+    if (!propertyId || !currentProfile || !currentProfile.company_id || window.__igAutoSyncing === propertyId) return;
+    try {
+      var status = await invoke({ action: 'status' });
+      if (!status || !status.connected) return;
+      var cutoff = Date.now() - 6 * 60 * 60 * 1000;
+      var query = await supa.from('property_marketing_events').select('id,url,last_synced_at,sync_status').eq('company_id', currentProfile.company_id).eq('property_id', propertyId).eq('channel', 'instagram').not('url', 'is', null);
+      if (query.error || !query.data || !query.data.length) return;
+      var needsSync = query.data.some(function (item) { return item.sync_status !== 'synced' || !item.last_synced_at || new Date(item.last_synced_at).getTime() < cutoff; });
+      if (!needsSync) return;
+      window.__igAutoSyncing = propertyId;
+      var result = await invoke({ action: 'sync_property', property_id: propertyId });
+      if (result.synced_count && typeof refreshPerformance === 'function') await refreshPerformance(propertyId);
+    } catch (_) { /* The existing property view keeps the last stored figures when Meta is unavailable. */ }
+    finally { if (window.__igAutoSyncing === propertyId) window.__igAutoSyncing = null; }
   }
 
   function updateBadge(value) {
@@ -197,6 +238,16 @@
     window.openInstagramConversation = openInstagramConversation;
     window.sendInstagramMessage = sendInstagramMessage;
     window.syncInstagramForCurrentProperty = syncInstagramForCurrentProperty;
+    var originalPerformance = window.loadPropertyPerformance;
+    if (typeof originalPerformance === 'function' && !originalPerformance.__instagramWrapped) {
+      var performanceWrapped = async function (propertyId) {
+        var result = await originalPerformance.apply(this, arguments);
+        setTimeout(function () { maybeSyncInstagramProperty(propertyId, originalPerformance); }, 250);
+        return result;
+      };
+      performanceWrapped.__instagramWrapped = true;
+      window.loadPropertyPerformance = performanceWrapped;
+    }
     var originalNavigate = window.navigate;
     if (typeof originalNavigate === 'function' && !originalNavigate.__instagramWrapped) {
       var wrapped = function (id, element) {
@@ -210,6 +261,7 @@
     }
     clearInterval(igRefreshTimer);
     igRefreshTimer = setInterval(function () { if (document.visibilityState === 'visible' && currentProfile && currentProfile.company_id) loadInstagramInbox(false); }, 45000);
+    handleInstagramOAuthReturn();
     setTimeout(loadStatus, 1500);
   }
 
