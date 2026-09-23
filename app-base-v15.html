@@ -2677,7 +2677,7 @@ function populatePropertyOwnerSelect(selectedId){
   if(!sel)return;
   sel.innerHTML='<option value="">— اختر مالك موجود —</option>';
   (allOwners||[]).filter(o=>!o.archived).forEach(o=>{
-    const label=(o.owner_type==='broker'?'🤝 ':o.owner_type==='agency'?'🏢 ':o.owner_type==='developer'?'🏗 ':'👤 ')+(o.name||'بدون اسم')+(o.phone?' · '+formatPhoneDisplay(o.phone):'');
+    const label=(o.owner_type==='broker'?'🤝 ':o.owner_type==='agency'?'🏢 ':o.owner_type==='developer'?'🏗 ':'👤 ')+(o.name||'بدون اسم')+(o.phone?' · '+(crmNormalizePhone(o.phone,'968')||String(o.phone)):'');
     sel.innerHTML+='<option value="'+o.id+'">'+escapeHtml(label)+'</option>';
   });
   if(selectedId)sel.value=selectedId;
@@ -4552,13 +4552,30 @@ function renderViewings(){
 let viewingFormGeneration=0,viewingFormOriginal=null,viewingRequestGeneration=0;
 const viewingChoiceState={client:{token:0,timer:null,offset:0,rows:[]},property:{token:0,timer:null,offset:0,rows:[]}};
 function scheduleViewingSearch(kind){const st=viewingChoiceState[kind];clearTimeout(st.timer);st.timer=setTimeout(()=>loadViewingChoices(kind,false),250);}
+function crmViewingContainsFilter(column,value){
+  const text=String(value),hasStar=text.includes('*');
+  // PostgREST treats * as a LIKE wildcard alias, even inside a quoted value.
+  // A literal escaped regex handles that character without changing the search.
+  const pattern=hasStar?text.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'):'%'+text.replace(/[\\%_]/g,'\\$&')+'%';
+  return column+(hasStar?'.imatch.':'.ilike.')+'"'+pattern.replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'"';
+}
+function crmViewingSearchFilter(kind,value){
+  const isClient=kind==='client',filters=[crmViewingContainsFilter(isClient?'name':'title',value),crmViewingContainsFilter(isClient?'phone':'area',value)];
+  const number=crmDigits(value);
+  if(isClient&&/^\+?[0-9\s().-]+$/.test(number)){
+    const digits=number.replace(/\D/g,'').replace(/^00/,''),normalized=crmNormalizePhone(number,'968').replace(/^\+/,'');
+    if(digits){filters.push(crmViewingContainsFilter('phone_normalized',normalized||digits));filters.push(crmViewingContainsFilter('phone',digits));}
+    if(normalized.startsWith('968')&&normalized.length===11)filters.push(crmViewingContainsFilter('phone',normalized.slice(3)));
+  }
+  return [...new Set(filters)].join(',');
+}
 async function loadViewingChoices(kind,append,selectedId){
   const st=viewingChoiceState[kind],token=++st.token,generation=viewingFormGeneration,isClient=kind==='client',prefix=isClient?'vClient':'vProperty',select=$(prefix),status=$(prefix+'Count'),more=$(prefix+'More');
-  const selected=selectedId||select.value,query=crmDigits($(prefix+'Search').value).trim().replace(/[^\p{L}\p{N}\s+.-]/gu,'').slice(0,80),offset=append?st.offset:0;
+  const selected=selectedId||select.value,query=$(prefix+'Search').value.trim().slice(0,80),offset=append?st.offset:0;
   if(!append){st.offset=0;st.rows=[];}status.textContent='جاري البحث…';more.disabled=true;
   try{
     let q=supa.from(isClient?'clients':'properties').select(isClient?'id,name,phone':'id,title,area,status',{count:'exact'}).neq('archived',true);
-    if(query)q=q.or((isClient?'name':'title')+'.ilike.%'+query+'%,'+(isClient?'phone':'area')+'.ilike.%'+query+'%');
+    if(query)q=q.or(crmViewingSearchFilter(kind,query));
     const r=await q.order(isClient?'name':'title').order('id').range(offset,offset+49);if(r.error)throw r.error;
     if(token!==st.token||generation!==viewingFormGeneration)return;
     let rows=append?st.rows.concat(r.data||[]):(r.data||[]);st.offset=offset+(r.data||[]).length;
@@ -4586,7 +4603,7 @@ async function loadViewingClientProperty(selectedRequest){
   try{const r=await supa.from('client_requests').select('id,request_type,preferred_area,preferred_areas,budget_max,status,branch_key').eq('client_id',clientId).in('status',['active','paused']).order('updated_at',{ascending:false});if(r.error)throw r.error;let rows=r.data||[];
     if(selectedRequest&&!rows.some(x=>x.id===selectedRequest)){const extra=await supa.from('client_requests').select('id,request_type,preferred_area,preferred_areas,budget_max,status,branch_key').eq('id',selectedRequest).eq('client_id',clientId).single();if(extra.error)throw extra.error;rows.unshift(extra.data);}
     if(generation!==viewingRequestGeneration||formGeneration!==viewingFormGeneration||$('vClient').value!==clientId)return;
-    $('vRequest').innerHTML='<option value="">اختر الطلب المرتبط بالزيارة</option>'+rows.map(r=>'<option value="'+r.id+'">'+escapeHtml(requestTypeAr(r.request_type)+' — '+(r.preferred_areas&&r.preferred_areas.join('، ')||r.preferred_area||r.branch_key||'غير محدد')+(r.budget_max?' — '+fmtMoney(r.budget_max):'')+' — '+requestStatusAr(r.status))+'</option>').join('');
+    $('vRequest').innerHTML='<option value="">اختر الطلب المرتبط بالزيارة</option>'+rows.map(r=>'<option value="'+r.id+'">'+escapeHtml(requestTypeAr(r.request_type)+' — '+(r.preferred_areas&&r.preferred_areas.join('، ')||r.preferred_area||r.branch_key||'غير محدد')+(r.budget_max?' — '+Number(r.budget_max).toLocaleString('en-US')+' ر.ع':'')+' — '+requestStatusAr(r.status))+'</option>').join('');
     if(selectedRequest)$('vRequest').value=selectedRequest;else if(rows.length===1)$('vRequest').value=rows[0].id;
     $('vRequest').disabled=!!(viewingFormOriginal&&viewingFormOriginal.request_id);
     if(!rows.length)$('vRequestHint').innerHTML='لا يوجد طلب حالي لهذا العميل. <button class="btn-secondary" onclick="closeModal(\'mViewing\');viewClient(\''+clientId+'\')">فتح العميل وإضافة طلب</button>';

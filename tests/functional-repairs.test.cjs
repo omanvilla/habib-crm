@@ -37,7 +37,7 @@ function harness(){
   assert(columnsStart>=0,'missing finance-aware data access metadata');
   run(source.slice(columnsStart,source.indexOf('\nfunction crmDataFrom(',columnsStart)));
   run(fn('crmDataFrom'));
-  for(const name of ['crmDigits','parseNum','crmReadNumber','crmReadBudget','crmNormalizePhone','crmValidatedPhone','crmNewId','crmBeginSave','crmEndSave','crmSaveKey','crmFinishSave','openCreateModal','closeModal'])run(fn(name));
+  for(const name of ['crmDigits','parseNum','crmReadNumber','crmReadBudget','crmNormalizePhone','crmValidatedPhone','crmNewId','crmBeginSave','crmEndSave','crmSaveKey','crmFinishSave','openCreateModal','closeModal','crmViewingContainsFilter','crmViewingSearchFilter'])run(fn(name));
   c.getFullPhone=(select,input)=>c.crmNormalizePhone(el(input).value,el(select).value||'968');
   c.clearViewingForm=()=>{};c.discardPropertyImageDraft=()=>{};c.setupPhoneField=(_s,i,value)=>{el(i).value=value||'';};
   return{c,el,run,calls,toasts,load:(...names)=>names.forEach(n=>run(fn(n)))};
@@ -99,3 +99,41 @@ test('routine completed deal edits and collection transitions preserve original 
   const h=harness();h.load('onDrop');h.c.canViewFinancials=()=>true;h.c.allDeals=[{id:'TEST_DEAL',stage:'closed',closed_at:'2026-08-12T10:00:00Z'}];h.c.draggedDealId='TEST_DEAL';h.c.syncPropertyStatus=async()=>{};h.c.dealStageAr=x=>x;await h.c.onDrop({preventDefault(){},currentTarget:{dataset:{stage:'commission_collected'},classList:{remove(){}}}});assert(!('closed_at' in h.calls[0].payload));
 });
 test('first sale closure uses current closing time and never substitutes creation date',async()=>{const h=harness();h.load('saveDeal');h.c.allDeals=[{id:'TEST_DEAL',stage:'negotiation'}];h.c.editingDealId='TEST_DEAL';h.el('dClient').value='TEST_CLIENT';h.el('dStage').value='closed';h.el('dCreatedDate').value='2020-01-01';const before=Date.now();await h.c.saveDeal();const saved=h.calls.find(q=>q.op==='update');assert(new Date(saved.payload.closed_at).getTime()>=before);assert(!('created_at' in saved.payload));});
+function decodeViewingFilter(filter){
+  const terms=[],parser=/(name|title|phone_normalized|phone|area)\.(ilike|imatch)\.("(?:\\.|[^"\\])*")(?:,|$)/gy;
+  let offset=0;
+  while(offset<filter.length){parser.lastIndex=offset;const m=parser.exec(filter);assert(m,'search filter has unquoted or injected syntax at '+offset);terms.push({column:m[1],operator:m[2],pattern:JSON.parse(m[3])});offset=parser.lastIndex;}
+  return terms;
+}
+function viewingPatternMatches(term,text){
+  if(term.operator==='imatch')return new RegExp(term.pattern,'iu').test(text);
+  let pattern='^';
+  for(let i=0;i<term.pattern.length;i++){let ch=term.pattern[i];if(ch==='\\'){ch=term.pattern[++i];assert.notEqual(ch,undefined);pattern+=ch.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}else if(ch==='%')pattern+='[\\s\\S]*';else if(ch==='_')pattern+='[\\s\\S]';else pattern+=ch.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+  return new RegExp(pattern+'$','iu').test(text);
+}
+test('visit name search preserves underscores and returns the exact TEST record',async()=>{
+  const h=harness();h.run("const viewingChoiceState={client:{token:0,offset:0,rows:[]},property:{token:0,offset:0,rows:[]}};");h.load('loadViewingChoices');
+  const expected='TEST_CRM_AUDIT_20260922';h.el('vClientSearch').value=expected;
+  h.c.respond=q=>{const clauses=decodeViewingFilter(q.filters.find(x=>x[0]==='or')[1]);const data=[{id:'TEST_MATCH',name:expected,phone:''},{id:'TEST_DECOY',name:'TESTXCRMXAUDITX20260922',phone:''}].filter(row=>clauses.some(t=>viewingPatternMatches(t,row[t.column]||'')));return{data,count:data.length,error:null};};
+  await h.c.loadViewingChoices('client',false);assert(h.el('vClient').innerHTML.includes('TEST_MATCH'));assert(!h.el('vClient').innerHTML.includes('TEST_DECOY'));assert.equal(h.el('vClientCount').textContent,'تم تحميل 1 من 1 المطابقة');
+});
+test('visit client/property search quotes punctuation and treats wildcard characters literally',()=>{
+  const h=harness();
+  for(const kind of ['client','property'])for(const value of ['TEST_100%','TEST "quote", (villa). \\path','TEST,phone.neq.null)','عقار * خاص [1]؟']){
+    const terms=decodeViewingFilter(h.c.crmViewingSearchFilter(kind,value));assert.equal(terms.length,2);assert(terms.every(t=>viewingPatternMatches(t,value)));assert(terms.every(t=>!viewingPatternMatches(t,'unrelated')));
+    if(value==='TEST_100%')assert(terms.every(t=>!viewingPatternMatches(t,'TESTX100anything')));
+    if(value.includes('*'))assert(terms.every(t=>!viewingPatternMatches(t,value.replace('*','anything'))));
+  }
+});
+test('visit phone search finds canonical Oman phone across Arabic digits and spaced local/country formats',()=>{
+  const h=harness();
+  for(const value of ['٩٠٠٠ ٠٠٠٠','۹۰۰۰ ۰۰۰۰','90000000','+968 9000 0000','00968 9000 0000','96890000000']){
+    const terms=decodeViewingFilter(h.c.crmViewingSearchFilter('client',value));assert(terms.some(t=>t.column==='phone_normalized'&&viewingPatternMatches(t,'96890000000')),value);assert(terms.some(t=>t.column==='phone'&&viewingPatternMatches(t,'90000000')),value);
+  }
+});
+test('visit request option budget and property owner phone contain plain text without HTML formatter output',async()=>{
+  const h=harness();h.load('loadViewingClientProperty','populatePropertyOwnerSelect');h.c.fmtMoney=()=>'<span dir="ltr">SHOULD_NOT_RENDER</span>';h.c.formatPhoneDisplay=()=>'<span dir="ltr">SHOULD_NOT_RENDER</span>';
+  h.el('vClient').value='TEST_CLIENT';h.c.respond=()=>({data:[{id:'TEST_REQUEST',request_type:'buyer',preferred_area:'TEST',budget_max:125000,status:'active'}],error:null});
+  await h.c.loadViewingClientProperty();assert(h.el('vRequest').innerHTML.includes('125,000 ر.ع'));assert(!h.el('vRequest').innerHTML.includes('SHOULD_NOT_RENDER'));
+  h.c.allOwners=[{id:'TEST_OWNER',name:'TEST Owner',phone:'٩٠٠٠٠٠٠٠'}];h.c.populatePropertyOwnerSelect('TEST_OWNER');assert(h.el('pOwnerId').innerHTML.includes('+96890000000'));assert(!h.el('pOwnerId').innerHTML.includes('SHOULD_NOT_RENDER'));assert.equal(h.el('pOwnerId').value,'TEST_OWNER');
+});
