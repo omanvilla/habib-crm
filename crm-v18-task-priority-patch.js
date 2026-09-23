@@ -55,7 +55,7 @@
     try{
       if(!task){
         var tr=await supa.from('tasks').select('*, client:clients(name,phone)').eq('id',id).single();
-        if(tr.error)throw tr.error;task=tr.data
+        if(tr.error)throw tr.error;task=tr.data;allTasks.push(task)
       }
       hydrateAssignees([task]);
       var request=null;
@@ -90,7 +90,7 @@
     var d=task.due_date&&typeof daysUntil==='function'?daysUntil(task.due_date):null;
     var overdue=d!==null&&d<0;
     var name=assigneeName(task);
-    var html='<div class="task-item '+(task.done?'done':'')+'" style="cursor:pointer" onclick="openTaskDetails(\''+task.id+'\')"><div class="task-check '+(task.done?'done':'')+'" onclick="event.stopPropagation();toggleTask(\''+task.id+'\','+(!task.done)+')">'+(task.done?'✓':'')+'</div><div class="task-content"><div class="task-title">'+esc(task.title)+'</div>';
+    var html='<div class="task-item '+(task.done?'done':'')+'" style="cursor:pointer" onclick="openTaskDetails(\''+task.id+'\')"><div class="task-check '+(task.done?'done':'')+'" onclick="event.stopPropagation();if(canEdit())toggleTask(\''+task.id+'\','+(!task.done)+')">'+(task.done?'✓':'')+'</div><div class="task-content"><div class="task-title">'+esc(task.title)+'</div>';
     if(taskNotes(task))html+='<div style="font-size:11px;color:var(--umber);margin-top:5px;line-height:1.6">'+esc(taskNotes(task))+'</div>';
     html+='<div class="task-meta">';
     if(task.due_date)html+='<span class="task-due '+(overdue?'overdue':'')+'">📅 '+esc(dueText(task))+'</span>';
@@ -99,16 +99,18 @@
     if(name)html+='<span>👨‍💼 المسؤول: '+esc(name)+'</span>';
     html+='</div></div>';
     if(compact)html+='<span style="color:var(--gold);font-size:18px">‹</span>';
-    else html+='<div class="task-actions"><span onclick="event.stopPropagation();editTask(\''+task.id+'\')" title="تعديل">✏️</span><span onclick="event.stopPropagation();deleteTask(\''+task.id+'\')" title="حذف">🗑</span></div>';
+    else if(typeof canEdit==='function'&&canEdit())html+='<div class="task-actions"><span onclick="event.stopPropagation();editTask(\''+task.id+'\')" title="تعديل">✏️</span><span onclick="event.stopPropagation();deleteTask(\''+task.id+'\')" title="حذف">🗑</span></div>';
     return html+'</div>'
   }
 
   window.renderDashTasks=function(tasks){
     var card=byId('dashTasksCard'),list=byId('dashTasksList');if(!list)return;
-    var rows=sortTasks(tasks);
+    var rows=sortTasks(tasks).slice(0,6);
     if(!rows.length){if(card)card.style.display='none';list.innerHTML='';return}
     if(card)card.style.display='';list.innerHTML=rows.map(function(t){return renderCard(t,true)}).join('')
   };
+
+  window.renderTaskCard=renderCard;
 
   window.renderTasks=function(){
     var list=byId('tasksList');if(!list)return;
@@ -127,26 +129,12 @@
   window.loadTasks=async function(){
     var list=byId('tasksList');if(list)list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';
     try{
-      var r=await supa.from('tasks').select('*, client:clients(name,phone)');
-      if(r.error){r=await supa.from('tasks').select('*');if(r.error)throw r.error}
-      allTasks=sortTasks(hydrateAssignees(r.data||[]));
+      var rows=await crmReadAll(function(){return supa.from('tasks').select('*, client:clients(name,phone)',{count:'exact'}).order('id')});
+      allTasks=sortTasks(hydrateAssignees(rows));
       window.renderTasks()
     }catch(err){
       if(list)list.innerHTML='<div class="empty"><div class="empty-ico">⚠️</div><div class="empty-title">خطأ في تحميل المهام</div><div class="empty-desc">'+esc(err.message||err)+'</div><button class="btn-primary" style="margin-top:14px;width:auto;padding:9px 18px" onclick="loadTasks()">🔄 إعادة المحاولة</button></div>'
     }
-  };
-
-  var previousDashboard=window.loadDashboard;
-  if(typeof previousDashboard==='function')window.loadDashboard=async function(){
-    var result=await previousDashboard.apply(this,arguments);
-    try{
-      var r=await supa.from('tasks').select('*, client:clients(name,phone)').eq('done',false).limit(100);
-      if(r.error)throw r.error;
-      var rows=sortTasks(hydrateAssignees(r.data||[]));
-      window.renderDashTasks(rows.slice(0,6));
-      var nav=byId('navTasksCount');if(nav){nav.textContent=rows.length;nav.style.display=rows.length?'':'none'}
-    }catch(err){console.warn('[Task priority patch]',err)}
-    return result
   };
 
   ensureDetailsModal();

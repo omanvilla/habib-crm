@@ -5,6 +5,10 @@
   var igActiveConversation = null;
   var igRefreshTimer = null;
   var igConnecting = false;
+  var igActiveTab = 'performance';
+  var igConversationRequest = 0;
+  var igSending = false;
+  var igDrafts = new Map();
 
   function esc(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
@@ -20,8 +24,22 @@
 
   async function invoke(body) {
     var result = await supa.functions.invoke('instagram-api', { body: body });
-    if (result.error) throw result.error;
-    if (!result.data || result.data.ok === false) throw new Error((result.data && (result.data.message || result.data.error)) || 'فشل طلب Instagram');
+    if (result.error) {
+      var details = result.data;
+      if (!details && result.error.context && typeof result.error.context.json === 'function') {
+        try { details = await result.error.context.json(); } catch (_) { /* Keep the original transport error. */ }
+      }
+      var failure = new Error(details && (details.message || details.error) || result.error.message || 'تعذر الاتصال بإنستغرام');
+      failure.sent = !!(details && details.sent);
+      failure.retrySafe = details && details.retry_safe;
+      throw failure;
+    }
+    if (!result.data || result.data.ok === false) {
+      var failure = new Error((result.data && (result.data.message || result.data.error)) || 'فشل طلب Instagram');
+      failure.sent = !!(result.data && result.data.sent);
+      failure.retrySafe = result.data && result.data.retry_safe;
+      throw failure;
+    }
     return result.data;
   }
 
@@ -49,8 +67,15 @@
     var page = document.createElement('div');
     page.className = 'page';
     page.id = 'page-instagram';
-    page.innerHTML = '<div class="page-header"><div><div class="page-title">صندوق <span>إنستغرام</span></div><div class="page-sub">رسائل حساب @omanvilla والعملاء الجدد في مكان واحد</div></div><button class="btn-secondary" onclick="loadInstagramInbox(true)">🔄 تحديث</button></div><div id="igInboxStatus" style="margin-bottom:12px"></div><div class="ig-layout"><div class="ig-list"><div class="ig-list-head"><input class="fi" id="igSearch" placeholder="🔍 ابحث في المحادثات..." oninput="renderInstagramConversations()"></div><div id="igConversationList"><div class="empty" style="padding:30px">جارٍ التحميل...</div></div></div><div class="ig-chat"><div class="ig-chat-head" id="igChatHead">اختر محادثة</div><div class="ig-messages" id="igMessages"><div class="empty" style="padding:60px">📷 اختر محادثة من القائمة</div></div><div class="ig-compose" id="igCompose" style="display:none"><textarea class="fta" id="igReply" rows="2" placeholder="اكتب ردك على Instagram..." onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();sendInstagramMessage()}"></textarea><button class="btn-primary" id="igSendBtn" onclick="sendInstagramMessage()" style="width:auto;padding:9px 18px">إرسال</button></div></div></div>';
+    page.innerHTML = '<div class="page-header"><div><div class="page-title">أداء <span>إنستغرام</span></div><div class="page-sub">أداء المنشورات المرتبطة بالعقارات والطلبات الناتجة عن دليل مسجل</div></div><button class="btn-secondary" id="igRefreshPage">تحديث العرض</button></div><div id="igInboxStatus" style="margin-bottom:12px"></div><div role="tablist" aria-label="أقسام إنستغرام" style="display:flex;gap:8px;margin-bottom:14px"><button class="btn-primary" id="igPerformanceTab" role="tab" aria-controls="igPerformancePanel" aria-selected="true" style="width:auto">الأداء والعقارات</button><button class="btn-secondary" id="igInboxTab" role="tab" aria-controls="igInboxPanel" aria-selected="false">الرسائل الخاصة</button></div><div id="igPerformancePanel" role="tabpanel" aria-labelledby="igPerformanceTab"><div id="igPerformanceContent"><div class="empty">افتح قسم الأداء لتحميل البيانات</div></div></div><div id="igInboxPanel" role="tabpanel" aria-labelledby="igInboxTab" hidden><div class="ig-layout"><div class="ig-list"><div class="ig-list-head"><input class="fi" id="igSearch" aria-label="البحث في محادثات إنستغرام" placeholder="ابحث في المحادثات..." oninput="renderInstagramConversations()"></div><div id="igConversationList"><div class="empty" style="padding:30px">افتح الرسائل لتحميل المحادثات</div></div></div><div class="ig-chat"><div class="ig-chat-head" id="igChatHead">اختر محادثة</div><div class="ig-messages" id="igMessages"><div class="empty" style="padding:60px">اختر محادثة من القائمة</div></div><div class="ig-compose" id="igCompose" style="display:none"><textarea class="fta" id="igReply" rows="2" placeholder="اكتب ردك على Instagram..." onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();sendInstagramMessage()}"></textarea><button class="btn-primary" id="igSendBtn" onclick="sendInstagramMessage()" style="width:auto;padding:9px 18px">إرسال</button></div></div></div></div>';
     if (settingsPage && settingsPage.parentNode) settingsPage.parentNode.insertBefore(page, settingsPage);
+    page.querySelector('#igPerformanceTab').addEventListener('click', function () { setInstagramTab('performance'); });
+    page.querySelector('#igInboxTab').addEventListener('click', function () { setInstagramTab('inbox'); });
+    page.querySelector('#igRefreshPage').addEventListener('click', function () { setInstagramTab(igActiveTab, true); });
+    page.querySelector('#igConversationList').addEventListener('click', function (event) {
+      var row = event.target.closest('[data-ig-conversation]');
+      if (row) openInstagramConversation(row.dataset.igConversation);
+    });
 
     var card = document.createElement('div');
     card.className = 'card';
@@ -58,6 +83,23 @@
     card.style.cssText = 'margin-top:18px;display:none';
     card.innerHTML = '<div class="card-head"><div class="card-title">📷 ربط Instagram بالـCRM</div></div><div class="card-body"><div id="instagramConnectionStatus"><div class="empty" style="padding:18px">جارٍ فحص الاتصال...</div></div></div>';
     if (settingsPage) settingsPage.appendChild(card);
+  }
+
+  function setInstagramTab(tab) {
+    igActiveTab = tab === 'inbox' ? 'inbox' : 'performance';
+    ['performance', 'inbox'].forEach(function (name) {
+      var active = name === igActiveTab;
+      var prefix = name === 'performance' ? 'igPerformance' : 'igInbox';
+      var panel = document.getElementById(prefix + 'Panel');
+      var button = document.getElementById(prefix + 'Tab');
+      if (panel) panel.hidden = !active;
+      if (button) { button.className = active ? 'btn-primary' : 'btn-secondary'; button.setAttribute('aria-selected', String(active)); }
+    });
+    if (igActiveTab === 'inbox') return loadInstagramInbox(true);
+    loadStatus();
+    if (window.CRMFunnel) return window.CRMFunnel.loadOverview();
+    var content = document.getElementById('igPerformanceContent');
+    if (content) content.textContent = 'تعذر تحميل عرض الأداء. أعد تحميل الصفحة.';
   }
 
   async function loadStatus() {
@@ -75,7 +117,7 @@
       var account = data.account || {};
       var image = account.profile_picture_url ? '<img class="ig-account-pic" src="' + esc(account.profile_picture_url) + '" alt="Instagram">' : '<div class="ig-avatar" style="width:54px;height:54px">IG</div>';
       var warning = account.webhook_subscribed ? '<span style="color:#16803c;font-weight:800">● الرسائل متصلة</span>' : '<span style="color:#b7791f;font-weight:800">● الحساب متصل — Webhook بانتظار التفعيل</span>';
-      var connected = '<div class="ig-status">' + image + '<div style="flex:1"><div style="font-weight:900;color:var(--espresso);font-size:15px">@' + esc(account.username || 'omanvilla') + '</div><div style="font-size:11px;color:var(--umber);margin-top:3px">ID: <span dir="ltr">' + esc(account.instagram_user_id) + '</span> · ' + warning + '</div><div style="font-size:10px;color:var(--umber);margin-top:4px">المتابعون: ' + esc(account.followers_count == null ? '—' : account.followers_count) + ' · المنشورات: ' + esc(account.media_count == null ? '—' : account.media_count) + '</div></div><button class="btn-secondary" onclick="connectInstagram()" style="width:auto">تحديث الصلاحيات</button></div>';
+      var connected = '<div class="ig-status">' + image + '<div style="flex:1"><div style="font-weight:900;color:var(--espresso);font-size:15px">@' + esc(account.username || 'omanvilla') + '</div><div style="font-size:11px;color:var(--umber);margin-top:3px">الحساب مربوط · ' + warning + '</div><div style="font-size:10px;color:var(--umber);margin-top:4px">المتابعون: ' + esc(account.followers_count == null ? '—' : account.followers_count) + ' · المنشورات: ' + esc(account.media_count == null ? '—' : account.media_count) + '</div></div>' + (typeof isOwner === 'function' && isOwner() ? '<button class="btn-secondary" onclick="connectInstagram()" style="width:auto">تحديث الصلاحيات</button>' : '') + '</div>';
       if (box) box.innerHTML = connected;
       if (inboxStatus) inboxStatus.innerHTML = connected;
       return data;
@@ -122,7 +164,7 @@
       var nav = Array.from(document.querySelectorAll('.nav-link')).find(function (item) { return item.textContent.indexOf('إنستغرام') >= 0; });
       if (typeof navigate === 'function' && nav) navigate('instagram', nav);
       await loadStatus();
-      await loadInstagramInbox(true);
+      await setInstagramTab('performance');
       return true;
     } catch (error) {
       showToast('⚠️ تعذّر ربط Instagram: ' + (error.message || error), 'error');
@@ -153,16 +195,19 @@
     list.innerHTML = rows.map(function (item) {
       var name = item.participant_name || (item.participant_username ? '@' + item.participant_username : 'Instagram ' + String(item.participant_id || '').slice(-6));
       var avatar = item.participant_profile_picture_url ? '<img src="' + esc(item.participant_profile_picture_url) + '" alt="">' : esc(name.slice(0, 1));
-      return '<div class="ig-conv ' + (igActiveConversation && igActiveConversation.id === item.id ? 'active' : '') + '" onclick="openInstagramConversation(\'' + esc(item.id) + '\')"><div class="ig-conv-top"><div class="ig-avatar">' + avatar + '</div><div class="ig-name">' + esc(name) + '</div>' + (item.unread_count ? '<span class="ig-unread">' + esc(item.unread_count) + '</span>' : '') + '</div><div class="ig-preview">' + esc(time(item.last_message_at)) + '</div></div>';
+      return '<button type="button" class="ig-conv ' + (igActiveConversation && igActiveConversation.id === item.id ? 'active' : '') + '" data-ig-conversation="' + esc(item.id) + '" style="display:block;width:100%;text-align:inherit;background:transparent;border-width:0 0 1px"><div class="ig-conv-top"><div class="ig-avatar">' + avatar + '</div><div class="ig-name">' + esc(name) + '</div>' + (item.unread_count ? '<span class="ig-unread">' + esc(item.unread_count) + '</span>' : '') + '</div><div class="ig-preview">' + esc(time(item.last_message_at)) + '</div></button>';
     }).join('');
   }
 
   async function openInstagramConversation(id) {
+    var request = ++igConversationRequest;
     try {
       var data = await invoke({ action: 'conversation', conversation_id: id });
+      if (request !== igConversationRequest) return;
+      var reply = document.getElementById('igReply');
+      if (reply && igActiveConversation && igActiveConversation.id !== id) igDrafts.set(igActiveConversation.id, reply.value);
+      if (reply && (!igActiveConversation || igActiveConversation.id !== id)) reply.value = igDrafts.get(id) || '';
       igActiveConversation = data.conversation;
-      var local = igConversations.find(function (item) { return item.id === id; });
-      if (local) local.unread_count = 0;
       renderInstagramConversations();
       var name = igActiveConversation.participant_name || (igActiveConversation.participant_username ? '@' + igActiveConversation.participant_username : 'Instagram ' + String(igActiveConversation.participant_id || '').slice(-6));
       document.getElementById('igChatHead').innerHTML = '📷 ' + esc(name) + (igActiveConversation.client_id ? ' <span class="badge b-em">عميل في CRM</span>' : '');
@@ -170,56 +215,98 @@
       var messages = document.getElementById('igMessages');
       messages.innerHTML = (data.messages || []).map(function (message) { return '<div class="ig-bubble ' + (message.direction === 'outbound' ? 'out' : 'in') + '">' + esc(message.body || ('[' + message.message_type + ']')) + '<small>' + esc(time(message.message_timestamp)) + '</small></div>'; }).join('') || '<div class="empty">لا توجد رسائل محفوظة</div>';
       messages.scrollTop = messages.scrollHeight;
-      updateBadge(igConversations.reduce(function (sum, item) { return sum + Number(item.unread_count || 0); }, 0));
+      var lastMessage = (data.messages || []).reduce(function (latest, item) {
+        // Receipt order, not the sender's timestamp: delayed events can appear
+        // earlier in the conversation while having a newer read watermark.
+        return !latest || Number(item.ingestion_seq || 0) >= Number(latest.ingestion_seq || 0) ? item : latest;
+      }, null);
+      if (lastMessage) {
+        try {
+          await invoke({ action: 'mark_read', conversation_id: id, through_message_id: lastMessage.id });
+          if (request !== igConversationRequest) return;
+          // Refresh authoritative unread counts: a new message may have arrived
+          // after the displayed watermark and must not be cleared locally.
+          await loadInstagramInbox(false);
+        } catch (_) { showToast('ظهرت الرسائل، لكن تعذر تحديث حالة القراءة. أعد فتح المحادثة لاحقًا.', 'info'); }
+      }
     } catch (error) { showToast('⚠️ ' + (error.message || error), 'error'); }
   }
 
   async function sendInstagramMessage() {
-    if (!igActiveConversation) return;
+    if (!igActiveConversation || igSending) return;
     var input = document.getElementById('igReply');
     var message = String(input.value || '').trim();
     if (!message) return;
     var button = document.getElementById('igSendBtn');
+    var conversationId = igActiveConversation.id;
+    var operation = null;
+    igSending = true;
     button.disabled = true;
     try {
-      await invoke({ action: 'send', conversation_id: igActiveConversation.id, body: message });
-      input.value = '';
-      await openInstagramConversation(igActiveConversation.id);
+      operation = await instagramSendOperation(conversationId, message);
+      await invoke({ action: 'send', conversation_id: conversationId, body: message, operation_id: operation.id });
+      // A confirmed success ends this logical attempt. An uncertain response
+      // intentionally keeps the key across refreshes, so retry cannot send twice.
+      try { operation.storage.removeItem(operation.key); } catch (_) { /* Keeping a confirmed key is safer than inventing another attempt. */ }
+      igDrafts.delete(conversationId);
+      if (igActiveConversation && igActiveConversation.id === conversationId) {
+        input.value = '';
+        await openInstagramConversation(conversationId);
+      }
       await loadInstagramInbox(false);
-    } catch (error) { showToast('⚠️ فشل الإرسال: ' + (error.message || error), 'error'); }
-    finally { button.disabled = false; }
+    } catch (error) {
+      if (error.sent) {
+        igDrafts.delete(conversationId);
+        if (igActiveConversation && igActiveConversation.id === conversationId) input.value = '';
+        showToast('تم إرسال الرسالة إلى Instagram لكن تعذر حفظها في سجل CRM. لا تعِد إرسالها؛ راجع المحادثة في Instagram.', 'error');
+      } else if (error.retrySafe === false) showToast('حالة الإرسال تحتاج مراجعة. تحقق من المحادثة في Instagram قبل أي إعادة إرسال؛ احتفظنا بمعرّف المحاولة لمنع التكرار.', 'error');
+      else showToast('تعذر تأكيد الإرسال: ' + (error.message || error) + ' · راجع المحادثة قبل إعادة المحاولة.', 'error');
+    }
+    finally { igSending = false; button.disabled = false; }
   }
 
-  async function syncInstagramForCurrentProperty() {
-    if (!window.viewingProperty) return;
+  async function instagramSendOperation(conversationId, body) {
+    if (typeof currentProfile === 'undefined' || !currentProfile || typeof currentUser === 'undefined' || !currentUser) throw new Error('انتهت جلسة المستخدم؛ سجل الدخول مجددًا');
+    var digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body));
+    var hash = Array.from(new Uint8Array(digest)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+    var key = 'crm_ig_send:' + currentProfile.company_id + ':' + currentUser.id + ':' + conversationId + ':' + hash;
+    var candidates = [];
+    for (var name of ['localStorage', 'sessionStorage']) {
+      try {
+        var candidate = window[name];
+        var previous = JSON.parse(candidate.getItem(key) || 'null');
+        if (previous && /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(previous.id)) return { key: key, id: previous.id, storage: candidate };
+        candidates.push(candidate);
+      } catch (_) { /* Try session storage when persistent storage is restricted. */ }
+    }
+    var id = crypto.randomUUID();
+    for (var storage of candidates) {
+      try { storage.setItem(key, JSON.stringify({ id: id, created_at: new Date().toISOString() })); return { key: key, id: id, storage: storage }; }
+      catch (_) { /* Neither a draft nor raw message text is stored here. */ }
+    }
+    throw new Error('تعذر حفظ حالة محاولة الإرسال على هذا الجهاز؛ اسمح للموقع بحفظ بياناته ثم حاول مجددًا');
+  }
+
+  var syncingProperties = new Set();
+  async function syncInstagramProperty(propertyId) {
+    if (!propertyId || syncingProperties.has(propertyId)) return null;
+    syncingProperties.add(propertyId);
     try {
-      var query = await supa.from('property_marketing_events').select('id,url').eq('company_id', currentProfile.company_id).eq('property_id', window.viewingProperty.id).eq('channel', 'instagram').not('url', 'is', null).order('published_at', { ascending: false });
+      var query = await supa.from('property_marketing_events').select('id,url').eq('company_id', currentProfile.company_id).eq('property_id', propertyId).eq('channel', 'instagram').not('url', 'is', null).order('published_at', { ascending: false });
       if (query.error) throw query.error;
       if (!query.data || !query.data.length) throw new Error('أضف رابط منشور أو Reel للعقار أولاً');
-      showToast('⏳ جاري تحليل ' + query.data.length + ' رابط Instagram للعقار...', 'info');
-      var result = await invoke({ action: 'sync_property', property_id: window.viewingProperty.id });
-      var views = Number((result.totals || {}).views || 0).toLocaleString('ar-OM');
-      showToast('✅ تمت مزامنة ' + result.synced_count + ' من ' + result.link_count + ' رابط · إجمالي المشاهدات ' + views, result.failed_count ? 'info' : 'success');
-      if (typeof loadPropertyPerformance === 'function') loadPropertyPerformance(window.viewingProperty.id);
+      showToast('جاري تحديث قياسات المنشورات من Instagram...', 'info');
+      var result = await invoke({ action: 'sync_property', property_id: propertyId });
+      // The acquisition RPC deduplicates media. Event-row totals can count a Reel twice.
+      showToast('تم تحديث ' + result.synced_count + ' من ' + result.link_count + ' رابط' + (result.failed_count ? ' · تعذر تحديث ' + result.failed_count + ' رابط، راجع حالة كل منشور' : ''), result.failed_count ? 'info' : 'success');
+      if (window.CRMFunnel) await window.CRMFunnel.refreshProperty(propertyId);
       return result;
-    } catch (error) { showToast('⚠️ تعذرت مزامنة Instagram: ' + (error.message || error), 'error'); }
+    } catch (error) { showToast('تعذرت مزامنة Instagram: ' + (error.message || error), 'error'); return null; }
+    finally { syncingProperties.delete(propertyId); }
   }
 
-  async function maybeSyncInstagramProperty(propertyId, refreshPerformance) {
-    if (!propertyId || !currentProfile || !currentProfile.company_id || window.__igAutoSyncing === propertyId) return;
-    try {
-      var status = await invoke({ action: 'status' });
-      if (!status || !status.connected) return;
-      var cutoff = Date.now() - 6 * 60 * 60 * 1000;
-      var query = await supa.from('property_marketing_events').select('id,url,last_synced_at,sync_status').eq('company_id', currentProfile.company_id).eq('property_id', propertyId).eq('channel', 'instagram').not('url', 'is', null);
-      if (query.error || !query.data || !query.data.length) return;
-      var needsSync = query.data.some(function (item) { return item.sync_status !== 'synced' || !item.last_synced_at || new Date(item.last_synced_at).getTime() < cutoff; });
-      if (!needsSync) return;
-      window.__igAutoSyncing = propertyId;
-      var result = await invoke({ action: 'sync_property', property_id: propertyId });
-      if (result.synced_count && typeof refreshPerformance === 'function') await refreshPerformance(propertyId);
-    } catch (_) { /* The existing property view keeps the last stored figures when Meta is unavailable. */ }
-    finally { if (window.__igAutoSyncing === propertyId) window.__igAutoSyncing = null; }
+  function syncInstagramForCurrentProperty() {
+    return syncInstagramProperty(window.viewingProperty && window.viewingProperty.id);
   }
 
   function updateBadge(value) {
@@ -238,21 +325,13 @@
     window.openInstagramConversation = openInstagramConversation;
     window.sendInstagramMessage = sendInstagramMessage;
     window.syncInstagramForCurrentProperty = syncInstagramForCurrentProperty;
-    var originalPerformance = window.loadPropertyPerformance;
-    if (typeof originalPerformance === 'function' && !originalPerformance.__instagramWrapped) {
-      var performanceWrapped = async function (propertyId) {
-        var result = await originalPerformance.apply(this, arguments);
-        setTimeout(function () { maybeSyncInstagramProperty(propertyId, originalPerformance); }, 250);
-        return result;
-      };
-      performanceWrapped.__instagramWrapped = true;
-      window.loadPropertyPerformance = performanceWrapped;
-    }
+    window.syncInstagramProperty = syncInstagramProperty;
+    window.setInstagramTab = setInstagramTab;
     var originalNavigate = window.navigate;
     if (typeof originalNavigate === 'function' && !originalNavigate.__instagramWrapped) {
       var wrapped = function (id, element) {
         var result = originalNavigate(id, element);
-        if (id === 'instagram') loadInstagramInbox(true);
+        if (id === 'instagram') setInstagramTab('performance');
         if (id === 'settings') { var card = document.getElementById('instagramSettingsCard'); if (card) card.style.display = (typeof isOwner === 'function' && isOwner()) ? '' : 'none'; loadStatus(); }
         return result;
       };
@@ -260,9 +339,21 @@
       window.navigate = wrapped;
     }
     clearInterval(igRefreshTimer);
-    igRefreshTimer = setInterval(function () { if (document.visibilityState === 'visible' && currentProfile && currentProfile.company_id) loadInstagramInbox(false); }, 45000);
+    igRefreshTimer = setInterval(function () {
+      var page = document.getElementById('page-instagram');
+      if (igActiveTab === 'inbox' && page && page.classList.contains('active') && document.visibilityState === 'visible' && currentProfile && currentProfile.company_id) loadInstagramInbox(false);
+    }, 45000);
     handleInstagramOAuthReturn();
     setTimeout(loadStatus, 1500);
+    if (supa.auth) supa.auth.onAuthStateChange(function (event) {
+      if (event !== 'SIGNED_OUT') return;
+      igConversationRequest++; igActiveConversation = null; igConversations = []; igDrafts.clear();
+      ['igMessages', 'igConversationList', 'igChatHead'].forEach(function (id) { var item = document.getElementById(id); if (item) item.textContent = ''; });
+      var compose = document.getElementById('igCompose'), reply = document.getElementById('igReply');
+      if (compose) compose.style.display = 'none';
+      if (reply) reply.value = '';
+      updateBadge(0);
+    });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', activate);

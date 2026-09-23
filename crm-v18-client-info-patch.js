@@ -45,7 +45,7 @@
     var summary=r.ai_extracted&&r.ai_extracted.request_summary?r.ai_extracted.request_summary:'';
     var title=index===0?'الطلب الحالي':'طلب حالي آخر';
     var h='<div class="crm-current-request" style="border:1px solid var(--cream-deeper);border-radius:14px;padding:14px;margin-top:12px;background:white">';
-    h+='<div style="font-weight:800;color:var(--espresso);margin-bottom:8px">'+title+'</div>';
+    h+='<div style="font-weight:800;color:var(--espresso);margin-bottom:8px">'+title+(r.id&&typeof canEdit==='function'&&canEdit()?' <button class="btn-secondary" onclick="editClientRequest(\''+r.id+'\')">تعديل الطلب</button>':'')+'</div>';
     h+=row('نوع الطلب',reqType(r.request_type));
     h+=row('العقار المطلوب',propText(r));
     h+=row('المنطقة المطلوبة',areaText(r));
