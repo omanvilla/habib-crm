@@ -75,3 +75,27 @@ test('property cohort keeps legacy inquiries outside rates and uses request deno
   assert.match(html, /ليست نسبة تحويل حصرية لإنستغرام/);
   assert.doesNotMatch(html, /value="28\.6"/);
 });
+
+test('link reconciliation selects exact Instagram keys and reports partial failures', async () => {
+  const calls = [], filters = [];
+  const { context } = fixture(async (name, args) => {
+    calls.push({ name, args });
+    return args.p_unmatched_id === 'TEST-two' ? { error: { message: 'TEST not assigned' } } : { data: { ok: true } };
+  });
+  context.supa.from = table => {
+    assert.equal(table, 'unmatched_property_links');
+    const query = {
+      select() { return this; }, eq(column, value) { filters.push([column, value]); return this; },
+      in(column, value) { filters.push([column, Array.from(value)]); return this; },
+      order() { return this; },
+      limit(value) { assert.equal(value, 201); return Promise.resolve({ data: [{ id: 'TEST-one' }, { id: 'TEST-two' }] }); }
+    };
+    return query;
+  };
+  const result = await context.CRMFunnel.reconcilePendingLinks('TEST-property', ['https://www.instagram.com/reel/TEST_1/'], 'TEST-company:TEST-owner');
+  assert.deepEqual(filters[2], ['link_key', ['instagram:TEST_1']]);
+  assert.equal(result.resolved, 1);
+  assert.equal(result.failed, 1);
+  assert.equal(calls.length, 2);
+  assert.ok(calls.every(call => call.name === 'resolve_unmatched_property_link' && call.args.p_property_id === 'TEST-property'));
+});
