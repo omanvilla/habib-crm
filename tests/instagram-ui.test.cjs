@@ -24,7 +24,7 @@ function fixture(handler) {
   vm.createContext(context);
   // The original closure is exposed only inside this isolated test VM. No test
   // hooks or fake credentials are added to the deployed browser source.
-  const source = fs.readFileSync(path.join(__dirname, '../instagram-crm.js'), 'utf8').replace(/\}\)\(\);\s*$/, 'window.__test = {openInstagramConversation, sendInstagramMessage, setActive: c => {igActiveConversation=c;}, getActive:()=>igActiveConversation};})();');
+  const source = fs.readFileSync(path.join(__dirname, '../instagram-crm.js'), 'utf8').replace(/\}\)\(\);\s*$/, 'window.__test = {loadStatus, openInstagramConversation, sendInstagramMessage, setActive: c => {igActiveConversation=c;}, getActive:()=>igActiveConversation};})();');
   vm.runInContext(source, context);
   return { context, element, events, toasts, persisted };
 }
@@ -34,6 +34,16 @@ function defaultResponse(body) {
   if (body.action === 'list') return { data: { ok: true, conversations: [], unread_total: 0 } };
   return { data: { ok: true } };
 }
+
+test('Insights connection does not claim Instagram messaging is connected without permissions', async () => {
+  const { context, element } = fixture(async () => ({ data: { ok: true, connected: true, account: {
+    username: 'TEST-account', webhook_subscribed: false, permissions: ['instagram_basic', 'instagram_manage_insights']
+  } } }));
+  await context.__test.loadStatus();
+  assert.match(element('igInboxStatus').innerHTML, /أداء المنشورات متصل/);
+  assert.match(element('igInboxStatus').innerHTML, /رسائل إنستغرام تحتاج صلاحيات Meta/);
+  assert.doesNotMatch(element('igInboxStatus').innerHTML, /الرسائل متصلة/);
+});
 
 test('messages render before read marking and the newest ingestion sequence is the watermark', async () => {
   let cursor;
