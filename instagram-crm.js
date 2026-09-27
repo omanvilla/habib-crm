@@ -116,7 +116,11 @@
       }
       var account = data.account || {};
       var image = account.profile_picture_url ? '<img class="ig-account-pic" src="' + esc(account.profile_picture_url) + '" alt="Instagram">' : '<div class="ig-avatar" style="width:54px;height:54px">IG</div>';
-      var warning = account.webhook_subscribed ? '<span style="color:#16803c;font-weight:800">● الرسائل متصلة</span>' : '<span style="color:#b7791f;font-weight:800">● الحساب متصل — Webhook بانتظار التفعيل</span>';
+      var granted = Array.isArray(account.permissions) ? account.permissions : [];
+      var missingMessaging = !granted.includes('pages_messaging') || !granted.includes('instagram_manage_messages');
+      var warning = account.webhook_subscribed ? '<span style="color:#16803c;font-weight:800">● الرسائل متصلة</span>' : missingMessaging
+        ? '<span style="color:#b7791f;font-weight:800">● أداء المنشورات متصل · رسائل إنستغرام تحتاج صلاحيات Meta</span>'
+        : '<span style="color:#b7791f;font-weight:800">● أداء المنشورات متصل · Webhook الرسائل لم يتفعّل بعد</span>';
       var connected = '<div class="ig-status">' + image + '<div style="flex:1"><div style="font-weight:900;color:var(--espresso);font-size:15px">@' + esc(account.username || 'omanvilla') + '</div><div style="font-size:11px;color:var(--umber);margin-top:3px">الحساب مربوط · ' + warning + '</div><div style="font-size:10px;color:var(--umber);margin-top:4px">المتابعون: ' + esc(account.followers_count == null ? '—' : account.followers_count) + ' · المنشورات: ' + esc(account.media_count == null ? '—' : account.media_count) + '</div></div>' + (typeof isOwner === 'function' && isOwner() ? '<button class="btn-secondary" onclick="connectInstagram()" style="width:auto">تحديث الصلاحيات</button>' : '') + '</div>';
       if (box) box.innerHTML = connected;
       if (inboxStatus) inboxStatus.innerHTML = connected;
@@ -138,7 +142,9 @@
     var state = Array.from(stateBytes).map(function (value) { return value.toString(16).padStart(2, '0'); }).join('');
     sessionStorage.setItem('instagram_oauth_state', state);
     var redirect = 'https://omanvilla.github.io/habib-crm/';
-    var scope = 'pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_insights';
+    // Insights alone cannot subscribe to Instagram messaging webhooks. Request
+    // the messaging and Page metadata scopes explicitly during reauthorization.
+    var scope = 'pages_show_list,pages_read_engagement,pages_manage_metadata,pages_messaging,instagram_basic,instagram_manage_insights,instagram_manage_messages';
     var url = 'https://www.facebook.com/v25.0/dialog/oauth?client_id=1639659247753419&redirect_uri=' + encodeURIComponent(redirect) + '&response_type=token&auth_type=rerequest&return_scopes=true&scope=' + encodeURIComponent(scope) + '&state=' + encodeURIComponent(state);
     showToast('🔗 جاري فتح موافقة Meta لربط @omanvilla', 'info');
     location.assign(url);
@@ -160,7 +166,7 @@
     try {
       showToast('⏳ جاري تثبيت ربط Instagram داخل CRM...', 'info');
       var data = await invoke({ action: 'connect', access_token: token, instagram_user_id: '17841444560608289' });
-      showToast(data.webhook_subscribed ? '✅ تم ربط @' + (data.username || 'omanvilla') + ' والرسائل بالـCRM' : '✅ تم ربط الحساب. بقي تفعيل Webhook من لوحة Meta.', 'success');
+      showToast(data.webhook_subscribed ? '✅ تم ربط @' + (data.username || 'omanvilla') + ' والرسائل بالـCRM' : 'تم ربط أداء Instagram، لكن الرسائل لم تتصل بعد: ' + (data.warning || 'راجع صلاحيات الرسائل وWebhook في Meta'), data.webhook_subscribed ? 'success' : 'error');
       var nav = Array.from(document.querySelectorAll('.nav-link')).find(function (item) { return item.textContent.indexOf('إنستغرام') >= 0; });
       if (typeof navigate === 'function' && nav) navigate('instagram', nav);
       await loadStatus();
