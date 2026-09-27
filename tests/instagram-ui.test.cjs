@@ -24,7 +24,7 @@ function fixture(handler) {
   vm.createContext(context);
   // The original closure is exposed only inside this isolated test VM. No test
   // hooks or fake credentials are added to the deployed browser source.
-  const source = fs.readFileSync(path.join(__dirname, '../instagram-crm.js'), 'utf8').replace(/\}\)\(\);\s*$/, 'window.__test = {loadStatus, openInstagramConversation, sendInstagramMessage, setActive: c => {igActiveConversation=c;}, getActive:()=>igActiveConversation};})();');
+  const source = fs.readFileSync(path.join(__dirname, '../instagram-crm.js'), 'utf8').replace(/\}\)\(\);\s*$/, 'window.__test = {loadStatus, connectInstagram, openInstagramConversation, sendInstagramMessage, setActive: c => {igActiveConversation=c;}, getActive:()=>igActiveConversation};})();');
   vm.runInContext(source, context);
   return { context, element, events, toasts, persisted };
 }
@@ -43,6 +43,19 @@ test('Insights connection does not claim Instagram messaging is connected withou
   assert.match(element('igInboxStatus').innerHTML, /أداء المنشورات متصل/);
   assert.match(element('igInboxStatus').innerHTML, /رسائل إنستغرام تحتاج صلاحيات Meta/);
   assert.doesNotMatch(element('igInboxStatus').innerHTML, /الرسائل متصلة/);
+});
+
+test('reauthorization requests the app-supported Instagram messaging scope without invalid Page scopes', async () => {
+  const { context } = fixture(defaultResponse);
+  let destination;
+  context.isOwner = () => true;
+  context.location = { assign: value => { destination = value; } };
+  await context.__test.connectInstagram();
+  const scopes = new URL(destination).searchParams.get('scope').split(',');
+  assert.ok(scopes.includes('instagram_manage_messages'));
+  assert.ok(scopes.includes('instagram_manage_insights'));
+  assert.ok(!scopes.includes('pages_messaging'));
+  assert.ok(!scopes.includes('pages_manage_metadata'));
 });
 
 test('messages render before read marking and the newest ingestion sequence is the watermark', async () => {
