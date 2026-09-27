@@ -34,3 +34,8 @@ Baseline: `5b3c779e0aceb5dc4a233d3ddeeedfe56b82b432`. Backup branch: `backup/pre
 - Photos, ambiguous text and unlinked posts still require a person to identify the property. Adding a link sends no customer messages.
 - Current snapshot before this change: 44 pending Instagram link occurrences across 16 distinct shortcodes; 8 Instagram marketing events were linked to properties. No historic records were automatically changed during deployment.
 - Test: `node --test tests/*.test.cjs` (47 passed). Rollback: revert the v3 static files; previously reconciled business records should be reviewed individually rather than deleted.
+
+## Instagram messaging authorization — operations v4
+- The connected account grants Insights permissions, but not `pages_messaging` or `instagram_manage_messages`. Meta rejected the `messages` subscription with error `(#200)` naming `pages_messaging`; the database has zero Instagram webhook events and conversations. Insights numbers are still available.
+- The reauthorization flow now requests `pages_manage_metadata`, `pages_messaging`, and `instagram_manage_messages` in addition to existing Insights scopes. The CRM status explains that performance and messages have different connection states. No new access was granted by deploying code; Meta account consent / app permission approval is still required, and webhook receipt must be tested after that.
+- Four active listings share the exact title and specifications of Ahmed Al Shaer 57k; three share one owner record, while the fourth points to a different owner record. No listing was archived or merged because the ownership conflict needs a verified business decision.
