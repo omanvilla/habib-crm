@@ -117,7 +117,7 @@
       var account = data.account || {};
       var image = account.profile_picture_url ? '<img class="ig-account-pic" src="' + esc(account.profile_picture_url) + '" alt="Instagram">' : '<div class="ig-avatar" style="width:54px;height:54px">IG</div>';
       var granted = Array.isArray(account.permissions) ? account.permissions : [];
-      var missingMessaging = !granted.includes('pages_messaging') || !granted.includes('instagram_manage_messages');
+      var missingMessaging = !granted.includes('instagram_manage_messages');
       var warning = account.webhook_subscribed ? '<span style="color:#16803c;font-weight:800">● الرسائل متصلة</span>' : missingMessaging
         ? '<span style="color:#b7791f;font-weight:800">● أداء المنشورات متصل · رسائل إنستغرام تحتاج صلاحيات Meta</span>'
         : '<span style="color:#b7791f;font-weight:800">● أداء المنشورات متصل · Webhook الرسائل لم يتفعّل بعد</span>';
@@ -142,9 +142,10 @@
     var state = Array.from(stateBytes).map(function (value) { return value.toString(16).padStart(2, '0'); }).join('');
     sessionStorage.setItem('instagram_oauth_state', state);
     var redirect = 'https://omanvilla.github.io/habib-crm/';
-    // Insights alone cannot subscribe to Instagram messaging webhooks. Request
-    // the messaging and Page metadata scopes explicitly during reauthorization.
-    var scope = 'pages_show_list,pages_read_engagement,pages_manage_metadata,pages_messaging,instagram_basic,instagram_manage_insights,instagram_manage_messages';
+    // This app's Instagram API with Facebook Login use case exposes
+    // instagram_manage_messages. Page Messaging/metadata scopes are invalid
+    // for this app and block OAuth before consent can be shown.
+    var scope = 'pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_insights,instagram_manage_messages';
     var url = 'https://www.facebook.com/v25.0/dialog/oauth?client_id=1639659247753419&redirect_uri=' + encodeURIComponent(redirect) + '&response_type=token&auth_type=rerequest&return_scopes=true&scope=' + encodeURIComponent(scope) + '&state=' + encodeURIComponent(state);
     showToast('🔗 جاري فتح موافقة Meta لربط @omanvilla', 'info');
     location.assign(url);
