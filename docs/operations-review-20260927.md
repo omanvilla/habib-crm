@@ -28,3 +28,9 @@ Baseline: `5b3c779e0aceb5dc4a233d3ddeeedfe56b82b432`. Backup branch: `backup/pre
 - WhatsApp Business phone-side read state cannot be inferred from opening CRM or from outbound echoes; leave unread indicators unchanged until an official reliable read event is available.
 - Bonus formula and monthly commission target amounts are not configured. Owner can set numeric goals; no bonus is calculated.
 - Historic properties need explicit owner review to assign sourced_by; attribution is not guessed from added_by.
+
+## Instagram permalink reconciliation — operations v3
+- Confirming an Instagram permalink on a property now checks older pending WhatsApp references with the exact same shortcode, within the signed-in employee's visible conversations. Each match uses the existing access-checked resolution RPC and creates/links its property request. Up to 200 occurrences are handled in one save; any failures or extra rows remain pending and are reported, without a false success message.
+- Photos, ambiguous text and unlinked posts still require a person to identify the property. Adding a link sends no customer messages.
+- Current snapshot before this change: 44 pending Instagram link occurrences across 16 distinct shortcodes; 8 Instagram marketing events were linked to properties. No historic records were automatically changed during deployment.
+- Test: `node --test tests/*.test.cjs` (47 passed). Rollback: revert the v3 static files; previously reconciled business records should be reviewed individually rather than deleted.
