@@ -395,7 +395,7 @@
     if (!canWrite()) { toast('لا تملك صلاحية إضافة روابط للعقار', 'error'); return; }
     var property = await getProperty(propertyId), box = createDialog();
     pendingFocus = document.activeElement; dialogProperty = property;
-    box.innerHTML = '<div class="cf-dialog-head"><h3>روابط منشورات العقار</h3>' + button('close', 'إغلاق') + '</div><p>' + escape(property.title || 'العقار') + '</p><label class="fl" for="cfLinksInput">رابط Reel أو منشور Instagram في كل سطر</label><textarea id="cfLinksInput" class="fta" rows="6" dir="ltr" placeholder="https://www.instagram.com/reel/…/"></textarea><div id="cfLinksPreview" class="cf-footnote" aria-live="polite"></div><div id="cfDialogError" role="alert"></div><div class="cf-note">تُحفظ الروابط على هذا العقار مع تجاهل الرابط المكرر. تحديث القياسات خطوة مستقلة ولا يرسل رسائل للعملاء.</div>' + button('save-links', 'حفظ الروابط', propertyId);
+    box.innerHTML = '<div class="cf-dialog-head"><h3>روابط منشورات العقار</h3>' + button('close', 'إغلاق') + '</div><p>' + escape(property.title || 'العقار') + '</p><label class="fl" for="cfLinksInput">رابط Reel أو منشور Instagram في كل سطر</label><textarea id="cfLinksInput" class="fta" rows="6" dir="ltr" placeholder="https://www.instagram.com/reel/…/"></textarea><div id="cfLinksPreview" class="cf-footnote" aria-live="polite"></div><div id="cfDialogError" role="alert"></div><div class="cf-note">تُحفظ الروابط على هذا العقار مع تجاهل الرابط المكرر. الرسائل السابقة التي تحمل الرابط نفسه وتستطيع الوصول إليها ستُربط بالعقار ويُسجل طلبها. راجع صحة العقار قبل الحفظ. تحديث القياسات خطوة مستقلة ولا يرسل رسائل للعملاء.</div>' + button('save-links', 'حفظ الروابط', propertyId);
     box.querySelector('#cfLinksInput').addEventListener('input', previewLinks);
     previewLinks(); box.showModal(); box.querySelector('#cfLinksInput').focus();
   }
@@ -405,6 +405,27 @@
     if (!input || !preview) return;
     var parsed = parseLinks(input.value);
     preview.textContent = parsed.links.length + ' روابط مختلفة صالحة' + (parsed.duplicate_count ? ' · تم تجاهل ' + parsed.duplicate_count + ' تكرار' : '') + (parsed.invalid_lines.length ? ' · راجع الأسطر: ' + parsed.invalid_lines.join('، ') : '');
+  }
+
+  // A newly confirmed permalink may already exist in older inbound WhatsApp
+  // messages. Resolve only identical shortcodes visible to this staff member;
+  // the RPC enforces conversation access and creates the linked request.
+  async function reconcilePendingLinks(propertyId, links, scope) {
+    var keys = links.map(function (url) { return 'instagram:' + url.split('/')[4]; });
+    var query = await supa.from('unmatched_property_links').select('id,link_key')
+      .eq('company_id', currentProfile.company_id).eq('status', 'pending')
+      .in('link_key', keys).order('created_at', { ascending: true }).limit(201);
+    if (query.error) throw query.error;
+    var rows = query.data || [], result = { resolved: 0, failed: 0, remaining: rows.length > 200 };
+    for (var row of rows.slice(0, 200)) {
+      if (scope !== getScope()) break;
+      try {
+        var linked = await supa.rpc('resolve_unmatched_property_link', { p_unmatched_id: row.id, p_property_id: propertyId });
+        if (linked.error || !linked.data || linked.data.ok !== true) throw linked.error || new Error('لم يؤكد حفظ الربط');
+        result.resolved++;
+      } catch (error) { result.failed++; console.warn('[Funnel link reconciliation]', row.id, error); }
+    }
+    return result;
   }
 
   async function saveLinks(propertyId, element) {
@@ -421,6 +442,14 @@
       if (scope !== getScope()) return;
       toast('تم حفظ ' + data.inserted_count + ' رابط جديد · ' + data.existing_count + ' موجود مسبقًا', 'success');
       if (dialogProperty && dialogProperty.property_id === propertyId) dialog.close();
+      try {
+        var history = await reconcilePendingLinks(propertyId, parsed.links, scope);
+        if (scope !== getScope()) return;
+        if (history.resolved) toast('تم ربط ' + history.resolved + ' استفسار واتساب سابق بالرابط نفسه', 'success');
+        if (history.failed || history.remaining) toast('بقيت بعض الرسائل للمراجعة: ' + history.failed + ' تعذر ربطها' + (history.remaining ? ' · توجد رسائل إضافية خارج الدفعة الحالية' : ''), 'error');
+      } catch (historyError) {
+        if (scope === getScope()) toast('حُفظ الرابط، لكن تعذرت مراجعة الرسائل السابقة: ' + message(historyError), 'error');
+      }
       await refreshProperty(propertyId);
     } catch (error) { if (scope === getScope() && errors.isConnected) errors.textContent = message(error); }
     finally { busy.delete('links:' + propertyId); if (element.isConnected) element.disabled = false; }
@@ -530,7 +559,7 @@
     if (typeof supa !== 'undefined' && supa.auth) supa.auth.onAuthStateChange(function (event) { if (event === 'SIGNED_OUT') { scopeKey = null; reset(); } });
   }
 
-  api.loadOverview = loadOverview; api.loadProperty = loadProperty; api.refreshProperty = refreshProperty; api.reset = reset;
+  api.loadOverview = loadOverview; api.loadProperty = loadProperty; api.refreshProperty = refreshProperty; api.reconcilePendingLinks = reconcilePendingLinks; api.reset = reset;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', activate);
   else activate();
 })(typeof window !== 'undefined' ? window : globalThis);
