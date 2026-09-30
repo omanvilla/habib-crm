@@ -207,7 +207,7 @@ window.fbAsyncInit = function(){
 <div class="dash-focus-head"><div><div class="dash-focus-title">🎯 ماذا يحتاج شغلك الآن؟</div><div class="dash-focus-sub">متابعتك القادمة وزياراتك، مع خطوة واضحة لكل طلب.</div></div></div>
 
 <div id="opsDailyWork" aria-live="polite"><p class="ops-note">جاري ترتيب عمل اليوم…</p></div>
-<div class="ops-secondary"><details><summary>مؤشرات العمل والتنبيهات</summary>
+<div class="ops-secondary"><details id="opsPerformanceDetails" ontoggle="if(this.open)crmDashboardPerformancePeriod('month')"><summary>الأداء خلال فترة</summary><div class="ops-periods"><button class="btn-secondary" data-period="day" onclick="crmDashboardPerformancePeriod('day')">اليوم</button><button class="btn-secondary" data-period="week" onclick="crmDashboardPerformancePeriod('week')">الأسبوع</button><button class="btn-secondary" data-period="month" onclick="crmDashboardPerformancePeriod('month')">الشهر</button></div><div id="opsDashboardPerformanceResults"></div></details><details><summary>مؤشرات العمل والتنبيهات</summary>
 <div class="card" id="employeeInventoryReminder" style="display:none"><div class="card-body" id="employeeInventoryReminderText"></div></div>
 <div class="card" id="dashTasksCard"><div class="card-head"><div class="card-title"><span>⏰</span>المهام العاجلة أولاً</div><a class="auth-link" style="font-size:12px" onclick="navigate('daily',null)">عرض الكل ←</a></div><div id="dashTasksList"><div class="empty"><div class="loader-spinner"></div></div></div></div>
 
@@ -2195,7 +2195,7 @@ function clearSessionUI(){
  currentUser=null;currentProfile=null;currentCompany=null;
  clientWorkRequests=[];viewingClient=null;window.viewingProperty=null;allViewings=[];
  window.dashboardWorkSnapshot=null;window.dashboardClientFilters=null;window.dashboardContactQueue=[];
- ['clientsList','propertiesList','dealsList','tasksList','viewingsList','opsDailyWork','employeePerformanceResults','employeePerformanceMini','cdName','cdSub','pdTitle','pdSub','waChatBody','waConversationList'].forEach(id=>{const el=$(id);if(el)el.textContent='';});
+ ['clientsList','propertiesList','dealsList','tasksList','viewingsList','opsDailyWork','employeePerformanceResults','opsDashboardPerformanceResults','employeePerformanceMini','cdName','cdSub','pdTitle','pdSub','waChatBody','waConversationList'].forEach(id=>{const el=$(id);if(el)el.textContent='';});
  if(typeof window.crmResetOperations==='function')window.crmResetOperations();
  allClients=[];allProperties=[];allDeals=[];allTasks=[];allOwners=[];allMembers=[];allExpenses=[];allNotifications=[];aiMessages=[];
  waInboxConversations=[];waInboxMessages=[];waInboxRequests=[];waInboxActiveId=null;waInboxActiveConversation=null;

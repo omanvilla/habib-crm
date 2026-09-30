@@ -18,7 +18,7 @@ fs.mkdirSync(out,{recursive:true});
    await page.evaluate(s=>navigate(s==='dashboard'?'dash':s,null),screen);await page.waitForTimeout(900);
    const name=mode+'-'+role+'-'+screen+'-desktop.png';await page.screenshot({path:path.join(out,name),fullPage:true});report.screens.push(name);
    if(mode==='after'){
-    if(screen==='dashboard')assert(await page.locator('#opsDailyWork').innerText());
+    if(screen==='dashboard'){assert((await page.locator('#opsDailyWork').innerText()).includes('الزيارات القادمة'));await page.locator('#opsPerformanceDetails summary').click();await page.waitForTimeout(200);assert((await page.locator('#opsDashboardPerformanceResults').innerText()).includes('لم تُحدد أهداف'));await page.locator('#opsPerformanceDetails summary').click();}
     if(screen==='properties'){
      const text=await page.locator('#propertiesList').innerText();
      if(role==='muscat')assert(!text.includes('الصومحان'));if(role==='barka')assert(!text.includes('الخوض'));
@@ -31,10 +31,10 @@ fs.mkdirSync(out,{recursive:true});
      if(role!=='barka'){assert(text.includes('عميلة بطلبين مستقلين'));assert(text.includes('الموالح'));assert(text.includes('المعبيلة'));}
      if(role==='muscat')assert(!text.includes('عميل متابعة بركاء'));if(role==='barka')assert(!text.includes('عميل مسقط التجريبي'));
     }
+   }
     await page.setViewportSize({width:390,height:844});
     const mobile=mode+'-'+role+'-'+screen+'-mobile.png';await page.screenshot({path:path.join(out,mobile),fullPage:true});report.screens.push(mobile);
     await page.setViewportSize({width:1440,height:1000});
-   }
   }
   if(mode==='after'){
    // Download from the rendered property details, with synthetic repeated/cancelled visits.
