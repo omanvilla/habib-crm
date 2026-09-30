@@ -204,8 +204,10 @@ window.fbAsyncInit = function(){
 <button class="qa-btn" onclick="openCreateModal('mTask')">⏰ مهمة</button>
 </div></div>
 
-<div class="dash-focus-head"><div><div class="dash-focus-title">🎯 ماذا يحتاج شغلك الآن؟</div><div class="dash-focus-sub">ابدأ بالمهام العاجلة، ثم راجع مؤشرات العملاء والعقارات التي تحتاج إجراء.</div></div></div>
+<div class="dash-focus-head"><div><div class="dash-focus-title">🎯 ماذا يحتاج شغلك الآن؟</div><div class="dash-focus-sub">متابعتك القادمة وزياراتك، مع خطوة واضحة لكل طلب.</div></div></div>
 
+<div id="opsDailyWork" aria-live="polite"><p class="ops-note">جاري ترتيب عمل اليوم…</p></div>
+<div class="ops-secondary"><details><summary>مؤشرات العمل والتنبيهات</summary>
 <div class="card" id="employeeInventoryReminder" style="display:none"><div class="card-body" id="employeeInventoryReminderText"></div></div>
 <div class="card" id="dashTasksCard"><div class="card-head"><div class="card-title"><span>⏰</span>المهام العاجلة أولاً</div><a class="auth-link" style="font-size:12px" onclick="navigate('daily',null)">عرض الكل ←</a></div><div id="dashTasksList"><div class="empty"><div class="loader-spinner"></div></div></div></div>
 
@@ -218,6 +220,7 @@ window.fbAsyncInit = function(){
 </div>
 
 <div id="dashPropertyActionQueue"></div>
+</details></div>
 
 </div>
 
@@ -268,6 +271,7 @@ window.fbAsyncInit = function(){
 <button class="role-tab" onclick="filterClientRole('followup',this)">⏰ يحتاج متابعة <span class="count" id="cntFollowup">0</span></button>
 <button class="role-tab" id="unassignedClientsTab" style="display:none" onclick="filterClientRole('unassigned',this)">📥 بانتظار التوزيع <span class="count" id="cntUnassigned">0</span></button>
 </div>
+<div class="ops-work-filters" id="opsClientsWork" aria-label="العمل المطلوب"></div>
 <div id="followupAlert"></div>
 <div class="archive-toggle"><button class="active" onclick="setClientArchiveView(false,this)">📋 النشطة</button><button onclick="setClientArchiveView(true,this)">📦 المؤرشفة</button></div>
 <div class="card" style="margin-bottom:14px"><div style="padding:16px">
@@ -293,7 +297,8 @@ window.fbAsyncInit = function(){
 <button class="btn-gold" onclick="openCreateModal('mProperty')">+ إضافة عقار</button>
 </div></div>
 <div class="archive-toggle"><button class="active" onclick="setPropView('active',this)">📋 النشطة <span class="count" id="cntPropActive">0</span></button><button onclick="setPropView('sold',this)">🔴 المباعة <span class="count" id="cntPropSold">0</span></button><button onclick="setPropView('archived',this)">📦 المؤرشفة</button></div>
-<div id="propertyActionQueuePanel"></div>
+<div class="ops-searchbar" id="opsPropertyFilters"><label>البحث<input id="opsPropertySearch" class="fi" placeholder="عنوان، رمز أو منطقة" type="search"></label><label id="opsPropertyBranchLabel">الفرع<select id="opsPropertyBranch" class="fs"><option value="">كل الفروع</option><option value="muscat">مسقط</option><option value="barka">بركاء</option><option value="unknown">غير محدد</option></select></label><label>المنطقة<select id="opsPropertyArea" class="fs"><option value="">كل المناطق</option></select></label><label>الحالة<select id="opsPropertyStatus" class="fs"><option value="">كل الحالات</option><option value="available">متوفر</option><option value="reserved">محجوز</option><option value="deposit">عربون</option><option value="negotiating">تفاوض</option><option value="not_available">غير متاح</option></select></label></div>
+<details class="ops-secondary"><summary>عقارات تحتاج إجراء</summary><div id="propertyActionQueuePanel"></div></details>
 <div class="card"><div id="propertiesList"><div class="empty"><div class="loader-spinner"></div></div></div></div>
 </div>
 
@@ -2182,8 +2187,16 @@ async function handleLogin(){
 async function handleSignup(){clearAuthMessages();if(!currentInviteToken){showError('هذا التسجيل يحتاج رابط دعوة صالح من صاحب الشركة.');return}const n=$('signupName').value.trim(),e=$('signupEmail').value.trim().toLowerCase(),p=$('signupPwd').value,ph=$('signupPhone').value.trim(),b=$('signupBtn');if(p.length<8){showError('كلمة المرور يجب أن تكون 8 أحرف على الأقل');return}b.disabled=true;b.textContent='⏳ جاري إنشاء الحساب...';try{const redirect=window.location.origin+window.location.pathname;const r=await supa.auth.signUp({email:e,password:p,options:{emailRedirectTo:redirect,data:{full_name:n,phone:ph,invite_token:currentInviteToken}}});if(r.error)throw r.error;showSuccess('🎉 <strong>تم إنشاء الحساب من الدعوة.</strong><br>تحقق من بريدك واضغط رابط التأكيد، وبعدها سجّل الدخول.');b.disabled=false;b.textContent='✅ تم إرسال التحقق'}catch(err){let m=err.message;if(m.indexOf('already registered')>=0)m='هذا البريد لديه حساب مسبقاً. إذا كان موظفاً سابقاً فعّل حسابه من صفحة الفريق بدلاً من إنشاء حساب جديد.';showError(m);b.disabled=false;b.textContent='✅ قبول الدعوة وإنشاء الحساب'}}
 async function handleReset(){clearAuthMessages();const e=$('resetEmail').value.trim(),b=$('resetBtn');b.disabled=true;b.textContent='⏳ جاري الإرسال...';try{const redirect=window.location.origin+window.location.pathname;const r=await supa.auth.resetPasswordForEmail(e,{redirectTo:redirect});if(r.error)throw r.error;showSuccess('📧 إذا كان البريد مسجلاً فسيصل رابط الاستعادة. افحص البريد الوارد والرسائل غير المرغوبة.');b.disabled=false;b.textContent='📧 إرسال رابط الاستعادة'}catch(err){showError(err.message);b.disabled=false;b.textContent='📧 إرسال رابط الاستعادة'}}
 let logoutPending=false;
+let crmSessionGeneration=0;
+let clientWorkRequests=[];
+function crmSessionCurrent(generation,userId){return generation===crmSessionGeneration&&currentUser&&currentUser.id===userId;}
 function clearSessionUI(){
+ crmSessionGeneration++;dashboardLoadSeq++;
  currentUser=null;currentProfile=null;currentCompany=null;
+ clientWorkRequests=[];viewingClient=null;window.viewingProperty=null;allViewings=[];
+ window.dashboardWorkSnapshot=null;window.dashboardClientFilters=null;window.dashboardContactQueue=[];
+ ['clientsList','propertiesList','dealsList','tasksList','viewingsList','opsDailyWork','employeePerformanceResults','employeePerformanceMini','cdName','cdSub','pdTitle','pdSub','waChatBody','waConversationList'].forEach(id=>{const el=$(id);if(el)el.textContent='';});
+ if(typeof window.crmResetOperations==='function')window.crmResetOperations();
  allClients=[];allProperties=[];allDeals=[];allTasks=[];allOwners=[];allMembers=[];allExpenses=[];allNotifications=[];aiMessages=[];
  waInboxConversations=[];waInboxMessages=[];waInboxRequests=[];waInboxActiveId=null;waInboxActiveConversation=null;
  document.querySelectorAll('.modal-ov.on').forEach(x=>x.classList.remove('on'));
@@ -2298,6 +2311,7 @@ function openDashboardDeals(){dealView='pipeline';navigate('deals',null)}
 
 var dashboardLoadSeq=0;
 async function loadDashboard(){
+  const sessionGeneration=crmSessionGeneration,sessionUser=currentUser&&currentUser.id;
   loadEmployeeTargetReminder();
   var seq=++dashboardLoadSeq;
   loadPropertyActionQueue('dashboard');
@@ -2305,13 +2319,14 @@ async function loadDashboard(){
     const todayStr=toLocalDateStr(new Date());
     const rs=await Promise.all([
       supa.rpc('crm_client_contact_queue',{p_limit:2000}),
-      supa.from('client_requests').select('id,client_id,status,lead_temperature,pipeline_stage,created_at,next_followup,first_human_response_at,last_mutual_contact_at').eq('status','active').limit(2500),
-      crmDataFrom('deals').select('*',{count:'exact',head:true}).not('stage','in','(closed,commission_collected,lost)'),
+      supa.from('client_requests').select('id,client_id,status,request_type,preferred_area,qualified_at,lead_temperature,pipeline_stage,created_at,next_followup,first_human_response_at,last_mutual_contact_at').eq('status','active').limit(2500),
+      crmDataFrom('deals').select('id,client_id,property_id,stage,client:clients(name),property:properties(title)',{count:'exact'}).not('stage','in','(closed,commission_collected,lost)').order('updated_at',{ascending:false}).limit(6),
       crmReadAll(()=>supa.from('tasks').select('*, client:clients(name,phone)',{count:'exact'}).eq('done',false).order('id')),
       supa.from('viewings').select('*',{count:'exact',head:true}).eq('viewing_date',todayStr).neq('archived',true),
-      supa.from('clients').select('id,name,phone,lead_temperature,status,pipeline_stage,preferred_area,client_type,budget_max,created_at,human_contact_at,last_contact_at,next_followup,followup_suppressed').neq('archived',true).limit(2000)
+      supa.from('clients').select('id,name,phone,lead_temperature,status,pipeline_stage,preferred_area,client_type,budget_max,created_at,human_contact_at,last_contact_at,next_followup,followup_suppressed').neq('archived',true).limit(2000),
+      supa.from('viewings').select('id,client_id,request_id,viewing_date,viewing_time,status,client:clients(name),property:properties(title)').neq('archived',true).gte('viewing_date',todayStr).in('status',['scheduled','confirmed','postponed']).order('viewing_date').order('viewing_time').limit(6)
     ]);
-    if(seq!==dashboardLoadSeq)return;
+    if(seq!==dashboardLoadSeq||!crmSessionCurrent(sessionGeneration,sessionUser))return;
     rs.forEach(function(x){if(x.error)throw x.error});
     const contactQueue=rs[0].data||[], reqs=rs[1].data||[], clients=rs[5].data||[];
     const clientMap=new Map(clients.map(c=>[c.id,c]));
@@ -2329,10 +2344,12 @@ async function loadDashboard(){
     if($('statHotClients'))$('statHotClients').textContent=hotIds.length;
     if($('statViewingsToday'))$('statViewingsToday').textContent=rs[4].count||0;
     if($('statOpenDeals'))$('statOpenDeals').textContent=rs[2].count||0;
-    const dashboardTasks=rs[3]||[];allTasks=allTasks.filter(t=>t.done).concat(dashboardTasks);renderDashTasks(dashboardTasks);
+    const dashboardTasks=rs[3]||[];
+    window.dashboardWorkSnapshot={requests:reqs,clients,visits:rs[6].data||[],deals:rs[2].data||[],tasks:dashboardTasks,contactQueue};
+    allTasks=allTasks.filter(t=>t.done).concat(dashboardTasks);renderDashTasks(dashboardTasks);
     const tCount=dashboardTasks.length;
     if($('navTasksCount')){if(tCount){$('navTasksCount').textContent=tCount;$('navTasksCount').style.display=''}else{$('navTasksCount').style.display='none'}}
-  }catch(err){console.error('Dashboard error:',err);showToast('تعذر تحديث لوحة العمل: '+(err.message||String(err)),'error')}
+  }catch(err){if(!crmSessionCurrent(sessionGeneration,sessionUser))return;window.dashboardWorkSnapshot=null;console.error('Dashboard error:',err);showToast('تعذر تحديث لوحة العمل: '+(err.message||String(err)),'error')}
 }
 function renderDashTasks(tasks){var card=$('dashTasksCard');if(!tasks.length){if(card)card.style.display='none';$('dashTasksList').innerHTML='';return}if(card)card.style.display='';let h='';tasks.forEach(function(t){const d=daysUntil(t.due_date);const ov=d!==null&&d<0,td=d===0;h+='<div class="task-item"><div class="task-check '+(t.done?'done':'')+'" onclick="toggleTask(\''+t.id+'\','+(!t.done)+')">'+(t.done?'✓':'')+'</div><div class="task-content"><div class="task-title">'+escapeHtml(t.title)+'</div><div class="task-meta">'+(t.due_date?'<span class="task-due '+(ov?'overdue':'')+'">📅 '+(ov?'متأخّرة '+(-d)+' يوم':td?'اليوم':'بعد '+d+' يوم')+'</span>':'')+'<span class="task-priority tp-'+(t.priority==='high'?'high':t.priority==='low'?'low':'med')+'">'+(t.priority==='high'?'🔴 عاجلة':t.priority==='low'?'⚪ منخفضة':'🟡 متوسطة')+'</span></div></div></div>'});$('dashTasksList').innerHTML=h}
 function renderDashHot(clients){if(!clients.length){$('dashHotList').innerHTML='<div class="empty" style="padding:25px"><div class="empty-ico" style="font-size:32px">🔥</div><div class="empty-desc">لا يوجد عملاء حارون الآن</div></div>';return}let h='<div style="padding:6px 0">';clients.forEach(function(c){h+='<div style="padding:12px 18px;border-bottom:1px solid var(--cream-dark);display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="viewClient(\''+c.id+'\')"><div><div style="font-weight:700;font-size:13px;color:var(--espresso)">'+escapeHtml(c.name)+'</div><div style="font-size:11px;color:var(--umber);margin-top:2px">'+escapeHtml(c.preferred_area||'—')+' · '+(clientTypeAr(c.client_type)||'')+'</div></div><div style="font-size:12px;color:var(--gold);font-weight:700">'+(c.budget_max?fmtMoneyShort(c.budget_max):'فتح العميل ←')+'</div></div>'});$('dashHotList').innerHTML=h+'</div>'}
@@ -2364,7 +2381,20 @@ function updateRoleCounts(){
   var ec=$('cntConsultations');if(ec)ec.textContent=consultations;
   $('cntHot').textContent=hot;
   $('cntFollowup').textContent=followup;if($('cntUnassigned'))$('cntUnassigned').textContent=unassigned;if($('unassignedClientsTab'))$('unassignedClientsTab').style.display=canManage()?'':'none';if(followup>0){$('followupAlert').innerHTML='<div class="followup-alert"><div class="followup-text">⏰ <strong>'+followup+' عميل</strong> يحتاج متابعة (أكثر من أسبوع بدون تواصل)</div><button class="btn-primary" style="width:auto;padding:7px 14px;font-size:12px" onclick="filterClientRole(\'followup\',document.querySelector(\'#clientRoleTabs .role-tab:nth-child(6)\'))">عرضهم</button></div>'}else{$('followupAlert').innerHTML=''}}
-async function loadClients(){const list=$('clientsList');list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';try{let q=supa.from('clients').select('*, agent:profiles!clients_assigned_to_fkey(full_name)').order('created_at',{ascending:false});const r=await q;if(r.error)throw r.error;allClients=(r.data||[]).filter(c=>showArchivedClients?c.archived===true:c.archived!==true);updateRoleCounts();renderClients()}catch(err){list.innerHTML='<div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(err.message)+'</div></div>'}}
+async function loadClients(){
+ const list=$('clientsList'),generation=crmSessionGeneration,userId=currentUser&&currentUser.id;
+ list.innerHTML='<div class="empty" role="status">جاري تحميل العملاء والطلبات…</div>';
+ try{
+  const [r,requests]=await Promise.all([
+   supa.from('clients').select('*, agent:profiles!clients_assigned_to_fkey(full_name)').order('created_at',{ascending:false}),
+   crmReadAll(()=>supa.from('client_requests').select('id,client_id,request_type,status,pipeline_stage,qualified_at,preferred_area,budget_min,budget_max,next_followup,branch_key',{count:'exact'}).in('status',['active','paused']).order('id'))
+  ]);
+  if(!crmSessionCurrent(generation,userId))return;
+  if(r.error)throw r.error;
+  clientWorkRequests=requests;allClients=(r.data||[]).filter(c=>showArchivedClients?c.archived===true:c.archived!==true);
+  updateRoleCounts();renderClients();
+ }catch(err){if(!crmSessionCurrent(generation,userId))return;allClients=[];clientWorkRequests=[];list.innerHTML='<div class="empty" role="alert"><p>تعذر تحميل العملاء وطلباتهم.</p><p>'+escapeHtml(err.message)+'</p><button class="btn-secondary" onclick="loadClients()">إعادة المحاولة</button></div>';}
+}
 window.clientSmartFilter = {text:'',type:'',area:'',budget:null};
 
 function populateClientSearchTypes(){
@@ -2446,6 +2476,7 @@ var rc=document.getElementById('csResultCount');if(rc)rc.textContent='🎯 '+fil
 var rc2=document.getElementById('csResultCount');if(rc2)rc2.textContent='';
 }
 if(!filtered.length){list.innerHTML='<div class="empty"><div class="empty-ico">👥</div><div class="empty-title">لا يوجد عملاء '+(clientRoleFilter==='all'?'بعد':'في هذا التصنيف')+'</div>'+(clientRoleFilter==='all'&&canEdit()?'<button class="btn-primary" style="margin-top:14px;width:auto;padding:10px 22px" onclick="openModal(\'mClient\')">+ إضافة عميل جديد</button>':'')+'</div>';return}
+if(typeof window.crmRenderClientWorkList==='function'){window.crmRenderClientWorkList(filtered);return;}
 if(typeof isMobileCRM==='function'&&isMobileCRM()){
   let mh='<div class="mobile-record-list">';
   filtered.forEach(function(c){
@@ -2495,7 +2526,7 @@ function deleteClient(id,n){
 
 async function restoreClient(id,n){confirmAction('استعادة العميل','هل تريد استعادة <strong>'+escapeHtml(n)+'</strong> من الأرشيف؟','♻️',async function(){let done=false;try{const r=await supa.from('clients').update({archived:false,archived_at:null,archived_by:null}).eq('id',id);if(r.error)throw r.error;done=true;showToast('♻️ تم استعادة العميل','success')}catch(err){console.error(err);showToast('خطأ: '+err.message,'error')}if(done){try{await logSystemActivity('edit','client',id,'استعادة العميل: '+n)}catch(e){}loadClients();loadDashboard()}})}
 function permanentDeleteClient(){if(!isOwner())return;showToast('الحذف النهائي غير متاح حالياً لحماية السجلات المرتبطة؛ يمكنك إبقاء العميل في الأرشيف أو استعادته','warning');}
-async function viewClient(id){try{const r=await supa.from('clients').select('*, agent:profiles!clients_assigned_to_fkey(full_name)').eq('id',id).single();if(r.error)throw r.error;viewingClient=r.data;navigate('clientDetail',null);renderClientDetail()}catch(err){showToast('خطأ: '+err.message,'error')}}
+async function viewClient(id){const generation=crmSessionGeneration,userId=currentUser&&currentUser.id;try{const r=await supa.from('clients').select('*, agent:profiles!clients_assigned_to_fkey(full_name)').eq('id',id).single();if(!crmSessionCurrent(generation,userId))return;if(r.error)throw r.error;viewingClient=r.data;navigate('clientDetail',null);renderClientDetail()}catch(err){showToast('خطأ: '+err.message,'error')}}
 function renderClientDetail(){
   if(!viewingClient)return;
   const c=viewingClient;
@@ -2623,7 +2654,7 @@ function downloadCSV(name,headers,rows){
  const csv='\ufeff'+[headers,...rows].map(row=>row.map(crmSafeCsvCell).join(',')).join('\n');
  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name+'-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);showToast('تم التصدير','success');
 }
-async function loadProperties(){loadPropertyActionQueue('properties');const list=$('propertiesList');list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';try{const r=await crmDataFrom('properties').select('*').order('created_at',{ascending:false});if(r.error)throw r.error;var allData=(r.data||[]);
+async function loadProperties(){const generation=crmSessionGeneration,userId=currentUser&&currentUser.id;loadPropertyActionQueue('properties');const list=$('propertiesList');list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';try{const r=await crmDataFrom('properties').select('*').order('created_at',{ascending:false});if(!crmSessionCurrent(generation,userId))return false;if(r.error)throw r.error;var allData=(r.data||[]);
 // حساب العدادات
 var activeCount=allData.filter(p=>p.archived!==true&&p.status!=='sold').length;
 var soldCount=allData.filter(p=>p.archived!==true&&p.status==='sold').length;
@@ -2658,7 +2689,7 @@ if(typeof isMobileCRM==='function'&&isMobileCRM()){
   });
   list.innerHTML=mh+'</div>';return;
 }
-let h='<table class="tbl"><thead><tr><th>العنوان</th><th>النوع</th><th>المنطقة</th><th>السعر</th><th>الحالة</th><th></th></tr></thead><tbody>';allProperties.forEach(function(p){const sm={available:'✅ متوفر',reserved:'⏳ محجوز',deposit:'💰 عربون',negotiating:'💬 تفاوض',sold:'🔴 مباع',not_available:'⚪ غير متاح'};h+='<tr'+(p.archived?' style="opacity:0.6;font-style:italic"':'')+' data-id="'+p.id+'"><td>'+(p.archived?'📦 ':'')+'<strong style="color:var(--espresso);cursor:pointer" onclick="viewProperty(\''+p.id+'\')">'+escapeHtml(p.title)+'</strong></td><td>'+propTypeAr(p.type)+'</td><td>'+escapeHtml(p.area)+'</td><td style="color:var(--gold);font-weight:700">'+fmtMoney(p.price)+'</td><td>'+(sm[p.status]||p.status)+'</td><td style="font-size:12px;color:var(--umber)" dir="ltr">'+fmtDate(p.created_at)+'</td><td style="display:flex;gap:6px;justify-content:flex-end">'+(canEdit()&&!p.archived?'<span style="cursor:pointer" onclick="editProperty(\''+p.id+'\')" title="تعديل">✏️</span>':'')+(p.archived?'<span style="cursor:pointer" onclick="restorePropertyById(\''+p.id+'\')" title="استعادة">♻️</span>'+(isOwner()?'<span style="cursor:pointer" onclick="permanentDeletePropertyById(\''+p.id+'\')" title="حذف نهائي">🗑</span>':''):'<span style="cursor:pointer" onclick="archivePropertyById(\''+p.id+'\')" title="أرشفة">📦</span>')+'</td></tr>'});list.innerHTML=h+'</tbody></table>'}catch(err){list.innerHTML='<div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(err.message)+'</div></div>'}}
+let h='<table class="tbl"><thead><tr><th>العنوان</th><th>النوع</th><th>المنطقة</th><th>السعر</th><th>الحالة</th><th></th></tr></thead><tbody>';allProperties.forEach(function(p){const sm={available:'✅ متوفر',reserved:'⏳ محجوز',deposit:'💰 عربون',negotiating:'💬 تفاوض',sold:'🔴 مباع',not_available:'⚪ غير متاح'};h+='<tr'+(p.archived?' style="opacity:0.6;font-style:italic"':'')+' data-id="'+p.id+'"><td>'+(p.archived?'📦 ':'')+'<strong style="color:var(--espresso);cursor:pointer" onclick="viewProperty(\''+p.id+'\')">'+escapeHtml(p.title)+'</strong></td><td>'+propTypeAr(p.type)+'</td><td>'+escapeHtml(p.area)+'</td><td style="color:var(--gold);font-weight:700">'+fmtMoney(p.price)+'</td><td>'+(sm[p.status]||p.status)+'</td><td style="font-size:12px;color:var(--umber)" dir="ltr">'+fmtDate(p.created_at)+'</td><td style="display:flex;gap:6px;justify-content:flex-end">'+(canEdit()&&!p.archived?'<span style="cursor:pointer" onclick="editProperty(\''+p.id+'\')" title="تعديل">✏️</span>':'')+(p.archived?'<span style="cursor:pointer" onclick="restorePropertyById(\''+p.id+'\')" title="استعادة">♻️</span>'+(isOwner()?'<span style="cursor:pointer" onclick="permanentDeletePropertyById(\''+p.id+'\')" title="حذف نهائي">🗑</span>':''):'<span style="cursor:pointer" onclick="archivePropertyById(\''+p.id+'\')" title="أرشفة">📦</span>')+'</td></tr>'});list.innerHTML=h+'</tbody></table>'}catch(err){if(!crmSessionCurrent(generation,userId))return false;allProperties=[];list.innerHTML='<div class="empty" role="alert"><p>تعذر تحميل العقارات.</p><p>'+escapeHtml(err.message)+'</p><button class="btn-secondary" onclick="loadProperties()">إعادة المحاولة</button></div>';return false;}}
 
 
 function populatePropertyOwnerSelect(selectedId){
