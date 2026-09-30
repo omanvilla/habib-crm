@@ -2319,7 +2319,7 @@ async function loadDashboard(){
     const todayStr=toLocalDateStr(new Date());
     const rs=await Promise.all([
       supa.rpc('crm_client_contact_queue',{p_limit:2000}),
-      supa.from('client_requests').select('id,client_id,status,request_type,preferred_area,qualified_at,lead_temperature,pipeline_stage,created_at,next_followup,first_human_response_at,last_mutual_contact_at').eq('status','active').limit(2500),
+      supa.from('client_requests').select('id,client_id,status,request_type,preferred_area,next_action,qualified_at,lead_temperature,pipeline_stage,created_at,next_followup,first_human_response_at,last_mutual_contact_at').eq('status','active').limit(2500),
       crmDataFrom('deals').select('id,client_id,property_id,stage,client:clients(name),property:properties(title)',{count:'exact'}).not('stage','in','(closed,commission_collected,lost)').order('updated_at',{ascending:false}).limit(6),
       crmReadAll(()=>supa.from('tasks').select('*, client:clients(name,phone)',{count:'exact'}).eq('done',false).order('id')),
       supa.from('viewings').select('*',{count:'exact',head:true}).eq('viewing_date',todayStr).neq('archived',true),
