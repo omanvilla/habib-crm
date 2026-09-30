@@ -4,6 +4,7 @@
   const safe=v=>escapeHtml(String(v==null?'':v));
   const n=v=>Number(v||0).toLocaleString('en-US');
   const omanDate=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'});
+  const dateText=d=>d?new Date(d).toLocaleDateString('ar-OM',{timeZone:'Asia/Muscat'}):'—';
   function period(kind){
     const today=omanDate(new Date()),date=new Date(today+'T12:00:00+04:00');
     let start=today,end=new Date(date.getTime()+86400000);
@@ -16,8 +17,8 @@
     const t=row.targets||{},days=kind==='day'?1:kind==='week'?7:new Date(Number(period('month').to.slice(0,4)),Number(period('month').to.slice(5,7))-1,0).getDate();
     const monthDays=new Date(Number(period('month').to.slice(0,4)),Number(period('month').to.slice(5,7))-1,0).getDate();
     const goals=[['active_inventory','inventory_target',false],['new_properties','new_properties_target',true],['inquiries','inquiries_target',true],['visits_done','visits_target',true],['sales','sold_target',true]];
-    const valid=goals.map(([key,target,flow])=>{let goal=t[target];if(goal==null||Number(goal)<=0)return null;goal=Number(goal)*(flow?days/monthDays:1);return Math.min(1,Number(row[key]||0)/goal)}).filter(x=>x!==null);
-    return valid.length?Math.round(100*valid.reduce((a,b)=>a+b,0)/valid.length)+'% · '+valid.length+'/5 أهداف مقيّمة':'لم تُحدد أهداف كافية للتقييم';
+    const valid=goals.map(([key,target,flow])=>{let goal=t[target]??(target==='inventory_target'?10:null);if(goal==null||Number(goal)<=0)return null;goal=Number(goal)*(flow?days/monthDays:1);return Math.min(1,Number(row[key]||0)/goal)}).filter(x=>x!==null);
+    return valid.length?'تحقيق الأهداف المحددة: '+Math.round(100*valid.reduce((a,b)=>a+b,0)/valid.length)+'% ('+valid.length+'/5)':'لم تُحدد أهداف كافية للتقييم';
   }
   async function renderPerformance(kind){
     const box=$id('employeePerformanceResults');if(!box)return;
@@ -53,7 +54,7 @@
       const branch=p.branch_key==='barka'?'بركاء':p.branch_key==='muscat'?'مسقط':'غير محدد';const area=p.area||'منطقة غير محددة',key=branch+'|'+area;
       if(!groups.has(key))groups.set(key,{branch,area,items:[]});groups.get(key).items.push(p)});
     const ordered=[...groups.values()].sort((a,b)=>['مسقط','بركاء','غير محدد'].indexOf(a.branch)-['مسقط','بركاء','غير محدد'].indexOf(b.branch)||a.area.localeCompare(b.area,'ar'));
-    let last='';list.innerHTML=ordered.map(g=>{const heading=g.branch===last?'':'<h3 class="ops-branch">'+safe(g.branch)+'</h3>';last=g.branch;return heading+'<section class="ops-area"><h4>'+safe(g.area)+' <small>('+g.items.length+')</small></h4><div class="ops-property-grid">'+g.items.map(p=>'<button class="ops-property" onclick="viewProperty(\''+p.id+'\')"><strong>'+safe(p.title)+'</strong><span>'+safe(p.status==='sold'?'مباع':p.status==='available'?'متوفر':p.status||'—')+' · '+n(p.price)+' ر.ع</span><small>أضيف '+safe(fmtDate(p.created_at))+'</small></button>').join('')+'</div></section>'}).join('');
+    let last='';list.innerHTML=ordered.map(g=>{const heading=g.branch===last?'':'<h3 class="ops-branch">'+safe(g.branch)+'</h3>';last=g.branch;return heading+'<section class="ops-area"><h4>'+safe(g.area)+' <small>('+g.items.length+')</small></h4><div class="ops-property-grid">'+g.items.map(p=>'<button class="ops-property" onclick="viewProperty(\''+p.id+'\')"><strong>'+safe(p.title)+'</strong><span>'+safe(p.status==='sold'?'مباع':p.status==='available'?'متوفر':p.status||'—')+' · '+n(p.price)+' ر.ع</span><small>أضيف '+safe(dateText(p.created_at))+'</small></button>').join('')+'</div></section>'}).join('');
   };
   const oldClients=window.renderClients;
   let clientBranch='all';
@@ -72,12 +73,12 @@
       supa.from('viewings').select('client_id,status,archived').eq('property_id',p.id),
       supa.from('property_marketing_events').select('channel,event_type,published_at,views,reach,total_interactions,last_synced_at,url,notes').eq('property_id',p.id).order('created_at',{ascending:false})]);
       [ir,vr,mr].forEach(r=>{if(r.error)throw r.error});const inbound=(ir.data||[]).filter(x=>x.has_inbound_inquiry),visits=(vr.data||[]).filter(x=>!x.archived),marketing=mr.data||[],visitedClients=new Set(visits.map(x=>x.client_id));
-      const rows=[['العقار',p.title],['المنطقة',p.area||''],['السعر',p.price||''],['تاريخ تسجيل العقار',fmtDate(p.created_at)],
+      const rows=[['العقار',p.title],['المنطقة',p.area||''],['السعر',p.price||''],['تاريخ تسجيل العقار',dateText(p.created_at)],
         ['عملاء لديهم استفسار وارد مثبت',new Set(inbound.map(x=>x.client_id)).size],['اهتمامات مستنتجة من زيارة',new Set((ir.data||[]).filter(x=>!x.has_inbound_inquiry&&visitedClients.has(x.client_id)).map(x=>x.client_id)).size],
         ['زيارات حجزت',visits.filter(x=>x.status!=='cancelled').length],['زيارات تمت',visits.filter(x=>x.status==='done').length],
         ['زيارات ألغيت',visits.filter(x=>x.status==='cancelled').length],['في التفاوض',inbound.filter(x=>x.status==='negotiation').length],['لم يناسبه',inbound.filter(x=>x.status==='not_suitable').length],[],
         ['سجل التسويق'],['القناة','النشاط','التاريخ','المشاهدات','الوصول','التفاعلات','آخر تحديث','الرابط','ملاحظات']];
-      marketing.forEach(m=>rows.push([m.channel||'',m.event_type||'',fmtDate(m.published_at),m.views??'غير متاح',m.reach??'غير متاح',m.total_interactions??'غير متاح',m.last_synced_at?fmtDate(m.last_synced_at):'لم يحدث',m.url||'',m.notes||'']));
+      marketing.forEach(m=>rows.push([m.channel||'',m.event_type||'',dateText(m.published_at),m.views??'غير متاح',m.reach??'غير متاح',m.total_interactions??'غير متاح',m.last_synced_at?dateText(m.last_synced_at):'لم يحدث',m.url||'',m.notes||'']));
       downloadCSV('تقرير-أداء-'+(p.title||'العقار'),[],rows);
     }catch(e){showToast('تعذر إعداد التقرير: '+e.message,'error')}
   };
