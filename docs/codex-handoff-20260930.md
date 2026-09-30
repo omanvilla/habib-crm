@@ -1,6 +1,6 @@
 # Codex handoff — 30 September 2026
 
-Read `AGENTS.md` first. This dated snapshot records completed work and the next verification/repair backlog. Recheck the current repository and live services before making changes. The owner wants implementation to continue from the latest agreement, with a concise Arabic result, rather than repeated audit from scratch.
+Read `AGENTS.md` first. Follow-up verification and repairs: [`codex-verification-20260930.md`](codex-verification-20260930.md). That follow-up records newer deployed fixes and clearly separates database tests from browser/Meta paths still unverified. This dated snapshot records completed work and the next verification/repair backlog. Recheck the current repository and live services before making changes. The owner wants implementation to continue from the latest agreement, with a concise Arabic result, rather than repeated audit from scratch.
 
 ## Current deployment
 

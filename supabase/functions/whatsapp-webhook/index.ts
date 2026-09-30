@@ -784,8 +784,28 @@ function listingText(value: unknown) {
     .replace(/[٠-٩]/g,c=>String("٠١٢٣٤٥٦٧٨٩".indexOf(c)))
     .replace(/[^\p{L}\p{N}]+/gu," ").trim().replace(/\s+/g," ");
 }
+function listingCandidateCorroborated(candidates: any[], candidate: any, message: string) {
+  const body=listingText(message).replace(/(\d) (?=\d{3}(?:\D|$))/g,"$1");
+  const contains=(value:string)=>(" "+body+" ").includes(" "+value+" ");
+  const code=listingText(candidate.property_code),title=listingText(candidate.title),area=listingText(candidate.area);
+  const price=String(Math.round(Number(candidate.price||0)));
+  const exactCode=code.length>=3&&contains(code)&&candidates.filter(p=>listingText(p.property_code)===code).length===1;
+  const exactTitle=title.length>=8&&contains(title)&&candidates.filter(p=>listingText(p.title)===title).length===1;
+  const areaPrice=area.length>=4&&contains(area)&&price.length>=4&&contains(price)
+    &&candidates.filter(p=>listingText(p.area)===area&&Math.round(Number(p.price||0))===Number(price)).length===1;
+  return exactCode||exactTitle||areaPrice;
+}
+async function queueListingReview(args:{messageId:string;clientId:string;conversationId:string;body:string;routeKey:string;messageAt:string}, reason="استفسار عن عقار محدد يحتاج تحديده") {
+  const key=`text:${args.messageId}`;
+  const pending=await supabase.from("unmatched_property_links").upsert({company_id:CRM_COMPANY_ID,client_id:args.clientId,conversation_id:args.conversationId,whatsapp_message_id:args.messageId,raw_url:args.body.slice(0,6000),link_key:key,provider:"other",status:"pending"},{onConflict:"company_id,whatsapp_message_id,link_key",ignoreDuplicates:true});
+  if(pending.error)throw new Error(`property_ai_review:${pending.error.message}`);
+  const message=await supabase.from("whatsapp_messages").update({property_match_status:"pending_manual"}).eq("id",args.messageId).is("matched_property_id",null);
+  if(message.error)throw new Error(`property_ai_review_message:${message.error.message}`);
+  const conversation=await supabase.from("whatsapp_conversations").update({human_handoff_required:true,handoff_reason:reason,handoff_updated_at:new Date().toISOString()}).eq("id",args.conversationId);
+  if(conversation.error)throw new Error(`property_ai_review_alert:${conversation.error.message}`);
+}
 async function attributeSpecificListingText(args:{messageId:string;clientId:string;conversationId:string;body:string;routeKey:string;messageAt:string}) {
-  if(!OPENAI_API_KEY || args.body.trim().length<10 || !["muscat","barka"].includes(args.routeKey))return;
+  if(!OPENAI_API_KEY || args.body.trim().length<3 || !["muscat","barka"].includes(args.routeKey))return;
   const rows=await supabase.from("properties").select("id,title,area,wilayat,price,bedrooms,land_size,built_size,property_code")
     .eq("company_id",CRM_COMPANY_ID).eq("branch_key",args.routeKey).eq("archived",false).limit(80);
   if(rows.error)throw new Error(`property_candidates:${rows.error.message}`);
@@ -799,11 +819,7 @@ async function attributeSpecificListingText(args:{messageId:string;clientId:stri
   if(!inferred.references_specific_listing)return;
   const body=listingText(args.body),evidence=listingText(inferred.evidence);
   if(candidate && Number(inferred.confidence)>=0.93 && evidence.length>=4 && body.includes(evidence)){
-    const code=listingText(candidate.property_code),title=listingText(candidate.title),area=listingText(candidate.area),price=String(Math.round(Number(candidate.price||0)));
-    const exactCode=code.length>=3&&body.includes(code),exactTitle=title.length>=8&&body.includes(title);
-    const areaPrice=area.length>=4&&body.includes(area)&&price.length>=4&&body.includes(price)
-      &&candidates.filter((p:any)=>listingText(p.area)===area&&Math.round(Number(p.price||0))===Number(price)).length===1;
-    if(exactCode||exactTitle||areaPrice){
+    if(listingCandidateCorroborated(candidates,candidate,args.body)){
       const linked=await supabase.rpc("record_property_link_inquiry_internal",{p_company_id:CRM_COMPANY_ID,p_client_id:args.clientId,p_property_id:candidate.id,p_marketing_event_id:null,p_whatsapp_message_id:args.messageId,p_raw_url:args.body.slice(0,6000),p_link_key:`ai-property:${candidate.id}`,p_message_at:args.messageAt,p_manual:false});
       if(linked.error)throw new Error(`property_ai_link:${linked.error.message}`);
       const updated=await supabase.from("whatsapp_messages").update({matched_property_id:candidate.id,property_match_status:"ai_verified"}).eq("id",args.messageId);
@@ -814,11 +830,7 @@ async function attributeSpecificListingText(args:{messageId:string;clientId:stri
       return;
     }
   }
-  const key=`text:${args.messageId}`;
-  const pending=await supabase.from("unmatched_property_links").upsert({company_id:CRM_COMPANY_ID,client_id:args.clientId,conversation_id:args.conversationId,whatsapp_message_id:args.messageId,raw_url:args.body.slice(0,6000),link_key:key,provider:"other",status:"pending"},{onConflict:"company_id,whatsapp_message_id,link_key",ignoreDuplicates:true});
-  if(pending.error)throw new Error(`property_ai_review:${pending.error.message}`);
-  await supabase.from("whatsapp_messages").update({property_match_status:"pending_manual"}).eq("id",args.messageId).is("matched_property_id",null);
-  await supabase.from("whatsapp_conversations").update({human_handoff_required:true,handoff_reason:"استفسار عن عقار محدد يحتاج تحديده",handoff_updated_at:new Date().toISOString()}).eq("id",args.conversationId);
+  await queueListingReview(args);
 }
 
 const BARKA_RE = /(بركاء|بركا|حي\s*عاصم|الهرم|الرميس|المنومة|الشخاخيط|الفليج|الصومحان|صومحان|السوادي|البله|الحرادي|السلاحه|العقدة|المريصي)/i;
@@ -1374,7 +1386,10 @@ async function processInboundMessage(value: any, m: any) {
     const batchResult = await applyRequestBatch({ clientId, route, messageId: messageRow.id, requests: extracted?.requests || [], messageAt });
     if(!propertyEvidence.data?.matched_property_id && body.trim()){
       try{await attributeSpecificListingText({messageId:messageRow.id,clientId,conversationId:conversation.id,body,routeKey:route.route_key,messageAt});}
-      catch(propertyError){console.error("[whatsapp-webhook] listing attribution review",String((propertyError as Error).message).slice(0,200));}
+      catch(propertyError){
+        console.error("[whatsapp-webhook] listing attribution review",String((propertyError as Error).message).slice(0,200));
+        await queueListingReview({messageId:messageRow.id,clientId,conversationId:conversation.id,body,routeKey:route.route_key,messageAt},"تعذر التحقق من مرجع العقار آلياً؛ تحتاج الرسالة مراجعة الموظف");
+      }
     }
     await finalizePropertyAttribution(messageRow.id);
     const appliedCount = Number(batchResult?.applied_count || 0), reviewNeeded = Boolean(extracted?.needs_human_review) || Boolean(batchResult?.needs_human_review);
