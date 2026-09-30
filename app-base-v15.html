@@ -2745,8 +2745,10 @@ async function saveProperty(){const t=$('pTitle').value.trim(),a=$('pArea').valu
 var pDate=$('pCreatedDate').value;if(pDate){data.created_at=new Date(pDate+'T12:00:00').toISOString();}let r;if(window.editingProperty){console.log('[Update Property] id:',window.editingProperty,'data:',data);r=await crmDataFrom('properties').update(data).eq('id',window.editingProperty);console.log('[Update Property] result:',r);if(!r.error)await logSystemActivity('edit','property',window.editingProperty,'تعديل العقار: '+t)}else{data.company_id=cid;data.added_by=currentUser.id;data.archived=false;r=await crmDataFrom('properties').insert(data).select().single();if(!r.error)await logSystemActivity('create','property',r.data.id,'إضافة عقار: '+t)}if(r.error)throw r.error;closeModal('mProperty');showToast('✅ تم الحفظ','success');['pTitle','pArea','pPrice','pBeds','pBaths','pLandSize','pBuiltSize','pDesc','pOwnerNet','pWilayat','pExpectedCommission'].forEach(i=>{var e=$(i);if(e)e.value=''});window.editingProperty=null;currentPropertyImages=[];loadProperties();loadDashboard()}catch(err){console.error('[Save Property]',err);showToast('خطأ: '+err.message,'error')}}
 window.viewingProperty = null;
 async function viewProperty(id){
+  const generation=crmSessionGeneration,userId=currentUser&&currentUser.id;
   try{
     const r=await crmDataFrom('properties').select('*').eq('id',id).single();
+    if(!crmSessionCurrent(generation,userId))return;
     if(r.error)throw r.error;
     window.viewingProperty=r.data;
     navigate('propertyDetail',null);
