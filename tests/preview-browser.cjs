@@ -82,6 +82,10 @@ fs.mkdirSync(out,{recursive:true});
  }
  assert.equal(report.errors.flatMap(x=>x.errors).length,0);
  fs.writeFileSync(path.join(out,'browser-report.json'),JSON.stringify(report,null,2));
+ 
+ const pairs=['owner','muscat','barka'].flatMap(role=>['dashboard','properties','clients'].map(screen=>'<section><h2>'+role+' · '+screen+'</h2><div class="pair"><figure><figcaption>قبل</figcaption><img src="before-'+role+'-'+screen+'-desktop.png"></figure><figure><figcaption>بعد</figcaption><img src="after-'+role+'-'+screen+'-desktop.png"></figure></div><details><summary>بعد — محاكاة مقاس الهاتف</summary><img src="after-'+role+'-'+screen+'-mobile.png"></details></section>'));
+ fs.writeFileSync(path.join(out,'index.html'),'<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>معاينة CRM</title><style>body{background:#eef3f2;color:#18372f;font:16px Arial;margin:24px}section{background:white;padding:20px;border-radius:16px;margin:24px 0}.pair{display:grid;grid-template-columns:1fr 1fr;gap:18px}figure{margin:0}img{width:100%;height:auto;border:1px solid #dde8e2}figcaption{padding:12px}details img{max-width:390px}@media(max-width:800px){.pair{grid-template-columns:1fr}}</style><h1>صور فعلية للمعاينة الاصطناعية — 2026-09-30</h1><p>التقطها Chromium. ليست جلسات الموظفين الفعلية ولا إثباتاً لصلاحيات الخادم. فتح هذا الملف محلياً لا يتصل بالإنتاج. الهاتف محاكاة مقاس شاشة.</p>'+pairs.join('')+'</html>');
+
  console.log(JSON.stringify(report,null,2));
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});

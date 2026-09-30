@@ -64,3 +64,14 @@ test('Review write failure is surfaced for webhook retry',async()=>{
   const q={upsert(){return Promise.resolve({error:{message:'database unavailable'}})}};
   await assert.rejects(attribution({from:()=>q}).queueListingReview({messageId:'msg',body:'عقار',clientId:'client',conversationId:'conv'}),/property_ai_review/);
 });
+
+test('Unconfigured inventory is not treated as an approved target',()=>{
+ const {targetScore}=calendar('2026-09-30T09:00:00Z');
+ assert.equal(targetScore({active_inventory:100,targets:{}},'month'),'لم تُحدد أهداف كافية للتقييم');
+ assert.match(targetScore({active_inventory:1,inquiries:30,targets:{inquiries_target:30}},'month'),/100% \(1\/5\)/);
+});
+test('Cross-month weekly score waits for approved target allocation',()=>{
+ const {targetScore}=calendar('2026-09-30T09:00:00Z');
+ assert.match(targetScore({active_inventory:10,targets:{inventory_target:10}},'week'),/يعبر شهرين/);
+ assert(!targetScore({active_inventory:10,targets:{inventory_target:10}},'week').includes('%'));
+});
