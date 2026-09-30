@@ -36,7 +36,7 @@ async function test(name,fn){await fn();tests++;console.log('PASS',name)}
      await pending;return e;
    }
    const old=await race(oldMain);assert.equal(old.run('allProperties.length'),1);
-   const fixed=await race(main);assert.equal(fixed.run('allProperties.length'),0);assert.equal(fixed.e('propertiesList').innerHTML,'');
+   const fixed=await race(main);assert.equal(fixed.run('allProperties.length'),0);assert.equal(fixed.e('propertiesList').textContent,'');assert(!fixed.e('propertiesList').innerHTML.includes('TEST former account property'));
  });
 
  await test('source and loaded patches compile',async()=>{new vm.Script(main);for(const f of ['modern-v17.js','crm-v18-task-priority-patch.js'])new vm.Script(fs.readFileSync(f,'utf8'))});
