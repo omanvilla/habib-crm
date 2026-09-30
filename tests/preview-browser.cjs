@@ -9,13 +9,13 @@ fs.mkdirSync(out,{recursive:true});
  for(const mode of ['before','after'])for(const role of ['owner','muscat','barka']){
   const context=await browser.newContext({viewport:{width:1440,height:1000},serviceWorkers:'block',acceptDownloads:true});
   const page=await context.newPage(),errors=[];
-  page.on('pageerror',e=>errors.push(e.message));
+  page.on('pageerror',e=>{errors.push(e.message);console.log('PAGEERROR',mode,role,e.message)});page.on('console',m=>{if(m.type()==='error')console.log('CONSOLE',mode,role,m.text())});
   await context.route('**/*',route=>{const u=new URL(route.request().url());return u.hostname==='127.0.0.1'?route.continue():route.abort();});
   await page.goto('http://127.0.0.1:4173/'+mode+'/'+role+'/');
-  await page.waitForFunction(()=>typeof currentProfile!=='undefined'&&currentProfile&&document.querySelector('#page-dashboard'),{timeout:30000});
+  try{await page.waitForFunction(()=>typeof currentProfile!=='undefined'&&currentProfile&&document.querySelector('#page-dash'),{timeout:12000});}catch(e){console.log('BOOT BODY',(await page.locator('body').innerText()).slice(0,5000));console.log('FIXTURE',await page.evaluate(()=>window.CRMPREVIEW&&({calls:CRMPREVIEW.calls,profile:CRMPREVIEW.profile})));await page.screenshot({path:path.join(out,'boot-failure-'+mode+'-'+role+'.png'),fullPage:true});throw e;}
   await page.waitForTimeout(1200);
   for(const screen of ['dashboard','properties','clients']){
-   await page.evaluate(s=>navigate(s,null),screen);await page.waitForTimeout(900);
+   await page.evaluate(s=>navigate(s==='dashboard'?'dash':s,null),screen);await page.waitForTimeout(900);
    const name=mode+'-'+role+'-'+screen+'-desktop.png';await page.screenshot({path:path.join(out,name),fullPage:true});report.screens.push(name);
    if(mode==='after'){
     if(screen==='dashboard')assert(await page.locator('#opsDailyWork').innerText());
