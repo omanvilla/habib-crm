@@ -25,7 +25,7 @@ Read `AGENTS.md` and the original `docs/codex-handoff-20260930.md` first. This f
   - Arabic grouped prices can corroborate a unique area/price description without a link.
   - An attribution-processing failure queues staff review and an alert; failures to persist that review propagate for retry.
   - No outbound behavior or follow-up scheduling was enabled.
-- Frontend bootstrap `20260930-operations-v6b`: UTC calendar arithmetic over the Oman-local date, correct actual month length for target scaling, owner CSV fallback from views to plays, and cancelled-only visits excluded from inferred-interest reporting. GitHub Pages deployment confirmation is tracked in the final repository workflow result.
+- Frontend bootstrap `20260930-operations-v6b`: UTC calendar arithmetic over the Oman-local date, correct actual month length for target scaling, owner CSV fallback from views to plays, and cancelled-only visits excluded from inferred-interest reporting. Implementation commit: `9f3c98d38570e64f5906d9337eeed2aae6770a14`. GitHub Pages run [`36684481867`](https://github.com/omanvilla/habib-crm/actions/runs/36684481867) completed successfully for that commit. The rendered public page was not directly loaded because no browser/HTTP tool was available.
 
 ## Direct verification
 
@@ -37,7 +37,7 @@ Read `AGENTS.md` and the original `docs/codex-handoff-20260930.md` first. This f
   - Financial projections still mask staff-only output; foreign-branch CRM mark-read rejects with `conversation_not_found`.
 - Rolled-back synthetic tests:
   - Fresh cancelled visit: zero interests after fix (one before fix), cancellation pipeline record retained.
-  - Atomic employee visit creation, idempotent replay, completion, cancellation, one inferred interest, stale-version rejection, and foreign property denial passed.
+  - Atomic visit creation, idempotent replay, completion, cancellation, one inferred interest, stale-version rejection, and foreign property denial passed separately as Hadeel and Maram. Fresh atomic cancellation also created no interest through either visit or appointment path.
   - Pending no-link text resolution, foreign-property denial, proven inbound attribution audit, replay deduplication, outbound-message rejection, and no fake marketing URL passed.
   - After tests: 31 properties, 32 visits, 38 interests; zero synthetic clients remain.
 - Five new JavaScript regression tests passed in the available JavaScript execution environment with module/file adapters: Oman boundaries including midnight and leap February, correct month target divisor, token/duplicate/Arabic-price corroboration, unique and ambiguous mocked attribution paths, and review write failure propagation. Tests saved in `tests/operations-continuity.test.cjs` for native Node execution later.
