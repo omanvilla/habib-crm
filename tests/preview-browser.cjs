@@ -44,14 +44,43 @@ fs.mkdirSync(out,{recursive:true});
     await page.evaluate(()=>exportPropertyOwnerReport());
     const download=await downloadPromise;await download.saveAs(path.join(out,'owner-synthetic-report.csv'));
     const csv=fs.readFileSync(path.join(out,'owner-synthetic-report.csv'),'utf8');
-    assert(csv.includes('زيارات ألغيت'));report.checks.push('CSV downloaded through Chromium; synthetic property report');
+    assert(csv.includes('زيارات ألغيت'));const records=csv.split('\n').map(line=>line.replace(/"/g,'').split(','));const numberFor=label=>Number(records.find(r=>r[0]===label)?.[1]);assert.equal(numberFor('عملاء لديهم استفسار وارد مثبت'),1);assert.equal(numberFor('زيارات تمت'),2);assert.equal(numberFor('زيارات ألغيت'),1);report.checks.push('CSV downloaded through Chromium; synthetic property report');
    }
+   
+   await page.evaluate(()=>navigate('clients',null));await page.waitForTimeout(500);
+   const requestButton=page.locator('#clientsList [data-work-action="request"]').first();
+   const chosen=await requestButton.getAttribute('data-request-id');
+   await requestButton.click();await page.locator('#mClientRequest.on').waitFor();
+   assert.equal(await page.evaluate(()=>editingClientRequest.id),chosen);
+   const unchanged=await page.evaluate(()=>JSON.stringify(CRMPREVIEW.db.client_requests));
+   await page.locator('#nrBudgetMin').fill('900000');await page.locator('#nrBudgetMax').fill('1');
+   await page.locator('#mClientRequest button').filter({hasText:'حفظ الطلب'}).click();await page.waitForTimeout(200);
+   assert.equal(await page.evaluate(()=>JSON.stringify(CRMPREVIEW.db.client_requests)),unchanged);
+   assert(await page.locator('#mClientRequest').evaluate(e=>e.classList.contains('on')));
+   await page.locator('#nrBudgetMin').fill('100');await page.locator('#nrBudgetMax').fill('200');
+   await page.locator('#nrNextAction').fill('إجراء اختبار مستقل');
+   await page.evaluate(()=>CRMPREVIEW.failNext='client_requests');
+   await page.locator('#mClientRequest button').filter({hasText:'حفظ الطلب'}).click();await page.waitForTimeout(200);
+   assert.equal(await page.evaluate(()=>JSON.stringify(CRMPREVIEW.db.client_requests)),unchanged);
+   await page.screenshot({path:path.join(out,'after-'+role+'-save-failure.png'),fullPage:true});
+   await page.locator('#mClientRequest button').filter({hasText:'حفظ الطلب'}).click();await page.waitForTimeout(500);
+   const changed=await page.evaluate(id=>CRMPREVIEW.db.client_requests.find(r=>r.id===id),chosen);
+   assert.equal(changed.next_action,'إجراء اختبار مستقل');
+   const originals=JSON.parse(unchanged),latest=await page.evaluate(()=>CRMPREVIEW.db.client_requests);
+   assert.equal(latest.length,originals.length);assert.deepEqual(latest.filter(r=>r.id!==chosen),originals.filter(r=>r.id!==chosen));
+   report.checks.push(role+': real click opens correct independent request; invalid budget and injected save failure preserve data; successful in-memory edit preserves other request');
+   await page.evaluate(()=>navigate('properties',null));await page.waitForTimeout(400);
+   await page.evaluate(()=>{CRMPREVIEW.failNext='properties';return loadProperties()});assert((await page.locator('#propertiesList').innerText()).includes('تعذر'));
+   await page.screenshot({path:path.join(out,'after-'+role+'-load-failure.png'),fullPage:true});
+   await page.evaluate(()=>loadProperties());
+
    const blocked=await page.evaluate(async()=>({status:(await fetch('/after/'+window.CRMPREVIEW.actor+'/api/send',{method:'POST'})).status,send:await supa.functions.invoke('whatsapp-send',{body:{}})}));
    assert.equal(blocked.status,405);assert(blocked.send.error);report.checks.push(role+': server POST and fixture external sending denied');
-   await page.evaluate(()=>clearSessionUI());assert.equal(await page.locator('#clientsList').innerText(),'');assert.equal(await page.locator('#propertiesList').innerText(),'');report.checks.push(role+': session UI cleared');
+   await page.evaluate(()=>logout());await page.waitForTimeout(500);assert.equal(await page.locator('#clientsList').innerText(),'');assert.equal(await page.locator('#propertiesList').innerText(),'');report.checks.push(role+': logout reload clears UI');await page.locator('#previewRestart').click();await page.waitForFunction(()=>typeof currentProfile!=='undefined'&&currentProfile);await page.reload();await page.waitForFunction(()=>typeof currentProfile!=='undefined'&&currentProfile);assert.equal(await page.evaluate(()=>currentProfile.role),role==='owner'?'owner':'agent');report.checks.push(role+': synthetic session restart and reload');
   }
   report.errors.push({mode,role,errors});await context.close();
  }
+ assert.equal(report.errors.flatMap(x=>x.errors).length,0);
  fs.writeFileSync(path.join(out,'browser-report.json'),JSON.stringify(report,null,2));
  console.log(JSON.stringify(report,null,2));
  }finally{await browser.close();server.close();}
