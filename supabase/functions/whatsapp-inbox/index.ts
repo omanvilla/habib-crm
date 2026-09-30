@@ -259,7 +259,15 @@ Deno.serve(async (req) => {
       return json({ok:true,request_id:requestId});
     }
 
-    if (action === "mark_read") return json({ok:false,error:"phone_read_state_not_available"},409);
+    if (action === "mark_read") {
+      const conversationId=String(payload?.conversation_id||"").trim();
+      const throughId=String(payload?.through_message_id||"").trim();
+      if(!conversationId||!throughId)return json({ok:false,error:"conversation_message_required"},400);
+      if(!await getConversation(conversationId))return json({ok:false,error:"conversation_not_found"},404);
+      const result=await userClient.rpc("crm_mark_whatsapp_read",{p_conversation_id:conversationId,p_message_id:throughId});
+      if(result.error)throw new Error(`crm_read_failed: ${result.error.message}`);
+      return json(result.data);
+    }
 
     if (action === "clear_handoff") {
       const conversationId=String(payload?.conversation_id||"").trim();if(!conversationId)return json({ok:false,error:"conversation_id_required"},400);

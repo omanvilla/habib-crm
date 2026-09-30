@@ -3732,7 +3732,7 @@ async function openWhatsAppConversation(id){
  waAutomationEvents=data.automation_events||[];waInboxRequests=data.requests||[];waInboxSelectedRequestId=null;
  const active=waInboxRequests.filter(r=>r.status==='active'||r.status==='paused');if(active.length===1)waInboxSelectedRequestId=active[0].id;
  if(data.client)waInboxActiveConversation.client=data.client;
- $('waInboxMessage').value=waInboxDrafts.get(id)||'';renderWhatsAppChat();
+ $('waInboxMessage').value=waInboxDrafts.get(id)||'';renderWhatsAppChat();await markWhatsAppConversationRead();
  }catch(e){if(seq!==waConversationLoadSeq)return;body.innerHTML='<div class="wa-inbox-error">'+escapeHtml(e.message||String(e))+'</div>'}
 }
 async function loadOlderWhatsAppMessages(){
@@ -3751,7 +3751,7 @@ async function markWhatsAppConversationRead(){
  try{const result=await waInboxInvoke({action:'mark_read',conversation_id:id,through_message_id:through});
  const row=waInboxConversations.find(x=>x.id===id);if(row)row.unread_count=Number(result.unread_count||0);
  if(waInboxActiveId===id&&waInboxActiveConversation)waInboxActiveConversation.unread_count=Number(result.unread_count||0);
- renderWhatsAppConversations();await refreshWhatsAppBadge();showToast('تم تعليم الرسائل المعروضة كمقروءة','success');
+ renderWhatsAppConversations();await refreshWhatsAppBadge();/* CRM reading position only; the phone application's read receipt is independent. */
  }catch(e){showToast('تعذر حفظ حالة القراءة: '+(e.message||e),'error')}finally{if(button)button.disabled=false}
 }
 function waAutomationBadge(m){
@@ -5595,16 +5595,16 @@ async function loadEmployeeTeamTargets(){
     acquired=properties.filter(x=>x.created_at>=start&&x.created_at<end&&!String(x.title||'').startsWith('TEST')).length,
     sold=d.filter(x=>x.agent_id===m.id&&['closed','commission_collected'].includes(x.stage)&&x.closed_at>=start&&x.closed_at<end),
     commission=sold.reduce((v,x)=>v+Number(x.company_commission??x.company_share??0),0),goal=target.inventory_target??10;
-    return '<div class="team-target-row" style="border:1px solid var(--cream-deeper);border-radius:9px;padding:10px;margin:8px 0"><strong>'+escapeHtml(m.full_name||'موظف')+'</strong> <span style="font-size:11px">🏠 '+active+'/'+goal+' نشط · ➕ '+acquired+' جديد · 🤝 '+sold.length+' بيع · 💰 '+fmtMoney(commission)+' عمولة شركة</span><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:end"><label>هدف الرصيد<input class="fi" type="number" min="0" max="1000" id="etInv_'+m.id+'" value="'+goal+'" style="max-width:90px"></label><label>هدف عقارات جديدة<input class="fi" type="number" min="0" max="1000" id="etNew_'+m.id+'" value="'+(target.new_properties_target??'')+'" style="max-width:90px"></label><label>هدف مبيعات<input class="fi" type="number" min="0" max="1000" id="etSold_'+m.id+'" value="'+(target.sold_target??'')+'" style="max-width:90px"></label><label>هدف عمولة الشركة (ر.ع)<input class="fi" type="number" min="0" step="0.001" id="etComm_'+m.id+'" value="'+(target.commission_target??'')+'" style="max-width:130px"></label><button class="btn-secondary" onclick="saveEmployeeTarget(\''+m.id+'\')">حفظ الهدف</button></div></div>';
+    return '<div class="team-target-row" style="border:1px solid var(--cream-deeper);border-radius:9px;padding:10px;margin:8px 0"><strong>'+escapeHtml(m.full_name||'موظف')+'</strong> <span style="font-size:11px">🏠 '+active+'/'+goal+' نشط · ➕ '+acquired+' جديد · 🤝 '+sold.length+' بيع · 💰 '+fmtMoney(commission)+' عمولة شركة</span><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:end"><label>هدف الرصيد<input class="fi" type="number" min="0" max="1000" id="etInv_'+m.id+'" value="'+goal+'" style="max-width:90px"></label><label>هدف عقارات جديدة<input class="fi" type="number" min="0" max="1000" id="etNew_'+m.id+'" value="'+(target.new_properties_target??'')+'" style="max-width:90px"></label><label>هدف استفسارات مثبتة<input class="fi" type="number" min="0" max="1000" id="etInq_'+m.id+'" value="'+(target.inquiries_target??'')+'" style="max-width:90px"></label><label>هدف زيارات تمت<input class="fi" type="number" min="0" max="1000" id="etVisits_'+m.id+'" value="'+(target.visits_target??'')+'" style="max-width:90px"></label><label>هدف مبيعات<input class="fi" type="number" min="0" max="1000" id="etSold_'+m.id+'" value="'+(target.sold_target??'')+'" style="max-width:90px"></label><label>هدف عمولة الشركة (ر.ع)<input class="fi" type="number" min="0" step="0.001" id="etComm_'+m.id+'" value="'+(target.commission_target??'')+'" style="max-width:130px"></label><button class="btn-secondary" onclick="saveEmployeeTarget(\''+m.id+'\')">حفظ الهدف</button></div></div>';
   }).join('');
  }catch(e){box.innerHTML='<div class="wa-inbox-error">تعذر تحميل أهداف الفريق: '+escapeHtml(e.message||String(e))+'</div>'}
 }
 async function saveEmployeeTarget(id){
  if(!isOwner())return;
  const value=(name)=>{const raw=$('et'+name+'_'+id).value;return raw===''?null:Number(raw)};
- const inventory=value('Inv'),newTarget=value('New'),sold=value('Sold'),commission=value('Comm');
- if([inventory,newTarget,sold].some(v=>v!==null&&(!Number.isInteger(v)||v<0||v>1000))||commission!==null&&(!Number.isFinite(commission)||commission<0)){showToast('راجع قيم الأهداف','error');return}
- const r=await supa.from('employee_monthly_targets').upsert({company_id:currentProfile.company_id,employee_id:id,month_start:employeeTargetMonth(),inventory_target:inventory??10,new_properties_target:newTarget,sold_target:sold,commission_target:commission,updated_at:new Date().toISOString()},{onConflict:'company_id,employee_id,month_start'});
+ const inventory=value('Inv'),newTarget=value('New'),inquiries=value('Inq'),visits=value('Visits'),sold=value('Sold'),commission=value('Comm');
+ if([inventory,newTarget,inquiries,visits,sold].some(v=>v!==null&&(!Number.isInteger(v)||v<0||v>1000))||commission!==null&&(!Number.isFinite(commission)||commission<0)){showToast('راجع قيم الأهداف','error');return}
+ const r=await supa.from('employee_monthly_targets').upsert({company_id:currentProfile.company_id,employee_id:id,month_start:employeeTargetMonth(),inventory_target:inventory??10,new_properties_target:newTarget,inquiries_target:inquiries,visits_target:visits,sold_target:sold,commission_target:commission,updated_at:new Date().toISOString()},{onConflict:'company_id,employee_id,month_start'});
  if(r.error)showToast('تعذر حفظ الهدف: '+r.error.message,'error');else{showToast('تم حفظ هدف الموظف','success');loadEmployeeTeamTargets()}
 }
 
