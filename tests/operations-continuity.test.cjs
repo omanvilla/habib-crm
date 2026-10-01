@@ -4,10 +4,10 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const ops=fs.readFileSync('crm-operations-v6.js','utf8');
 const webhook=fs.readFileSync('supabase/functions/whatsapp-webhook/index.ts','utf8');
-function calendar(now){
+function calendar(now,company={created_at:'2026-05-06T15:00:00Z'}){
   class FixedDate extends Date { constructor(...args){super(...(args.length?args:[now]));} }
   const start=ops.indexOf('  const omanDate'),end=ops.indexOf('  async function renderPerformance');
-  return new Function('Date',ops.slice(start,end)+';return {period,targetScore};')(FixedDate);
+  return new Function('Date','currentCompany',ops.slice(start,end)+';return {period,targetScore};')(FixedDate,company);
 }
 function attribution(db,fetchMock){
   const begin=webhook.indexOf('function listingText'),end=webhook.indexOf('const BARKA_RE',begin);
@@ -65,13 +65,25 @@ test('Review write failure is surfaced for webhook retry',async()=>{
   await assert.rejects(attribution({from:()=>q}).queueListingReview({messageId:'msg',body:'عقار',clientId:'client',conversationId:'conv'}),/property_ai_review/);
 });
 
-test('Unconfigured inventory is not treated as an approved target',()=>{
+test('Standing inventory goal is explicitly 10; other missing goals are excluded',()=>{
  const {targetScore}=calendar('2026-09-30T09:00:00Z');
- assert.equal(targetScore({active_inventory:100,targets:{}},'month'),'لم تُحدد أهداف كافية للتقييم');
- assert.match(targetScore({active_inventory:1,inquiries:30,targets:{inquiries_target:30}},'month'),/100% \(1\/5\)/);
+ assert.match(targetScore({active_inventory:7,targets:{}},'month'),/70%.*1 من 6/);
+ assert.match(targetScore({active_inventory:1,inquiries:30,targets:{inquiries_target:30}},'month'),/55%.*2 من 6/);
 });
 test('Cross-month weekly score waits for approved target allocation',()=>{
  const {targetScore}=calendar('2026-09-30T09:00:00Z');
  assert.match(targetScore({active_inventory:10,targets:{inventory_target:10}},'week'),/يعبر شهرين/);
  assert(!targetScore({active_inventory:10,targets:{inventory_target:10}},'week').includes('%'));
+});
+
+test('Lifetime starts at company inception and does not compare to monthly goals',()=>{
+ const {period,targetScore}=calendar('2026-10-01T10:00:00Z');
+ assert.deepEqual(period('all'),{from:'2026-05-06',to:'2026-10-02'});
+ assert.match(targetScore({active_inventory:12,targets:{inventory_target:10}},'all'),/إجمالي تاريخي/);
+ assert(!targetScore({},'all').includes('%'));
+});
+test('Own company commission goal participates only when its value is visible',()=>{
+ const score=calendar('2026-10-01T10:00:00Z').targetScore;
+ assert.match(score({active_inventory:10,company_commission:50,targets:{commission_target:100}},'month'),/75%.*2 من 6/);
+ assert.match(score({active_inventory:10,company_commission:null,targets:{commission_target:100}},'month'),/100%.*1 من 6/);
 });

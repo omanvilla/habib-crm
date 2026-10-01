@@ -18,7 +18,7 @@ fs.mkdirSync(out,{recursive:true});
    await page.evaluate(s=>navigate(s==='dashboard'?'dash':s,null),screen);await page.waitForTimeout(900);
    const name=mode+'-'+role+'-'+screen+'-desktop.png';await page.screenshot({path:path.join(out,name),fullPage:true});report.screens.push(name);
    if(mode==='after'){
-    if(screen==='dashboard'){assert((await page.locator('#opsDailyWork').innerText()).includes('الزيارات القادمة'));await page.locator('#opsPerformanceDetails summary').click();await page.waitForTimeout(200);assert((await page.locator('#opsDashboardPerformanceResults').innerText()).includes('لم تُحدد أهداف'));await page.locator('#opsPerformanceDetails summary').click();}
+    if(screen==='dashboard'){assert((await page.locator('#opsDailyWork').innerText()).includes('الزيارات القادمة'));await page.locator('#opsPerformanceDetails summary').click();await page.waitForTimeout(200);assert((await page.locator('#opsDashboardPerformanceResults').innerText()).includes('محدد 1 من 6'));await page.locator('#opsPerformanceDetails summary').click();}
     if(screen==='properties'){
      const text=await page.locator('#propertiesList').innerText();
      if(role==='muscat')assert(!text.includes('الصومحان'));if(role==='barka')assert(!text.includes('الخوض'));

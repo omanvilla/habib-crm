@@ -44,7 +44,7 @@ const visits=[
 {id:uuid(405),client_id:uuid(101),request_id:uuid(201),property_id:uuid(301),agent_id:muscat,viewing_date:relative(-3),viewing_time:'12:00:00',status:'done'},
 {id:uuid(406),client_id:uuid(101),request_id:uuid(201),property_id:uuid(301),agent_id:muscat,viewing_date:relative(-2),viewing_time:'12:00:00',status:'cancelled'}
 ].map(v=>({...v,company_id:company,created_by:v.agent_id,created_at:now,archived:false,row_version:1,duration_minutes:60,pipeline_outcome:v.status==='done'?'followup':null}));
-const db={profiles,companies:[{id:company,name:'أبناء حبيب · شركة اختبار',default_company_commission:0}],clients,client_requests:requests,properties,viewings:visits,
+const db={profiles,companies:[{id:company,name:'أبناء حبيب · شركة اختبار',created_at:'2026-05-06T15:00:00Z',default_company_commission:0}],clients,client_requests:requests,properties,viewings:visits,
 tasks:[
 {id:uuid(501),user_id:muscat,client_id:uuid(101),request_id:uuid(201),title:'تأكيد موعد زيارة الخوض',due_date:relative(0),priority:'high'},
 {id:uuid(502),user_id:muscat,client_id:uuid(102),request_id:uuid(202),title:'توثيق نتيجة التفاوض على طلب الشراء',due_date:relative(-1),priority:'high'},
@@ -143,7 +143,7 @@ rpc:async(name,args={})=>{
  if(signedOut)return {data:null,error:{message:'TEST signed out'}};
  if(name==='crm_client_contact_queue')return {data:clients.filter(c=>allowed(c,'clients')&&!c.human_contact_at).map(c=>({client_id:c.id})),error:null};
  if(name==='crm_property_action_queue')return {data:[],error:null};
- if(name==='crm_employee_performance')return {data:{from:args.p_from,to:args.p_to,employees:profiles.filter(p=>p.role==='agent'&&(profile.role!=='agent'||p.id===profile.id)).map(p=>({employee_id:p.id,name:p.full_name,active_inventory:2,new_properties:0,inquiries:0,visits_booked:0,visits_done:0,sales:0,activities:0,outbound_messages:0,targets:{}}))},error:null};
+ if(name==='crm_employee_performance')return {data:{from:args.p_from,to:args.p_to,employees:profiles.filter(p=>p.role==='agent'&&(profile.role!=='agent'||p.id===profile.id)).map(p=>({employee_id:p.id,name:p.full_name,active_inventory:2,new_properties:0,inquiries:0,visits_booked:0,visits_done:0,sales:0,activities:0,outbound_messages:0,company_commission:20,targets:{inventory_target:10}}))},error:null};
  if(name==='crm_property_acquisition_funnel')return {data:[],error:null};
  if(name==='crm_client_360')return {data:{requests:requests.filter(r=>r.client_id===args.p_client_id&&allowed(r,'client_requests')),property_journey:[],appointments:[],activities:[],tasks:[],deals:[],whatsapp:[]},error:null};
  if(name==='crm_data_quality_summary')return {data:[],error:null};

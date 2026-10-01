@@ -37,3 +37,30 @@ jobs:
         with:
           name: synthetic-crm-before-after
           path: preview-results/
+
+  attribution-sql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: synthetic-test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: synthetic-test-only
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test branch attribution on isolated PostgreSQL
+        run: |
+          psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f tests/fixtures/employee-attribution.sql
+          psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f db/changes/11-approved-branch-employee-attribution.forward.sql
+          psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f tests/fixtures/employee-attribution-assert.sql

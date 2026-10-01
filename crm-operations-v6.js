@@ -14,17 +14,19 @@
     let from=today,to=iso(new Date(date.getTime()+86400000));
     if(kind==='week'){from=iso(new Date(date.getTime()-day*86400000));to=iso(new Date(date.getTime()+(7-day)*86400000));}
     if(kind==='month'){from=today.slice(0,7)+'-01';to=iso(new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,1)));}
+    if(kind==='all')from=typeof currentCompany!=='undefined'&&currentCompany?.created_at?omanDate(currentCompany.created_at):null;
     return {from,to};
   }
   const metric=(label,value)=>'<span class="ops-metric"><strong>'+n(value)+'</strong><small>'+label+'</small></span>';
   function targetScore(row,kind){
-    const t=row.targets||{},span=period(kind),month=period('month');
+    if(kind==='all')return 'إجمالي تاريخي؛ لا يُقارن بهدف شهر واحد';
+    const t={inventory_target:10,...(row.targets||{})},span=period(kind),month=period('month');
     const monthDays=(Date.parse(month.to+'T00:00:00Z')-Date.parse(month.from+'T00:00:00Z'))/86400000;
     const days=(Date.parse(span.to+'T00:00:00Z')-Date.parse(span.from+'T00:00:00Z'))/86400000;
-    const goals=[['active_inventory','inventory_target',false],['new_properties','new_properties_target',true],['inquiries','inquiries_target',true],['visits_done','visits_target',true],['sales','sold_target',true]];
+    const goals=[['active_inventory','inventory_target',false],['new_properties','new_properties_target',true],['inquiries','inquiries_target',true],['visits_done','visits_target',true],['sales','sold_target',true],['company_commission','commission_target',true]];
     if(kind==='week'&&span.from.slice(0,7)!==new Date(Date.parse(span.to+'T00:00:00Z')-86400000).toISOString().slice(0,7))return 'الأسبوع يعبر شهرين؛ مقارنة الأهداف تحتاج اعتماد طريقة توزيعها';
-    const valid=goals.map(([key,target,flow])=>{let goal=t[target];if(goal==null||Number(goal)<=0)return null;goal=Number(goal)*(flow?days/monthDays:1);return Math.min(1,Number(row[key]||0)/goal)}).filter(x=>x!==null);
-    return valid.length?'تحقيق الأهداف المحددة: '+Math.round(100*valid.reduce((a,b)=>a+b,0)/valid.length)+'% ('+valid.length+'/5)':'لم تُحدد أهداف كافية للتقييم';
+    const valid=goals.map(([key,target,flow])=>{let goal=t[target];if(goal==null||Number(goal)<=0||(key==='company_commission'&&row[key]==null))return null;goal=Number(goal)*(flow?days/monthDays:1);return Math.min(1,Number(row[key]||0)/goal)}).filter(x=>x!==null);
+    return valid.length?'متوسط إنجاز الأهداف المعتمدة: '+Math.round(100*valid.reduce((a,b)=>a+b,0)/valid.length)+'% · محدد '+valid.length+' من '+goals.length+' أهداف؛ البقية غير محددة':'لم تُحدد أهداف كافية للتقييم';
   }
   async function renderPerformance(kind,boxId='employeePerformanceResults'){
     const generation=crmSessionGeneration,user=currentUser&&currentUser.id;
@@ -34,10 +36,10 @@
       const span=period(kind),r=await supa.rpc('crm_employee_performance',{p_from:span.from,p_to:span.to});
       if(!crmSessionCurrent(generation,user))return;
       if(r.error)throw r.error;
-      box.innerHTML='<p class="ops-note">'+safe(span.from)+' حتى قبل '+safe(span.to)+' · الاستفسار المثبت برسالة واردة فقط. الزيارات والمبيعات نشاط مسجل خلال الفترة، ونسب التحويل تُحسب على مجموعة الاستفسارات أو الزيارات نفسها. عرض المالك يشمل الإسنادات التاريخية، وعرض الموظف يقتصر على الفرع المسموح؛ لذلك قد تختلف الأرقام. لا تُنسب العقارات القديمة إلى موظف بالتخمين.</p>'+
+      box.innerHTML='<p class="ops-note">'+safe(r.data.from||span.from||'بداية الشركة')+' حتى قبل '+safe(span.to)+' · الاستفسار المثبت برسالة واردة فقط. الزيارات والمبيعات نشاط مسجل خلال الفترة، ونسب التحويل تُحسب على مجموعة الاستفسارات أو الزيارات نفسها. الإسناد المعتمد للعمل منذ 1 أغسطس 2026: مسقط لهديل وبركاء لمرام. الموظفة ترى شغلها وعمولة الشركة الناتجة عنه فقط. العقارات النشطة رصيد حالي، والعقارات الجديدة إضافات الفترة المختارة؛ التواريخ الأصلية محفوظة.</p>'+
       (r.data.employees||[]).map(x=>'<article class="ops-person"><div class="ops-person-title"><strong>'+safe(x.name)+'</strong><span>'+safe(targetScore(x,kind))+'</span></div><div class="ops-metrics">'+
-        metric('عقارات نشطة وفّرها',x.active_inventory)+metric('عقارات جديدة',x.new_properties)+metric('استفسارات عقار مثبتة',x.inquiries)+metric('منها تحوّل إلى زيارة',x.inquiry_to_visit)+metric('زيارات حُجزت',x.visits_booked)+metric('زيارات تمت',x.visits_done)+metric('منها تحوّل إلى بيع',x.visit_to_sale)+metric('مبيعات أُغلقت',x.sales)+metric('تواصل يدوي موثق',x.activities)+metric('رسائل صادرة من الموظف',x.outbound_messages)+'</div>'+
-        (x.company_commission==null?'':'<div class="ops-note">عمولة الشركة المسجلة: '+n(x.company_commission)+' ر.ع</div>')+'</article>').join('')||'<p>لا يوجد موظفون نشطون.</p>';
+        metric('عقارات نشطة مسندة لها الآن',x.active_inventory)+metric('عقارات جديدة',x.new_properties)+metric('استفسارات عقار مثبتة',x.inquiries)+metric('منها تحوّل إلى زيارة',x.inquiry_to_visit)+metric('زيارات حُجزت',x.visits_booked)+metric('زيارات تمت',x.visits_done)+metric('منها تحوّل إلى بيع',x.visit_to_sale)+metric('مبيعات أُغلقت',x.sales)+metric('تواصل يدوي موثق',x.activities)+metric('رسائل صادرة من الموظف',x.outbound_messages)+'</div>'+
+        (x.company_commission==null?'':'<div class="ops-note">عمولة الشركة الناتجة عن هذا الشغل: '+n(x.company_commission)+' ر.ع</div>')+'</article>').join('')||'<p>لا يوجد موظفون نشطون.</p>';
     }catch(e){if(!crmSessionCurrent(generation,user))return;box.innerHTML='<p role="alert">تعذر حساب الأداء: '+safe(e.message)+'</p>'}
   }
   window.crmDashboardPerformancePeriod=function(kind){const panel=$id('opsPerformanceDetails');if(!currentProfile||!['owner','manager','agent'].includes(currentProfile.role))return;if(panel)panel.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('active',b.dataset.period===kind));renderPerformance(kind,'opsDashboardPerformanceResults')};
@@ -45,7 +47,7 @@
   function addPerformance(){
     const target=$id('employeeTargetsPanel'),team=$id('page-team');if(!team||$id('employeePerformancePanel'))return;
     const card=document.createElement('div');card.className='card';card.id='employeePerformancePanel';
-    card.innerHTML='<div class="card-body"><h3>أداء الفريق</h3><div class="ops-periods"><button class="btn-secondary ops-period" data-period="day" onclick="crmPerformancePeriod(\'day\')">اليوم</button><button class="btn-secondary ops-period" data-period="week" onclick="crmPerformancePeriod(\'week\')">هذا الأسبوع</button><button class="btn-secondary ops-period active" data-period="month" onclick="crmPerformancePeriod(\'month\')">هذا الشهر</button></div><div id="employeePerformanceResults"></div></div>';
+    card.innerHTML='<div class="card-body"><h3>أداء الفريق</h3><div class="ops-periods"><button class="btn-secondary ops-period" data-period="day" onclick="crmPerformancePeriod(\'day\')">اليوم</button><button class="btn-secondary ops-period" data-period="week" onclick="crmPerformancePeriod(\'week\')">هذا الأسبوع</button><button class="btn-secondary ops-period active" data-period="month" onclick="crmPerformancePeriod(\'month\')">هذا الشهر</button><button class="btn-secondary ops-period" data-period="all" onclick="crmPerformancePeriod(\'all\')">من بداية الشركة</button></div><div id="employeePerformanceResults"></div></div>';
     if(target)target.closest('.card').after(card);else team.append(card);
   }
   const oldTeam=window.loadTeam;
