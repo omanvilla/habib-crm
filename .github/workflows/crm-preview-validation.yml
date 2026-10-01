@@ -64,3 +64,6 @@ jobs:
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f tests/fixtures/employee-attribution.sql
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f db/changes/11-approved-branch-employee-attribution.forward.sql
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f tests/fixtures/employee-attribution-assert.sql
+          psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f tests/fixtures/employee-performance.sql
+          psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f db/changes/12-approved-performance-credit.forward.sql
+          psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f tests/fixtures/employee-performance-assert.sql
