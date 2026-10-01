@@ -18,7 +18,7 @@
 
   function time(value) {
     if (!value) return '';
-    try { return new Date(value).toLocaleString('ar-OM', { dateStyle: 'short', timeStyle: 'short' }); }
+    try { return new Date(value).toLocaleString('ar-OM-u-nu-latn', { dateStyle: 'short', timeStyle: 'short' }); }
     catch (_) { return String(value); }
   }
 

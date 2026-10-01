@@ -51,3 +51,5 @@
 #page-clients .role-tab.active{color:var(--ops-green);background:#eef5ef}
 #page-clients .card,#page-properties>.card{box-shadow:none;border-color:var(--ops-line)}
 @media(max-width:768px){.ops-day-grid{grid-template-columns:1fr;gap:4px}.ops-work-section,.ops-client,.ops-property{padding:16px}.ops-searchbar{grid-template-columns:1fr 1fr}.ops-searchbar label:first-child{grid-column:1/-1}.ops-property-grid{grid-template-columns:1fr}.ops-property .ops-title{min-height:0}#page-clients #clientsList{grid-template-columns:1fr;padding:0;background:transparent}.ops-client-head{gap:8px}.ops-client .ops-status{font-size:10px}.ops-work-row{gap:8px}.ops-action{padding:8px;min-height:40px}.ops-client-foot{flex-wrap:wrap}}
+
+#employeeInventoryReminder{border-inline-start:4px solid #a56a20;margin-bottom:20px}#employeeInventoryReminder .card-body{padding:18px}#employeeInventoryReminder strong{display:block;color:#654316}#employeeInventoryReminder .btn-secondary{margin-top:10px}

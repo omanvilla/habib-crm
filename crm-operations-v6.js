@@ -4,7 +4,7 @@
   const safe=v=>escapeHtml(String(v==null?'':v));
   const n=v=>Number(v||0).toLocaleString('en-US');
   const omanDate=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'});
-  const dateText=d=>d?new Date(d).toLocaleDateString('ar-OM',{timeZone:'Asia/Muscat'}):'—';
+  const dateText=d=>d?new Date(d).toLocaleDateString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat'}):'—';
   // Calendar arithmetic uses UTC components of the Oman-local date.
   // Browser/device timezone must not move the period boundary.
   function period(kind){
@@ -20,10 +20,10 @@
   const metric=(label,value)=>'<span class="ops-metric"><strong>'+n(value)+'</strong><small>'+label+'</small></span>';
   function targetScore(row,kind){
     if(kind==='all')return 'إجمالي تاريخي؛ لا يُقارن بهدف شهر واحد';
-    const t={inventory_target:10,...(row.targets||{})},span=period(kind),month=period('month');
+    const t={...(row.targets||{}),inventory_target:10},span=period(kind),month=period('month');
     const monthDays=(Date.parse(month.to+'T00:00:00Z')-Date.parse(month.from+'T00:00:00Z'))/86400000;
     const days=(Date.parse(span.to+'T00:00:00Z')-Date.parse(span.from+'T00:00:00Z'))/86400000;
-    const goals=[['active_inventory','inventory_target',false],['new_properties','new_properties_target',true],['inquiries','inquiries_target',true],['visits_done','visits_target',true],['sales','sold_target',true],['company_commission','commission_target',true]];
+    const goals=[['active_inventory','inventory_target',false],['inquiries','inquiries_target',true],['visits_done','visits_target',true],['sales','sold_target',true],['company_commission','commission_target',true]];
     if(kind==='week'&&span.from.slice(0,7)!==new Date(Date.parse(span.to+'T00:00:00Z')-86400000).toISOString().slice(0,7))return 'الأسبوع يعبر شهرين؛ مقارنة الأهداف تحتاج اعتماد طريقة توزيعها';
     const valid=goals.map(([key,target,flow])=>{let goal=t[target];if(goal==null||Number(goal)<=0||(key==='company_commission'&&row[key]==null))return null;goal=Number(goal)*(flow?days/monthDays:1);return Math.min(1,Number(row[key]||0)/goal)}).filter(x=>x!==null);
     return valid.length?'متوسط إنجاز الأهداف المعتمدة: '+Math.round(100*valid.reduce((a,b)=>a+b,0)/valid.length)+'% · محدد '+valid.length+' من '+goals.length+' أهداف؛ البقية غير محددة':'لم تُحدد أهداف كافية للتقييم';
@@ -38,7 +38,7 @@
       if(r.error)throw r.error;
       box.innerHTML='<p class="ops-note">'+safe(r.data.from||span.from||'بداية الشركة')+' حتى قبل '+safe(span.to)+' · الاستفسار المثبت برسالة واردة فقط. الزيارات والمبيعات نشاط مسجل خلال الفترة، ونسب التحويل تُحسب على مجموعة الاستفسارات أو الزيارات نفسها. الإسناد المعتمد للعمل منذ 1 أغسطس 2026: مسقط لهديل وبركاء لمرام. الموظفة ترى شغلها وعمولة الشركة الناتجة عنه فقط. العقارات النشطة رصيد حالي، والعقارات الجديدة إضافات الفترة المختارة؛ التواريخ الأصلية محفوظة.</p>'+
       (r.data.employees||[]).map(x=>'<article class="ops-person"><div class="ops-person-title"><strong>'+safe(x.name)+'</strong><span>'+safe(targetScore(x,kind))+'</span></div><div class="ops-metrics">'+
-        metric('عقارات نشطة مسندة لها الآن',x.active_inventory)+metric('عقارات جديدة',x.new_properties)+metric('استفسارات عقار مثبتة',x.inquiries)+metric('منها تحوّل إلى زيارة',x.inquiry_to_visit)+metric('زيارات حُجزت',x.visits_booked)+metric('زيارات تمت',x.visits_done)+metric('منها تحوّل إلى بيع',x.visit_to_sale)+metric('مبيعات أُغلقت',x.sales)+metric('تواصل بشري منسوب للشغل',x.activities)+metric('رسائل بشرية منسوبة للشغل',x.outbound_messages)+'</div>'+
+        metric('عقارات نشطة مسندة لها الآن',x.active_inventory)+metric('إضافات جديدة خلال الفترة',x.new_properties)+metric('استفسارات عقار مثبتة',x.inquiries)+metric('منها تحوّل إلى زيارة',x.inquiry_to_visit)+metric('زيارات حُجزت',x.visits_booked)+metric('زيارات تمت',x.visits_done)+metric('منها تحوّل إلى بيع',x.visit_to_sale)+metric('مبيعات أُغلقت',x.sales)+metric('تواصل بشري منسوب للشغل',x.activities)+metric('رسائل بشرية منسوبة للشغل',x.outbound_messages)+'</div>'+
         (x.company_commission==null?'':'<div class="ops-note">عمولة الشركة الناتجة عن هذا الشغل: '+n(x.company_commission)+' ر.ع</div>')+'</article>').join('')||'<p>لا يوجد موظفون نشطون.</p>';
     }catch(e){if(!crmSessionCurrent(generation,user))return;box.innerHTML='<p role="alert">تعذر حساب الأداء: '+safe(e.message)+'</p>'}
   }

@@ -16,7 +16,7 @@
 
   function number(value) {
     var n = count(value);
-    return n == null ? 'غير متاح' : n.toLocaleString('ar-OM');
+    return n == null ? 'غير متاح' : n.toLocaleString('ar-OM-u-nu-latn');
   }
 
   function instagramUrl(raw) {
@@ -155,7 +155,7 @@
   }
   function stamp(value) {
     if (!value || Number.isNaN(Date.parse(value))) return 'لم تُحدّث القياسات بعد';
-    return new Date(value).toLocaleString('ar-OM', { dateStyle: 'short', timeStyle: 'short' });
+    return new Date(value).toLocaleString('ar-OM-u-nu-latn', { dateStyle: 'short', timeStyle: 'short' });
   }
   function button(action, text, id, extra) { return '<button type="button" class="btn-secondary" data-funnel-action="' + action + '"' + (id ? ' data-property-id="' + escape(id) + '"' : '') + (extra || '') + '>' + escape(text) + '</button>'; }
   function metric(label, value, hint) { return '<div class="cf-metric"><strong>' + number(value) + '</strong><span>' + escape(label) + '</span>' + (hint ? '<small>' + escape(hint) + '</small>' : '') + '</div>'; }
@@ -229,7 +229,7 @@
     var h = '<h4>نتائج نفس مجموعة الطلبات المرتبطة</h4><p class="cf-footnote">الأساس: ' + number(denominator) + ' طلبًا مختلفًا مرتبطًا بهذا العقار من جميع المصادر، وليست نسبة تحويل حصرية لإنستغرام. كل نسبة من هذه المجموعة نفسها؛ المراحل قد تتداخل ولا تمثل قسمة عدد زيارات على عدد أشخاص.</p><div class="cf-cohort">';
     stages.forEach(function (stage) {
       var value = count(cohort[stage[0]]), rate = cohortRate(value, denominator);
-      h += '<div><strong>' + number(value) + '</strong><span>' + escape(stage[1]) + '</span><small>' + (rate == null ? 'لا توجد نسبة قابلة للمقارنة' : rate.toLocaleString('ar-OM') + '% من الطلبات المرتبطة') + '</small>' + (rate == null ? '' : '<meter min="0" max="100" value="' + rate + '" aria-label="' + escape(stage[1]) + '">' + rate + '%</meter>') + '</div>';
+      h += '<div><strong>' + number(value) + '</strong><span>' + escape(stage[1]) + '</span><small>' + (rate == null ? 'لا توجد نسبة قابلة للمقارنة' : rate.toLocaleString('ar-OM-u-nu-latn') + '% من الطلبات المرتبطة') + '</small>' + (rate == null ? '' : '<meter min="0" max="100" value="' + rate + '" aria-label="' + escape(stage[1]) + '">' + rate + '%</meter>') + '</div>';
     });
     return h + '</div>';
   }

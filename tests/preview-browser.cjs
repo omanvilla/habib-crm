@@ -14,11 +14,33 @@ fs.mkdirSync(out,{recursive:true});
   await page.goto('http://127.0.0.1:4173/'+mode+'/'+role+'/');
   try{await page.waitForFunction(()=>typeof currentProfile!=='undefined'&&currentProfile&&document.querySelector('#page-dash'),{timeout:12000});}catch(e){console.log('BOOT BODY',(await page.locator('body').innerText()).slice(0,5000));console.log('FIXTURE',await page.evaluate(()=>window.CRMPREVIEW&&({calls:CRMPREVIEW.calls,profile:CRMPREVIEW.profile})));await page.screenshot({path:path.join(out,'boot-failure-'+mode+'-'+role+'.png'),fullPage:true});throw e;}
   await page.waitForTimeout(1200);
+  
+  if(mode==='after'&&role!=='owner'){
+   await page.evaluate(()=>loadEmployeeTargetReminder());
+   assert(await page.locator('#employeeInventoryReminder').isVisible());
+   assert.equal(await page.locator('#employeeInventoryReminder').evaluate(e=>e.closest('details')),null);
+   const original=await page.evaluate(()=>JSON.parse(JSON.stringify(CRMPREVIEW.db.properties)));
+   await page.evaluate(()=>{
+     const state=CRMPREVIEW,property=state.db.properties.find(p=>p.sourced_by===state.profile.id);
+     const active=state.db.properties.filter(p=>p.sourced_by===state.profile.id&&!p.archived&&!['sold','not_available'].includes(p.status)).length;
+     for(let i=active;i<10;i++)state.db.properties.push({...property,id:'SYNTHETIC-STOCK-'+i,status:'available',archived:false});
+   });
+   await page.evaluate(()=>loadEmployeeTargetReminder());assert(!(await page.locator('#employeeInventoryReminder').isVisible()));
+   await page.evaluate(()=>{const row=CRMPREVIEW.db.properties.find(p=>p.sourced_by===CRMPREVIEW.profile.id&&!p.archived&&!['sold','not_available'].includes(p.status));row.status='sold'});
+   await page.evaluate(()=>loadEmployeeTargetReminder());assert(await page.locator('#employeeInventoryReminder').isVisible());
+   assert.equal(await page.evaluate(()=>employeeInventoryState.needed),1);
+   await page.evaluate(()=>{CRMPREVIEW.failNext='properties';return loadEmployeeTargetReminder()});assert((await page.locator('#employeeInventoryReminder').innerText()).includes('تعذر'));
+   await page.evaluate(rows=>{CRMPREVIEW.db.properties.splice(0,CRMPREVIEW.db.properties.length,...rows)},original);
+   await page.evaluate(()=>loadEmployeeTargetReminder());
+   report.checks.push(role+': shortage reminder visible outside details, hidden at 10, restored at 9, load failure does not invent a shortage');
+  }
+
   for(const screen of ['dashboard','properties','clients']){
    await page.evaluate(s=>navigate(s==='dashboard'?'dash':s,null),screen);await page.waitForTimeout(900);
+   if(mode==='after'){const generated=await page.locator('#page-'+(screen==='dashboard'?'dash':screen)).innerText();assert(!/[\u0660-\u0669\u06f0-\u06f9]/.test(generated));}
    const name=mode+'-'+role+'-'+screen+'-desktop.png';await page.screenshot({path:path.join(out,name),fullPage:true});report.screens.push(name);
    if(mode==='after'){
-    if(screen==='dashboard'){assert((await page.locator('#opsDailyWork').innerText()).includes('الزيارات القادمة'));await page.locator('#opsPerformanceDetails summary').click();await page.waitForTimeout(200);assert((await page.locator('#opsDashboardPerformanceResults').innerText()).includes('محدد 1 من 6'));await page.locator('#opsPerformanceDetails [data-period="all"]').click();await page.waitForTimeout(200);assert((await page.locator('#opsDashboardPerformanceResults').innerText()).includes('إجمالي تاريخي'));await page.screenshot({path:path.join(out,'after-'+role+'-performance-lifetime.png'),fullPage:true});await page.locator('#opsPerformanceDetails [data-period="month"]').click();await page.locator('#opsPerformanceDetails summary').click();}
+    if(screen==='dashboard'){assert((await page.locator('#opsDailyWork').innerText()).includes('الزيارات القادمة'));await page.locator('#opsPerformanceDetails summary').click();await page.waitForTimeout(200);assert((await page.locator('#opsDashboardPerformanceResults').innerText()).includes('محدد 1 من 5'));await page.locator('#opsPerformanceDetails [data-period="all"]').click();await page.waitForTimeout(200);assert((await page.locator('#opsDashboardPerformanceResults').innerText()).includes('إجمالي تاريخي'));await page.screenshot({path:path.join(out,'after-'+role+'-performance-lifetime.png'),fullPage:true});await page.locator('#opsPerformanceDetails [data-period="month"]').click();await page.locator('#opsPerformanceDetails summary').click();}
     if(screen==='properties'){
      const text=await page.locator('#propertiesList').innerText();
      if(role==='muscat')assert(!text.includes('الصومحان'));if(role==='barka')assert(!text.includes('الخوض'));
