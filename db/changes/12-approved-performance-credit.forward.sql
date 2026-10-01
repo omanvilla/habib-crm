@@ -89,7 +89,7 @@ begin
  where e.company_id=v_company and e.role='agent' and e.is_active
   and (v_role in('owner','manager') or e.id=v_actor);
  return jsonb_build_object('from',p_from,'to',p_to,'employees',v_result);
-end $function$
+end $function$;
 
 REVOKE ALL ON FUNCTION public.crm_employee_performance(date,date) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.crm_employee_performance(date,date) TO authenticated;
