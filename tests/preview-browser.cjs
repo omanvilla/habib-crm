@@ -7,7 +7,7 @@ fs.mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({headless:true}),report={synthetic:true,realEmployeeSessions:false,device:'Chromium desktop and viewport emulation, not physical phone',screens:[],checks:[],errors:[]};
  try{
  for(const mode of ['before','after'])for(const role of ['owner','muscat','barka']){
-  const context=await browser.newContext({viewport:{width:1440,height:1000},serviceWorkers:'block',acceptDownloads:true});
+  const context=await browser.newContext({viewport:{width:1440,height:1000},timezoneId:'Asia/Muscat',serviceWorkers:'block',acceptDownloads:true});
   const page=await context.newPage(),errors=[];
   page.on('pageerror',e=>{errors.push(e.message);console.log('PAGEERROR',mode,role,e.message)});page.on('console',m=>{if(m.type()==='error')console.log('CONSOLE',mode,role,m.text())});
   await context.route('**/*',route=>{const u=new URL(route.request().url());return u.hostname==='127.0.0.1'?route.continue():route.abort();});

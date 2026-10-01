@@ -87,3 +87,12 @@ test('Own company commission goal participates only when its value is visible',(
  assert.match(score({active_inventory:10,company_commission:50,targets:{commission_target:100}},'month'),/75%.*2 من 6/);
  assert.match(score({active_inventory:10,company_commission:null,targets:{commission_target:100}},'month'),/100%.*1 من 6/);
 });
+
+test('Target-month end is exclusive and does not lose the last day in Oman',()=>{
+ const html=fs.readFileSync('app-base-v15.html','utf8');
+ const fn=html.match(/function employeeTargetMonthEnd\(month\)\{([^\n]+)\}/)[1];
+ const end=new Function('month',fn);
+ assert.equal(end('2026-10-01'),'2026-11-01');
+ assert.equal(end('2024-02-01'),'2024-03-01');
+ assert.equal(end('2026-12-01'),'2027-01-01');
+});

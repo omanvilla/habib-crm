@@ -5595,6 +5595,7 @@ async function populatePropertySourceSelect(selectedId){
  }catch(e){sel.innerHTML='<option value="'+escapeHtml(currentUser.id)+'">الحساب الحالي</option>';console.warn('Source users:',e)}
 }
 function employeeTargetMonth(){return new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'}).slice(0,7)+'-01'}
+function employeeTargetMonthEnd(month){return new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),1)).toISOString().slice(0,10)}
 function employeeActiveProperty(p){return p.archived!==true&&!['sold','not_available'].includes(p.status)&&!String(p.title||'').startsWith('TEST')}
 async function loadEmployeeTargetReminder(){
  const card=$('employeeInventoryReminder'),box=$('employeeInventoryReminderText');
@@ -5606,14 +5607,14 @@ async function loadEmployeeTargetReminder(){
   ]);
   if(tr.error)throw tr.error;if(pr.error)throw pr.error;
   const target=tr.data&&tr.data.inventory_target!=null?Number(tr.data.inventory_target):10,available=(pr.data||[]).filter(employeeActiveProperty).length,shortfall=target===null?null:Math.max(0,target-available);
-  box.innerHTML='<strong>🏠 عقاراتك الموجودة والنشطة الآن: '+available+(target===null?' · الهدف غير محدد':' من '+target)+'</strong><div style="margin-top:6px">'+(target===null?'لم يعتمد هدف لهذا الشهر؛ لا تحسب نسبة إنجاز.':shortfall?'تحتاج توفير '+shortfall+' عقار إضافي للوصول إلى هدفك.':'وصلت إلى هدف العقارات النشطة لهذا الشهر.')+'</div><div style="font-size:10px;color:var(--umber);margin-top:5px">تُحسب العقارات المسجلة باسم الموظف الذي وفّرها؛ الإسناد حسب قرار المالك: مسقط لهديل وبركاء لمرام؛ تاريخ تسجيل العقار محفوظ.</div>';
+  box.innerHTML='<strong>🏠 عقاراتك الموجودة والنشطة الآن: '+available+(target===null?' · الهدف غير محدد':' من '+target)+'</strong><div style="margin-top:6px">'+(target===null?'لم يعتمد هدف لهذا الشهر؛ لا تحسب نسبة إنجاز.':shortfall?'تحتاج توفير '+shortfall+' عقار إضافي للوصول إلى هدفك.':'وصلت إلى هدف العقارات النشطة لهذا الشهر.')+'</div><div style="font-size:10px;color:var(--umber);margin-top:5px">تُحسب العقارات النشطة المسندة لحساب الموظفة بحسب الفرع؛ الإسناد حسب قرار المالك: مسقط لهديل وبركاء لمرام؛ تاريخ تسجيل العقار محفوظ.</div>';
   card.style.display='';
  }catch(e){card.style.display='none';console.warn('Employee target reminder:',e)}
 }
 async function loadEmployeeTeamTargets(){
  const box=$('employeeTargetsPanel');if(!box||!isOwner())return;
  try{
-  const month=employeeTargetMonth(),start=month,end=new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),1).toISOString().slice(0,10);
+  const month=employeeTargetMonth(),start=month,end=employeeTargetMonthEnd(month);
   const [t,p,d]=await Promise.all([
    supa.from('employee_monthly_targets').select('*').eq('company_id',currentProfile.company_id).eq('month_start',month),
    crmReadAll(()=>supa.from('properties').select('sourced_by,created_at,status,archived,title',{count:'exact'}).eq('company_id',currentProfile.company_id).order('id')),
@@ -5623,7 +5624,7 @@ async function loadEmployeeTeamTargets(){
   const targets=new Map((t.data||[]).map(x=>[x.employee_id,x]));
   const agents=(allMembers||[]).filter(x=>x.role==='agent'&&x.is_active!==false);
   if(!agents.length){box.textContent='لا يوجد موظفون نشطون.';return}
-  box.innerHTML='<div style="font-size:11px;color:var(--umber);margin-bottom:9px">العقارات النشطة الآن: من كل الشهور وهدفها المعتمد 10. الإضافات الجديدة: ما أضيف خلال هذا الشهر فقط، وهدفها تحدده أنت. الاستفسارات المثبتة: عملاء لديهم استفسار وارد مثبت عن عقار. الزيارات التي تمت والمبيعات المكتملة وعمولة الشركة: وفق السجلات خلال الفترة. بقية الأهداف تترك غير محددة حتى تعتمدها.  والمبيعات والعمولة المسجلة خلال الشهر. السجلات التي لا تحدد الموظف المصدر تحتاج مراجعة ولا تُنسب تلقائياً.</div>'+agents.map(m=>{
+  box.innerHTML='<div style="font-size:11px;color:var(--umber);margin-bottom:9px">العقارات النشطة الآن: من كل الشهور وهدفها المعتمد 10. الإضافات الجديدة: ما أضيف خلال هذا الشهر فقط، وهدفها تحدده أنت. الاستفسارات المثبتة: عملاء لديهم استفسار وارد مثبت عن عقار. الزيارات التي تمت والمبيعات المكتملة وعمولة الشركة: وفق السجلات خلال الفترة. بقية الأهداف تترك غير محددة حتى تعتمدها.  والمبيعات والعمولة المسجلة خلال الشهر. العقارات المصنفة تُنسب حسب الفرع؛ السجلات غير المصنفة تحتاج مراجعة ولا تُنسب بالتخمين.</div>'+agents.map(m=>{
     const target=targets.get(m.id)||{},properties=p.filter(x=>x.sourced_by===m.id),active=properties.filter(employeeActiveProperty).length,
     acquired=properties.filter(x=>x.created_at>=start&&x.created_at<end&&!String(x.title||'').startsWith('TEST')).length,
     sold=d.filter(x=>x.agent_id===m.id&&['closed','commission_collected'].includes(x.stage)&&x.closed_at>=start&&x.closed_at<end),
