@@ -75,7 +75,14 @@ async function verifyVisitWorkflow(page,role,report){
 }
 async function verifyDealWorkflow(page,role,report){
  await page.evaluate(()=>navigate('deals',null));
- await page.locator('#page-deals button[onclick*="openModal(\'mDeal\')"]').click();
+ const headerCreate=page.locator('#page-deals > .page-header button[onclick*="openModal(\'mDeal\')"]');
+ assert.equal(await headerCreate.count(),1);
+ if(role==='barka'){
+  const emptyTitle=page.locator('#dealsContent .empty-title');await emptyTitle.waitFor();
+  assert.equal(await emptyTitle.innerText(),'لا توجد صفقات بعد');
+  const emptyCreate=page.locator('#dealsContent .empty button[onclick*="openModal(\'mDeal\')"]');
+  assert.equal(await emptyCreate.count(),1);assert(await headerCreate.isVisible());await emptyCreate.click();
+ }else await headerCreate.click();
  await page.locator('#dealWorkflowForm').waitFor();
  await page.waitForFunction(()=>!document.querySelector('#dwSave').disabled&&Array.from(document.querySelector('#dwClientChoice').options).some(o=>o.value==='__new__'));
  const branch=role==='barka'?'barka':'muscat';
@@ -100,8 +107,31 @@ async function verifyDealWorkflow(page,role,report){
  }
  const desktop='after-'+role+'-historical-deal-desktop.png';await page.screenshot({path:path.join(out,desktop),fullPage:true});report.screens.push(desktop);
  await page.setViewportSize({width:390,height:844});
- assert(await page.locator('#dealWorkflowForm').evaluate(e=>e.scrollWidth<=e.clientWidth+1),'One-screen deal form must fit the emulated mobile width');
  const mobile='after-'+role+'-historical-deal-mobile.png';await page.screenshot({path:path.join(out,mobile),fullPage:true});report.screens.push(mobile);
+ const mobileGeometry=await page.locator('#dealWorkflowForm').evaluate(form=>{
+  const bounds=form.getBoundingClientRect(),round=n=>Math.round(n*100)/100;
+  const geometry=element=>{
+   const rect=element.getBoundingClientRect(),style=getComputedStyle(element);
+   return {id:element.id||null,tag:element.tagName,className:typeof element.className==='string'?element.className:null,
+    clientWidth:element.clientWidth,scrollWidth:element.scrollWidth,scrollLeft:element.scrollLeft,
+    relativeBounds:{left:round(rect.left-bounds.left),right:round(rect.right-bounds.left),top:round(rect.top-bounds.top),bottom:round(rect.bottom-bounds.top),width:round(rect.width),height:round(rect.height)},
+    computed:{display:style.display,position:style.position,width:style.width,minWidth:style.minWidth,maxWidth:style.maxWidth,boxSizing:style.boxSizing,
+     marginLeft:style.marginLeft,marginRight:style.marginRight,paddingLeft:style.paddingLeft,paddingRight:style.paddingRight,
+     gridTemplateColumns:style.gridTemplateColumns,gap:style.gap,overflowX:style.overflowX,direction:style.direction,transform:style.transform}};
+  };
+  const overflows=form.scrollWidth>form.clientWidth+1;
+  return {viewport:{width:innerWidth,height:innerHeight},overflows,form:geometry(form),parent:geometry(form.parentElement),
+   descendants:overflows?Array.from(form.querySelectorAll('*')).filter(element=>{
+    const rect=element.getBoundingClientRect(),style=getComputedStyle(element);
+    return element.getClientRects().length&&rect.width&&rect.height&&style.visibility!=='hidden'&&
+     (rect.left<bounds.left-1||rect.right>bounds.right+1||element.scrollWidth>element.clientWidth+1);
+   }).map(geometry):[]};
+ });
+ if(mobileGeometry.overflows){
+  console.log('DEAL_FORM_MOBILE_OVERFLOW',role,JSON.stringify(mobileGeometry,null,2));
+  fs.writeFileSync(path.join(out,'after-'+role+'-historical-deal-mobile-overflow.json'),JSON.stringify(mobileGeometry,null,2));
+ }
+ assert(!mobileGeometry.overflows,'One-screen deal form must fit the emulated mobile width');
  await page.setViewportSize({width:1440,height:1000});
  const historicalStart=await page.evaluate(()=>{CRMPREVIEW.failNext='crm_save_deal_workflow';return CRMPREVIEW.calls.length});
  await page.locator('#dwSave').click();

@@ -2,6 +2,7 @@
 .dw-modal [hidden]{display:none!important}
 .dw-modal .full{grid-column:1/-1}
 .dw-modal .fg,.dw-modal .fgrid,.dw-subform{min-width:0}
+.dw-modal .modal-title{margin-left:0;margin-right:0}
 .dw-intro,.dw-hint{font-size:12px;line-height:1.7;color:var(--umber,#6b5a3e);margin:0 0 14px}
 .dw-hint{margin:5px 0 0;font-weight:400}
 .dw-subform{background:var(--cream,#faf8f4);border:1px solid var(--cream-deeper,#e7dfd0);padding:15px;border-radius:12px}
