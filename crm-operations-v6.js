@@ -98,6 +98,10 @@
   if(typeof oldPhone==='function')window.formatPhoneDisplay=function(v){return oldPhone(v).replace(/<span dir="ltr"/g,'<bdi dir="ltr"').replace(/<\/span>/g,'</bdi>')};
   let propertySearch='',propertyBranch='',propertyArea='',propertyStatus='';
   const propertyStatusLabel=s=>({available:'متوفر',reserved:'محجوز',deposit:'عربون',negotiating:'تفاوض',sold:'مباع',not_available:'غير متاح'}[s]||s||'غير محدد');
+  function propertyActions(p){
+    const button=(action,label)=>'<button type="button" class="ops-action" data-work-action="'+action+'" data-work-id="'+safe(p.id)+'">'+label+'</button>';
+    return '<div class="ops-property-actions">'+button('property','التفاصيل')+(canEdit()?(p.archived?button('restore-property','استعادة من الأرشيف'):button('edit-property','تعديل')+button('archive-property','أرشفة العقار')):'')+'</div>';
+  }
   function renderOrganizedProperties(){
     const list=$id('propertiesList');if(!list)return;
     const branchLabel=$id('opsPropertyBranchLabel');if(branchLabel)branchLabel.hidden=!isOwner();
@@ -113,7 +117,7 @@
     const ordered=[...groups.values()].sort((a,b)=>['مسقط','بركاء','غير محدد'].indexOf(a.branch)-['مسقط','بركاء','غير محدد'].indexOf(b.branch)||a.area.localeCompare(b.area,'ar'));
     let last='';list.innerHTML=ordered.map(g=>{
       const heading=g.branch===last?'':'<h3 class="ops-branch">'+safe(g.branch)+'</h3>';last=g.branch;
-      return heading+'<section class="ops-area"><h4>'+safe(g.area)+' <small>'+g.items.length+' عقارات</small></h4><div class="ops-property-grid">'+g.items.map(p=>'<article class="ops-property"><div class="ops-property-top"><span class="ops-status '+(p.status==='available'?'ops-available':'')+'">'+safe(propertyStatusLabel(p.status))+'</span><bdi dir="ltr" class="ops-code">'+safe(p.property_code||'')+'</bdi></div><button class="ops-title" data-work-action="property" data-work-id="'+safe(p.id)+'">'+safe(p.title||'عقار')+'</button><div class="ops-property-price">'+n(p.price)+' <small>ر.ع</small></div><p>'+safe(typeof propTypeAr==='function'?propTypeAr(p.type):p.type||'')+(p.bedrooms?' · '+n(p.bedrooms)+' غرف':'')+(p.land_size?' · '+n(p.land_size)+' م²':'')+'</p><div class="ops-property-foot"><small>أضيف '+safe(dateText(p.created_at))+'</small>'+workButton('property','التفاصيل','','',p.id)+'</div></article>').join('')+'</div></section>';
+      return heading+'<section class="ops-area"><h4>'+safe(g.area)+' <small>'+g.items.length+' عقارات</small></h4><div class="ops-property-grid">'+g.items.map(p=>'<article class="ops-property"><div class="ops-property-top"><span class="ops-status '+(!p.archived&&p.status==='available'?'ops-available':'')+'">'+safe((p.archived?'مؤرشف · ':'')+propertyStatusLabel(p.status))+'</span><bdi dir="ltr" class="ops-code">'+safe(p.property_code||'')+'</bdi></div><button type="button" class="ops-title" data-work-action="property" data-work-id="'+safe(p.id)+'">'+safe(p.title||'عقار')+'</button><div class="ops-property-price">'+n(p.price)+' <small>ر.ع</small></div><p>'+safe(typeof propTypeAr==='function'?propTypeAr(p.type):p.type||'')+(p.bedrooms?' · '+n(p.bedrooms)+' غرف':'')+(p.land_size?' · '+n(p.land_size)+' م²':'')+'</p><div class="ops-property-foot"><small>أضيف '+safe(dateText(p.created_at))+'</small>'+propertyActions(p)+'</div></article>').join('')+'</div></section>';
     }).join('');
   }
   const oldProperties=window.loadProperties;
@@ -178,7 +182,16 @@
       else if(action==='task'){if(canEdit())await editTask(id);else navigate('daily',null);}
       else if(action==='tasks')navigate('daily',null);
       else if(action==='deal')navigate('deals',null);
-      else if(action==='property')await viewProperty(id);
+      else if(['property','edit-property','archive-property','restore-property'].includes(action)){
+        e.preventDefault();e.stopPropagation();
+        const property=allProperties.find(p=>p.id===id);
+        if(!property){showToast('العقار غير موجود في العرض الحالي. حدّث القائمة ثم حاول مجددًا.','error');return;}
+        if(action==='property')await viewProperty(id);
+        else if(!canEdit())showPermissionDenied();
+        else if(action==='edit-property'&&!property.archived)await editProperty(id);
+        else if(action==='archive-property'&&!property.archived)archivePropertyById(id);
+        else if(action==='restore-property'&&property.archived)restorePropertyById(id);
+      }
       else if(action==='clear-properties'){propertySearch=propertyBranch=propertyArea=propertyStatus='';['opsPropertySearch','opsPropertyBranch','opsPropertyStatus'].forEach(id=>{if($id(id))$id(id).value='';});renderOrganizedProperties();}
       else if(action==='clear-clients'){clientWorkFilter='all';renderClients();}
     }catch(err){showToast('تعذر فتح الإجراء: '+err.message,'error');}

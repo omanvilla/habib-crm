@@ -23,7 +23,14 @@ begin
  if v_company is null or v_actor is null or v_role not in ('owner','manager','agent') then
   raise exception using errcode='42501',message='performance_not_allowed';
  end if;
- select (created_at at time zone 'Asia/Muscat')::date into v_inception from public.companies where id=v_company;
+ -- Company row creation is not the beginning of the historical business ledger.
+ select least((c.created_at at time zone 'Asia/Muscat')::date,(
+   select min((hd.closed_at at time zone 'Asia/Muscat')::date)
+   from public.deals hd where hd.company_id=c.id and hd.stage in('closed','commission_collected')
+    and (v_role<>'agent' or (hd.agent_id=v_actor
+      and crm_repair_private.can_access_client(hd.company_id,hd.client_id)
+      and (hd.property_id is null or exists(select 1 from public.properties hp where hp.id=hd.property_id and hp.company_id=hd.company_id and crm_repair_private.staff_can_access_branch(hp.company_id,hp.branch_key)))))
+ )) into v_inception from public.companies c where c.id=v_company;
  if p_from is null then p_from:=v_inception;end if;
  if p_from is null or p_to is null or p_to<=p_from then
   raise exception using errcode='22023',message='invalid_performance_period';

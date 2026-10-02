@@ -67,3 +67,54 @@ jobs:
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f tests/fixtures/employee-performance.sql
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f db/changes/12-approved-performance-credit.forward.sql
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f tests/fixtures/employee-performance-assert.sql
+
+  workflows-sql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: synthetic-test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: synthetic-test-only
+      PGHOST: 127.0.0.1
+      PGUSER: postgres
+      PGPORT: 5432
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test atomic visit request resolution and concurrent saves
+        run: |
+          createdb crm_visit_test
+          psql -d crm_visit_test -v ON_ERROR_STOP=1 -f tests/fixtures/visit-auto-request.sql
+          psql -d crm_visit_test -v ON_ERROR_STOP=1 -f db/changes/13-visit-auto-request.forward.sql
+          psql -d crm_visit_test -v ON_ERROR_STOP=1 -f tests/fixtures/visit-auto-request-assert.sql
+          HABIB_VISIT_TEST_DATABASE=crm_visit_test node tests/visit-auto-request.test.cjs
+      - name: Test atomic historical and current deal workflows
+        run: |
+          createdb crm_deal_test
+          psql -d crm_deal_test -v ON_ERROR_STOP=1 -f tests/fixtures/rejection-consistency.sql
+          psql -d crm_deal_test -v ON_ERROR_STOP=1 -f db/changes/13-visit-auto-request.forward.sql
+          psql -d crm_deal_test -v ON_ERROR_STOP=1 -f db/changes/14-deal-workflow.forward.sql
+          psql -d crm_deal_test -v ON_ERROR_STOP=1 -f db/changes/15-primary-rejection-consistency.forward.sql
+          psql -d crm_deal_test -v ON_ERROR_STOP=1 -f tests/fixtures/deal-workflow-assert.sql
+      - name: Test primary rejection history and report consistency
+        run: |
+          createdb crm_rejection_test
+          psql -d crm_rejection_test -v ON_ERROR_STOP=1 -f tests/fixtures/rejection-consistency.sql
+          psql -d crm_rejection_test -v ON_ERROR_STOP=1 -f db/changes/13-visit-auto-request.forward.sql
+          psql -d crm_rejection_test -v ON_ERROR_STOP=1 -f db/changes/14-deal-workflow.forward.sql
+          psql -d crm_rejection_test -v ON_ERROR_STOP=1 -f db/changes/15-primary-rejection-consistency.forward.sql
+          psql -d crm_rejection_test -v ON_ERROR_STOP=1 -f tests/fixtures/rejection-consistency-assert.sql

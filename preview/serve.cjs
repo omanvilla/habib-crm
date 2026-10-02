@@ -1,7 +1,7 @@
 'use strict';
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process');
 const root=path.resolve(__dirname,'..'),baseline='e9bd1d54e0781cd9445c9d7ad5ac2f004749e961';
-const files=new Set(['index.html','app-base-v15.html','modern-v17.css','modern-v17.js','crm-operations-v6.css','crm-operations-v6.js','crm-v17-patch.js','whatsapp-direct-bind-ui.js','crm-v18-routing-patch.js','crm-v18-request-integrity-patch.js','crm-v18-client-info-patch.js','crm-v18-property-monitoring-patch.js','crm-v18-task-priority-patch.js','instagram-crm.js','crm-funnel.js']);
+const files=new Set(['index.html','app-base-v15.html','modern-v17.css','modern-v17.js','crm-operations-v6.css','crm-operations-v6.js','crm-deal-workflow.js','crm-deal-workflow.css','crm-v17-patch.js','whatsapp-direct-bind-ui.js','crm-v18-routing-patch.js','crm-v18-request-integrity-patch.js','crm-v18-client-info-patch.js','crm-v18-property-monitoring-patch.js','crm-v18-task-priority-patch.js','instagram-crm.js','crm-funnel.js']);
 function content(file,before){return before?cp.execFileSync('git',['show',baseline+':'+file],{cwd:root,encoding:'utf8',maxBuffer:4*1024*1024}):fs.readFileSync(path.join(root,file),'utf8');}
 const csp="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self'; frame-src 'none'; form-action 'self'; base-uri 'self'; object-src 'none';";
 const server=http.createServer((req,res)=>{

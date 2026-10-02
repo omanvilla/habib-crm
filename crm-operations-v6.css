@@ -33,7 +33,8 @@
 .ops-property .ops-title{margin:16px 0 10px;min-height:54px}
 .ops-property-price{font-size:23px;font-weight:800;direction:rtl}.ops-property-price small{font-size:12px;font-weight:400}
 .ops-property p,.ops-property-foot small{color:var(--ops-muted);font-size:12px}
-.ops-property-foot{border-top:1px solid #edf1ee;margin-top:18px;padding-top:14px}
+.ops-property-foot{border-top:1px solid #edf1ee;margin-top:18px;padding-top:14px;flex-wrap:wrap}
+.ops-property-actions{display:flex;flex-wrap:wrap;gap:7px;width:100%}
 .ops-branch{font-size:19px;color:var(--ops-ink);margin:24px 0 12px}
 .ops-area h4{font-size:14px;margin-bottom:14px;color:var(--ops-ink)}.ops-area h4 small{font-weight:400;margin-inline-start:8px;color:var(--ops-muted)}
 #page-clients #clientsList{padding:16px;background:#f6f8f5;display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:18px}

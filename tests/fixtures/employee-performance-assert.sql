@@ -34,3 +34,23 @@ DO $$ BEGIN
 END $$;
 RESET ROLE;
 SELECT 'PASS lifetime, August cutoff, preserved actors, own commission and denied viewer (synthetic DB policies)' AS result;
+
+-- Historical imports predate the technical company record without fake visits.
+INSERT INTO deals VALUES
+('00000000-0000-4000-8000-000000000304','00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000202','00000000-0000-4000-8000-000000000102','00000000-0000-4000-8000-000000000003','commission_collected','2020-04-05',11,11),
+('00000000-0000-4000-8000-000000000305','00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000201','00000000-0000-4000-8000-000000000101','00000000-0000-4000-8000-000000000002','closed','2022-07-08',13,13);
+SELECT set_config('test.role','owner',false);
+DO $$DECLARE r jsonb;BEGIN
+ r:=public.crm_employee_performance(NULL,'2026-10-02');
+ IF r->>'from'<>'2020-04-05' THEN RAISE EXCEPTION 'historical lifetime clipped to company technical creation';END IF;
+ IF (SELECT sum((x->>'sales')::int) FROM jsonb_array_elements(r->'employees') x)<>5 THEN RAISE EXCEPTION 'historical sales missing';END IF;
+END$$;
+SELECT set_config('test.actor','00000000-0000-4000-8000-000000000002',false);
+SELECT set_config('test.role','agent',false);
+SET ROLE authenticated;
+DO $$DECLARE r jsonb;BEGIN
+ r:=public.crm_employee_performance(NULL,'2026-10-02');
+ IF r->>'from'<>'2022-07-08' OR (r->'employees'->0->>'sales')::int<>2 THEN RAISE EXCEPTION 'staff historical scope';END IF;
+END$$;
+RESET ROLE;
+SELECT 'PASS historical 2020/2022 sales included without creating visits or leaking other-branch history' AS result;

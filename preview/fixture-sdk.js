@@ -35,7 +35,7 @@ const properties=[
 {id:uuid(303),title:'شقة المعبيلة للإيجار',property_code:'TEST-M03',branch_key:'muscat',wilayat:'السيب',area:'المعبيلة',price:300,status:'available',bedrooms:2,land_size:110,type:'apartment',sourced_by:muscat},
 {id:uuid(304),title:'فيلا الصومحان الجديدة',property_code:'TEST-B01',branch_key:'barka',wilayat:'بركاء',area:'الصومحان',price:65000,status:'reserved',bedrooms:4,land_size:330,sourced_by:barka},
 {id:uuid(305),title:'فيلا حي عاصم',property_code:'TEST-B02',branch_key:'barka',wilayat:'بركاء',area:'حي عاصم',price:75000,status:'available',bedrooms:4,land_size:400,sourced_by:barka}
-].map((p,i)=>({...p,type:p.type||'villa',company_id:company,added_by:p.sourced_by,archived:false,images:[],created_at:relative(-i-1)+'T08:00:00Z',updated_at:now,expected_commission:900,owner_net:p.price-900}));
+].map((p,i)=>({...p,type:p.type||'villa',company_id:company,added_by:p.sourced_by,owner_id:uuid(p.branch_key==='barka'?902:901),archived:false,images:[],created_at:relative(-i-1)+'T08:00:00Z',updated_at:now,expected_commission:900,owner_net:p.price-900}));
 const visits=[
 {id:uuid(401),client_id:uuid(101),request_id:uuid(201),property_id:uuid(301),agent_id:muscat,viewing_date:relative(0),viewing_time:'11:00:00',status:'confirmed'},
 {id:uuid(402),client_id:uuid(102),request_id:uuid(202),property_id:uuid(302),agent_id:muscat,viewing_date:relative(1),viewing_time:'16:30:00',status:'scheduled'},
@@ -45,6 +45,9 @@ const visits=[
 {id:uuid(406),client_id:uuid(101),request_id:uuid(201),property_id:uuid(301),agent_id:muscat,viewing_date:relative(-2),viewing_time:'12:00:00',status:'cancelled'}
 ].map(v=>({...v,company_id:company,created_by:v.agent_id,created_at:now,archived:false,row_version:1,duration_minutes:60,pipeline_outcome:v.status==='done'?'followup':null}));
 const db={profiles,companies:[{id:company,name:'أبناء حبيب · شركة اختبار',created_at:'2026-05-06T15:00:00Z',default_company_commission:0}],clients,client_requests:requests,properties,viewings:visits,
+owners:[{id:uuid(901),company_id:company,added_by:muscat,name:'مالك مسقط الاصطناعي',phone:'+96800000011',owner_type:'owner',archived:false},{id:uuid(902),company_id:company,added_by:barka,name:'مالك بركاء الاصطناعي',phone:'+96800000012',owner_type:'owner',archived:false}],
+company_lead_routes:[{id:uuid(1301),company_id:company,route_key:'muscat',label:'مسقط',assigned_to:muscat,is_active:true},{id:uuid(1302),company_id:company,route_key:'barka',label:'بركاء',assigned_to:barka,is_active:true}],
+rejection_reasons:[{id:uuid(1401),company_id:null,code:'price_high',label_ar:'السعر أعلى من الميزانية',category:'price',is_active:true,sort_order:1},{id:uuid(1402),company_id:null,code:'location',label_ar:'الموقع غير مناسب',category:'property',is_active:true,sort_order:2}],
 tasks:[
 {id:uuid(501),user_id:muscat,client_id:uuid(101),request_id:uuid(201),title:'تأكيد موعد زيارة الخوض',due_date:relative(0),priority:'high'},
 {id:uuid(502),user_id:muscat,client_id:uuid(102),request_id:uuid(202),title:'توثيق نتيجة التفاوض على طلب الشراء',due_date:relative(-1),priority:'high'},
@@ -71,6 +74,9 @@ function allowed(row,table){
  if(['properties'].includes(table))return row.branch_key===branch;
  if(table==='clients')return row.lead_route===branch;
  if(table==='client_requests')return row.branch_key===branch;
+ if(table==='owners')return properties.some(p=>p.owner_id===row.id&&p.branch_key===branch);
+ if(table==='company_lead_routes')return row.route_key===branch;
+ if(table==='rejection_reasons')return row.company_id==null||row.company_id===company;
  if(table==='profiles')return row.id===profile.id;
  if(table==='companies')return row.id===company;
  if(table==='tasks')return row.user_id===profile.id;
@@ -83,7 +89,7 @@ function decorate(row){
  if(row.client_id)result.client=clients.find(c=>c.id===row.client_id);
  if(row.property_id)result.property=properties.find(p=>p.id===row.property_id);
  if(row.agent_id||row.assigned_to)result.agent=profiles.find(p=>p.id===(row.agent_id||row.assigned_to));
- if(profile.role!=='owner'){result.owner_net=null;result.expected_commission=null;result.company_commission=null;result.agent_commission=null;}
+ if(profile.role!=='owner')for(const field of ['owner_net','expected_commission','company_commission','agent_commission','commission_total','company_share','agent_share','broker_id','broker_commission','employee_commission_percent'])result[field]=null;
  return result;
 }
 function query(name){
@@ -139,8 +145,13 @@ function query(name){
 const client={
 from:query,
 rpc:async(name,args={})=>{
- state.calls.push({rpc:name});
+ state.calls.push({rpc:name,args:structuredClone(args)});
  if(signedOut)return {data:null,error:{message:'TEST signed out'}};
+ if(state.failNext===name){state.failNext=null;return {data:null,error:{message:'TEST simulated RPC failure'}};}
+ if(name==='crm_get_deal_workflow'){
+  const deal=db.deals.find(d=>d.id===args.p_deal_id&&allowed(d,'deals'));
+  return deal?{data:{deal:decorate(deal)},error:null}:{data:null,error:{message:'TEST fixture scope denial'}};
+ }
  if(name==='crm_client_contact_queue')return {data:clients.filter(c=>allowed(c,'clients')&&!c.human_contact_at).map(c=>({client_id:c.id})),error:null};
  if(name==='crm_property_action_queue')return {data:[],error:null};
  if(name==='crm_employee_performance')return {data:{from:args.p_from,to:args.p_to,employees:profiles.filter(p=>p.role==='agent'&&(profile.role!=='agent'||p.id===profile.id)).map(p=>({employee_id:p.id,name:p.full_name,active_inventory:properties.filter(x=>x.sourced_by===p.id&&!x.archived&&!['sold','not_available'].includes(x.status)).length,new_properties:0,inquiries:0,visits_booked:0,visits_done:0,sales:0,activities:0,outbound_messages:0,company_commission:20,targets:{inventory_target:10}}))},error:null};

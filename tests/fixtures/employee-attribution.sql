@@ -1,4 +1,5 @@
-CREATE ROLE anon;CREATE ROLE authenticated;
+DO $$BEGIN CREATE ROLE anon; EXCEPTION WHEN duplicate_object THEN NULL;END$$;
+DO $$BEGIN CREATE ROLE authenticated; EXCEPTION WHEN duplicate_object THEN NULL;END$$;
 CREATE SCHEMA crm_repair_private;
 CREATE TABLE public.companies(id uuid PRIMARY KEY);
 CREATE TABLE public.profiles(id uuid PRIMARY KEY,company_id uuid REFERENCES companies(id),full_name text,role text,is_active boolean);
