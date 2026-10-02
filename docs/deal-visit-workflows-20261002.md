@@ -24,7 +24,7 @@ Scope: Ahmed's later October 2 request. Review implementation, not a production 
 
 ## Evidence and release boundary
 
-Local checks include property action render/dispatch and an archive/restore cycle; provenance versus customer text; preserved historical sale dates; isolated PostgreSQL performance assertions for 2020/2022 and branch-safe lifetime boundaries. Additional workflow and browser evidence is recorded below after integration.
+Local checks include property action render/dispatch and an archive/restore cycle; provenance versus customer text; preserved historical sale dates; isolated PostgreSQL performance assertions for 2020/2022 and branch-safe lifetime boundaries. Final integrated workflow and browser evidence is recorded below.
 
 The visit SQL suite verifies owner and both employee branches, compatible request reuse, incompatible/ambiguous independent requests, atomic rollback, replay, stale edits, historical location preservation, and no fabricated inbound inquiry. A simultaneous owner/employee save created one request for two distinct visits. Completed date-only visits explicitly retain unknown time and create no appointment timestamp; they remain editable from Visits. Normal scheduled visits still need a time.
 
@@ -35,5 +35,15 @@ The deal PostgreSQL suite verifies historical entries without fabricated visits/
 The combined SQL13/14/15 regression also completes an existing scheduled card with a previously missing request and an inline actual visit: it keeps the same deal ID and creation timestamp and produces exactly one card. New-form selection of an existing visit reuses its existing nonfinal card while preserving financial amounts, notes and employee attribution. The private transaction context used for this link has no client permissions and is cleaned before completion.
 
 SQL fixtures use an isolated local PostgreSQL database and synthetic records. Browser checks use a fixture SDK with external requests/sends blocked. Neither proves a successful real employee browser login. No production migration, customer message, data deletion or broad UI release is part of this review update.
+
+## Final verification and review location
+
+- Draft review: [PR #1](https://github.com/omanvilla/habib-crm/pull/1), including the preceding interface/performance preview. Full workflow implementation: `170a424`; final tested runtime: `198b16d868e6343f3aa532f1b06185e70e1da92b`.
+- [GitHub Actions run 37030958640](https://github.com/omanvilla/habib-crm/actions/runs/37030958640) completed successfully with all four jobs: `node-tests`, `synthetic-browser`, `attribution-sql`, `workflows-sql`.
+- Local Node run: 105 tests, 103 passed, two optional database tests skipped in the generic runner. Their applicable SQL/concurrency paths ran against actual isolated PostgreSQL separately, including in Actions. The 26-case security harness also passed.
+- Final local Chromium pass: 24 functional checks, 45 synthetic screenshots, zero uncaught page errors across before/after owner, Muscat and Barka. It exercises property actions and write-failure recovery, automatic visit payloads, primary refusal with optional words, one-screen inline historical entry, current-deal date guards, finance visibility, CSV download, request edits, session reload/logout, blocked external sends and mobile form width. Browser save failures are injected deliberately to verify payloads and retained inputs; successful atomic persistence is verified by the separate PostgreSQL suites.
+- The browser pass exposed mobile negative margins on the title/footer and a test selector matching both the header and legitimate empty-state deal buttons. Margins are scoped to the new form; the test now exercises the exact header action for owner/Muscat and the empty-state action for Barka. The overflow assertion remains in place, with diagnostic geometry captured on failure.
+- Successful Actions artifact: `synthetic-crm-before-after`, ID `11237362960`, SHA256 `c0c03107ad74280c7aafd3c44650a53ac7d201a731bda976560c1048eea5450b`. It contains synthetic screenshots and the browser report, not customer data. Local `preview-results/` is ignored by Git.
+- The production baseline `8e1c018` is incorporated into the review branch with the latest `AGENTS.md` and current-state rules retained. Only documentation had merge conflicts; the merged non-document tree equals the successful tested runtime. The final evidence/continuity commit uses `[skip ci]` because it changes no runtime, tests, SQL or CI configuration.
 
 Release requires the matching prepared database changes and frontend together, after the standing review gate. Keep the original property-layout reference outstanding and do not replace it with an invented redesign.

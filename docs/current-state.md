@@ -8,8 +8,9 @@ Updated 2026-10-02. Read this with `AGENTS.md` before work. This file distinguis
 |---|---|
 | Production website | GitHub Pages from `main`; frontend `20260930-operations-v6b` |
 | Latest production baseline inspected | `8e1c0180d54f7f393f8be5bc1a27a59d9537d5b6`; narrow October 2 inbox repair `ab1a598`, last public frontend implementation `9f3c98d` |
-| Active review branch | `codex/role-workflows-ui-preview-20260930`; this workflow work starts from `d5530787d51e8cd653b2b2692494f9a1f4187739` |
+| Active review branch | `codex/role-workflows-ui-preview-20260930`; draft [PR #1](https://github.com/omanvilla/habib-crm/pull/1). Workflow implementation `170a424`; final tested runtime `198b16d868e6343f3aa532f1b06185e70e1da92b` |
 | October2 implementation evidence | Main repair `ab1a598`; review fixes `af936ad`, all three CI jobs passed |
+| Later October2 workflow verification | All four jobs passed in [run 37030958640](https://github.com/omanvilla/habib-crm/actions/runs/37030958640): Node/security, synthetic browser, attribution/performance SQL, deal/visit/rejection SQL |
 | Review frontend | `20261002-review-v11` prepared for property actions and deal/visit workflows; not released to production |
 | Supabase | `dmsckqjkcnsfmnzfjczz`; inbox v12 released October2; webhook v33; deployed separately from Pages |
 | Approved production business change | Classified property attribution to Hadeel/Muscat and Maram/Barka; standing inventory target 10, migration `approved_branch_employee_attribution_20261001` |
@@ -35,7 +36,9 @@ The October 2 conversation mentioned local Codex commit `d3c7481` on `work`. It 
 
 The review branch contains simplified dashboard/property/client screens, inventory shortage reminder, period/lifetime performance presentation, Western date numerals and session guards. October 2 adds performance-response and export-session regressions and integration hardening. See `docs/audit-20261002.md` for exact verified scope and release state.
 
-The later October 2 workflow update is documented separately in `docs/deal-visit-workflows-20261002.md`. It corrects the operations renderer hiding property actions and extends lifetime reporting before the company's technical account-creation date when genuine historical completed deals exist. Do not count visit-origin pipeline notes as completed sales or fabricate missing historical rejection reasons.
+The later October 2 workflow update is documented separately in `docs/deal-visit-workflows-20261002.md`. It corrects the operations renderer hiding property actions and extends lifetime reporting before the company's technical account-creation date when genuine historical completed deals exist. Its local synthetic browser pass covers 24 checks and 45 screenshots across owner/Muscat/Barka and desktop/mobile emulation; it is not real employee-login evidence. Mobile deal-form title/footer overflow was corrected without removing the width assertion. Do not count visit-origin pipeline notes as completed sales or fabricate missing historical rejection reasons.
+
+The final continuity commit incorporates the production baseline into the review branch and retains these latest product rules, resolving documentation-only conflicts. Runtime, tests, SQL and workflow configuration are unchanged from the exact successful CI head `198b16d`; the continuity/evidence commit skips a redundant CI run. This does not merge the review into `main` or deploy SQL12–16.
 
 The interface/performance preview still requires Ahmed's concrete review before a broad production release. Do not publish it merely because it is newer. Complete its matching server work and commission flow before claiming the requested performance system is finished.
 
