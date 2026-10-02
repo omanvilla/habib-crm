@@ -9,6 +9,7 @@ Updated 2026-10-02. Read this with `AGENTS.md` before work. This file distinguis
 | Production website | GitHub Pages from `main`; frontend `20260930-operations-v6b` |
 | Latest production baseline inspected | `36bc4263298f81abc302c527e45d1de5fc4b12e7`; last frontend implementation `9f3c98d` |
 | Active review branch | `codex/role-workflows-ui-preview-20260930`; baseline `a522e97`, 19 commits ahead of the common production ancestor |
+| October2 implementation evidence | Main repair `ab1a598`; review fixes `af936ad`, all three CI jobs passed |
 | Review frontend | `20261002-review-v10`; not released to production |
 | Supabase | `dmsckqjkcnsfmnzfjczz`; inbox v12 released October2; webhook v33; deployed separately from Pages |
 | Approved production business change | Classified property attribution to Hadeel/Muscat and Maram/Barka; standing inventory target 10, migration `approved_branch_employee_attribution_20261001` |
