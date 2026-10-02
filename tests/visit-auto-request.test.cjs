@@ -26,7 +26,7 @@ test('simultaneous operation keys create one automatic property request',{skip:!
  const {execFile}=require('node:child_process');
  const db=process.env.HABIB_VISIT_TEST_DATABASE,host=process.env.PGHOST||'',port=process.env.PGPORT||'55432';
  assert.match(db,/^crm_visit_test(?:_[a-z0-9]+)?$/,'concurrency test requires dedicated synthetic database');
- assert.match(host,/^\/tmp\/habib-workflow-pg-socket$/,'concurrency test is local socket only');
+ assert(host==='/tmp/habib-workflow-pg-socket'||(process.env.GITHUB_ACTIONS==='true'&&host==='127.0.0.1'&&port==='5432'),'concurrency test requires the isolated local socket or Actions PostgreSQL service');
  const run=sql=>new Promise((resolve,reject)=>execFile('psql',['-h',host,'-p',port,'-U','postgres','-d',db,'-v','ON_ERROR_STOP=1','-Atq','-c',sql],(e,stdout,stderr)=>e?reject(Error(stderr)):resolve(stdout.trim())));
  await run("DELETE FROM crm_repair_private.viewing_save_operations WHERE viewing_id IN(SELECT id FROM viewings WHERE client_id=test_id(217)); DELETE FROM viewings WHERE client_id=test_id(217); DELETE FROM appointment_properties WHERE appointment_id IN(SELECT id FROM appointments WHERE client_id=test_id(217)); DELETE FROM appointments WHERE client_id=test_id(217); DELETE FROM property_inquiries WHERE client_id=test_id(217); DELETE FROM client_requests WHERE client_id=test_id(217); INSERT INTO clients(id,company_id,name,phone,assigned_to,lead_route)VALUES(test_id(217),test_id(1),'TEST CONCURRENT','+96890000217',test_id(2),'muscat')ON CONFLICT(id) DO NOTHING;");
  const call="SET ROLE authenticated; SELECT set_config('test.actor','00000000-0000-4000-8000-000000000002',false);SELECT test_visit(217,101);";
