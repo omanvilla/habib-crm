@@ -28,22 +28,27 @@
     const valid=goals.map(([key,target,flow])=>{let goal=t[target];if(goal==null||Number(goal)<=0||(key==='company_commission'&&row[key]==null))return null;goal=Number(goal)*(flow?days/monthDays:1);return Math.min(1,Number(row[key]||0)/goal)}).filter(x=>x!==null);
     return valid.length?'متوسط إنجاز الأهداف المعتمدة: '+Math.round(100*valid.reduce((a,b)=>a+b,0)/valid.length)+'% · محدد '+valid.length+' من '+goals.length+' أهداف؛ البقية غير محددة':'لم تُحدد أهداف كافية للتقييم';
   }
+  const performanceLoads=new WeakMap();
+  let teamPerformancePeriod='month';
   async function renderPerformance(kind,boxId='employeePerformanceResults'){
     const generation=crmSessionGeneration,user=currentUser&&currentUser.id;
     const box=$id(boxId);if(!box)return;
+    const request={};performanceLoads.set(box,request);
+    const isCurrent=()=>performanceLoads.get(box)===request&&crmSessionCurrent(generation,user);
     box.textContent='جاري حساب الأداء...';
     try{
       const span=period(kind),r=await supa.rpc('crm_employee_performance',{p_from:span.from,p_to:span.to});
-      if(!crmSessionCurrent(generation,user))return;
+      if(!isCurrent())return;
       if(r.error)throw r.error;
+      const employees=r.data.employees||[];
       box.innerHTML='<p class="ops-note">'+safe(r.data.from||span.from||'بداية الشركة')+' حتى قبل '+safe(span.to)+' · الاستفسار المثبت برسالة واردة فقط. الزيارات والمبيعات نشاط مسجل خلال الفترة، ونسب التحويل تُحسب على مجموعة الاستفسارات أو الزيارات نفسها. الإسناد المعتمد للعمل منذ 1 أغسطس 2026: مسقط لهديل وبركاء لمرام. الموظفة ترى شغلها وعمولة الشركة الناتجة عنه فقط. العقارات النشطة رصيد حالي، والعقارات الجديدة إضافات الفترة المختارة؛ التواريخ الأصلية محفوظة.</p>'+
-      (r.data.employees||[]).map(x=>'<article class="ops-person"><div class="ops-person-title"><strong>'+safe(x.name)+'</strong><span>'+safe(targetScore(x,kind))+'</span></div><div class="ops-metrics">'+
+      (employees.map(x=>'<article class="ops-person"><div class="ops-person-title"><strong>'+safe(x.name)+'</strong><span>'+safe(targetScore(x,kind))+'</span></div><div class="ops-metrics">'+
         metric('عقارات نشطة مسندة لها الآن',x.active_inventory)+metric('إضافات جديدة خلال الفترة',x.new_properties)+metric('استفسارات عقار مثبتة',x.inquiries)+metric('منها تحوّل إلى زيارة',x.inquiry_to_visit)+metric('زيارات حُجزت',x.visits_booked)+metric('زيارات تمت',x.visits_done)+metric('منها تحوّل إلى بيع',x.visit_to_sale)+metric('مبيعات أُغلقت',x.sales)+metric('تواصل بشري منسوب للشغل',x.activities)+metric('رسائل بشرية منسوبة للشغل',x.outbound_messages)+'</div>'+
-        (x.company_commission==null?'':'<div class="ops-note">عمولة الشركة الناتجة عن هذا الشغل: '+n(x.company_commission)+' ر.ع</div>')+'</article>').join('')||'<p>لا يوجد موظفون نشطون.</p>';
-    }catch(e){if(!crmSessionCurrent(generation,user))return;box.innerHTML='<p role="alert">تعذر حساب الأداء: '+safe(e.message)+'</p>'}
+        (x.company_commission==null?'':'<div class="ops-note">عمولة الشركة الناتجة عن هذا الشغل: '+n(x.company_commission)+' ر.ع</div>')+'</article>').join('')||'<p>لا يوجد موظفون نشطون.</p>');
+    }catch(e){if(!isCurrent())return;box.innerHTML='<p role="alert">تعذر حساب الأداء: '+safe(e.message)+'</p>'}
   }
   window.crmDashboardPerformancePeriod=function(kind){const panel=$id('opsPerformanceDetails');if(!currentProfile||!['owner','manager','agent'].includes(currentProfile.role))return;if(panel)panel.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('active',b.dataset.period===kind));renderPerformance(kind,'opsDashboardPerformanceResults')};
-  window.crmPerformancePeriod=function(kind){document.querySelectorAll('.ops-period').forEach(b=>b.classList.toggle('active',b.dataset.period===kind));renderPerformance(kind)};
+  window.crmPerformancePeriod=function(kind){teamPerformancePeriod=kind;document.querySelectorAll('.ops-period').forEach(b=>b.classList.toggle('active',b.dataset.period===kind));return renderPerformance(kind)};
   function addPerformance(){
     const target=$id('employeeTargetsPanel'),team=$id('page-team');if(!team||$id('employeePerformancePanel'))return;
     const card=document.createElement('div');card.className='card';card.id='employeePerformancePanel';
@@ -51,7 +56,7 @@
     if(target)target.closest('.card').after(card);else team.append(card);
   }
   const oldTeam=window.loadTeam;
-  if(typeof oldTeam==='function')window.loadTeam=async function(){addPerformance();const result=await oldTeam.apply(this,arguments);await renderPerformance('month');return result};
+  if(typeof oldTeam==='function')window.loadTeam=async function(){addPerformance();const result=await oldTeam.apply(this,arguments);await window.crmPerformancePeriod(teamPerformancePeriod);return result};
   function workDate(value){return value?String(value).slice(0,10):'';}
   function requestLabel(r){
     return ({buyer:'شراء',seller:'بيع',tenant:'استئجار',landlord:'تأجير',investor:'استثمار',consultation:'استشارة'}[r.request_type]||'طلب')+(r.preferred_area?' · '+r.preferred_area:'');
@@ -146,6 +151,7 @@
     }).join('');
   };
   window.crmResetOperations=function(){
+    teamPerformancePeriod='month';
     clientBranch='all';clientWorkFilter='all';propertySearch='';propertyBranch='';propertyArea='';propertyStatus='';
     ['opsPropertySearch','opsPropertyBranch','opsPropertyArea','opsPropertyStatus'].forEach(id=>{if($id(id))$id(id).value='';});
   };
@@ -179,11 +185,12 @@
   });
   // An owner CSV is based on actual visits. Inferred visit interest is shown separately from inbound leads.
   window.exportPropertyOwnerReport=async function(){
-    const p=window.viewingProperty;if(!p)return;
+    const p=window.viewingProperty,generation=crmSessionGeneration,user=currentUser&&currentUser.id;if(!p||!user)return;
     try{const [ir,vr,mr]=await Promise.all([
       supa.from('property_inquiries').select('client_id,has_inbound_inquiry,inquiry_count,status,rejection_reason').eq('property_id',p.id),
       supa.from('viewings').select('client_id,status,archived').eq('property_id',p.id),
       supa.from('property_marketing_events').select('channel,event_type,published_at,views,plays,reach,total_interactions,last_synced_at,url,notes').eq('property_id',p.id).order('created_at',{ascending:false})]);
+      if(!crmSessionCurrent(generation,user))return;
       [ir,vr,mr].forEach(r=>{if(r.error)throw r.error});const inbound=(ir.data||[]).filter(x=>x.has_inbound_inquiry),visits=(vr.data||[]).filter(x=>!x.archived),marketing=mr.data||[],visitedClients=new Set(visits.filter(x=>x.status!=='cancelled').map(x=>x.client_id));
       const rows=[['العقار',p.title],['المنطقة',p.area||''],['السعر',p.price||''],['تاريخ تسجيل العقار',dateText(p.created_at)],
         ['عملاء لديهم استفسار وارد مثبت',new Set(inbound.map(x=>x.client_id)).size],['اهتمامات مستنتجة من زيارة',new Set((ir.data||[]).filter(x=>!x.has_inbound_inquiry&&visitedClients.has(x.client_id)).map(x=>x.client_id)).size],
@@ -191,8 +198,9 @@
         ['زيارات ألغيت',visits.filter(x=>x.status==='cancelled').length],['في التفاوض',inbound.filter(x=>x.status==='negotiation').length],['لم يناسبه',inbound.filter(x=>x.status==='not_suitable').length],[],
         ['سجل التسويق'],['القناة','النشاط','التاريخ','المشاهدات','الوصول','التفاعلات','آخر تحديث','الرابط','ملاحظات']];
       marketing.forEach(m=>rows.push([m.channel||'',m.event_type||'',dateText(m.published_at),m.views??m.plays??'غير متاح',m.reach??'غير متاح',m.total_interactions??'غير متاح',m.last_synced_at?dateText(m.last_synced_at):'لم يحدث',m.url||'',m.notes||'']));
+      if(!crmSessionCurrent(generation,user))return;
       downloadCSV('تقرير-أداء-'+(p.title||'العقار'),[],rows);
-    }catch(e){showToast('تعذر إعداد التقرير: '+e.message,'error')}
+    }catch(e){if(crmSessionCurrent(generation,user))showToast('تعذر إعداد التقرير: '+e.message,'error')}
   };
   addPerformance();
 })();

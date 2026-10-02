@@ -247,12 +247,10 @@ Deno.serve(async (req) => {
       const conversationId=String(payload?.conversation_id||"").trim(), messageId=String(payload?.message_id||"").trim(), requestId=String(payload?.request_id||"").trim();
       if(!conversationId||!messageId||!requestId)return json({ok:false,error:"conversation_message_request_required"},400);
       const conversation=await getConversation(conversationId);if(!conversation)return json({ok:false,error:"conversation_not_found"},404);
-      const rr=await admin.from("client_requests").select("id,client_id,assigned_to").eq("id",requestId).eq("company_id",companyId).eq("client_id",conversation.client_id).maybeSingle();
+      // The request must pass the caller's current branch and request policies.
+      // A stale assignment/team membership is not a substitute for those rules.
+      const rr=await userClient.from("client_requests").select("id,client_id").eq("id",requestId).eq("company_id",companyId).eq("client_id",conversation.client_id).maybeSingle();
       if(rr.error||!rr.data)return json({ok:false,error:"request_not_found"},404);
-      if(profile.role==="agent" && rr.data.assigned_to!==user.id){
-        const a=await admin.from("client_request_assignees").select("request_id").eq("company_id",companyId).eq("request_id",requestId).eq("user_id",user.id).maybeSingle();
-        if(a.error||!a.data)return json({ok:false,error:"request_not_authorized"},403);
-      }
       const mr=await admin.from("whatsapp_messages").select("id,direction").eq("id",messageId).eq("company_id",companyId).eq("conversation_id",conversationId).maybeSingle();
       if(mr.error||!mr.data)return json({ok:false,error:"message_not_found"},404);
       const ur=await admin.from("whatsapp_messages").update({request_id:requestId}).eq("id",messageId).eq("company_id",companyId);if(ur.error)throw new Error(`message_request_link_failed: ${ur.error.message}`);
