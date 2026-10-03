@@ -1,0 +1,26 @@
+{
+  "sources": [
+    {
+      "file": "db/changes/12-approved-performance-credit.forward.sql",
+      "sha256": "2fcb83ac2c22e52ea6ad0d5f7057e90e3053056e001b43fb5203115a2da66948"
+    },
+    {
+      "file": "db/changes/13-visit-auto-request.forward.sql",
+      "sha256": "87835dfb2ae0bbefbddbaf1a8647195c14b9e3d4d4fd5f5d2c55cdcc8d6eda55"
+    },
+    {
+      "file": "db/changes/14-deal-workflow.forward.sql",
+      "sha256": "c79af57e0d1b1a1e47b46deab6920c55f96c84275f09407488529c13796d790b"
+    },
+    {
+      "file": "db/changes/15-primary-rejection-consistency.forward.sql",
+      "sha256": "30687950ff0e946e791bd6853ef054b6f40bea82092df153c55c56447938dee9"
+    },
+    {
+      "file": "db/changes/16-primary-rejection-reporting.forward.sql",
+      "sha256": "62800820cad549eee37d40d41a997ba25878b0e29d7e26d174cbae24921c6c82"
+    }
+  ],
+  "batch_sha256": "19062eb17eae6669b7d48518c0cc408b5c9b4e508a2e36e2880d771ca8897db5",
+  "bytes": 111233
+}

@@ -1,0 +1,104 @@
+[
+  {
+    "asset": "app-base-v15.html",
+    "http_status": 200,
+    "sha256": "f2cd66851880fb65d000ee6954d090dd82d843eff1602c97e10cc6a6ea1e57cd",
+    "matches_release": true
+  },
+  {
+    "asset": "modern-v17.css",
+    "http_status": 200,
+    "sha256": "7e82320e76b414c9391d3c8bc73c902ffb4ca0dd4be545f4a8f95c2f21ae9ec0",
+    "matches_release": true
+  },
+  {
+    "asset": "crm-operations-v6.css",
+    "http_status": 200,
+    "sha256": "9f37aa2dfe929c7d2dc9e89efd9050cc8cd4521bd53bc952d6eae8d660cd9602",
+    "matches_release": true
+  },
+  {
+    "asset": "crm-deal-workflow.css",
+    "http_status": 200,
+    "sha256": "0678b4c5f217000d7ef0e77de7f367d5e83abee907f736c72041a11663620c0f",
+    "matches_release": true
+  },
+  {
+    "asset": "crm-v17-patch.js",
+    "http_status": 200,
+    "sha256": "596b6f6ed4243d34eaa93ee886ff4800d60c2ef46c60f02063d9ca87435b4483",
+    "matches_release": true
+  },
+  {
+    "asset": "modern-v17.js",
+    "http_status": 200,
+    "sha256": "e62672b5436de419f1a1cd2bb524194286e1ff636a8238e332c4b32ca7b93a35",
+    "matches_release": true
+  },
+  {
+    "asset": "whatsapp-direct-bind-ui.js",
+    "http_status": 200,
+    "sha256": "60961f4f9894409751c6649f9fc50141a1b3306502009b81e9007a02603f4d48",
+    "matches_release": true
+  },
+  {
+    "asset": "crm-v18-routing-patch.js",
+    "http_status": 200,
+    "sha256": "ce66e0ec64ce98e9f38520b8cb7ce1dcdd973860bfb7236331af62cd7ed21c00",
+    "matches_release": true
+  },
+  {
+    "asset": "crm-v18-request-integrity-patch.js",
+    "http_status": 200,
+    "sha256": "c3759269d76644882dda97896a7a8de792e84f4a2f1575ddbe3a28d576e80e5c",
+    "matches_release": true
+  },
+  {
+    "asset": "crm-v18-client-info-patch.js",
+    "http_status": 200,
+    "sha256": "06709a4b5ebaca2f31286e79abe26d34a6261a60fd7673336509c0078255d285",
+    "matches_release": true
+  },
+  {
+    "asset": "crm-v18-property-monitoring-patch.js",
+    "http_status": 200,
+    "sha256": "74bfccf96fa06321fd5df3a3b1455672081542f4e007109f5d62049843605bec",
+    "matches_release": true
+  },
+  {
+    "asset": "crm-v18-task-priority-patch.js",
+    "http_status": 200,
+    "sha256": "cfebda2c135cf075cc5faf3d65247a0fd3883315ccc50822a717fb5b5def1997",
+    "matches_release": true
+  },
+  {
+    "asset": "instagram-crm.js",
+    "http_status": 200,
+    "sha256": "e36cbaf92572263a615b954fc0c38406c9146f7018ef952894603a697a058663",
+    "matches_release": true
+  },
+  {
+    "asset": "crm-funnel.js",
+    "http_status": 200,
+    "sha256": "6ab4ee4f00a3f0353738aa97b918d3cf211c7a0b91cfe4a4294b791526111901",
+    "matches_release": true
+  },
+  {
+    "asset": "crm-operations-v6.js",
+    "http_status": 200,
+    "sha256": "071cedf46d3e9be11f90aba091e3f0688978ee80d3dae1b6af9bf283de901fdc",
+    "matches_release": true
+  },
+  {
+    "asset": "crm-deal-workflow.js",
+    "http_status": 200,
+    "sha256": "752dd5a0b0dc626096b7df84a059b0e66ef502cdca55ee00304519c97a20f821",
+    "matches_release": true
+  },
+  {
+    "asset": "index.html",
+    "http_status": 200,
+    "sha256": "fc589283caea29fed674a4ce41a0251b3ce06a93e4be32ca5ef858946a00d271",
+    "matches_release": true
+  }
+]
