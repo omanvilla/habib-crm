@@ -1,0 +1,20 @@
+.dw-modal{max-width:850px!important;width:calc(100% - 24px);max-height:92vh;overflow:auto}
+.dw-modal [hidden]{display:none!important}
+.dw-modal .full{grid-column:1/-1}
+.dw-modal .fg,.dw-modal .fgrid,.dw-subform{min-width:0}
+.dw-modal .modal-title{margin-left:0;margin-right:0}
+.dw-intro,.dw-hint{font-size:12px;line-height:1.7;color:var(--umber,#6b5a3e);margin:0 0 14px}
+.dw-hint{margin:5px 0 0;font-weight:400}
+.dw-subform{background:var(--cream,#faf8f4);border:1px solid var(--cream-deeper,#e7dfd0);padding:15px;border-radius:12px}
+.dw-subform h4{margin:0 0 12px;font-size:14px;color:var(--espresso,#392c20)}
+.dw-loss{background:#fff8f6;border-color:#efc7be}
+.dw-error{padding:12px;background:#fff1f2;border:1px solid #fecdd3;border-radius:9px;color:#9f1239;font-size:13px;line-height:1.7;margin-bottom:15px}
+.dw-provenance{font-size:12px;color:var(--umber,#6b5a3e);line-height:1.7}
+.dw-provenance summary{cursor:pointer}
+/* Base mobile footers bleed -12px outside their parent. This footer lives inside
+   a form, so retain its full width without increasing the form scrollWidth. */
+.dw-modal .modal-foot{position:sticky;bottom:-1px;background:var(--cream,#fff);margin:18px 0 0;padding-top:14px;padding-bottom:12px;border-top:1px solid var(--cream-deeper,#e7dfd0);z-index:2}
+.dw-modal .modal-foot .btn-primary{width:auto;padding:10px 22px}
+.dw-modal input[readonly]{background:#f3f4f6}
+.dw-modal select{max-width:100%}
+@media(max-width:600px){.dw-modal{padding:18px!important;width:calc(100% - 16px);max-height:95vh}.dw-modal .fgrid{grid-template-columns:1fr}.dw-subform{padding:12px}.dw-modal .fi,.dw-modal .fs,.dw-modal .fta{font-size:16px}.dw-modal .modal-foot{bottom:-12px}}

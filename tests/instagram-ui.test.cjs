@@ -6,7 +6,7 @@ const path = require('node:path');
 const { webcrypto } = require('node:crypto');
 
 function fixture(handler) {
-  const events = [], nodes = new Map(), toasts = [];
+  const events = [], nodes = new Map(), toasts = [], authListeners = [];
   const persisted = new Map();
   const storage = { getItem: key => persisted.get(key) || null, setItem: (key, value) => persisted.set(key, value), removeItem: key => persisted.delete(key) };
   function element(id) {
@@ -19,14 +19,16 @@ function fixture(handler) {
   const context = { console, URLSearchParams, crypto: webcrypto, TextEncoder, localStorage: storage, sessionStorage: storage,
     currentProfile: { company_id: 'TEST-company' }, currentUser: { id: 'TEST-owner' }, document: { readyState: 'loading', addEventListener() {}, getElementById: element },
     isOwner: () => false, showToast: (text, type) => toasts.push({ text, type }),
-    supa: { functions: { invoke: async (_, { body }) => { events.push(body.action); return handler(body); } } } };
+    setInterval() { return 1; }, clearInterval() {}, setTimeout() { return 1; },
+    location: { hash: '' },
+    supa: { auth: { onAuthStateChange: fn => authListeners.push(fn) }, functions: { invoke: async (_, { body }) => { events.push(body.action); return handler(body); } } } };
   context.window = context;
   vm.createContext(context);
   // The original closure is exposed only inside this isolated test VM. No test
   // hooks or fake credentials are added to the deployed browser source.
-  const source = fs.readFileSync(path.join(__dirname, '../instagram-crm.js'), 'utf8').replace(/\}\)\(\);\s*$/, 'window.__test = {loadStatus, connectInstagram, openInstagramConversation, sendInstagramMessage, setActive: c => {igActiveConversation=c;}, getActive:()=>igActiveConversation};})();');
+  const source = fs.readFileSync(path.join(__dirname, '../instagram-crm.js'), 'utf8').replace(/\}\)\(\);\s*$/, 'window.__test = {activate, loadInstagramInbox, loadStatus, connectInstagram, openInstagramConversation, sendInstagramMessage, setActive: c => {igActiveConversation=c;}, getActive:()=>igActiveConversation};})();');
   vm.runInContext(source, context);
-  return { context, element, events, toasts, persisted };
+  return { context, element, events, toasts, persisted, authListeners };
 }
 
 function defaultResponse(body) {
@@ -34,6 +36,43 @@ function defaultResponse(body) {
   if (body.action === 'list') return { data: { ok: true, conversations: [], unread_total: 0 } };
   return { data: { ok: true } };
 }
+
+test('a delayed inbox from the previous account cannot repopulate the signed-out or next account UI', async () => {
+  let resolveOld, oldStarted;
+  const started = new Promise(resolve => { oldStarted = resolve; });
+  let lists = 0;
+  const f = fixture(async body => {
+    if (body.action === 'list' && ++lists === 1) {
+      oldStarted();
+      return new Promise(resolve => { resolveOld = resolve; });
+    }
+    if (body.action === 'list') return { data: { ok: true, conversations: [{ id: 'new', participant_name: 'NEW ACCOUNT' }], unread_total: 2 } };
+    return defaultResponse(body);
+  });
+  f.context.__test.activate();
+  const oldLoad = f.context.__test.loadInstagramInbox(true);
+  await started;
+  f.context.currentUser = null;
+  f.context.currentProfile = null;
+  f.authListeners.forEach(fn => fn('SIGNED_OUT', null));
+  f.context.currentUser = { id: 'TEST-next' };
+  f.context.currentProfile = { company_id: 'TEST-company' };
+  f.authListeners.forEach(fn => fn('SIGNED_IN', { user: { id: 'TEST-next' } }));
+  await f.context.__test.loadInstagramInbox(true);
+  resolveOld({ data: { ok: true, conversations: [{ id: 'old', participant_name: 'OLD PRIVATE ACCOUNT' }], unread_total: 77 } });
+  await oldLoad;
+  assert.match(f.element('igConversationList').innerHTML, /NEW ACCOUNT/);
+  assert.doesNotMatch(f.element('igConversationList').innerHTML, /OLD PRIVATE ACCOUNT/);
+  assert.equal(f.element('navInstagramCount').textContent, '2');
+});
+
+test('anonymous status loading does not invoke the authenticated Instagram API', async () => {
+  const f = fixture(defaultResponse);
+  f.context.currentUser = null;
+  f.context.currentProfile = null;
+  assert.equal(await f.context.__test.loadStatus(), null);
+  assert.deepEqual(f.events.filter(event => event === 'status'), []);
+});
 
 test('Insights connection does not claim Instagram messaging is connected without permissions', async () => {
   const { context, element } = fixture(async () => ({ data: { ok: true, connected: true, account: {

@@ -7,8 +7,22 @@
   var igConnecting = false;
   var igActiveTab = 'performance';
   var igConversationRequest = 0;
+  var igInboxRequest = 0;
+  var igStatusRequest = 0;
+  var igSessionVersion = 0;
+  var igAuthUserId = null;
   var igSending = false;
   var igDrafts = new Map();
+
+  function instagramSessionKey() {
+    if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id ||
+        typeof currentProfile === 'undefined' || !currentProfile || !currentProfile.company_id) return '';
+    return currentUser.id + ':' + currentProfile.company_id;
+  }
+
+  function instagramReadCurrent(version, key) {
+    return !!key && version === igSessionVersion && key === instagramSessionKey();
+  }
 
   function esc(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
@@ -18,7 +32,7 @@
 
   function time(value) {
     if (!value) return '';
-    try { return new Date(value).toLocaleString('ar-OM', { dateStyle: 'short', timeStyle: 'short' }); }
+    try { return new Date(value).toLocaleString('ar-OM-u-nu-latn', { dateStyle: 'short', timeStyle: 'short' }); }
     catch (_) { return String(value); }
   }
 
@@ -103,11 +117,15 @@
   }
 
   async function loadStatus() {
+    var sessionKey = instagramSessionKey(), sessionVersion = igSessionVersion;
+    if (!sessionKey) return null;
+    var request = ++igStatusRequest;
     var box = document.getElementById('instagramConnectionStatus');
     var inboxStatus = document.getElementById('igInboxStatus');
     if (!box && !inboxStatus) return null;
     try {
       var data = await invoke({ action: 'status' });
+      if (request !== igStatusRequest || !instagramReadCurrent(sessionVersion, sessionKey)) return null;
       if (!data.connected) {
         var disconnected = '<div class="ig-status"><div class="ig-avatar">IG</div><div style="flex:1"><div style="font-weight:800;color:var(--espresso)">حساب Instagram غير مربوط</div><div style="font-size:11px;color:var(--umber);margin-top:4px">اربط @omanvilla لاستقبال الرسائل ومزامنة أداء المنشورات.</div></div>' + (typeof isOwner === 'function' && isOwner() ? '<button class="btn-primary" onclick="connectInstagram()" style="width:auto;padding:9px 18px">🔗 ربط @omanvilla</button>' : '') + '</div>';
         if (box) box.innerHTML = disconnected;
@@ -126,6 +144,7 @@
       if (inboxStatus) inboxStatus.innerHTML = connected;
       return data;
     } catch (error) {
+      if (request !== igStatusRequest || !instagramReadCurrent(sessionVersion, sessionKey)) return null;
       var message = '<div class="auth-error">⚠️ ' + esc(error.message || error) + '</div>';
       if (box) box.innerHTML = message;
       if (inboxStatus) inboxStatus.innerHTML = message;
@@ -180,17 +199,25 @@
   }
 
   async function loadInstagramInbox(force) {
+    var sessionKey = instagramSessionKey(), sessionVersion = igSessionVersion;
+    if (!sessionKey) return;
+    var request = ++igInboxRequest;
     var list = document.getElementById('igConversationList');
     if (!list) return;
     if (force) list.innerHTML = '<div class="empty" style="padding:30px"><div class="loader-spinner"></div></div>';
     var status = await loadStatus();
+    if (request !== igInboxRequest || !instagramReadCurrent(sessionVersion, sessionKey)) return;
     if (!status || !status.connected) { igConversations = []; renderInstagramConversations(); return; }
     try {
       var data = await invoke({ action: 'list' });
+      if (request !== igInboxRequest || !instagramReadCurrent(sessionVersion, sessionKey)) return;
       igConversations = data.conversations || [];
       renderInstagramConversations();
       updateBadge(data.unread_total || 0);
-    } catch (error) { list.innerHTML = '<div class="auth-error">⚠️ ' + esc(error.message || error) + '</div>'; }
+    } catch (error) {
+      if (request !== igInboxRequest || !instagramReadCurrent(sessionVersion, sessionKey)) return;
+      list.innerHTML = '<div class="auth-error">⚠️ ' + esc(error.message || error) + '</div>';
+    }
   }
 
   function renderInstagramConversations() {
@@ -352,10 +379,14 @@
     }, 45000);
     handleInstagramOAuthReturn();
     setTimeout(loadStatus, 1500);
-    if (supa.auth) supa.auth.onAuthStateChange(function (event) {
-      if (event !== 'SIGNED_OUT') return;
+    igAuthUserId = typeof currentUser !== 'undefined' && currentUser ? currentUser.id : null;
+    if (supa.auth) supa.auth.onAuthStateChange(function (event, session) {
+      var nextUserId = session && session.user ? session.user.id : null;
+      if (event !== 'SIGNED_OUT' && !(event === 'SIGNED_IN' && nextUserId !== igAuthUserId)) return;
+      igAuthUserId = nextUserId;
+      igSessionVersion++; igInboxRequest++; igStatusRequest++;
       igConversationRequest++; igActiveConversation = null; igConversations = []; igDrafts.clear();
-      ['igMessages', 'igConversationList', 'igChatHead'].forEach(function (id) { var item = document.getElementById(id); if (item) item.textContent = ''; });
+      ['igMessages', 'igConversationList', 'igChatHead', 'igInboxStatus', 'instagramConnectionStatus'].forEach(function (id) { var item = document.getElementById(id); if (item) item.textContent = ''; });
       var compose = document.getElementById('igCompose'), reply = document.getElementById('igReply');
       if (compose) compose.style.display = 'none';
       if (reply) reply.value = '';

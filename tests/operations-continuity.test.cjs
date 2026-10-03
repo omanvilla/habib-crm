@@ -4,10 +4,10 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const ops=fs.readFileSync('crm-operations-v6.js','utf8');
 const webhook=fs.readFileSync('supabase/functions/whatsapp-webhook/index.ts','utf8');
-function calendar(now){
+function calendar(now,company={created_at:'2026-05-06T15:00:00Z'}){
   class FixedDate extends Date { constructor(...args){super(...(args.length?args:[now]));} }
   const start=ops.indexOf('  const omanDate'),end=ops.indexOf('  async function renderPerformance');
-  return new Function('Date',ops.slice(start,end)+';return {period,targetScore};')(FixedDate);
+  return new Function('Date','currentCompany',ops.slice(start,end)+';return {period,targetScore};')(FixedDate,company);
 }
 function attribution(db,fetchMock){
   const begin=webhook.indexOf('function listingText'),end=webhook.indexOf('const BARKA_RE',begin);
@@ -63,4 +63,48 @@ test('Unique no-link mention is recorded; ambiguity queues review and alerts wit
 test('Review write failure is surfaced for webhook retry',async()=>{
   const q={upsert(){return Promise.resolve({error:{message:'database unavailable'}})}};
   await assert.rejects(attribution({from:()=>q}).queueListingReview({messageId:'msg',body:'عقار',clientId:'client',conversationId:'conv'}),/property_ai_review/);
+});
+
+test('Standing inventory goal is explicitly 10; other missing goals are excluded',()=>{
+ const {targetScore}=calendar('2026-09-30T09:00:00Z');
+ assert.match(targetScore({active_inventory:7,targets:{}},'month'),/70%.*1 من 5/);
+ assert.match(targetScore({active_inventory:1,inquiries:30,targets:{inquiries_target:30}},'month'),/55%.*2 من 5/);
+});
+test('Cross-month weekly score waits for approved target allocation',()=>{
+ const {targetScore}=calendar('2026-09-30T09:00:00Z');
+ assert.match(targetScore({active_inventory:10,targets:{inventory_target:10}},'week'),/يعبر شهرين/);
+ assert(!targetScore({active_inventory:10,targets:{inventory_target:10}},'week').includes('%'));
+});
+
+test('Lifetime starts at company inception and does not compare to monthly goals',()=>{
+ const {period,targetScore}=calendar('2026-10-01T10:00:00Z');
+ assert.deepEqual(period('all'),{from:'2026-05-06',to:'2026-10-02'});
+ assert.match(targetScore({active_inventory:12,targets:{inventory_target:10}},'all'),/إجمالي تاريخي/);
+ assert(!targetScore({},'all').includes('%'));
+});
+test('Own company commission goal participates only when its value is visible',()=>{
+ const score=calendar('2026-10-01T10:00:00Z').targetScore;
+ assert.match(score({active_inventory:10,company_commission:50,targets:{commission_target:100}},'month'),/75%.*2 من 5/);
+ assert.match(score({active_inventory:10,company_commission:null,targets:{commission_target:100}},'month'),/100%.*1 من 5/);
+});
+
+test('Target-month end is exclusive and does not lose the last day in Oman',()=>{
+ const html=fs.readFileSync('app-base-v15.html','utf8');
+ const fn=html.match(/function employeeTargetMonthEnd\(month\)\{([^\n]+)\}/)[1];
+ const end=new Function('month',fn);
+ assert.equal(end('2026-10-01'),'2026-11-01');
+ assert.equal(end('2024-02-01'),'2024-03-01');
+ assert.equal(end('2026-12-01'),'2027-01-01');
+});
+
+test('Acquisition requirement follows current shortage, not monthly additions',()=>{
+ const html=fs.readFileSync('app-base-v15.html','utf8');
+ const body=html.match(/function employeeInventoryDeficit\(active\)\{([^\n]+)\}/)[1],needed=new Function('active',body);
+ assert.equal(needed(7),3);assert.equal(needed(8),2);assert.equal(needed(10),0);assert.equal(needed(12),0);assert.equal(needed(9),1);
+ const score=calendar('2026-10-01T10:00:00Z').targetScore;
+ assert.match(score({active_inventory:7,new_properties:0,targets:{new_properties_target:999}},'month'),/70%.*1 من 5/);
+});
+test('Arabic date labels retain Western numerals',()=>{
+ const rendered=new Date('2026-10-01T10:25:00Z').toLocaleString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat'});
+ assert(!/[\u0660-\u0669\u06f0-\u06f9]/.test(rendered));assert(/[0-9]/.test(rendered));
 });
