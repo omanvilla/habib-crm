@@ -6,16 +6,16 @@ Updated 2026-10-11. Read this with `AGENTS.md` before work. This file distinguis
 
 | Surface | State |
 |---|---|
-| October 11 WhatsApp follow-up | In validation: correct unknown-geography WhatsApp branch fallback and a conservative audited repair; complete Clients-page pagination. See `docs/whatsapp-client-routing-20261011.md`. |
+| October 11 WhatsApp follow-up | Deployed and verified: receiving-line fallback replaces the unknown-geography Muscat default; 48 affected clients and 53 linked requests repaired with private before/after evidence; complete Clients-page pagination published. See `docs/whatsapp-client-routing-20261011.md`. |
 | October 11 visit update | Deployed and verified: inline client creation/selection in New Visit and automatic loading of all permitted client options. Frontend-only; no database migration. See `docs/visit-client-20261011.md`. |
 | October 3 release | Completed: matching database changes and frontend deployed. Ahmed's standing instruction now authorizes direct deployment after validation, followed by his live review. See `docs/release-20261003.md`. |
-| Production website | GitHub Pages from `main`; frontend `20261011-visit-client-v13`; published runtime `72553a7ac8128e99d41d86301840bdde3f19ae04` |
+| Production website | GitHub Pages from `main`; published runtime `e38bac4392a26b7d4cf660d6fc13d92316841142`, frontend `20261011-whatsapp-clients-v14` |
 | Validation branch | `codex/role-workflows-ui-preview-20260930`; October 11 candidate validated here, then fast-forwarded to `main` under the standing deployment authorization. Earlier [PR #1](https://github.com/omanvilla/habib-crm/pull/1) remains merged. |
-| Release validation | Candidate `72553a7ac8128e99d41d86301840bdde3f19ae04`: all four jobs passed in [run 38122533133](https://github.com/omanvilla/habib-crm/actions/runs/38122533133): Node/security, synthetic browser, attribution/performance SQL, deal/visit/rejection SQL |
-| Public deployment verification | [Pages run 38122660005](https://github.com/omanvilla/habib-crm/actions/runs/38122660005) succeeded; the three changed public runtime assets returned HTTP 200 and matched source bytes exactly |
-| Supabase | `dmsckqjkcnsfmnzfjczz`; coordinated workflow/reporting migration applied October 3; inbox v12 and webhook v33 retained; deployed separately from Pages |
+| Release validation | Runtime `e38bac4392a26b7d4cf660d6fc13d92316841142`: all four jobs passed in [run 38123904162](https://github.com/omanvilla/habib-crm/actions/runs/38123904162): `attribution-sql`, `synthetic-browser`, `workflows-sql`, `node-tests`. Local Node: 126 passed, 2 SQL-context skips; security harness: 26 passed. |
+| Public deployment verification | [Pages run 38124246664](https://github.com/omanvilla/habib-crm/actions/runs/38124246664) succeeded at runtime `e38bac4392a26b7d4cf660d6fc13d92316841142`; public `index.html` and `app-base-v15.html` returned HTTP 200 and matched source bytes exactly; version v14 verified. |
+| Supabase | `dmsckqjkcnsfmnzfjczz`; WhatsApp routing migration `20261011081328` / `whatsapp_branch_fallback_20261011` applied; webhook v34 ACTIVE and retrieved source matches the runtime commit byte-for-byte; inbox v12 retained; deployed separately from Pages |
 | Approved production business change | Classified property attribution to Hadeel/Muscat and Maram/Barka; standing inventory target 10, migration `approved_branch_employee_attribution_20261001` |
-| Deployed database changes | SQL12–16 under `db/changes/` applied atomically as migration `20261003050357`, named `crm_workflows_performance_primary_rejection_release_20261003`. Private backup captured 88 catalog and integrity entries; original deal/visit/rejection row fingerprints remained unchanged. |
+| Deployed database changes | SQL17 applied as migration `20261011081328`; audited backfill repaired 48 clients / 53 linked requests, with 48 private before/after snapshots and original identity, dates and business-field assertions passing. SQL12–16 remain deployed as migration `20261003050357`; their private backup captured 88 catalog/integrity entries and preserved original deal/visit/rejection fingerprints. |
 
 The October 2 conversation mentioned local Codex commit `d3c7481` on `work`. It was not found on GitHub and is not evidence of a production deployment. Inspect that local workspace if it becomes available; do not recreate or discard unseen local changes.
 
@@ -37,6 +37,8 @@ The October 2 conversation mentioned local Codex commit `d3c7481` on `work`. It 
 - Follow-ups remain disabled. No customer messages or production data deletion for tests.
 
 ## Deployed work and remaining verification
+
+The October 11 WhatsApp backend repair now uses the verified receiving line when request geography is unknown, preserves explicit customer geography and manual assignments, and prevents request summaries from reassigning a physical inbox. The reported contact and its request now belong to the receiving branch. Transaction-local authenticated SQL reads verified that Barka sees the target client, request and conversation, Muscat sees none of those three records, and the owner sees all three. The conservative backfill repaired 48 clients and 53 requests with private snapshots; assertions preserved original identities, creation dates and business fields. Security-advisor output is unchanged: the same five findings before and after, with no new warnings. These are live database-role checks, not actual employee browser sessions. The complete Clients-page pagination frontend is published and its changed public assets match the validated source bytes.
 
 The October 11 frontend update adds client creation/selection inside New Visit, preserving other form values, and loads all permitted client options automatically. The complete CI suite passed; synthetic owner/Muscat/Barka browser checks cover creation, duplicate-phone reuse (including Arabic digits), double submission, and subsequent visit payload. No database migration or production test record was needed. This does not replace the outstanding actual employee login walkthroughs.
 

@@ -17,6 +17,22 @@ When property geography was unknown, request geography/team triggers defaulted t
 
 ## Verification and release
 
-Prepared for isolated CI validation and coordinated backend/frontend deployment. Tests include real routing function execution with synthetic input, SQL routing/triggers/private privileges, read isolation, conservative backfill exclusions and a zero-change second run. The client-list regression uses more than 1000 synthetic rows, a failed later page and an account switch.
+Runtime commit `e38bac4392a26b7d4cf660d6fc13d92316841142`, frontend version `20261011-whatsapp-clients-v14`, was promoted to `main` after all four jobs passed in [CI run 38123904162](https://github.com/omanvilla/habib-crm/actions/runs/38123904162): `attribution-sql`, `synthetic-browser`, `workflows-sql` and `node-tests`. Local Node validation passed 126 tests with 2 SQL-context skips; the security harness passed 26 checks.
 
-No customer messages are sent, no automation is enabled and no real test client is created. Real employee UI-session verification remains separate from SQL role and synthetic browser evidence. Cases with explicit cross-branch requests are not automatically moved.
+The isolated tests execute routing functions with synthetic input and cover SQL routing/triggers/private privileges, read isolation, conservative backfill exclusions and a zero-change second run. The client-list regression uses more than 1000 synthetic rows, a failed later page and an account switch. SQL CI confirmed both the branch-fallback assertions and the safe-backfill/idempotency assertions passed.
+
+Production backend deployment and verification:
+
+- Migration `20261011081328`, named `whatsapp_branch_fallback_20261011`, applied successfully. This live migration version is distinct from the CLI-generated source filename timestamp `20261011080610`. The deployed `whatsapp-webhook` is version 34, ACTIVE; its retrieved source is byte-identical to the runtime commit.
+- The audited backfill repaired exactly 48 clients and 53 linked requests. The final private-audit check confirmed 48 complete before/after snapshots and preserved identities. Assertions confirmed original creation dates and request business fields were preserved. The final conversation check found zero unlinked conversations.
+- The reported contact and request now belong to Barka and its assigned employee. Transaction-local authenticated SQL reads verified client/request/conversation visibility as Barka: all visible; Muscat: all hidden; owner: all visible. This is live RLS evidence, not an actual employee browser login.
+- Security-advisor findings are unchanged: the same five findings before and after, with no new warnings.
+
+[Pages run 38124246664](https://github.com/omanvilla/habib-crm/actions/runs/38124246664) succeeded for the runtime commit. Public GET requests for `index.html` and `app-base-v15.html` returned HTTP 200, and both files matched the validated source bytes exactly. The public index identifies version `20261011-whatsapp-clients-v14`.
+
+| Public asset | Verified SHA-256 |
+|---|---|
+| `index.html` | `bd478332ca0551dfde59ab848c92b5516ba8e64681ab59018e6123f1f1f85420` |
+| `app-base-v15.html` | `b7e17ffdf0efcda77100115d8c9d3b8a3cfc2296d7edb3c92a21cb106c1cf5c5` |
+
+No customer messages were sent, no automation was enabled and no real test client was created. Real employee UI-session verification remains separate from SQL role and synthetic browser evidence. Cases with explicit cross-branch requests were not automatically moved. Ahmed explicitly confirmed the preceding New Visit change worked before reporting this issue.
