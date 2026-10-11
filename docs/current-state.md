@@ -6,12 +6,12 @@ Updated 2026-10-11. Read this with `AGENTS.md` before work. This file distinguis
 
 | Surface | State |
 |---|---|
-| October 11 visit update | Prepared for validation: inline client creation/selection in New Visit and automatic loading of all permitted client options. Frontend-only; no database migration. See `docs/visit-client-20261011.md`. |
+| October 11 visit update | Deployed and verified: inline client creation/selection in New Visit and automatic loading of all permitted client options. Frontend-only; no database migration. See `docs/visit-client-20261011.md`. |
 | October 3 release | Completed: matching database changes and frontend deployed. Ahmed's standing instruction now authorizes direct deployment after validation, followed by his live review. See `docs/release-20261003.md`. |
-| Production website | GitHub Pages from `main`; frontend `20261003-workflows-v12`; published runtime `ac1ea307ec761f4b8ad2e741beba4c4f9905905d` |
-| Merged workflow branch | `codex/role-workflows-ui-preview-20260930`; [PR #1](https://github.com/omanvilla/habib-crm/pull/1) merged into `main`. The former preview is now deployed. |
-| Release validation | Candidate `c5e53dae0b16a5c36c6573d904a58987f2b13d1e`: all four jobs passed in [run 37098440454](https://github.com/omanvilla/habib-crm/actions/runs/37098440454): Node/security, synthetic browser, attribution/performance SQL, deal/visit/rejection SQL |
-| Public deployment verification | [Pages run 37098663141](https://github.com/omanvilla/habib-crm/actions/runs/37098663141) succeeded; 17 public assets returned HTTP 200 and matched source bytes exactly |
+| Production website | GitHub Pages from `main`; frontend `20261011-visit-client-v13`; published runtime `72553a7ac8128e99d41d86301840bdde3f19ae04` |
+| Validation branch | `codex/role-workflows-ui-preview-20260930`; October 11 candidate validated here, then fast-forwarded to `main` under the standing deployment authorization. Earlier [PR #1](https://github.com/omanvilla/habib-crm/pull/1) remains merged. |
+| Release validation | Candidate `72553a7ac8128e99d41d86301840bdde3f19ae04`: all four jobs passed in [run 38122533133](https://github.com/omanvilla/habib-crm/actions/runs/38122533133): Node/security, synthetic browser, attribution/performance SQL, deal/visit/rejection SQL |
+| Public deployment verification | [Pages run 38122660005](https://github.com/omanvilla/habib-crm/actions/runs/38122660005) succeeded; the three changed public runtime assets returned HTTP 200 and matched source bytes exactly |
 | Supabase | `dmsckqjkcnsfmnzfjczz`; coordinated workflow/reporting migration applied October 3; inbox v12 and webhook v33 retained; deployed separately from Pages |
 | Approved production business change | Classified property attribution to Hadeel/Muscat and Maram/Barka; standing inventory target 10, migration `approved_branch_employee_attribution_20261001` |
 | Deployed database changes | SQL12–16 under `db/changes/` applied atomically as migration `20261003050357`, named `crm_workflows_performance_primary_rejection_release_20261003`. Private backup captured 88 catalog and integrity entries; original deal/visit/rejection row fingerprints remained unchanged. |
@@ -35,6 +35,8 @@ The October 2 conversation mentioned local Codex commit `d3c7481` on `work`. It 
 - Follow-ups remain disabled. No customer messages or production data deletion for tests.
 
 ## Deployed work and remaining verification
+
+The October 11 frontend update adds client creation/selection inside New Visit, preserving other form values, and loads all permitted client options automatically. The complete CI suite passed; synthetic owner/Muscat/Barka browser checks cover creation, duplicate-phone reuse (including Arabic digits), double submission, and subsequent visit payload. No database migration or production test record was needed. This does not replace the outstanding actual employee login walkthroughs.
 
 The October 3 release includes the simplified dashboard/property/client screens, inventory shortage reminder, period/lifetime performance presentation, Western date numerals, session guards, performance-response and export-session regressions, and integration hardening. See `docs/release-20261003.md` for current deployment evidence; `docs/audit-20261002.md` records the earlier audit scope.
 
