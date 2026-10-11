@@ -29,6 +29,17 @@ async function verifyPropertyActions(page,role,report){
  assert.deepEqual(result.visits,original.visits);assert.deepEqual(result.deals,original.deals);
  report.checks.push(role+': rendered edit/archive/restore buttons; injected archive failure preserves record; confirmed archive/restore preserves business status, dates and related synthetic records');
 }
+async function waitForInlineClientSelection(page,role,message){
+ try{
+  await page.waitForFunction(expected=>document.querySelector('#vNewClientBox').hidden&&document.querySelector('#vNewClientStatus').textContent.includes(expected),message);
+ }catch(error){
+  const state=await page.evaluate(()=>({status:document.querySelector('#vNewClientStatus')?.textContent,
+   panelHidden:document.querySelector('#vNewClientBox')?.hidden,selectedClient:document.querySelector('#vClient')?.value,
+   phoneCountry:document.querySelector('#vNewClientPhoneCountry')?.value,phoneLocal:document.querySelector('#vNewClientPhoneLocal')?.value,
+   recentCalls:CRMPREVIEW.calls.slice(-6).map(call=>({table:call.table,operation:call.operation,rpc:call.rpc}))}));
+  throw new Error(role+' inline-client selection failed: '+JSON.stringify(state)+'\n'+error.message);
+ }
+}
 async function verifyVisitWorkflow(page,role,report){
  await page.evaluate(()=>navigate('viewings',null));
  // More than the old 50-row limit in BOTH branches; no manual load-more action.
@@ -70,10 +81,10 @@ async function verifyVisitWorkflow(page,role,report){
  const clientCountBefore=await page.evaluate(()=>CRMPREVIEW.db.clients.length);
  await page.locator('#vNewClientToggle').click();
  await page.locator('#vNewClientName').fill('عميل جديد من الزيارة '+role);
- await page.locator('#vNewClientPhoneLocal').fill('00000981');
+ await page.locator('#vNewClientPhoneLocal').fill('90000981');
  // Two rendered click events in one task must result in one contact insert.
  await page.locator('#vNewClientBox button').evaluate(button=>{button.click();button.click();});
- await page.waitForFunction(()=>document.querySelector('#vNewClientBox').hidden&&document.querySelector('#vNewClientStatus').textContent.includes('تم حفظ العميل'));
+ await waitForInlineClientSelection(page,role,'تم حفظ العميل');
  const addedClient=await page.locator('#vClient').inputValue();
  assert(addedClient&&addedClient!==chosen.client);
  assert.equal(await page.evaluate(()=>CRMPREVIEW.db.clients.length),clientCountBefore+1);
@@ -87,9 +98,9 @@ async function verifyVisitWorkflow(page,role,report){
  // The same local phone resolves the accessible saved client, without a second record.
  await page.locator('#vNewClientToggle').click();
  await page.locator('#vNewClientName').fill('اسم مختلف لنفس رقم الاختبار');
- await page.locator('#vNewClientPhoneLocal').fill('00000981');
+ await page.locator('#vNewClientPhoneLocal').fill('٩٠٠٠٠٩٨١');
  await page.locator('#vNewClientBox button').click();
- await page.waitForFunction(()=>document.querySelector('#vNewClientBox').hidden&&document.querySelector('#vNewClientStatus').textContent.includes('دون تكراره'));
+ await waitForInlineClientSelection(page,role,'دون تكراره');
  assert.equal(await page.locator('#vClient').inputValue(),addedClient);
  assert.equal(await page.evaluate(()=>CRMPREVIEW.db.clients.length),clientCountBefore+1);
  chosen.client=addedClient;
