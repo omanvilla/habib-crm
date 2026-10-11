@@ -31,7 +31,25 @@ async function verifyPropertyActions(page,role,report){
 }
 async function verifyVisitWorkflow(page,role,report){
  await page.evaluate(()=>navigate('viewings',null));
+ // More than the old 50-row limit in BOTH branches; no manual load-more action.
+ const expectedClients=await page.evaluate(()=>{
+  for(const branch of ['muscat','barka']){
+   const model=CRMPREVIEW.db.clients.find(c=>c.lead_route===branch);
+   for(let i=0;i<65;i++){
+    const phone='+96800'+(branch==='muscat'?'1':'2')+String(i).padStart(5,'0');
+    CRMPREVIEW.db.clients.push({...model,id:'TEST-visit-client-'+branch+'-'+i,name:'عميل اختبار القائمة '+branch+' '+i,phone,phone_normalized:phone,next_followup:null});
+   }
+  }
+  return CRMPREVIEW.db.clients.filter(c=>!c.archived&&(CRMPREVIEW.actor==='owner'||c.lead_route===CRMPREVIEW.actor)).length;
+ });
  await page.locator('#page-viewings button[onclick*="mViewing"]').click();await page.locator('#mViewing.on').waitFor();
+ await page.waitForFunction(count=>Array.from(document.querySelector('#vClient').options).filter(o=>o.value).length===count,expectedClients);
+ assert.equal(await page.locator('#vClientMore').isVisible(),false);
+ if(role!=='owner'){
+  const visibleIds=await page.locator('#vClient option').evaluateAll(options=>options.map(o=>o.value).filter(Boolean));
+  const foreignIds=await page.evaluate(()=>CRMPREVIEW.db.clients.filter(c=>c.lead_route!==CRMPREVIEW.actor).map(c=>c.id));
+  assert(!visibleIds.some(id=>foreignIds.includes(id)),'Complete loading must keep the current fixture branch scope');
+ }
  const chosen=await page.evaluate(()=>{
   const branch=CRMPREVIEW.actor==='barka'?'barka':'muscat';
   return {client:CRMPREVIEW.db.clients.find(c=>c.lead_route===branch&&c.client_type==='buyer').id,property:CRMPREVIEW.db.properties.find(p=>p.branch_key===branch).id};
@@ -49,6 +67,32 @@ async function verifyVisitWorkflow(page,role,report){
  await page.locator('#vNextStep').fill('تأكيد رغبة العميل في المتابعة');
  const date=await page.locator('#vDate').inputValue();await page.locator('#vFollowupDate').fill(date);
  await page.locator('#vNotes').fill('زيارة اصطناعية لا تتصل بالإنتاج');
+ const clientCountBefore=await page.evaluate(()=>CRMPREVIEW.db.clients.length);
+ await page.locator('#vNewClientToggle').click();
+ await page.locator('#vNewClientName').fill('عميل جديد من الزيارة '+role);
+ await page.locator('#vNewClientPhoneLocal').fill('00000981');
+ // Two rendered click events in one task must result in one contact insert.
+ await page.locator('#vNewClientBox button').evaluate(button=>{button.click();button.click();});
+ await page.waitForFunction(()=>document.querySelector('#vNewClientBox').hidden&&document.querySelector('#vNewClientStatus').textContent.includes('تم حفظ العميل'));
+ const addedClient=await page.locator('#vClient').inputValue();
+ assert(addedClient&&addedClient!==chosen.client);
+ assert.equal(await page.evaluate(()=>CRMPREVIEW.db.clients.length),clientCountBefore+1);
+ assert.equal(await page.locator('#vProperty').inputValue(),chosen.property);
+ assert.equal(await page.locator('#vDate').inputValue(),date);
+ assert.equal(await page.locator('#vTime').inputValue(),'11:45');
+ assert.equal(await page.locator('#vAttendance').inputValue(),'client_alone');
+ assert.equal(await page.locator('#vFollowupDate').inputValue(),date);
+ assert.equal(await page.locator('#vNextStep').inputValue(),'تأكيد رغبة العميل في المتابعة');
+ assert.equal(await page.locator('#vNotes').inputValue(),'زيارة اصطناعية لا تتصل بالإنتاج');
+ // The same local phone resolves the accessible saved client, without a second record.
+ await page.locator('#vNewClientToggle').click();
+ await page.locator('#vNewClientName').fill('اسم مختلف لنفس رقم الاختبار');
+ await page.locator('#vNewClientPhoneLocal').fill('00000981');
+ await page.locator('#vNewClientBox button').click();
+ await page.waitForFunction(()=>document.querySelector('#vNewClientBox').hidden&&document.querySelector('#vNewClientStatus').textContent.includes('دون تكراره'));
+ assert.equal(await page.locator('#vClient').inputValue(),addedClient);
+ assert.equal(await page.evaluate(()=>CRMPREVIEW.db.clients.length),clientCountBefore+1);
+ chosen.client=addedClient;
  const before=await page.evaluate(()=>({db:JSON.stringify(CRMPREVIEW.db),calls:CRMPREVIEW.calls.length}));
  await page.evaluate(()=>CRMPREVIEW.failNext='crm_save_viewing_atomic');
  await page.locator('#mViewing .modal-foot button').filter({hasText:'حفظ'}).click();
@@ -71,7 +115,7 @@ async function verifyVisitWorkflow(page,role,report){
  assert.equal(lossPayload.rejection_reason,'price');assert.equal(lossPayload.outcome_note,null);
  const screen='after-'+role+'-visit-auto-request.png';await page.screenshot({path:path.join(out,screen),fullPage:true});report.screens.push(screen);
  await page.locator('#mViewing .modal-foot button').filter({hasText:'إلغاء'}).click();
- report.checks.push(role+': rendered visit submits an automatic request and omits detailed location; keeps attendance, follow-up and next action; lost outcome accepts a primary reason without customer words; rejected synthetic RPC retains form/data (backend creation tested separately)');
+ report.checks.push(role+': complete branch-scoped client options load automatically beyond50; inline contact create/select preserves visit fields, double click and normalized-phone reuse do not duplicate; rendered visit submits selected new client with automatic request and omits detailed location; keeps attendance, follow-up and next action; lost outcome accepts a primary reason without customer words; rejected synthetic RPC retains form/data (backend creation tested separately)');
 }
 async function verifyDealWorkflow(page,role,report){
  await page.evaluate(()=>navigate('deals',null));

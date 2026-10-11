@@ -1,11 +1,12 @@
 # Habib CRM — current state
 
-Updated 2026-10-03. Read this with `AGENTS.md` before work. This file distinguishes deployed changes, direct verification and remaining work. Older dated reports remain evidence, not competing product rules.
+Updated 2026-10-11. Read this with `AGENTS.md` before work. This file distinguishes deployed changes, direct verification and remaining work. Older dated reports remain evidence, not competing product rules.
 
 ## Where the work is
 
 | Surface | State |
 |---|---|
+| October 11 visit update | Prepared for validation: inline client creation/selection in New Visit and automatic loading of all permitted client options. Frontend-only; no database migration. See `docs/visit-client-20261011.md`. |
 | October 3 release | Completed: matching database changes and frontend deployed. Ahmed's standing instruction now authorizes direct deployment after validation, followed by his live review. See `docs/release-20261003.md`. |
 | Production website | GitHub Pages from `main`; frontend `20261003-workflows-v12`; published runtime `ac1ea307ec761f4b8ad2e741beba4c4f9905905d` |
 | Merged workflow branch | `codex/role-workflows-ui-preview-20260930`; [PR #1](https://github.com/omanvilla/habib-crm/pull/1) merged into `main`. The former preview is now deployed. |
@@ -27,6 +28,7 @@ The October 2 conversation mentioned local Codex commit `d3c7481` on `work`. It 
 - Owner must see company commission by employee. Employee commission is an owner-selected percentage per deal of company commission, never sale price. The deployed deal workflow supports an explicit per-deal percentage without retroactively recalculating historical amounts; actual employee UI-use verification remains outstanding.
 - Latest October 2 request: one-screen deal entry with inline client/property/owner; historical 2020/2022 sales may omit an unknown visit. New completed sales require an actual visit and a collection date when commission is received. Record-creation timestamps remain audit evidence, separate from sale dates. A refusal has one primary reason plus optional customer words.
 - A new visit resolves or creates its property request atomically; manual request choice is optional. Remove the detailed meeting-address field while preserving stored historical values. Preserve date/time, status, attendance, next action and automatic follow-up task behavior.
+- October 11: create/select a client directly in New Visit by name and phone without leaving or resetting the form. Contact save is explicit and separate from visit save. Automatically load all accessible unarchived client choices instead of requiring manual batches of 50; preserve branch and session boundaries.
 - Keep property edit/archive/restore actions usable and reversible. Ahmed will send a reference for the new property layout; that design is still pending.
 - CRM read state is separate from phone WhatsApp. A visit creates interest but does not fabricate an inbound inquiry.
 - Generated UI numbers use 0–9 with Arabic text. Keep source content unchanged.

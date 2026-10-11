@@ -21,7 +21,7 @@ const clients=[
 {id:uuid(102),name:'عميلة بطلبين مستقلين',phone:'+96800000002',assigned_to:muscat,lead_route:'muscat',client_type:'buyer',is_buyer:true,lead_temperature:'hot',status:'hot',preferred_area:'الموالح',budget_max:130000,human_contact_at:now},
 {id:uuid(103),name:'عميل متابعة بركاء',phone:'+96800000003',assigned_to:barka,lead_route:'barka',client_type:'buyer',is_buyer:true,lead_temperature:'warm',status:'warm',preferred_area:'الصومحان',budget_max:68000,next_followup:relative(0),human_contact_at:now},
 {id:uuid(104),name:'بائعة بركاء التجريبية',phone:'+96800000004',assigned_to:barka,lead_route:'barka',client_type:'seller',is_seller:true,lead_temperature:'cold',status:'cold',preferred_area:'حي عاصم',human_contact_at:null}
-].map((c,i)=>({...c,company_id:company,archived:false,followup_suppressed:false,created_at:relative(-i-2)+'T08:00:00Z',lead_score:i===1?80:40,notes:'بيانات اصطناعية؛ لا يوجد عميل حقيقي'}));
+].map((c,i)=>({...c,phone_normalized:c.phone,company_id:company,archived:false,followup_suppressed:false,created_at:relative(-i-2)+'T08:00:00Z',lead_score:i===1?80:40,notes:'بيانات اصطناعية؛ لا يوجد عميل حقيقي'}));
 const requests=[
 {id:uuid(201),client_id:uuid(101),assigned_to:muscat,branch_key:'muscat',route_key:'muscat',request_type:'buyer',preferred_area:'الخوض',budget_min:70000,budget_max:95000,next_followup:relative(-2),pipeline_stage:'qualified',qualified_at:now},
 {id:uuid(202),client_id:uuid(102),assigned_to:muscat,branch_key:'muscat',route_key:'muscat',request_type:'buyer',preferred_area:'الموالح',budget_min:100000,budget_max:130000,next_followup:relative(0),pipeline_stage:'negotiation'},
@@ -121,6 +121,10 @@ function query(name){
     for(const value of values){
      const record={id:value.id||uuid(next++),company_id:company,created_at:now,updated_at:now,archived:false,...value};
      if(table==='clients'&&!record.lead_route)record.lead_route=actor==='barka'?'barka':'muscat';
+     if(table==='clients'&&record.phone){
+      record.phone_normalized='+'+String(record.phone).replace(/\D/g,'');
+      if(source.some(r=>r.company_id===record.company_id&&r.phone_normalized===record.phone_normalized))return {data:null,error:{code:'23505',message:'TEST duplicate normalized phone'}};
+     }
      if(table==='client_requests'&&!record.branch_key)record.branch_key=actor==='barka'?'barka':'muscat';
      if(table==='properties'&&!record.branch_key)record.branch_key=record.wilayat==='بركاء'?'barka':'muscat';
      if(!allowed(record,table))return {data:null,error:{message:'TEST fixture scope denial'}};

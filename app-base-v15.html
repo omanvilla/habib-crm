@@ -1125,7 +1125,7 @@ window.fbAsyncInit = function(){
 <div class="modal-ov" id="mViewing"><div class="modal-box lg">
 <div class="modal-title" id="mViewingTitle">👁 زيارة جديدة</div>
 <div class="fgrid">
-<div class="fg"><label class="fl" for="vClientSearch">العميل *</label><input class="fi" id="vClientSearch" placeholder="ابحث بالاسم أو الهاتف" oninput="scheduleViewingSearch('client')"><select class="fs" id="vClient" required onchange="loadViewingClientProperty()"><option value="">اختر عميلاً</option></select><div id="vClientCount" role="status" style="font-size:11px"></div><button type="button" class="btn-secondary" id="vClientMore" onclick="loadViewingChoices('client',true)" style="display:none">تحميل المزيد</button></div>
+<div class="fg"><label class="fl" for="vClientSearch">العميل *</label><input class="fi" id="vClientSearch" placeholder="ابحث بالاسم أو الهاتف" oninput="scheduleViewingSearch('client')"><select class="fs" id="vClient" required onchange="loadViewingClientProperty()"><option value="">اختر عميلاً</option></select><div id="vClientCount" role="status" style="font-size:11px"></div><button type="button" class="btn-secondary" id="vClientMore" onclick="loadViewingChoices('client',false)" style="display:none">إعادة المحاولة</button><button type="button" class="btn-secondary" id="vNewClientToggle" onclick="toggleViewingNewClient()" aria-expanded="false" aria-controls="vNewClientBox" style="margin-top:8px">+ عميل جديد</button><div id="vNewClientBox" hidden></div><div id="vNewClientStatus" role="status" style="font-size:12px;line-height:1.7;margin-top:6px"></div></div>
 <div class="fg"><label class="fl" for="vRequestType">نوع الطلب</label><select class="fs" id="vRequestType"><option value="buyer">شراء</option><option value="tenant">إيجار</option><option value="investor">استثمار</option></select><select id="vRequest" hidden aria-hidden="true"><option value=""></option></select><div id="vRequestHint" role="status" style="font-size:11px">سيُربط الطلب المناسب أو يُنشأ طلب للعقار تلقائياً عند حفظ الزيارة.</div></div>
 <div class="fg"><label class="fl" for="vPropertySearch">العقار *</label><input class="fi" id="vPropertySearch" placeholder="ابحث بعنوان العقار أو المنطقة" oninput="scheduleViewingSearch('property')"><select class="fs" id="vProperty" required><option value="">اختر عقاراً</option></select><div id="vPropertyCount" role="status" style="font-size:11px"></div><button type="button" class="btn-secondary" id="vPropertyMore" onclick="loadViewingChoices('property',true)" style="display:none">تحميل المزيد</button></div>
 <div class="fg"><label class="fl">التاريخ *</label><input class="fi" type="date" id="vDate" required></div>
@@ -2192,6 +2192,7 @@ let clientWorkRequests=[];
 function crmSessionCurrent(generation,userId){return generation===crmSessionGeneration&&currentUser&&currentUser.id===userId;}
 function clearSessionUI(){
  crmSessionGeneration++;dashboardLoadSeq++;
+ if(typeof resetViewingNewClient==='function')resetViewingNewClient();
  currentUser=null;currentProfile=null;currentCompany=null;
  window.employeeInventoryState=null;clientWorkRequests=[];viewingClient=null;window.viewingProperty=null;allViewings=[];
  window.dashboardWorkSnapshot=null;window.dashboardClientFilters=null;window.dashboardContactQueue=[];
@@ -4633,22 +4634,24 @@ function crmViewingSearchFilter(kind,value){
 }
 async function loadViewingChoices(kind,append,selectedId){
   const st=viewingChoiceState[kind],token=++st.token,generation=viewingFormGeneration,isClient=kind==='client',prefix=isClient?'vClient':'vProperty',select=$(prefix),status=$(prefix+'Count'),more=$(prefix+'More');
-  const selected=selectedId||select.value,query=$(prefix+'Search').value.trim().slice(0,80),offset=append?st.offset:0;
-  if(!append){st.offset=0;st.rows=[];}status.textContent='جاري البحث…';more.disabled=true;
+  const sessionGeneration=crmSessionGeneration,sessionUser=currentUser&&currentUser.id,current=()=>token===st.token&&generation===viewingFormGeneration&&crmSessionCurrent(sessionGeneration,sessionUser);
+  const selected=selectedId||select.value,query=$(prefix+'Search').value.trim().slice(0,80),offset=!isClient&&append?st.offset:0;
+  if(!append||isClient){st.offset=0;st.rows=[];}status.textContent=isClient?'جاري تحميل العملاء…':'جاري البحث…';more.disabled=true;
   try{
-    let q=supa.from(isClient?'clients':'properties').select(isClient?'id,name,phone':'id,title,area,status',{count:'exact'}).neq('archived',true);
-    if(query)q=q.or(crmViewingSearchFilter(kind,query));
-    const r=await q.order(isClient?'name':'title').order('id').range(offset,offset+49);if(r.error)throw r.error;
-    if(token!==st.token||generation!==viewingFormGeneration)return;
-    let rows=append?st.rows.concat(r.data||[]):(r.data||[]);st.offset=offset+(r.data||[]).length;
-    if(selected&&!rows.some(x=>x.id===selected)){const one=await supa.from(isClient?'clients':'properties').select(isClient?'id,name,phone':'id,title,area,status').eq('id',selected).single();if(one.error)throw one.error;if(token!==st.token||generation!==viewingFormGeneration)return;rows=[one.data,...rows];}
+    const buildQuery=()=>{if(!current())throw new Error('تغيّرت جلسة الزيارة');let q=supa.from(isClient?'clients':'properties').select(isClient?'id,name,phone':'id,title,area,status',{count:'exact'}).neq('archived',true);if(query)q=q.or(crmViewingSearchFilter(kind,query));return q.order(isClient?'name':'title').order('id');};
+    // Load every permitted client automatically, including when the API caps each response.
+    const r=isClient?{data:await crmReadAll(buildQuery)}:await buildQuery().range(offset,offset+49);if(r.error)throw r.error;if(isClient)r.count=r.data.length;
+    if(!current())return;
+    let rows=!isClient&&append?st.rows.concat(r.data||[]):(r.data||[]);st.offset=offset+(r.data||[]).length;
+    if(selected&&!rows.some(x=>x.id===selected)){const one=await supa.from(isClient?'clients':'properties').select(isClient?'id,name,phone':'id,title,area,status').eq('id',selected).single();if(one.error)throw one.error;if(!current())return;rows=[one.data,...rows];}
     st.rows=[...new Map(rows.map(x=>[x.id,x])).values()];select.innerHTML='<option value="">'+(isClient?'اختر عميلاً':'اختر عقاراً')+'</option>'+st.rows.map(x=>'<option value="'+x.id+'">'+escapeHtml(isClient?x.name+(x.phone?' — '+x.phone:''):x.title+(x.status==='sold'?' (مباع)':x.status==='reserved'?' (محجوز)':''))+'</option>').join('');
-    if(selected)select.value=selected;status.textContent='تم تحميل '+st.offset+' من '+(r.count==null?'النتائج':r.count)+(query?' المطابقة':'');more.style.display=r.count!=null?st.offset<r.count?'':'none':(r.data||[]).length===50?'':'none';
-  }catch(e){if(token===st.token&&generation===viewingFormGeneration){status.textContent='تعذر تحميل القائمة: '+e.message;more.style.display='';more.textContent='إعادة المحاولة';}}
-  finally{if(token===st.token){more.disabled=false;if(!status.textContent.startsWith('تعذر'))more.textContent='تحميل المزيد';}}
+    if(selected)select.value=selected;status.textContent=isClient?'تم تحميل جميع العملاء'+(query?' المطابقين':'')+' ('+st.offset+')':'تم تحميل '+st.offset+' من '+(r.count==null?'النتائج':r.count)+(query?' المطابقة':'');more.style.display=isClient?'none':r.count!=null?st.offset<r.count?'':'none':(r.data||[]).length===50?'':'none';
+  }catch(e){if(current()){status.textContent='تعذر تحميل القائمة: '+e.message;more.style.display='';more.textContent='إعادة المحاولة';}}
+  finally{if(current()){more.disabled=false;if(!status.textContent.startsWith('تعذر'))more.textContent=isClient?'إعادة المحاولة':'تحميل المزيد';}}
 }
 async function populateViewingForm(viewing){
   const generation=++viewingFormGeneration;viewingFormOriginal=viewing||null;crmSaveAttempts.delete('mViewing');
+  if(typeof resetViewingNewClient==='function')resetViewingNewClient();if($('vNewClientToggle')){$('vNewClientToggle').hidden=!!viewing||!canEdit();$('vNewClientToggle').disabled=!!viewing;}
   ['vClientSearch','vPropertySearch'].forEach(id=>{$(id).value='';$(id).disabled=!!viewing;});$('vClient').disabled=!!viewing;$('vProperty').disabled=!!viewing;
   $('vClient').value='';$('vProperty').value='';$('vRequest').innerHTML='<option value="">اختر العميل أولاً</option>';$('vRequestHint').textContent='سيُربط الطلب المناسب أو يُنشأ طلب للعقار تلقائياً عند حفظ الزيارة.';$('vRequestType').value='buyer';$('vRequestType').disabled=!!(viewing&&viewing.request_id);
   const members=[{id:currentUser.id,full_name:currentProfile.full_name||'أنا'},...(allMembers||[]).filter(m=>m.id!==currentUser.id&&m.is_active!==false)];
@@ -4674,6 +4677,7 @@ async function loadViewingClientProperty(selectedRequest){
   }catch(e){if(generation===viewingRequestGeneration){$('vRequestHint').textContent='تعذر تحميل الطلب المرتبط؛ أعد فتح الزيارة قبل الحفظ.';showToast('تعذر تحميل الطلب: '+e.message,'error');}}
 }
 function clearViewingForm(){
+  if(typeof resetViewingNewClient==='function')resetViewingNewClient();
   ['vClient','vRequest','vProperty','vClientSearch','vPropertySearch','vDate','vTime','vDuration','vAttendance','vFeedback','vRejectionReason','vPipelineOutcome','vOutcomeNote','vNextStep','vFollowupDate','vNotes'].forEach(id=>{if($(id))$(id).value='';});
   $('vStatus').value='scheduled';$('vAgent').value='';$('vRequestType').value='buyer';$('vRequestType').disabled=false;$('mViewingTitle').textContent='زيارة جديدة';viewingFormOriginal=null;viewingRequestGeneration++;updateViewingOutcomeFields();
 }
