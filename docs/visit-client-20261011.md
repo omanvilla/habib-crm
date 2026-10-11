@@ -24,4 +24,4 @@ Release status: deployed October 11. Runtime commit `72553a7ac8128e99d41d8630184
 | `app-base-v15.html` | 738600 | `7635d0de113411943d8c6755b945298e85513ba62e9386f194f683a3d5c56a50` |
 | `crm-visit-client.js` | 6723 | `bc57baf7058e1af2eda827074c1a0041b7f9dee16ca7c078ed69af6228d60959` |
 
-Previous production release evidence remains in `release-20261003.md`. Ahmed's live review is pending; silence is not acceptance.
+Previous production release evidence remains in `release-20261003.md`. Ahmed explicitly confirmed this change worked on October 11, then reported a separate WhatsApp client-visibility issue documented in `whatsapp-client-routing-20261011.md`.

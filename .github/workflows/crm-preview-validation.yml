@@ -118,3 +118,9 @@ jobs:
           psql -d crm_rejection_test -v ON_ERROR_STOP=1 -f db/changes/14-deal-workflow.forward.sql
           psql -d crm_rejection_test -v ON_ERROR_STOP=1 -f db/changes/15-primary-rejection-consistency.forward.sql
           psql -d crm_rejection_test -v ON_ERROR_STOP=1 -f tests/fixtures/rejection-consistency-assert.sql
+      - name: Test WhatsApp receiving-branch fallback without real contacts
+        run: |
+          createdb crm_whatsapp_branch_test
+          psql -d crm_whatsapp_branch_test -v ON_ERROR_STOP=1 -f tests/fixtures/whatsapp-branch-fallback.sql
+          psql -d crm_whatsapp_branch_test -v ON_ERROR_STOP=1 -f db/changes/17-whatsapp-branch-fallback.forward.sql
+          psql -d crm_whatsapp_branch_test -v ON_ERROR_STOP=1 -f tests/fixtures/whatsapp-branch-fallback-assert.sql

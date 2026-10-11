@@ -1160,31 +1160,27 @@ async function postProcessLinkedRequests(args: { clientId: string; conversationI
   const links = await supabase.from("whatsapp_message_requests").select("request_id").eq("company_id", CRM_COMPANY_ID).eq("message_id", args.messageId);
   if (links.error) throw new Error(`request links: ${links.error.message}`);
   const requestIds = [...new Set((links.data || []).map((x: any) => String(x.request_id)).filter(Boolean))]; if (!requestIds.length) return;
-  const rr = await supabase.from("client_requests").select("id,client_id,request_type,property_type,property_types,preferred_area,preferred_areas,alternative_areas,wilayat,budget_min,budget_max,payment_method,purchase_timing,bedrooms_min,status,branch_key,route_key,assigned_to,missing_required_fields,last_requirements_prompt_fields,last_requirements_prompt_at,requirements_prompt_count,requirements_completed_at").in("id", requestIds).eq("company_id", CRM_COMPANY_ID);
+  const rr = await supabase.from("client_requests").select("id,client_id,request_type,property_type,property_types,preferred_area,preferred_areas,alternative_areas,wilayat,budget_min,budget_max,payment_method,purchase_timing,bedrooms_min,status,branch_key,route_key,assigned_to,manual_assigned_to,missing_required_fields,last_requirements_prompt_fields,last_requirements_prompt_at,requirements_prompt_count,requirements_completed_at").in("id", requestIds).eq("company_id", CRM_COMPANY_ID);
   if (rr.error) throw new Error(`postprocess requests: ${rr.error.message}`);
   const assignments = await routeAssignments();
   for (const r of rr.data || []) {
     if (!['active','paused'].includes(String(r.status))) continue;
-    const branch = args.physicalRoute === "investment" ? "investment" : (inferBranch(r) || "muscat");
-    const assignee = assignments[branch] || (branch !== "investment" ? assignments.muscat : null) || r.assigned_to || null;
+    const physicalBranch = ["muscat", "barka", "investment"].includes(args.physicalRoute) ? args.physicalRoute : null;
+    const existingBranch = [r.branch_key, r.route_key].find((value: any) => ["muscat", "barka", "investment"].includes(String(value))) || null;
+    // Missing requirements do not transfer a Barka contact to Muscat. Explicit
+    // geography remains authoritative; otherwise retain the receiving branch.
+    const branch = physicalBranch === "investment" || existingBranch === "investment" ? "investment" : (inferBranch(r) || physicalBranch || existingBranch || "general");
+    const assignee = r.manual_assigned_to || assignments[branch] || (existingBranch === branch ? r.assigned_to : null) || null;
     const missing = requestMissingFields(r);
     const patch: any = { branch_key: branch, assigned_to: assignee, missing_required_fields: missing, updated_at: new Date().toISOString() };
     if (missing.length) patch.requirements_completed_at = null; else if (!r.requirements_completed_at) patch.requirements_completed_at = new Date().toISOString();
-    await supabase.from("client_requests").update(patch).eq("id", r.id).eq("company_id", CRM_COMPANY_ID);
+    const saved = await supabase.from("client_requests").update(patch).eq("id", r.id).eq("company_id", CRM_COMPANY_ID).select("id").single();
+    if (saved.error || !saved.data?.id) throw new Error(`postprocess request update: ${saved.error?.message || "request not found"}`);
   }
-  if (args.physicalRoute !== "investment") {
-    const live = await supabase.from("client_requests").select("id,branch_key,status").eq("company_id", CRM_COMPANY_ID).eq("client_id", args.clientId).in("status", ["active","paused"]);
-    if (!live.error) {
-      const rows = live.data || [], allBarka = rows.length > 0 && rows.every((x: any) => x.branch_key === "barka");
-      const clientAssignee = allBarka ? assignments.barka : assignments.muscat;
-      if (clientAssignee) {
-        await supabase.from("clients").update({ assigned_to: clientAssignee, updated_at: new Date().toISOString() }).eq("id", args.clientId).eq("company_id", CRM_COMPANY_ID);
-        await supabase.from("whatsapp_conversations").update({ assigned_to: clientAssignee, updated_at: new Date().toISOString() }).eq("id", args.conversationId).eq("company_id", CRM_COMPANY_ID);
-      }
-    }
-  }
+  // The database reconciles the client's summary assignment. A physical inbox
+  // keeps its own route assignment even when the client has other requests.
   const refreshed = await supabase.from("client_requests").select("id,request_type,status,property_type,property_types,preferred_area,preferred_areas,wilayat,budget_min,budget_max,payment_method,purchase_timing,bedrooms_min,missing_required_fields,last_requirements_prompt_fields,last_requirements_prompt_at,requirements_prompt_count,requirements_completed_at").in("id", requestIds).eq("company_id", CRM_COMPANY_ID);
-  if (refreshed.error) return;
+  if (refreshed.error) throw new Error(`postprocess request reload: ${refreshed.error.message}`);
   const promptRows = (refreshed.data || []).filter((r: any) => String(r.request_type) === "buyer" && ['active','paused'].includes(String(r.status)) && Array.isArray(r.missing_required_fields) && r.missing_required_fields.length && !sameFields(r.last_requirements_prompt_fields, r.missing_required_fields));
   if (promptRows.length) {
     const sent = await autoSendRequirements({ conversationId: args.conversationId, clientId: args.clientId, messageId: args.messageId, requestIds, missingByRequest: promptRows.map((r: any) => ({ id: r.id, request_type: r.request_type, missing: r.missing_required_fields, prior: r })) });

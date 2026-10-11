@@ -2386,13 +2386,12 @@ async function loadClients(){
  const list=$('clientsList'),generation=crmSessionGeneration,userId=currentUser&&currentUser.id;
  list.innerHTML='<div class="empty" role="status">جاري تحميل العملاء والطلبات…</div>';
  try{
-  const [r,requests]=await Promise.all([
-   supa.from('clients').select('*, agent:profiles!clients_assigned_to_fkey(full_name)').order('created_at',{ascending:false}),
+  const [clients,requests]=await Promise.all([
+   crmReadAll(()=>supa.from('clients').select('*, agent:profiles!clients_assigned_to_fkey(full_name)',{count:'exact'}).order('created_at',{ascending:false}).order('id')),
    crmReadAll(()=>supa.from('client_requests').select('id,client_id,request_type,status,pipeline_stage,qualified_at,preferred_area,budget_min,budget_max,next_followup,branch_key',{count:'exact'}).in('status',['active','paused']).order('id'))
   ]);
   if(!crmSessionCurrent(generation,userId))return;
-  if(r.error)throw r.error;
-  clientWorkRequests=requests;allClients=(r.data||[]).filter(c=>showArchivedClients?c.archived===true:c.archived!==true);
+  clientWorkRequests=requests;allClients=clients.filter(c=>showArchivedClients?c.archived===true:c.archived!==true);
   updateRoleCounts();renderClients();
  }catch(err){if(!crmSessionCurrent(generation,userId))return;allClients=[];clientWorkRequests=[];list.innerHTML='<div class="empty" role="alert"><p>تعذر تحميل العملاء وطلباتهم.</p><p>'+escapeHtml(err.message)+'</p><button class="btn-secondary" onclick="loadClients()">إعادة المحاولة</button></div>';}
 }
