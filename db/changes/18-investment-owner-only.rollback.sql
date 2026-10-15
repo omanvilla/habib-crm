@@ -86,4 +86,5 @@ DO $restore$ DECLARE saved record; BEGIN
  FOR saved IN SELECT definition FROM crm_repair_private.investment_catalog_backup ORDER BY CASE WHEN object_kind='function' THEN 0 ELSE 1 END,object_identity LOOP EXECUTE saved.definition;END LOOP;
 END $restore$;
 DROP FUNCTION IF EXISTS public.crm_shared_ai_evidence_mask(jsonb);
+DROP FUNCTION IF EXISTS crm_repair_private.shared_ai_evidence_mask(jsonb);
 -- Keep nullable notification context, private backup and non-exposed helpers for evidence.

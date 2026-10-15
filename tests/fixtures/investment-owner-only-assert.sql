@@ -176,6 +176,7 @@ SELECT test_assert(crm_shared_ai_evidence_mask(jsonb_build_array(
  jsonb_build_object('table','properties','id',test_id(300))
 ))=ARRAY[true,false,false,false,false,false,false,true],'shared AI evidence mask leaked private/foreign/missing evidence or rejected public evidence');
 SELECT test_assert(crm_shared_ai_evidence_mask('[]')='{}'::boolean[],'empty evidence input incorrect');
+SELECT test_assert(crm_repair_private.shared_ai_evidence_mask(jsonb_build_array(jsonb_build_object('table','clients','id',test_id(100)),jsonb_build_object('table','clients','id',test_id(102))))=ARRAY[true,false],'checked private helper owner result incorrect');
 DO $$DECLARE rows jsonb;BEGIN
  SELECT jsonb_agg(jsonb_build_object('table','clients','id',test_id(100))) INTO rows FROM generate_series(1,1000);
  PERFORM test_assert(cardinality(crm_shared_ai_evidence_mask(rows))=1000,'valid 1000-row evidence bound rejected');
@@ -190,12 +191,15 @@ DO $$DECLARE n int;BEGIN
  FOR n IN 11..15 LOOP
   PERFORM set_config('test.actor',test_id(n)::text,false);
   BEGIN PERFORM crm_shared_ai_evidence_mask(jsonb_build_array(jsonb_build_object('table','clients','id',test_id(100))));RAISE EXCEPTION 'nonowner could classify owner evidence';EXCEPTION WHEN insufficient_privilege THEN NULL;END;
+  BEGIN PERFORM crm_repair_private.shared_ai_evidence_mask(jsonb_build_array(jsonb_build_object('table','clients','id',test_id(100))));RAISE EXCEPTION 'nonowner bypassed wrapper via private helper';EXCEPTION WHEN insufficient_privilege THEN NULL;END;
  END LOOP;
  PERFORM set_config('test.actor',test_id(16)::text,false);
  PERFORM test_assert(crm_shared_ai_evidence_mask(jsonb_build_array(jsonb_build_object('table','clients','id',test_id(100))))=ARRAY[false],'foreign owner classified another company row');
 END$$;
 RESET ROLE;
 SELECT test_assert(NOT has_function_privilege('anon','public.crm_shared_ai_evidence_mask(jsonb)','EXECUTE') AND NOT has_function_privilege('service_role','public.crm_shared_ai_evidence_mask(jsonb)','EXECUTE'),'shared evidence RPC has accidental backend/public grants');
+SELECT test_assert(NOT (SELECT prosecdef FROM pg_proc WHERE oid='public.crm_shared_ai_evidence_mask(jsonb)'::regprocedure) AND (SELECT prosecdef FROM pg_proc WHERE oid='crm_repair_private.shared_ai_evidence_mask(jsonb)'::regprocedure),'public evidence RPC must be invoker with checked private definer');
+SELECT test_assert(NOT has_function_privilege('anon','crm_repair_private.shared_ai_evidence_mask(jsonb)','EXECUTE') AND NOT has_function_privilege('service_role','crm_repair_private.shared_ai_evidence_mask(jsonb)','EXECUTE'),'private checked helper has accidental backend/public grants');
 SELECT test_assert(NOT has_function_privilege('authenticated','crm_repair_private.investment_link_is_private(uuid,jsonb,text[])','EXECUTE') AND NOT has_table_privilege('authenticated','crm_repair_private.investment_catalog_backup','SELECT'),'private traversal/backup exposed');
 ROLLBACK;
 SELECT test_assert_ordinary_unchanged();

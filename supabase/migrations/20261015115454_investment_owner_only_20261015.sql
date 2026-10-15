@@ -73,7 +73,7 @@ GRANT EXECUTE ON FUNCTION crm_repair_private.investment_row_allowed(uuid,jsonb) 
 
 -- Shared AI caches must not persist investor evidence into public client/property summaries.
 -- Only the current owner can classify actual same-company rows; no data or identifiers are returned.
-CREATE OR REPLACE FUNCTION public.crm_shared_ai_evidence_mask(p_rows jsonb)
+CREATE OR REPLACE FUNCTION crm_repair_private.shared_ai_evidence_mask(p_rows jsonb)
 RETURNS boolean[] LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $$
 DECLARE company uuid:=public.my_company();item jsonb;table_name text;row_id uuid;row_data jsonb;result boolean[]:='{}'::boolean[];
 BEGIN
@@ -91,6 +91,12 @@ BEGIN
  END LOOP;
  RETURN result;
 END $$;
+REVOKE ALL ON FUNCTION crm_repair_private.shared_ai_evidence_mask(jsonb) FROM PUBLIC,anon,authenticated,service_role;
+GRANT EXECUTE ON FUNCTION crm_repair_private.shared_ai_evidence_mask(jsonb) TO authenticated;
+CREATE OR REPLACE FUNCTION public.crm_shared_ai_evidence_mask(p_rows jsonb)
+RETURNS boolean[] LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
+ SELECT crm_repair_private.shared_ai_evidence_mask(p_rows)
+$$;
 REVOKE ALL ON FUNCTION public.crm_shared_ai_evidence_mask(jsonb) FROM PUBLIC,anon,authenticated,service_role;
 GRANT EXECUTE ON FUNCTION public.crm_shared_ai_evidence_mask(jsonb) TO authenticated;
 
