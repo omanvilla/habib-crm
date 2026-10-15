@@ -22,6 +22,11 @@ let tests=0;
 async function test(name,fn){await fn();tests++;console.log('PASS',name)}
 (async()=>{
 
+ await test('sign-out clears previously rendered Reports Team performance',async()=>{
+   const e=createEnv();e.e('teamLeaderboard').textContent='TEST former owner team performance';
+   e.run('clearSessionUI()');assert.equal(e.e('teamLeaderboard').textContent,'');
+ });
+
  await test('property response from a signed-out session cannot repopulate UI (baseline race reproduced)',async()=>{
    const cp=require('node:child_process');
    const baselineHtml=cp.execFileSync('git',['show','e9bd1d54e0781cd9445c9d7ad5ac2f004749e961:app-base-v15.html'],{encoding:'utf8',maxBuffer:4*1024*1024});

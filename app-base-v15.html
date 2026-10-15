@@ -2183,7 +2183,7 @@ function clearSessionUI(){
  currentUser=null;currentProfile=null;currentCompany=null;
  window.employeeInventoryState=null;clientWorkRequests=[];viewingClient=null;window.viewingProperty=null;allViewings=[];
  window.dashboardWorkSnapshot=null;window.dashboardClientFilters=null;window.dashboardContactQueue=[];
- ['clientsList','propertiesList','dealsList','tasksList','viewingsList','opsDailyWork','employeeInventoryReminderText','employeePerformanceResults','opsDashboardPerformanceResults','employeePerformanceMini','cdName','cdSub','pdTitle','pdSub','waChatBody','waConversationList'].forEach(id=>{const el=$(id);if(el)el.textContent='';});
+ ['clientsList','propertiesList','dealsList','tasksList','viewingsList','opsDailyWork','employeeInventoryReminderText','employeePerformanceResults','opsDashboardPerformanceResults','teamLeaderboard','employeePerformanceMini','cdName','cdSub','pdTitle','pdSub','waChatBody','waConversationList'].forEach(id=>{const el=$(id);if(el)el.textContent='';});
  if(typeof window.crmResetOperations==='function')window.crmResetOperations();
  allClients=[];allProperties=[];allDeals=[];allTasks=[];allOwners=[];allMembers=[];allExpenses=[];allNotifications=[];aiMessages=[];
  waInboxConversations=[];waInboxMessages=[];waInboxRequests=[];waInboxActiveId=null;waInboxActiveConversation=null;

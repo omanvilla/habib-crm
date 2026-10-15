@@ -9,6 +9,7 @@ The existing RPC counted first-ever client/property inquiry pairs (October:16 Mu
 ## Implementation
 
 - Full month:1–31 October2026; rolling year:15 October2025–15 October2026. Rolling3/6/9 use calendar-month subtraction and clamp short months. Oman-local inclusive display, exclusive RPC end. Lifetime asks the backend for the actual historical start; a company account-creation date cannot hide older genuine sales.
+- Session reset clears the Reports Team performance panel, and stale account responses cannot repopulate it.
 - Reports retain the specific-month picker; selecting a preset clears its stale override. Reports use Oman boundaries. Target percentages are monthly only.
 - `inquiry_clients`: distinct clients with a real inbound message attributed to a permitted property during the selected period, including returning clients and deduplicating multiple properties.
 - `replied_inquiry_clients`: subset with a successful human message after a qualifying inquiry in the same conversation and period. An explicit quote of an unrelated message is excluded. This is observable message chronology, not a claim that AI verified the content of every response.
@@ -18,7 +19,7 @@ The existing RPC counted first-ever client/property inquiry pairs (October:16 Mu
 
 ## Validation before release
 
-- Node:258 passed,2 existing database-context skips. Security harness:26 passed, no network calls or production writes.
+- Node:258 passed,2 existing database-context skips. Security harness:27 passed, no network calls or production writes.
 - Full synthetic SQL catalog:29 stages passed locally, including duplicate SQL23 apply, every legacy metric unchanged for five roles, business-row fingerprints, unique clients/repeat inquiries/multiple properties, Oman boundaries, reply ordering, automation/failure exclusions, cross-company/branch and owner-only investment protection, exact rollback.
 - Synthetic Chromium:five roles, all six period filters and RPC dates, dashboard/Team/Reports→Team, February2024 picker followed by yearly preset, desktop/mobile wrapping and no JavaScript errors. These are synthetic sessions, not employee logins.
 
