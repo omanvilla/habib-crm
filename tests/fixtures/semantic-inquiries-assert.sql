@@ -70,12 +70,22 @@ UPDATE whatsapp_messages SET reply_to_message_id='wamid.semantic.6305' WHERE id=
 UPDATE whatsapp_messages SET reply_to_message_id='wamid.semantic.6304' WHERE id=test_id(6321);
 UPDATE whatsapp_messages SET reply_to_message_id='wamid.semantic.6302' WHERE id=test_id(6304);
 INSERT INTO client_requests(id,company_id,client_id,request_type,subject_property_id,route_key,branch_key,assigned_to,preferred_area)
-VALUES(test_id(6400),test_id(1),test_id(6006),'buyer',test_id(6100),'muscat','muscat',test_id(11),'الخوض');
+VALUES(test_id(6400),test_id(1),test_id(6006),'buyer',NULL,'muscat','muscat',test_id(11),'الخوض');
+INSERT INTO whatsapp_message_requests(company_id,message_id,request_id,relation)
+VALUES(test_id(1),test_id(6330),test_id(6400),'mentioned');
 INSERT INTO client_requests(id,company_id,client_id,request_type,route_key,branch_key,assigned_to,preferred_area,notes)
 VALUES(test_id(6402),test_id(1),test_id(6007),'consultation','muscat','muscat',test_id(11),'الخوض','Independent consultation must stay unchanged');
 CREATE TEMP TABLE semantic_consult_before AS SELECT to_jsonb(r) row_data FROM client_requests r WHERE id=test_id(6402);
 INSERT INTO property_inquiries(id,company_id,client_id,property_id,request_id,assigned_to,source,status,has_inbound_inquiry,first_inquiry_at,last_inquiry_at)
 VALUES(test_id(6401),test_id(1),test_id(6006),test_id(6100),test_id(6400),test_id(11),'other','inquiry',false,'2026-10-03T10:00:00Z','2026-10-03T10:00:00Z');
+-- Reproduce legacy persisted state: a real historical visit and its interest
+-- existed while the linked generic request still had no subject property.
+SET LOCAL session_replication_role=replica;
+INSERT INTO viewings(id,company_id,client_id,property_id,request_id,agent_id,viewing_date,viewing_time,status,attendance,created_at)
+VALUES(test_id(6403),test_id(1),test_id(6006),test_id(6100),test_id(6400),test_id(11),'2026-10-03','14:00','done','attended','2026-10-02T08:00:00Z');
+SET LOCAL session_replication_role=origin;
+CREATE TEMP TABLE semantic_generic_request_before AS SELECT to_jsonb(r) row_data FROM client_requests r WHERE id=test_id(6400);
+CREATE TEMP TABLE semantic_original_visit_before AS SELECT to_jsonb(v) row_data FROM viewings v WHERE id=test_id(6403);
 CREATE TEMP TABLE semantic_before AS SELECT id,to_jsonb(c) row_data FROM clients c WHERE id BETWEEN test_id(6000) AND test_id(6007);
 
 SET LOCAL ROLE service_role;
@@ -139,6 +149,11 @@ SELECT crm_apply_verified_property_inquiries(test_id(6317),jsonb_build_array(pg_
 SELECT test_assert((SELECT first_inquiry_at='2026-09-30T10:00:00Z'::timestamptz FROM property_inquiries WHERE client_id=test_id(6000) AND property_id=test_id(6100) AND has_inbound_inquiry),'earlier real inquiry timestamp lost');
 SELECT crm_apply_verified_property_inquiries(test_id(6330),jsonb_build_array(pg_temp.semantic_match(6330,6100,'text','فيلا الخوض 135 ألف')));
 SELECT test_assert((SELECT has_inbound_inquiry AND first_inquiry_at='2026-09-29T10:00:00Z'::timestamptz AND last_inquiry_at='2026-09-29T10:00:00Z'::timestamptz FROM property_inquiries WHERE id=test_id(6401)),'visit dates masqueraded as inbound dates');
+SELECT test_assert((SELECT count(*) FROM property_inquiries WHERE client_id=test_id(6006))=1
+ AND (SELECT inquiry_id=test_id(6401) AND request_id=test_id(6400) FROM property_message_attributions WHERE message_id=test_id(6330)),
+ 'generic request visit interest left duplicate orphan or redirected to non-inbound interest');
+SELECT test_assert((SELECT subject_property_id=test_id(6100) AND route_key='muscat' AND branch_key='muscat' FROM client_requests WHERE id=test_id(6400)),
+ 'exact message-linked generic request did not retain its route when binding the property');
 SELECT crm_apply_verified_property_inquiries(test_id(6318),jsonb_build_array(pg_temp.semantic_match(6318,6100,'text','فيلا الخوض 135 ألف')));
 SELECT test_assert((SELECT status='pending' FROM unmatched_property_links WHERE whatsapp_message_id=test_id(6318) AND link_key LIKE 'instagram%'),'unknown reference blanket resolved');
 SELECT test_assert((SELECT property_match_status='partial_match' FROM whatsapp_messages WHERE id=test_id(6318)),'unknown remaining reference not partial');
@@ -153,6 +168,17 @@ SELECT test_assert(NOT EXISTS(SELECT 1 FROM semantic_before b JOIN clients c ON 
  WHERE b.row_data->f.k IS DISTINCT FROM to_jsonb(c)->f.k),'semantic attribution changed protected client identity/routing');
 SELECT test_assert((SELECT c.client_type=b.row_data->>'client_type' FROM semantic_before b JOIN clients c ON c.id=b.id WHERE c.id=test_id(6002)),'seller classification not preserved');
 SELECT test_assert((SELECT to_jsonb(r)=b.row_data FROM semantic_consult_before b CROSS JOIN client_requests r WHERE r.id=test_id(6402)),'independent consultation request changed');
+SELECT test_assert((SELECT to_jsonb(r)-ARRAY['subject_property_id','updated_at','last_contact_at']=b.row_data-ARRAY['subject_property_id','updated_at','last_contact_at']
+ FROM semantic_generic_request_before b CROSS JOIN client_requests r WHERE r.id=test_id(6400)),
+ 'binding exact generic request changed fields: '||(SELECT string_agg(k,',') FROM semantic_generic_request_before b CROSS JOIN client_requests r
+ CROSS JOIN LATERAL jsonb_object_keys(b.row_data) k WHERE r.id=test_id(6400) AND b.row_data->k IS DISTINCT FROM to_jsonb(r)->k));
+-- The existing response-milestone trigger may fill a previously unknown last
+-- contact from this genuine inbound when the message receives its request ID.
+SELECT test_assert((SELECT b.row_data->>'last_contact_at' IS NULL AND r.last_contact_at='2026-09-29T10:00:00Z'::timestamptz
+ FROM semantic_generic_request_before b CROSS JOIN client_requests r WHERE r.id=test_id(6400)),
+ 'generic request contact milestone was fabricated or lost the actual inbound timestamp');
+SELECT test_assert((SELECT to_jsonb(v)=b.row_data FROM semantic_original_visit_before b CROSS JOIN viewings v WHERE v.id=test_id(6403)),
+ 'historical visit was replaced, redated or otherwise changed by inquiry reconciliation');
 SELECT test_assert(NOT has_function_privilege('authenticated','public.crm_apply_verified_property_inquiries(uuid,jsonb,boolean)','EXECUTE') AND NOT has_function_privilege('anon','public.crm_apply_verified_property_inquiries(uuid,jsonb,boolean)','EXECUTE'),'semantic RPC exposed to browser roles');
 SELECT test_assert(NOT has_function_privilege('authenticated','crm_repair_private.semantic_property_is_private(uuid,uuid)','EXECUTE'),'private classifier exposed');
 SELECT test_assert(NOT has_function_privilege('authenticated','public.crm_property_inquiry_candidates(uuid,integer,integer)','EXECUTE') AND NOT has_function_privilege('anon','public.crm_property_inquiry_candidates(uuid,integer,integer)','EXECUTE'),'candidate RPC exposed');

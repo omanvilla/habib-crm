@@ -89,6 +89,7 @@ DECLARE m public.whatsapp_messages%rowtype; w public.whatsapp_conversations%rowt
  c public.clients%rowtype; p public.properties%rowtype; s public.whatsapp_messages%rowtype;
  item jsonb; ev jsonb; source_id uuid; source_ids uuid[]; ids uuid[]:='{}'; prior_ids uuid[];
  prop_id uuid; inq_id uuid; first_id uuid; event_id uuid; v_at timestamptz; kind text;
+ linked_request uuid; linked_requests integer;
  before_inq public.property_inquiries%rowtype; parent_before jsonb; parent_after jsonb;
  private_work boolean; support_count integer; total_count integer; new_count integer:=0;
  pending boolean; classification_sale boolean:=true; blocked text; previous_parent_context text;
@@ -183,6 +184,27 @@ BEGIN
   IF kind='conversation' AND NOT EXISTS(SELECT 1 FROM public.whatsapp_messages sm
     WHERE sm.id=ANY(source_ids) AND sm.id<>m.id AND position(ev->>'quote' IN coalesce(sm.body,''))>0) THEN
    RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='property_quote_not_in_response';END IF;
+
+  -- The established finalizer may reuse the one compatible request already
+  -- linked to this exact inbound. Bind its empty subject before recording so a
+  -- visit-derived interest on that request is upgraded in place, rather than
+  -- creating an orphan interest and later redirecting its attribution.
+  IF jsonb_array_length(p_matches)=1 AND cardinality(prior_ids)=0
+    AND NOT EXISTS(SELECT 1 FROM public.client_requests r WHERE r.company_id=m.company_id
+     AND r.client_id=m.client_id AND r.subject_property_id=p.id AND r.status='active'
+     AND private_work=(coalesce(r.route_key='investment',false) OR coalesce(r.branch_key='investment',false))) THEN
+   SELECT count(*),(array_agg(r.id))[1] INTO linked_requests,linked_request
+    FROM public.client_requests r JOIN public.whatsapp_message_requests mr ON mr.request_id=r.id AND mr.company_id=r.company_id
+    WHERE mr.message_id=m.id AND r.company_id=m.company_id AND r.client_id=m.client_id
+     AND r.status='active' AND r.request_type IN ('buyer','tenant','investor') AND r.subject_property_id IS NULL
+     AND private_work=(coalesce(r.route_key='investment',false) OR coalesce(r.branch_key='investment',false))
+     AND (private_work OR (coalesce(r.branch_key,r.route_key,'general') IN (w.route_key,'general')
+       AND coalesce(r.route_key,r.branch_key,'general') IN (w.route_key,'general')));
+   IF linked_requests=1 THEN
+    UPDATE public.client_requests SET subject_property_id=p.id
+     WHERE id=linked_request AND company_id=m.company_id AND subject_property_id IS NULL;
+   END IF;
+  END IF;
 
   -- Capture the exact recorder target before it is promoted from visit-derived
   -- interest, so first/last inquiry dates reflect actual inbound evidence only.

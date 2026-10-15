@@ -148,7 +148,7 @@ export function matchListingReferences(text, candidates, {requireIntent = true} 
       if (whole(body, title) && (info.explicit || !requireIntent)) addGroup(inventory.filter(x => normalizeListingText(x.title) === title), {kind: 'exact_title', title});
     }
     const prices = [...body.matchAll(/\b\d+(?:\.\d+)?\b/g)].map(hit => ({value: Number(hit[0]), raw: hit[0], start: hit.index, end: hit.index + hit[0].length}));
-    let priorListingPriceEnd = -1;
+    let priorListingPriceEnd = -1, priorListingArea = null;
     for (const token of prices) {
       if (token.raw.split('.')[0].length > 6 || (token.value >= 1900 && token.value <= 2100 && !/(?:ريال|omr|rial)/i.test(body.slice(Math.max(0, token.start - 8), token.end + 12)))) continue;
       const beforeAmount = body.slice(Math.max(0, token.start - 28), token.start);
@@ -163,6 +163,15 @@ export function matchListingReferences(text, candidates, {requireIntent = true} 
       const conflictingAreas = new Set(preceding.map(area => area.name)).size > 1
         || new Set(preceding.map(area => area.subarea).filter(Boolean)).size > 1;
       const ranked = (preceding.length ? preceding : surrounding.filter(area => area.distance <= 65)).sort((a, b) => a.distance - b.distance);
+      // A compact explicit second-listing reference can inherit the same area:
+      // "الخوض 135 والفيلا اللي 120". Never inherit across a new area or a
+      // long separate description, or from an unknown/conflicting prior price.
+      const joinedReference = body.slice(Math.max(0, priorListingPriceEnd), token.start);
+      if (!ranked.length && priorListingArea && token.start - priorListingPriceEnd <= 120
+        && /(?:^| )و(?:ال)?(?:فيلا|ڤيلا|فله|بيت|عقار|منزل|شقه)(?: |$)/.test(joinedReference)
+        && !areas.some(area => area.start > priorListingPriceEnd && area.start <= token.end + 65)) {
+        ranked.push({...priorListingArea, distance: token.start - priorListingPriceEnd});
+      }
       if (!ranked.length || ranked[0].distance > maxDistance) continue;
       const nearest = ranked.filter(x => x.distance === ranked[0].distance);
       if (new Set(nearest.map(x => x.name)).size > 1) { result.ambiguous = true; continue; }
@@ -177,7 +186,7 @@ export function matchListingReferences(text, candidates, {requireIntent = true} 
       const explicitPrice = currency || /(?:السعر|سعرها|المطلوب|المبلغ|قيمتها|price|asking)\s*$/i.test(beforeAmount);
       const matchesInventoryPrice = inventory.some(candidate => possible.has(Number(candidate.price)));
       if (conflictingAreas) {
-        if (explicitPrice || matchesInventoryPrice) { result.ambiguous = true; priorListingPriceEnd = token.end; }
+        if (explicitPrice || matchesInventoryPrice) { result.ambiguous = true; priorListingPriceEnd = token.end; priorListingArea = null; }
         continue;
       }
       for (const candidate of inventory) {
@@ -188,7 +197,7 @@ export function matchListingReferences(text, candidates, {requireIntent = true} 
       }
       const rows = inventory.filter(candidate => possible.has(Number(candidate.price)) && inventoryAreas(candidate).some(a => a.name === area.name && (!area.subarea || a.subarea === area.subarea)));
       addGroup(rows, {kind: 'area_price', area: area.name, subarea: area.subarea, price: rows.length === 1 ? Number(rows[0].price) : null});
-      if (rows.length || explicitPrice) priorListingPriceEnd = token.end;
+      if (rows.length || explicitPrice) { priorListingPriceEnd = token.end; priorListingArea = rows.length ? area : null; }
     }
   }
   // A title alone cannot overrule an explicitly incompatible price for that

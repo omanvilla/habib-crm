@@ -85,6 +85,10 @@ test('Long listing sections bind their own area and price, including multiple st
   const competingDistricts=match(`فيلا في الخوض الرابعة أو الخوض السابعة ${details} السعر 135 ألف`,rows,{requireIntent:false});
   assert.deepEqual(ids(competingDistricts),[]);assert.equal(competingDistricts.ambiguous,true);
   assert.deepEqual(ids(match(`ابحث عن فيلا بالخوض ${details} ميزانيتي 135 ألف`,rows)),[]);
+  const joined='اريد اعاين الڤلل الي مستقلة وذكرتوها ف الانستجرام الخوض ١٣٥\nوالڤيلا الي ١٢٠ الف';
+  assert.deepEqual(ids(match(joined,rows)),['k135','wrong1']);
+  assert.deepEqual(ids(match('ممكن تفاصيل الخوض 135 والفيلا الي 120 في المعبيلة',rows)),['k135','m120']);
+  assert.deepEqual(ids(match(`ممكن تفاصيل الخوض 135 والفيلا ${details} السعر 120 ألف`,rows)),['k135']);
 });
 test('Unique exact title/code, code boundaries, and blank titles are checked',async()=>{
   const {matchListingReferences:match}=await api;
