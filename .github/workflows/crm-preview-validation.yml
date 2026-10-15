@@ -33,6 +33,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: node tests/preview-browser.cjs
       - run: node tests/investment-browser.cjs
+      - run: node tests/dashboard-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -158,3 +159,14 @@ jobs:
           psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/investment-owner-only-assert.sql
           psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/investment-rpc-assert.sql
           psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/investment-attribution-assert.sql
+          psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/dashboard-workspace-before.sql
+          psql -d crm_investment_test -v ON_ERROR_STOP=1 -f db/changes/19-dashboard-workspace.forward.sql
+          psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/dashboard-workspace-assert.sql
+          psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/dashboard-performance-before.sql
+          psql -d crm_investment_test -v ON_ERROR_STOP=1 -f db/changes/20-dashboard-performance.forward.sql
+          psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/dashboard-performance-assert.sql
+          psql -d crm_investment_test -v ON_ERROR_STOP=1 -f db/changes/21-saved-link-inquiry-reconciliation.forward.sql
+          psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/dashboard-inquiries-assert.sql
+          psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/investment-rpc-assert.sql
+          psql -d crm_investment_test -v ON_ERROR_STOP=1 -f db/changes/20-dashboard-performance.rollback.sql
+          psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/dashboard-performance-rollback-assert.sql

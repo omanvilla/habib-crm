@@ -24,7 +24,7 @@ const clients=[
 {id:uuid(104),name:'بائعة بركاء التجريبية',phone:'+96800000004',assigned_to:barka,lead_route:'barka',client_type:'seller',is_seller:true,lead_temperature:'cold',status:'cold',preferred_area:'حي عاصم',human_contact_at:null}
 ].map((c,i)=>({...c,phone_normalized:c.phone,company_id:company,archived:false,followup_suppressed:false,created_at:relative(-i-2)+'T08:00:00Z',lead_score:i===1?80:40,notes:'بيانات اصطناعية؛ لا يوجد عميل حقيقي'}));
 const requests=[
-{id:uuid(205),client_id:uuid(105),assigned_to:owner,branch_key:'investment',route_key:'investment',request_type:'investor',preferred_area:null,pipeline_stage:'new'},
+{id:uuid(206),client_id:uuid(105),assigned_to:owner,branch_key:'investment',route_key:'investment',request_type:'investor',preferred_area:null,pipeline_stage:'new'},
 {id:uuid(201),client_id:uuid(101),assigned_to:muscat,branch_key:'muscat',route_key:'muscat',request_type:'buyer',preferred_area:'الخوض',budget_min:70000,budget_max:95000,next_followup:relative(-2),pipeline_stage:'qualified',qualified_at:now},
 {id:uuid(202),client_id:uuid(102),assigned_to:muscat,branch_key:'muscat',route_key:'muscat',request_type:'buyer',preferred_area:'الموالح',budget_min:100000,budget_max:130000,next_followup:relative(0),pipeline_stage:'negotiation'},
 {id:uuid(203),client_id:uuid(102),assigned_to:muscat,branch_key:'muscat',route_key:'muscat',request_type:'tenant',preferred_area:'المعبيلة',budget_min:200,budget_max:350,next_followup:relative(3),pipeline_stage:'new'},
@@ -163,6 +163,14 @@ rpc:async(name,args={})=>{
  if(name==='crm_get_deal_workflow'){
   const deal=db.deals.find(d=>d.id===args.p_deal_id&&allowed(d,'deals'));
   return deal?{data:{deal:decorate(deal)},error:null}:{data:null,error:{message:'TEST fixture scope denial'}};
+ }
+ if(name==='crm_dashboard_work'){
+  const scope=args.p_scope||'branches';if(scope==='investment'&&profile.role!=='owner')return {data:null,error:{message:'TEST owner only',code:'42501'}};
+  const privateRow=row=>row?.lead_route==='investment'||row?.route_key==='investment'||row?.branch_key==='investment'||clients.find(c=>c.id===row?.client_id)?.lead_route==='investment'||requests.find(r=>r.id===row?.request_id)?.route_key==='investment';
+  const scoped=(table)=>db[table].filter(row=>allowed(row,table)&&!!privateRow(row)===(scope==='investment'));
+  const active=scoped('client_requests').filter(r=>r.status==='active'),cs=scoped('clients').filter(c=>!c.archived),due=active.filter(r=>r.next_followup&&r.next_followup.slice(0,10)<=today),hot=active.filter(r=>r.lead_temperature==='hot'),vs=scoped('viewings').filter(v=>!v.archived),ds=scoped('deals').filter(d=>!d.archived&&!['closed','commission_collected','lost'].includes(d.stage)),ts=scoped('tasks').filter(t=>!t.done),urgent=ts.filter(t=>t.priority==='high'||t.due_date&&t.due_date.slice(0,10)<=today),contact=cs.filter(c=>!c.human_contact_at).map(c=>({client_id:c.id})),unique=rows=>[...new Set(rows.map(r=>r.client_id))];
+  const selectedVisits=vs.filter(v=>v.viewing_date===today&&v.status!=='cancelled'||v.viewing_date>today&&['scheduled','confirmed','postponed'].includes(v.status)),limit=Math.max(1,Math.min(200,args.p_limit||20)),offset=Math.max(0,args.p_offset||0),page=rows=>rows.slice(offset,offset+limit).map(decorate);
+  return {data:{scope,as_of:today,generated_at:now,counts:{uncontacted:contact.length,followups_due:unique(due).length,hot_requests:unique(hot).length,viewings_today:vs.filter(v=>v.viewing_date===today&&v.status!=='cancelled').length,open_deals:ds.length,urgent_tasks:urgent.length,open_tasks:ts.length},requests:page(active),followups:page(due),hotRequests:page(hot),clients:cs,visits:page(selectedVisits),deals:page(ds),tasks:page(urgent),contactQueue:page(contact),totals:{requests:active.length,followups:due.length,hotRequests:hot.length,visits:selectedVisits.length,deals:ds.length,tasks:urgent.length,contactQueue:contact.length},clientFilters:{uncontacted:unique(contact),due:unique(due),hotfocus:unique(hot)}},error:null};
  }
  if(name==='crm_client_contact_queue')return {data:clients.filter(c=>allowed(c,'clients')&&!c.human_contact_at).map(c=>({client_id:c.id})),error:null};
  if(name==='crm_property_action_queue')return {data:[],error:null};

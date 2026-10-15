@@ -100,7 +100,7 @@ DO $$DECLARE n integer; v jsonb; e jsonb; expected_requests integer;BEGIN
  PERFORM set_config('test.actor',test_id(10)::text,true);
  v:=test_rpc_snapshot();
  INSERT INTO rpc_with_private VALUES(10,v);
- PERFORM test_assert((v->'kpi'->>'from')::date='2020-01-04','owner historical investment inception lost');
+ PERFORM test_assert((v->'kpi'->>'from')::date=CASE WHEN to_regclass('crm_repair_private.dashboard_performance_backup_20261015') IS NULL THEN '2020-01-04'::date ELSE '2026-01-01'::date END,'owner employee-report inception did not follow team/private scope');
  PERFORM test_assert((v->'mixed360'->'metrics'->>'requests_total')::int=1 AND (v->'mixed360'->'metrics'->>'closed_deals')::int=1,'owner mixed investment history missing');
  PERFORM test_assert((SELECT metric_count FROM crm_funnel_cohort_metrics(test_id(2100),'investment') WHERE metric_key='new_requests')=4,'owner investment funnel missing');
  PERFORM test_assert(EXISTS(SELECT 1 FROM crm_properties_access WHERE id=test_id(303)),'owner cannot view investor-owned property');

@@ -196,33 +196,19 @@ window.fbAsyncInit = function(){
 <div class="content">
 
 <div class="page active" id="page-dash">
-<div class="page-header"><div><div class="page-title">مرحباً، <span id="welcomeName">بك</span> 👋</div><div class="page-sub" id="welcomeSub">سلطنة عُمان</div></div>
-<div class="dash-toolbar">
-<button class="qa-btn" onclick="openCreateModal('mClient')">👤 عميل جديد</button>
-<button class="qa-btn" onclick="openCreateModal('mProperty')">🏠 عقار جديد</button>
-<button class="qa-btn" onclick="navigate('whatsapp',null)">💚 واتساب</button>
-<button class="qa-btn" onclick="openCreateModal('mTask')">⏰ مهمة</button>
+<div class="page-header ops-dashboard-header"><div><div class="ops-eyebrow">HABIB CRM <span aria-hidden="true">/</span> مساحة العمل</div><h1 class="page-title" id="opsDashboardTitle">لوحة العمل</h1><div class="ops-account-line"><span id="welcomeName"></span><span aria-hidden="true">·</span><span id="welcomeSub">سلطنة عُمان</span></div></div>
+<div class="dash-toolbar" aria-label="إجراءات سريعة">
+<button class="qa-btn" onclick="openCreateModal('mClient')">عميل جديد</button>
+<button class="qa-btn" onclick="openCreateModal('mProperty')">عقار جديد</button>
+<button class="qa-btn" onclick="navigate('whatsapp',null)">واتساب</button>
+<button class="qa-btn" onclick="openCreateModal('mTask')">مهمة جديدة</button>
 </div></div>
-
-<div class="dash-focus-head"><div><div class="dash-focus-title">🎯 ماذا يحتاج شغلك الآن؟</div><div class="dash-focus-sub">متابعتك القادمة وزياراتك، مع خطوة واضحة لكل طلب.</div></div></div>
-
+<div class="ops-dashboard-intro"><div><h2>أعمال اليوم</h2><p id="opsDashboardScopeNote">المتابعات والزيارات والمهام التي تحتاج انتباهك.</p></div><div class="ops-day-meta"><time id="opsDashboardDate"></time><button class="ops-action" data-work-action="refresh-day">تحديث</button></div></div>
 <div class="card" id="employeeInventoryReminder" style="display:none"><div class="card-body" id="employeeInventoryReminderText"></div></div>
-<div id="opsDailyWork" aria-live="polite"><p class="ops-note">جاري ترتيب عمل اليوم…</p></div>
-<div class="ops-secondary"><details id="opsPerformanceDetails" ontoggle="if(this.open)crmDashboardPerformancePeriod('month')"><summary>الأداء خلال فترة</summary><div class="ops-periods"><button class="btn-secondary" data-period="day" onclick="crmDashboardPerformancePeriod('day')">اليوم</button><button class="btn-secondary" data-period="week" onclick="crmDashboardPerformancePeriod('week')">الأسبوع</button><button class="btn-secondary" data-period="month" onclick="crmDashboardPerformancePeriod('month')">هذا الشهر</button><button class="btn-secondary" data-period="all" onclick="crmDashboardPerformancePeriod('all')">من بداية الشركة</button></div><div id="opsDashboardPerformanceResults"></div></details><details><summary>مؤشرات العمل والتنبيهات</summary>
-
-<div class="card" id="dashTasksCard"><div class="card-head"><div class="card-title"><span>⏰</span>المهام العاجلة أولاً</div><a class="auth-link" style="font-size:12px" onclick="navigate('daily',null)">عرض الكل ←</a></div><div id="dashTasksList"><div class="empty"><div class="loader-spinner"></div></div></div></div>
-
-<div class="dash-kpi-grid">
-  <div class="dash-kpi good" onclick="openClientsDashboardFilter('uncontacted')"><div class="dash-kpi-num" id="statNewLeadsToday">0</div><div class="dash-kpi-label">📞 تواصل غير موثّق</div><div class="dash-kpi-hint">افتح العميل لتأكيد تواصل سابق أو تسجيل الرد</div></div>
-  <div class="dash-kpi danger" onclick="openClientsDashboardFilter('due')"><div class="dash-kpi-num" id="statFollowupsDue">0</div><div class="dash-kpi-label">⏰ متابعة اليوم / متأخرة</div><div class="dash-kpi-hint">بحسب الموعد المسجل في الطلب؛ حدّثه بعد المتابعة</div></div>
-  <div class="dash-kpi warn" onclick="openClientsDashboardFilter('hotfocus')"><div class="dash-kpi-num" id="statHotClients">0</div><div class="dash-kpi-label">🔥 فرص حارة نشطة</div><div class="dash-kpi-hint">نشاط حديث أو متابعة محددة — اضغط لفتحهم</div></div>
-  <div class="dash-kpi info" onclick="openDashboardViewings('today')"><div class="dash-kpi-num" id="statViewingsToday">0</div><div class="dash-kpi-label">👁 زيارات اليوم</div><div class="dash-kpi-hint">افتح جدول الزيارات</div></div>
-  <div class="dash-kpi gold" onclick="openDashboardDeals()"><div class="dash-kpi-num" id="statOpenDeals">0</div><div class="dash-kpi-label">🤝 صفقات مفتوحة</div><div class="dash-kpi-hint">ادخل على خط الإغلاق</div></div>
-</div>
-
-<div id="dashPropertyActionQueue"></div>
-</details></div>
-
+<div id="opsDailyWork" aria-live="polite"><p class="ops-state" role="status">جاري تحميل أعمال اليوم…</p></div>
+<div class="ops-secondary"><details id="opsPerformanceDetails" ontoggle="if(this.open)crmDashboardPerformancePeriod('month')"><summary><span>أداء الفريق خلال الفترة</span><small>العقارات، الاستفسارات، الزيارات والمبيعات</small></summary><div class="ops-periods"><button class="btn-secondary" data-period="day" onclick="crmDashboardPerformancePeriod('day')">اليوم</button><button class="btn-secondary" data-period="week" onclick="crmDashboardPerformancePeriod('week')">الأسبوع</button><button class="btn-secondary" data-period="month" onclick="crmDashboardPerformancePeriod('month')">هذا الشهر</button><button class="btn-secondary" data-period="all" onclick="crmDashboardPerformancePeriod('all')">من بداية الشركة</button></div><div id="opsDashboardPerformanceResults"></div></details></div>
+<!-- Property action reminders are paused on the dashboard only, at the owner's request. -->
+<div id="dashPropertyActionQueue" hidden></div>
 </div>
 
 <div class="page" id="page-daily">
@@ -2314,46 +2300,10 @@ function openDashboardDeals(){dealView='pipeline';navigate('deals',null)}
 
 var dashboardLoadSeq=0;
 async function loadDashboard(){
-  const sessionGeneration=crmSessionGeneration,sessionUser=currentUser&&currentUser.id;
-  loadEmployeeTargetReminder();
-  var seq=++dashboardLoadSeq;
-  loadPropertyActionQueue('dashboard');
-  try{
-    const todayStr=toLocalDateStr(new Date());
-    const rs=await Promise.all([
-      supa.rpc('crm_client_contact_queue',{p_limit:2000}),
-      supa.from('client_requests').select('id,client_id,status,request_type,preferred_area,next_action,qualified_at,lead_temperature,pipeline_stage,created_at,next_followup,first_human_response_at,last_mutual_contact_at').eq('status','active').limit(2500),
-      crmDataFrom('deals').select('id,client_id,property_id,stage,client:clients(name),property:properties(title)',{count:'exact'}).not('stage','in','(closed,commission_collected,lost)').order('updated_at',{ascending:false}).limit(6),
-      crmReadAll(()=>supa.from('tasks').select('*, client:clients(name,phone)',{count:'exact'}).eq('done',false).order('id')),
-      supa.from('viewings').select('*',{count:'exact',head:true}).eq('viewing_date',todayStr).neq('archived',true),
-      supa.from('clients').select('id,name,phone,lead_temperature,status,pipeline_stage,preferred_area,client_type,budget_max,created_at,human_contact_at,last_contact_at,next_followup,followup_suppressed').neq('archived',true).limit(2000),
-      supa.from('viewings').select('id,client_id,request_id,viewing_date,viewing_time,status,client:clients(name),property:properties(title)').neq('archived',true).gte('viewing_date',todayStr).in('status',['scheduled','confirmed','postponed']).order('viewing_date').order('viewing_time').limit(6)
-    ]);
-    if(seq!==dashboardLoadSeq||!crmSessionCurrent(sessionGeneration,sessionUser))return;
-    rs.forEach(function(x){if(x.error)throw x.error});
-    const contactQueue=rs[0].data||[], reqs=rs[1].data||[], clients=rs[5].data||[];
-    const clientMap=new Map(clients.map(c=>[c.id,c]));
-    const uncontactedIds=[...new Set(contactQueue.map(x=>x.client_id).filter(Boolean))];
-    const dueIds=[...new Set(reqs.filter(r=>r.next_followup&&r.next_followup<=todayStr).map(r=>r.client_id).filter(Boolean))];
-    const hotIds=[...new Set(reqs.filter(r=>{
-      if((r.lead_temperature||'')!=='hot')return false;
-      if(!withinDays(r.created_at,30)&&!r.next_followup&&!withinDays(r.last_mutual_contact_at,30))return false;
-      return true;
-    }).map(r=>r.client_id).filter(Boolean))];
-    window.dashboardContactQueue=contactQueue;
-    window.dashboardClientFilters={uncontacted:uncontactedIds,due:dueIds,hotfocus:hotIds};
-    if($('statNewLeadsToday'))$('statNewLeadsToday').textContent=uncontactedIds.length;
-    if($('statFollowupsDue'))$('statFollowupsDue').textContent=dueIds.length;
-    if($('statHotClients'))$('statHotClients').textContent=hotIds.length;
-    if($('statViewingsToday'))$('statViewingsToday').textContent=rs[4].count||0;
-    if($('statOpenDeals'))$('statOpenDeals').textContent=rs[2].count||0;
-    const dashboardTasks=rs[3]||[];
-    window.dashboardWorkSnapshot={requests:reqs,clients,visits:rs[6].data||[],deals:rs[2].data||[],tasks:dashboardTasks,contactQueue};
-    allTasks=allTasks.filter(t=>t.done).concat(dashboardTasks);renderDashTasks(dashboardTasks);
-    const tCount=dashboardTasks.length;
-    if($('navTasksCount')){if(tCount){$('navTasksCount').textContent=tCount;$('navTasksCount').style.display=''}else{$('navTasksCount').style.display='none'}}
-  }catch(err){if(!crmSessionCurrent(sessionGeneration,sessionUser))return;window.dashboardWorkSnapshot=null;console.error('Dashboard error:',err);showToast('تعذر تحديث لوحة العمل: '+(err.message||String(err)),'error')}
+  if(typeof window.crmLoadDashboardWork==='function')return window.crmLoadDashboardWork();
+  window.crmDashboardPending=true;
 }
+
 function renderDashTasks(tasks){var card=$('dashTasksCard');if(!tasks.length){if(card)card.style.display='none';$('dashTasksList').innerHTML='';return}if(card)card.style.display='';let h='';tasks.forEach(function(t){const d=daysUntil(t.due_date);const ov=d!==null&&d<0,td=d===0;h+='<div class="task-item"><div class="task-check '+(t.done?'done':'')+'" onclick="toggleTask(\''+t.id+'\','+(!t.done)+')">'+(t.done?'✓':'')+'</div><div class="task-content"><div class="task-title">'+escapeHtml(t.title)+'</div><div class="task-meta">'+(t.due_date?'<span class="task-due '+(ov?'overdue':'')+'">📅 '+(ov?'متأخّرة '+(-d)+' يوم':td?'اليوم':'بعد '+d+' يوم')+'</span>':'')+'<span class="task-priority tp-'+(t.priority==='high'?'high':t.priority==='low'?'low':'med')+'">'+(t.priority==='high'?'🔴 عاجلة':t.priority==='low'?'⚪ منخفضة':'🟡 متوسطة')+'</span></div></div></div>'});$('dashTasksList').innerHTML=h}
 function renderDashHot(clients){if(!clients.length){$('dashHotList').innerHTML='<div class="empty" style="padding:25px"><div class="empty-ico" style="font-size:32px">🔥</div><div class="empty-desc">لا يوجد عملاء حارون الآن</div></div>';return}let h='<div style="padding:6px 0">';clients.forEach(function(c){h+='<div style="padding:12px 18px;border-bottom:1px solid var(--cream-dark);display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="viewClient(\''+c.id+'\')"><div><div style="font-weight:700;font-size:13px;color:var(--espresso)">'+escapeHtml(c.name)+'</div><div style="font-size:11px;color:var(--umber);margin-top:2px">'+escapeHtml(c.preferred_area||'—')+' · '+(clientTypeAr(c.client_type)||'')+'</div></div><div style="font-size:12px;color:var(--gold);font-weight:700">'+(c.budget_max?fmtMoneyShort(c.budget_max):'فتح العميل ←')+'</div></div>'});$('dashHotList').innerHTML=h+'</div>'}
 function populateClientForm(){if(!editingClient&&$('cCreatedDate'))$('cCreatedDate').value='';if(editingClient){const c=(viewingClient&&viewingClient.id===editingClient?viewingClient:allClients.find(x=>x.id===editingClient));if(c){if($('cPaymentMethod'))$('cPaymentMethod').value=c.payment_method||'';if($('cPurchaseTiming'))$('cPurchaseTiming').value=c.purchase_timing||'';if($('cPurpose'))$('cPurpose').value=c.purpose||'';if($('cWilayat'))$('cWilayat').value=c.wilayat||'';if($('cNationality'))$('cNationality').value=c.nationality||'';if($('cCountry'))$('cCountry').value=c.country||''}}else{['cPaymentMethod','cPurchaseTiming','cPurpose','cWilayat','cNationality','cCountry'].forEach(i=>{const e=$(i);if(e)e.value=''})}setTimeout(updateLeadScorePreview,100);if($('cAssignedFG')){if(canManage()){$('cAssignedFG').style.display='';const sel=$('cAssignedTo');sel.innerHTML='<option value="">— تلقائي (أنت) —</option>';allMembers.forEach(function(m){if(m.is_active!==false)sel.innerHTML+='<option value="'+m.id+'">'+escapeHtml(m.full_name)+'</option>'})}else{$('cAssignedFG').style.display='none'}}
@@ -3604,7 +3554,18 @@ function deleteDeal(id){
   if(!canDelete()){showToast('حذف الرحلة متاح للمدير فقط','error');return;}
   confirmAction('حذف الصفقة','سيتم حذف الرحلة وبياناتها التابعة داخل عملية واحدة. هل تريد المتابعة؟','',async()=>{try{const r=await supa.rpc('crm_delete_deal_atomic',{p_deal_id:id});if(r.error)throw r.error;showToast('تم حذف الرحلة وتحديث حالة العقار','success');loadDeals();loadDashboard();}catch(e){showToast('لم يتم الحذف: '+e.message,'error');}});
 }
-async function populateTaskSelects(){try{const rows=await Promise.all([crmReadAll(()=>supa.from('clients').select('id,name',{count:'exact'}).order('id')),crmReadAll(()=>crmDataFrom('deals').select('id, client:clients(name)',{count:'exact'}).order('id'))]);const c={data:rows[0]},d={data:rows[1]};const cs=$('tClient');cs.innerHTML='<option value="">— لا شيء —</option>';(c.data||[]).forEach(function(i){cs.innerHTML+='<option value="'+i.id+'">'+escapeHtml(i.name)+'</option>'});const ds=$('tDeal');ds.innerHTML='<option value="">— لا شيء —</option>';(d.data||[]).forEach(function(i){ds.innerHTML+='<option value="'+i.id+'">صفقة: '+escapeHtml(i.client&&i.client.name||'—')+'</option>'});if(canManage()){$('tAssigneeFG').style.display='';const sel=$('tAssignedTo');sel.innerHTML='<option value="">— أنا ('+escapeHtml(currentProfile.full_name)+') —</option>';(allMembers||[]).forEach(function(m){if(m.is_active!==false&&m.id!==currentUser.id){sel.innerHTML+='<option value="'+m.id+'">'+escapeHtml(m.full_name)+' ('+roleAr(m.role)+')</option>'}})}else{$('tAssigneeFG').style.display='none'}}catch(err){showToast('تعذر تحميل خيارات المهمة: '+(err.message||err),'error');throw err}}
+async function populateTaskSelects(){
+ const generation=crmSessionGeneration,user=currentUser&&currentUser.id,current=()=>crmSessionCurrent(generation,user);
+ try{
+  const rows=await Promise.all([crmReadAll(()=>{if(!current())throw new Error('تغيّرت جلسة المهمة');return supa.from('clients').select('id,name',{count:'exact'}).order('id')}),crmReadAll(()=>{if(!current())throw new Error('تغيّرت جلسة المهمة');return crmDataFrom('deals').select('id, client:clients(name)',{count:'exact'}).order('id')})]);
+  if(!current())return false;
+  const c={data:rows[0]},d={data:rows[1]},cs=$('tClient');cs.innerHTML='<option value="">— لا شيء —</option>';
+  (c.data||[]).forEach(function(i){cs.innerHTML+='<option value="'+i.id+'">'+escapeHtml(i.name)+'</option>'});
+  const ds=$('tDeal');ds.innerHTML='<option value="">— لا شيء —</option>';(d.data||[]).forEach(function(i){ds.innerHTML+='<option value="'+i.id+'">صفقة: '+escapeHtml(i.client&&i.client.name||'—')+'</option>'});
+  if(canManage()){$('tAssigneeFG').style.display='';const sel=$('tAssignedTo');sel.innerHTML='<option value="">— أنا ('+escapeHtml(currentProfile.full_name)+') —</option>';(allMembers||[]).forEach(function(m){if(m.is_active!==false&&m.id!==currentUser.id){sel.innerHTML+='<option value="'+m.id+'">'+escapeHtml(m.full_name)+' ('+roleAr(m.role)+')</option>'}})}else{$('tAssigneeFG').style.display='none'}
+  return true;
+ }catch(err){if(!current())return false;showToast('تعذر تحميل خيارات المهمة: '+(err.message||err),'error');throw err}
+}
 async function loadTasks(){const list=$('tasksList');list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';try{
 let r=await supa.from('tasks').select('*, client:clients(name)').order('due_date',{ascending:true,nullsFirst:false});if(r.error){console.warn('[Tasks] Relation query failed, trying simple:',r.error.message);
 r=await supa.from('tasks').select('*').order('due_date',{ascending:true,nullsFirst:false});if(r.error)throw r.error}allTasks=r.data||[];
@@ -3626,11 +3587,12 @@ async function saveTask(){
 }
 async function editTask(id){
  if(!canEdit()){showPermissionDenied();return}
- try{let task=allTasks.find(x=>x.id===id);if(!task){const r=await supa.from('tasks').select('*').eq('id',id).single();if(r.error)throw r.error;task=r.data;allTasks.push(task)}
+ const generation=crmSessionGeneration,user=currentUser&&currentUser.id,current=()=>crmSessionCurrent(generation,user);
+ try{let task=allTasks.find(x=>x.id===id);if(!task){const r=await supa.from('tasks').select('*').eq('id',id).single();if(!current())return;if(r.error)throw r.error;task=r.data;allTasks.push(task)}
  window.editingTask=id;$('mTaskTitle').textContent='تعديل المهمة';$('tTitle').value=task.title||'';$('tDueDate').value=task.due_date||'';$('tPriority').value=task.priority||'medium';$('tNotes').value=task.notes||'';
- await populateTaskSelects();$('tClient').value=task.client_id||'';$('tDeal').value=task.deal_id||'';if(canManage())$('tAssignedTo').value=task.user_id===currentUser.id?'':task.user_id||'';
+ if(await populateTaskSelects()===false||!current())return;$('tClient').value=task.client_id||'';$('tDeal').value=task.deal_id||'';if(canManage())$('tAssignedTo').value=task.user_id===currentUser.id?'':task.user_id||'';
  $('mTask').classList.add('on');
- }catch(e){showToast('تعذر فتح المهمة: '+(e.message||e),'error')}
+ }catch(e){if(current())showToast('تعذر فتح المهمة: '+(e.message||e),'error')}
 }
 const taskTogglePending=new Set();
 async function toggleTask(id,done){
@@ -4723,31 +4685,31 @@ async function loadViewingChoices(kind,append,selectedId){
   finally{if(current()){more.disabled=false;if(!status.textContent.startsWith('تعذر'))more.textContent=isClient?'إعادة المحاولة':'تحميل المزيد';}}
 }
 async function populateViewingForm(viewing){
-  const generation=++viewingFormGeneration;viewingFormOriginal=viewing||null;crmSaveAttempts.delete('mViewing');
+  const generation=++viewingFormGeneration,session=crmSessionGeneration,actor=currentUser&&currentUser.id,current=()=>generation===viewingFormGeneration&&crmSessionCurrent(session,actor);viewingFormOriginal=viewing||null;crmSaveAttempts.delete('mViewing');
   if(typeof resetViewingNewClient==='function')resetViewingNewClient();if($('vNewClientToggle')){$('vNewClientToggle').hidden=!!viewing||!canEdit();$('vNewClientToggle').disabled=!!viewing;}
   ['vClientSearch','vPropertySearch'].forEach(id=>{$(id).value='';$(id).disabled=!!viewing;});$('vClient').disabled=!!viewing;$('vProperty').disabled=!!viewing;
   $('vClient').value='';$('vProperty').value='';$('vRequest').innerHTML='<option value="">اختر العميل أولاً</option>';$('vRequestHint').textContent='سيُربط الطلب المناسب أو يُنشأ طلب للعقار تلقائياً عند حفظ الزيارة.';$('vRequestType').value='buyer';$('vRequestType').disabled=!!(viewing&&viewing.request_id);
   const members=[{id:currentUser.id,full_name:currentProfile.full_name||'أنا'},...(allMembers||[]).filter(m=>m.id!==currentUser.id&&m.is_active!==false)];
   $('vAgent').innerHTML=members.map(m=>'<option value="'+m.id+'">'+escapeHtml(m.full_name)+'</option>').join('');
-  try{if(viewing&&viewing.agent_id&&!members.some(m=>m.id===viewing.agent_id)){const r=await supa.from('profiles').select('id,full_name').eq('id',viewing.agent_id).single();if(r.error)throw r.error;if(generation!==viewingFormGeneration)return;$('vAgent').insertAdjacentHTML('beforeend','<option value="'+r.data.id+'">'+escapeHtml(r.data.full_name)+'</option>');}
-    if(generation!==viewingFormGeneration)return;$('vAgent').value=viewing&&viewing.agent_id||currentUser.id;
+  try{if(viewing&&viewing.agent_id&&!members.some(m=>m.id===viewing.agent_id)){const r=await supa.from('profiles').select('id,full_name').eq('id',viewing.agent_id).single();if(r.error)throw r.error;if(!current())return;$('vAgent').insertAdjacentHTML('beforeend','<option value="'+r.data.id+'">'+escapeHtml(r.data.full_name)+'</option>');}
+    if(!current())return;$('vAgent').value=viewing&&viewing.agent_id||currentUser.id;
     await Promise.all([loadViewingChoices('client',false,viewing&&viewing.client_id),loadViewingChoices('property',false,viewing&&viewing.property_id)]);
-    if(generation!==viewingFormGeneration)return;if(viewing)await loadViewingClientProperty(viewing.request_id);
-  }catch(e){if(generation===viewingFormGeneration)showToast('تعذر تحميل الزيارة: '+e.message,'error');}
+    if(!current())return;if(viewing)await loadViewingClientProperty(viewing.request_id);
+  }catch(e){if(current())showToast('تعذر تحميل الزيارة: '+e.message,'error');}
 }
 async function loadViewingClientProperty(selectedRequest){
-  const clientId=$('vClient').value,generation=++viewingRequestGeneration,formGeneration=viewingFormGeneration;
+  const clientId=$('vClient').value,generation=++viewingRequestGeneration,formGeneration=viewingFormGeneration,session=crmSessionGeneration,actor=currentUser&&currentUser.id,current=()=>generation===viewingRequestGeneration&&formGeneration===viewingFormGeneration&&crmSessionCurrent(session,actor);
   $('vRequest').innerHTML='<option value=""></option>';$('vRequest').value='';
   $('vRequestType').disabled=!!(viewingFormOriginal&&viewingFormOriginal.request_id);
   $('vRequestHint').textContent='سيُربط الطلب المناسب أو يُنشأ طلب للعقار تلقائياً عند حفظ الزيارة.';
   if(!selectedRequest||!clientId)return;
   // Existing visits retain their original journey. New visits resolve the request atomically on save.
   try{const r=await supa.from('client_requests').select('id,request_type').eq('id',selectedRequest).eq('client_id',clientId).single();if(r.error)throw r.error;
-    if(generation!==viewingRequestGeneration||formGeneration!==viewingFormGeneration||$('vClient').value!==clientId)return;
+    if(!current()||$('vClient').value!==clientId)return;
     $('vRequest').innerHTML='<option value="'+r.data.id+'"></option>';$('vRequest').value=r.data.id;
     $('vRequestType').value=r.data.request_type;
     $('vRequestHint').textContent='الزيارة مرتبطة بطلب العميل الحالي؛ سيبقى الربط محفوظاً.';
-  }catch(e){if(generation===viewingRequestGeneration){$('vRequestHint').textContent='تعذر تحميل الطلب المرتبط؛ أعد فتح الزيارة قبل الحفظ.';showToast('تعذر تحميل الطلب: '+e.message,'error');}}
+  }catch(e){if(current()){$('vRequestHint').textContent='تعذر تحميل الطلب المرتبط؛ أعد فتح الزيارة قبل الحفظ.';showToast('تعذر تحميل الطلب: '+e.message,'error');}}
 }
 function clearViewingForm(){
   if(typeof resetViewingNewClient==='function')resetViewingNewClient();
@@ -4774,10 +4736,11 @@ async function saveViewing(){
 }
 async function editViewing(id){
   if(!canEdit()||crmSavingForms.has('mViewing'))return;
-  try{const r=await supa.from('viewings').select('*').eq('id',id).single();if(r.error)throw r.error;const v=r.data;editingViewing=id;$('mViewingTitle').textContent='تعديل الزيارة';
+  const generation=crmSessionGeneration,user=currentUser&&currentUser.id,current=()=>crmSessionCurrent(generation,user);
+  try{const r=await supa.from('viewings').select('*').eq('id',id).single();if(!current())return;if(r.error)throw r.error;const v=r.data;editingViewing=id;$('mViewingTitle').textContent='تعديل الزيارة';
     const values={vDate:v.viewing_date,vTime:v.viewing_time,vDuration:v.duration_minutes||60,vStatus:v.status||'scheduled',vAttendance:v.attendance,vFeedback:v.client_feedback,vRejectionReason:v.rejection_reason,vPipelineOutcome:v.pipeline_outcome==='followup'?'':(v.pipeline_outcome||(v.client_feedback==='wants_negotiate'?'negotiation':v.client_feedback==='disliked'?'lost':'')),vOutcomeNote:v.outcome_note,vNextStep:v.next_step,vFollowupDate:v.followup_date,vNotes:v.notes};
     Object.keys(values).forEach(k=>$(k).value=values[k]==null?'':values[k]);updateViewingOutcomeFields();$('mViewing').classList.add('on');await populateViewingForm(v);
-  }catch(e){showToast('تعذر فتح الزيارة: '+e.message,'error');}
+  }catch(e){if(current())showToast('تعذر فتح الزيارة: '+e.message,'error');}
 }
 
 function deleteViewing(id){

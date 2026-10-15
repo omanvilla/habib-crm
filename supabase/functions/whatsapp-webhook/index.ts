@@ -823,6 +823,22 @@ async function queueListingReview(args:{messageId:string;clientId:string;convers
   const conversation=await supabase.from("whatsapp_conversations").update({human_handoff_required:true,handoff_reason:reason,handoff_updated_at:new Date().toISOString()}).eq("id",args.conversationId);
   if(conversation.error)throw new Error(`property_ai_review_alert:${conversation.error.message}`);
 }
+async function alertUnresolvedListingReference(args:{messageId:string;clientId:string;conversationId:string;body:string;routeKey:string;messageAt:string}) {
+  // The database catches unmapped social links and explicit "this property"
+  // references even when the language model returns no structured request.
+  // Surface those existing references without adding duplicate queue rows or
+  // treating every inbound photo/greeting as a property inquiry.
+  const pending=await supabase.from("unmatched_property_links").select("id")
+    .eq("company_id",CRM_COMPANY_ID).eq("whatsapp_message_id",args.messageId)
+    .eq("conversation_id",args.conversationId).eq("status","pending")
+    .not("link_key","like","image:%").limit(1);
+  if(pending.error)throw new Error(`property_reference_review:${pending.error.message}`);
+  if(!pending.data?.length)return;
+  const alerted=await supabase.from("whatsapp_conversations").update({human_handoff_required:true,
+    handoff_reason:"استفسار عن عقار يحتاج تحديده وربطه بالعقار الصحيح",handoff_updated_at:new Date().toISOString()})
+    .eq("company_id",CRM_COMPANY_ID).eq("id",args.conversationId).eq("human_handoff_required",false);
+  if(alerted.error)throw new Error(`property_reference_alert:${alerted.error.message}`);
+}
 async function attributeSpecificListingText(args:{messageId:string;clientId:string;conversationId:string;body:string;routeKey:string;messageAt:string}) {
   if(!OPENAI_API_KEY || args.body.trim().length<3 || !["muscat","barka"].includes(args.routeKey))return;
   const rows=await supabase.from("properties").select("id,title,area,wilayat,price,bedrooms,land_size,built_size,property_code")
@@ -1410,6 +1426,7 @@ async function processInboundMessage(value: any, m: any) {
       }
     }
     await finalizePropertyAttribution(messageRow.id);
+    await alertUnresolvedListingReference({messageId:messageRow.id,clientId,conversationId:conversation.id,body,routeKey:route.route_key,messageAt});
     const appliedCount = Number(batchResult?.applied_count || 0), reviewNeeded = Boolean(extracted?.needs_human_review) || Boolean(batchResult?.needs_human_review);
     const convUpdate: any = { updated_at: new Date().toISOString() }; if (extracted?.conversation_summary) convUpdate.ai_summary = extracted.conversation_summary; if (extracted) convUpdate.ai_last_extracted = extracted;
     await supabase.from("whatsapp_conversations").update(convUpdate).eq("id", conversation.id);

@@ -17,7 +17,7 @@
     if(kind==='all')from=typeof currentCompany!=='undefined'&&currentCompany?.created_at?omanDate(currentCompany.created_at):null;
     return {from,to};
   }
-  const metric=(label,value)=>'<span class="ops-metric"><strong>'+n(value)+'</strong><small>'+label+'</small></span>';
+  const metric=(label,value,hint='')=>'<span class="ops-metric"><strong>'+n(value)+'</strong><small>'+label+'</small>'+(hint?'<span class="ops-metric-help">'+hint+'</span>':'')+'</span>';
   function targetScore(row,kind){
     if(kind==='all')return 'إجمالي تاريخي؛ لا يُقارن بهدف شهر واحد';
     const t={...(row.targets||{}),inventory_target:10},span=period(kind),month=period('month');
@@ -35,17 +35,18 @@
     const box=$id(boxId);if(!box)return;
     const request={};performanceLoads.set(box,request);
     const isCurrent=()=>performanceLoads.get(box)===request&&crmSessionCurrent(generation,user);
-    box.textContent='جاري حساب الأداء...';
+    box.innerHTML='<p class="ops-state" role="status">جاري تحميل الأداء…</p>';
     try{
-      const span=period(kind),r=await supa.rpc('crm_employee_performance',{p_from:span.from,p_to:span.to});
+      const span=period(kind),r=await bounded(supa.rpc('crm_employee_performance',{p_from:span.from,p_to:span.to}));
       if(!isCurrent())return;
       if(r.error)throw r.error;
       const employees=r.data.employees||[];
-      box.innerHTML='<p class="ops-note">'+safe(r.data.from||span.from||'بداية الشركة')+' حتى قبل '+safe(span.to)+' · الاستفسار المثبت برسالة واردة فقط. الزيارات والمبيعات نشاط مسجل خلال الفترة، ونسب التحويل تُحسب على مجموعة الاستفسارات أو الزيارات نفسها. الإسناد المعتمد للعمل منذ 1 أغسطس 2026: مسقط لهديل وبركاء لمرام. الموظفة ترى شغلها وعمولة الشركة الناتجة عنه فقط. العقارات النشطة رصيد حالي، والعقارات الجديدة إضافات الفترة المختارة؛ التواريخ الأصلية محفوظة.</p>'+
+      box.innerHTML='<div class="ops-performance-caption"><span>'+safe(r.data.from||span.from||'بداية الشركة')+' — '+safe(new Date(Date.parse(span.to+'T00:00:00Z')-86400000).toISOString().slice(0,10))+'</span><small>العقارات النشطة رصيد حالي؛ بقية الأرقام للفترة المختارة.</small></div>'+
       (employees.map(x=>'<article class="ops-person"><div class="ops-person-title"><strong>'+safe(x.name)+'</strong><span>'+safe(targetScore(x,kind))+'</span></div><div class="ops-metrics">'+
-        metric('عقارات نشطة مسندة لها الآن',x.active_inventory)+metric('إضافات جديدة خلال الفترة',x.new_properties)+metric('استفسارات عقار مثبتة',x.inquiries)+metric('منها تحوّل إلى زيارة',x.inquiry_to_visit)+metric('زيارات حُجزت',x.visits_booked)+metric('زيارات تمت',x.visits_done)+metric('منها تحوّل إلى بيع',x.visit_to_sale)+metric('مبيعات أُغلقت',x.sales)+metric('تواصل بشري منسوب للشغل',x.activities)+metric('رسائل بشرية منسوبة للشغل',x.outbound_messages)+'</div>'+
-        (x.company_commission==null?'':'<div class="ops-note">عمولة الشركة الناتجة عن هذا الشغل: '+n(x.company_commission)+' ر.ع</div>')+'</article>').join('')||'<p>لا يوجد موظفون نشطون.</p>');
-    }catch(e){if(!isCurrent())return;box.innerHTML='<p role="alert">تعذر حساب الأداء: '+safe(e.message)+'</p>'}
+        metric('عقارات نشطة الآن',x.active_inventory,'مسندة للموظفة')+metric('عقارات أُضيفت خلال الفترة',x.new_properties,'إضافة عقار جديد إلى CRM')+metric('استفسارات عن عقار محدد',x.inquiries,'رسائل واردة رُبطت بعقار')+metric('استفسارات الفترة التي وصلت لزيارة',x.inquiry_to_visit,'قد تكون الزيارة في فترة لاحقة')+metric('زيارات حُجزت',x.visits_booked)+metric('زيارات تمت',x.visits_done)+metric('مبيعات الفترة المرتبطة بزيارة',x.visit_to_sale,'يشمل الزيارات السابقة للفترة')+metric('مبيعات أُغلقت',x.sales)+metric('أنشطة متابعة موثقة',x.activities,'مكالمات واجتماعات ومتابعات مسجلة')+metric('رسائل واتساب صادرة من الفريق',x.outbound_messages,'رسائل أرسلها موظف، دون الآلية')+'</div>'+
+        (x.company_commission==null?'':'<div class="ops-commission"><span>عمولة الشركة من صفقات الفترة</span><strong>'+n(x.company_commission)+' <small>ر.ع</small></strong></div>')+'</article>').join('')||'<p class="ops-empty">لا يوجد موظفون نشطون.</p>')+
+        '<details class="ops-metric-definitions"><summary>كيف تُحسب هذه الأرقام؟</summary><p>الاستفسار يُحسب عند وجود رسالة واردة مرتبطة بعقار محدد. الزيارة اليدوية تُحسب زيارة، ولا تتحول وحدها إلى استفسار وارد. مبيعات الفترة المرتبطة بزيارة تشمل البيع الذي أُغلق خلالها وكانت له زيارة مكتملة، حتى لو تمت الزيارة في شهر سابق. أنشطة المتابعة هي السجلات البشرية الفعلية؛ رسائل واتساب الآلية مستبعدة.</p><p>الإسناد المعتمد للعمل منذ 1 أغسطس 2026: مسقط لهديل وبركاء لمرام. رصيد العقارات المستهدف 10، وبقية الأهداف حسب اعتماد المالك.</p></details>';
+    }catch(e){if(!isCurrent())return;box.innerHTML='<div class="ops-error" role="alert"><strong>تعذر تحميل الأداء</strong><span>'+safe(e.message)+'</span><button class="ops-action" data-performance-retry="'+safe(kind)+'" data-performance-box="'+safe(boxId)+'">إعادة المحاولة</button></div>'}
   }
   window.crmDashboardPerformancePeriod=function(kind){const panel=$id('opsPerformanceDetails');if(!currentProfile||!['owner','manager','agent'].includes(currentProfile.role))return;if(panel)panel.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('active',b.dataset.period===kind));renderPerformance(kind,'opsDashboardPerformanceResults')};
   window.crmPerformancePeriod=function(kind){teamPerformancePeriod=kind;document.querySelectorAll('.ops-period').forEach(b=>b.classList.toggle('active',b.dataset.period===kind));return renderPerformance(kind)};
@@ -68,32 +69,122 @@
   function workButton(action,label,client,request,id){
     return '<button class="ops-action" data-work-action="'+action+'" data-client-id="'+safe(client||'')+'" data-request-id="'+safe(request||'')+'" data-work-id="'+safe(id||'')+'">'+safe(label)+'</button>';
   }
-  function renderDailyWork(snapshot){
-    const box=$id('opsDailyWork');if(!box)return;
-    if(!snapshot){box.innerHTML='<div class="ops-state" role="alert">تعذر تحديث عمل اليوم. '+workButton('refresh-day','إعادة المحاولة')+'</div>';return;}
-    const tasksCard=$id('dashTasksCard');if(tasksCard)tasksCard.style.display='none';
-    const today=omanDate(new Date()),clients=new Map(snapshot.clients.map(c=>[c.id,c]));
-    const followups=snapshot.requests.filter(r=>r.next_followup&&workDate(r.next_followup)<=today)
-      .sort((a,b)=>String(a.next_followup).localeCompare(String(b.next_followup)));
-    const qualified=snapshot.requests.filter(r=>!r.next_followup&&(r.qualified_at||r.pipeline_stage==='qualified'));
-    const requestRows=followups.concat(qualified).slice(0,6);
-    const owner=currentProfile&&currentProfile.role==='owner';
-    const row=(r)=>{const c=clients.get(r.client_id)||{};return '<div class="ops-work-row"><div><strong>'+safe(c.name||'عميل')+'</strong><span>'+safe(requestLabel(r))+'</span><small class="'+(r.next_followup&&workDate(r.next_followup)<today?'ops-overdue':'')+'">'+safe(r.next_followup?dueLabel(r.next_followup):'طلب مؤهل · حدّد الخطوة التالية')+'</small>'+(r.next_action?'<small>التالي: '+safe(r.next_action)+'</small>':'')+'</div>'+workButton('request','فتح الطلب',r.client_id,r.id)+'</div>';};
-    const contactRows=(snapshot.contactQueue||[]).slice(0,3).map(q=>{const c=clients.get(q.client_id)||{};return '<div class="ops-work-row"><div><strong>'+safe(c.name||'عميل')+'</strong><small>لم يوثق تواصل بشري بعد</small></div>'+workButton('client','فتح العميل',q.client_id)+'</div>';}).join('');
-    const visits=snapshot.visits.map(v=>'<div class="ops-work-row"><div><strong>'+safe(v.client?.name||'عميل')+'</strong><span>'+safe(v.property?.title||'عقار')+'</span><small>'+safe(workDate(v.viewing_date))+' · <bdi dir="ltr">'+safe(String(v.viewing_time||'').slice(0,5))+'</bdi> · '+safe(v.status==='confirmed'?'مؤكدة':v.status==='postponed'?'مؤجلة':'محجوزة')+'</small></div>'+workButton('visit',canEdit()?'تحديث الزيارة':'فتح العميل',v.client_id,v.request_id,v.id)+'</div>').join('');
-    const tasks=snapshot.tasks.slice().sort((a,b)=>String(a.due_date||'9999').localeCompare(String(b.due_date||'9999'))).slice(0,5);
-    box.innerHTML='<p class="ops-scope">'+(owner?'متابعة الفرعين · تظهر السجلات بحسب نطاق صلاحيتك':'عمل الفرع المسموح لحسابك · كل طلب مستقل عن بقية طلبات العميل')+'</p><div class="ops-day-grid"><section class="ops-work-section"><div class="ops-section-head"><h3>الطلبات التي تحتاج خطوة</h3>'+workButton('due-clients','كل المتابعات')+'</div>'+ (requestRows.map(row).join('')||'<div class="ops-state">لا توجد متابعة مستحقة أو طلبات مؤهلة دون خطوة. '+workButton('clients','فتح العملاء')+'</div>')+(contactRows?'<h4>عملاء ينتظرون أول تواصل</h4>'+contactRows:'')+'</section><section class="ops-work-section"><div class="ops-section-head"><h3>الزيارات القادمة</h3>'+workButton('visits','الجدول')+'</div>'+(visits||'<div class="ops-state">لا توجد زيارات قادمة مسجلة.</div>')+'</section></div><section class="ops-work-section ops-task-section"><div class="ops-section-head"><h3>المهام التالية</h3>'+workButton('tasks','كل المهام')+'</div>'+(tasks.map(t=>'<div class="ops-work-row"><div><strong>'+safe(t.title)+'</strong><small>'+safe(dueLabel(t.due_date))+'</small></div>'+workButton('task',canEdit()?'فتح المهمة':'عرض المهام',t.client_id,t.request_id,t.id)+'</div>').join('')||'<div class="ops-state">لا توجد مهام مفتوحة. يمكنك إضافة مهمة عند تحديد خطوة متابعة.</div>')+'</section><details class="ops-work-section"><summary>صفقات تحتاج استكمالاً</summary>'+(snapshot.deals.map(d=>'<div class="ops-work-row"><div><strong>'+safe(d.client?.name||'عميل')+'</strong><span>'+safe(d.property?.title||'عقار')+'</span><small>'+safe(typeof stageAr==='function'?stageAr(d.stage):d.stage)+'</small></div>'+workButton('deal','فتح الصفقات',d.client_id,d.request_id,d.id)+'</div>').join('')||'<div class="ops-state">لا توجد صفقات مفتوحة.</div>')+'</details>';
+  // Each scope settles independently. A slow source never leaves the whole dashboard spinning.
+  function bounded(promise, milliseconds=18000){
+    if(typeof setTimeout!=='function')return Promise.resolve(promise);
+    let timer;return Promise.race([Promise.resolve(promise),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('استغرق الاتصال وقتًا أطول من المعتاد. أعد المحاولة.')),milliseconds);})]).finally(()=>clearTimeout(timer));
   }
-  const oldDashboard=window.loadDashboard;
-  if(typeof oldDashboard==='function')window.loadDashboard=async function(){
-    const user=currentUser&&currentUser.id,generation=crmSessionGeneration;
-    const box=$id('opsDailyWork');if(box)box.innerHTML='<div class="ops-state" role="status">جاري ترتيب عمل اليوم…</div>';
-    const panel=$id('opsPerformanceDetails');if(panel)panel.hidden=!currentProfile||!['owner','manager','agent'].includes(currentProfile.role);
-    const result=await oldDashboard.apply(this,arguments);
-    if(!crmSessionCurrent(generation,user))return result;
-    renderDailyWork(window.dashboardWorkSnapshot);
-    return result;
+  const dashboardScopes=new Map();
+  let dashboardScope='branches',dashboardSession='',dashboardCategory='all';
+  const scopeTitle=scope=>scope==='investment'?'المستثمرون · عملي الخاص':currentProfile?.role==='owner'?'مسقط وبركاء والعمل العام':'عمل الفرع';
+  const scopeDescription=scope=>scope==='investment'?'مسار الاستثمار · خاص بالمالك':currentProfile?.role==='owner'?'العمل المشترك · دون مسار المستثمرين':'السجلات المسموح بها لحسابك فقط';
+  const countDefinitions=[
+    ['followups_due','عملاء بمتابعة مستحقة','لديهم متابعة اليوم أو متأخرة','followups'],
+    ['hot_requests','عملاء بفرص حارة','فرص نشطة لها تواصل حديث أو متابعة','hot'],
+    ['viewings_today','زيارات اليوم','زيارات غير ملغاة مسجلة لليوم','visits'],
+    ['open_deals','صفقات مفتوحة','صفقات لم تغلق ولم تُفقد','deals'],
+    ['urgent_tasks','مهام عاجلة','متأخرة أو لليوم أو عالية الأولوية','tasks'],
+    ['uncontacted','بانتظار توثيق التواصل','لم يسجل تواصل فعلي بعد','contact']
+  ];
+  function scopeButtons(){return [...dashboardScopes.keys()].map(scope=>'<button class="ops-filter '+(scope===dashboardScope?'active':'')+'" data-dashboard-scope="'+scope+'" aria-pressed="'+(scope===dashboardScope)+'">'+scopeTitle(scope)+'</button>').join('');}
+  function scopeCard(scope,state){
+    const selected=scope===dashboardScope,loading=state.status==='loading',failed=state.status==='error',counts=state.data?.counts||{};
+    return '<section class="ops-summary-card '+(scope==='investment'?'ops-private-card':'')+'" data-dashboard-card="'+scope+'" aria-busy="'+loading+'"><header><div><h3>'+scopeTitle(scope)+'</h3><p>'+scopeDescription(scope)+'</p></div><span class="ops-scope-mark">'+(scope==='investment'?'خاص':'تشغيل')+'</span></header>'+
+      (failed?'<div class="ops-error" role="alert"><strong>تعذر تحديث هذا الملخص</strong><span>'+safe(state.error)+'</span><button class="ops-action" data-dashboard-retry="'+scope+'">إعادة المحاولة</button></div>':'<div class="ops-count-grid">'+countDefinitions.map(([key,label,hint,category])=>'<button class="ops-count '+(Number(counts[key])>0&&['followups_due','urgent_tasks'].includes(key)?'ops-needs-action':'')+'" data-dashboard-scope="'+scope+'" data-dashboard-category="'+category+'" '+(loading?'disabled':'')+' title="'+hint+'"><strong>'+ (loading?'—':n(counts[key]))+'</strong><span>'+label+'</span></button>').join('')+'</div>')+
+      '<footer><span role="status">'+(loading?'جاري تحميل المؤشرات…':failed?'آخر تحديث غير متاح':state.data.as_of?'بيانات يوم '+safe(String(state.data.as_of).slice(0,10)):'تم التحديث')+'</span><button class="ops-text-action" data-dashboard-scope="'+scope+'" '+(loading||failed?'disabled':'')+'>'+(selected?'عرض قائمة العمل':'فتح قائمة العمل')+'</button></footer></section>';
+  }
+  function requestRow(r,clients){
+    const c=clients.get(r.client_id)||r.client||{};
+    return '<div class="ops-work-row"><div><strong>'+safe(c.name||r.client_name||'عميل')+'</strong><span>'+safe(requestLabel(r))+'</span><small class="'+(r.next_followup&&workDate(r.next_followup)<omanDate(new Date())?'ops-overdue':'')+'">'+safe(r.next_followup?dueLabel(r.next_followup):'حدّد الخطوة التالية')+'</small>'+(r.next_action?'<small>التالي: '+safe(r.next_action)+'</small>':'')+'</div>'+workButton('request',canEdit()?'فتح الطلب':'ملف العميل',r.client_id,r.id)+'</div>';
+  }
+  const listFields={followups:'followups',hot:'hotRequests',visits:'visits',deals:'deals',tasks:'tasks',contact:'contactQueue'};
+  function workSection(title,rows,empty,category){
+    const state=dashboardScopes.get(dashboardScope),field=listFields[category],total=state?.data?.totals?.[field]??rows.length,shown=dashboardCategory==='all'?rows.slice(0,6):rows;
+    const more=state?.more?.[category];
+    return '<section class="ops-work-section" data-dashboard-list="'+category+'"><div class="ops-section-head"><h3>'+title+'</h3><span class="ops-list-count">'+n(total)+'</span></div>'+(shown.join('')||'<p class="ops-empty">'+empty+'</p>')+
+      (total>shown.length?'<div class="ops-list-footer"><span>المعروض '+n(shown.length)+' من '+n(total)+' سجل</span>'+(dashboardCategory==='all'?'<button class="ops-text-action" data-dashboard-category="'+category+'">فتح القائمة</button>':'<button class="ops-text-action" data-dashboard-more="'+category+'" '+(more?.loading?'disabled':'')+'>'+(more?.loading?'جاري التحميل…':'عرض المزيد')+'</button>')+'</div>':'')+
+      (more?.error?'<p class="ops-list-error" role="alert">'+safe(more.error)+'</p>':'')+'</section>';
+  }
+
+  function dashboardWork(data){
+    const today=omanDate(new Date()),clients=new Map((data.clients||[]).map(c=>[c.id,c]));
+    const requests=data.requests||[],followups=data.followups||requests.filter(r=>r.next_followup&&workDate(r.next_followup)<=today).sort((a,b)=>String(a.next_followup).localeCompare(String(b.next_followup))),hot=data.hotRequests||requests.filter(r=>(data.clientFilters?.hotfocus||[]).includes(r.client_id));
+    const visits=(data.visits||[]).map(v=>'<div class="ops-work-row"><div><strong>'+safe(v.client?.name||v.client_name||clients.get(v.client_id)?.name||'عميل')+'</strong><span>'+safe(v.property?.title||v.property_title||'زيارة عقار')+'</span><small>'+safe(workDate(v.viewing_date))+' · <bdi dir="ltr">'+safe(String(v.viewing_time||'').slice(0,5)||'الوقت غير محدد')+'</bdi> · '+safe(({done:'تمت',confirmed:'مؤكدة',postponed:'مؤجلة',scheduled:'محجوزة',no_show:'لم يحضر'}[v.status]||v.status||'مسجلة'))+'</small></div>'+workButton('visit',canEdit()?'فتح الزيارة':'ملف العميل',v.client_id,v.request_id,v.id)+'</div>');
+    const tasks=(data.tasks||[]).map(t=>'<div class="ops-work-row"><div><strong>'+safe(t.title)+'</strong><small class="'+(t.due_date&&workDate(t.due_date)<today?'ops-overdue':'')+'">'+safe(dueLabel(t.due_date))+(t.priority==='high'?' · أولوية عالية':'')+'</small></div>'+workButton('task',canEdit()?'فتح المهمة':'المهام',t.client_id,t.request_id,t.id)+'</div>');
+    const deals=(data.deals||[]).map(d=>'<div class="ops-work-row"><div><strong>'+safe(d.client?.name||d.client_name||clients.get(d.client_id)?.name||'عميل')+'</strong><span>'+safe(d.property?.title||d.property_title||'صفقة عقارية')+'</span><small>'+safe(({negotiation:'تفاوض',viewing_scheduled:'زيارة مجدولة',viewed:'زيارة تمت',offer:'عرض',deposit:'عربون',contract:'عقد'}[d.stage])||(typeof stageAr==='function'?stageAr(d.stage):d.stage))+'</small></div>'+workButton('deal','فتح الصفقة',d.client_id,d.request_id,d.id)+'</div>');
+    const contact=(data.contactQueue||[]).map(q=>'<div class="ops-work-row"><div><strong>'+safe(clients.get(q.client_id)?.name||q.client_name||'عميل')+'</strong><small>افتح الملف وسجّل التواصل الفعلي أو الخطوة القادمة</small></div>'+workButton('client','ملف العميل',q.client_id)+'</div>');
+    const sections={followups:()=>workSection('المتابعات المستحقة',followups.map(r=>requestRow(r,clients)),'لا توجد متابعات مستحقة مسجلة.', 'followups'),hot:()=>workSection('الفرص الحارة النشطة',hot.map(r=>requestRow(r,clients)),'لا توجد فرص حارة نشطة حاليًا.','hot'),visits:()=>workSection('زيارات اليوم والزيارات القادمة',visits,'لا توجد زيارات مسجلة لليوم أو للأيام القادمة.','visits'),tasks:()=>workSection('المهام العاجلة أولًا',tasks,'لا توجد مهام عاجلة مسجلة.','tasks'),deals:()=>workSection('الصفقات المفتوحة',deals,'لا توجد صفقات مفتوحة حاليًا.','deals'),contact:()=>workSection('بانتظار توثيق التواصل',contact,'لا يوجد تواصل ينتظر التوثيق.','contact')};
+    if(dashboardCategory!=='all'&&sections[dashboardCategory])return sections[dashboardCategory]();
+    return '<div class="ops-day-grid">'+sections.followups()+sections.tasks()+sections.visits()+sections.deals()+'</div>';
+  }
+  function renderDashboard(){
+    const box=$id('opsDailyWork');if(!box)return;
+    if(!dashboardScopes.has(dashboardScope))dashboardScope='branches';
+    const state=dashboardScopes.get(dashboardScope),owner=currentProfile?.role==='owner';
+    if(!state)return;
+    box.innerHTML='<div class="ops-summary-grid '+(owner?'':'ops-single-scope')+'">'+[...dashboardScopes].map(([scope,item])=>scopeCard(scope,item)).join('')+'</div><div class="ops-work-head"><div><h2>قائمة العمل</h2><p>خطوة تالية واضحة، من نفس السجل.</p></div>'+(owner?'<div class="ops-scope-tabs" aria-label="نطاق قائمة العمل">'+scopeButtons()+'</div>':'')+'</div><div class="ops-category-tabs" aria-label="نوع العمل">'+[['all','الأولوية الآن'],['followups','المتابعات'],['tasks','المهام'],['visits','الزيارات'],['deals','الصفقات'],['hot','الفرص الحارة'],['contact','التواصل']].map(([key,label])=>'<button class="ops-filter '+(dashboardCategory===key?'active':'')+'" data-dashboard-category="'+key+'" aria-pressed="'+(dashboardCategory===key)+'">'+label+'</button>').join('')+'</div><div id="opsScopeWork">'+
+      (state.status==='loading'?'<div class="ops-state" role="status">جاري تحميل قائمة العمل…</div>':state.status==='error'?'<div class="ops-error" role="alert"><strong>قائمة العمل غير متاحة حاليًا</strong><span>أعد تحميل هذا القسم. يمكنك متابعة الأقسام الأخرى المتاحة.</span><button class="ops-action" data-dashboard-retry="'+dashboardScope+'">إعادة المحاولة</button></div>':dashboardScope==='investment'&&!Object.values(state.data.counts||{}).some(v=>Number(v)>0)&&!Object.values(state.data.totals||{}).some(v=>Number(v)>0)&&!['requests','followups','hotRequests','visits','deals','tasks','contactQueue'].some(key=>(state.data[key]||[]).length)?'<div class="ops-investment-empty"><div><strong>مساحتك الخاصة للمستثمرين جاهزة</strong><p>أضف المستثمر، ثم حدّد الخطوة القادمة وموعد متابعتها ليظهر العمل هنا.</p></div>'+workButton('new-investor','إضافة مستثمر')+'</div>':dashboardWork(state.data))+'</div>';
+    // Legacy client filters are populated only with the selected scope; rows never mix scopes.
+    window.dashboardClientFilters=state.data?.clientFilters||{uncontacted:[],due:[],hotfocus:[]};
+    window.dashboardContactQueue=state.data?.contactQueue||[];
+    window.dashboardWorkSnapshot=state.data||null;
+  }
+  async function loadDashboardScope(scope){
+    if(scope==='investment'&&currentProfile?.role!=='owner')return;
+    const generation=crmSessionGeneration,user=currentUser&&currentUser.id,request={status:'loading'};
+    dashboardScopes.set(scope,request);renderDashboard();
+    const current=()=>dashboardScopes.get(scope)===request&&crmSessionCurrent(generation,user);
+    try{
+      const r=await bounded(supa.rpc('crm_dashboard_work',{p_scope:scope,p_limit:20,p_offset:0}));
+      if(!current())return;
+      if(r.error)throw r.error;
+      if(!r.data||!r.data.counts||r.data.scope!==scope)throw new Error('لم تكتمل بيانات هذا القسم. حاول تحديثه.');
+      request.status='ready';request.data=r.data;
+    }catch(e){if(!current())return;request.status='error';request.error=e.message||'تعذر الاتصال بالخادم.';}
+    if(current())renderDashboard();
+  }
+  async function loadDashboardMore(category){
+    const scope=dashboardScope,state=dashboardScopes.get(scope),field=listFields[category];if(!field||state?.status!=='ready'||state.more?.[category]?.loading)return;
+    const generation=crmSessionGeneration,user=currentUser&&currentUser.id,offset=(state.data[field]||[]).length;
+    state.more=state.more||{};state.more[category]={loading:true};renderDashboard();
+    const current=()=>dashboardScopes.get(scope)===state&&crmSessionCurrent(generation,user);
+    try{
+      const r=await bounded(supa.rpc('crm_dashboard_work',{p_scope:scope,p_limit:20,p_offset:offset}));if(!current())return;
+      if(r.error)throw r.error;if(r.data?.scope!==scope||!Array.isArray(r.data[field]))throw new Error('لم تكتمل القائمة. أعد المحاولة.');
+      const append=(existing,added)=>[...new Map([...(existing||[]),...(added||[])].map(row=>[row.id||row.client_id,row])).values()];
+      state.data[field]=append(state.data[field],r.data[field]);state.data.clients=append(state.data.clients,r.data.clients);state.data.totals=r.data.totals||state.data.totals;
+      if(!r.data[field].length&&offset<Number(state.data.totals?.[field]||0))throw new Error('تغيّرت القائمة أثناء التحميل. حدّث الملخص للحصول على آخر البيانات.');
+      state.more[category]={loading:false};
+    }catch(e){if(!current())return;state.more[category]={loading:false,error:e.message||'تعذر تحميل بقية السجلات.'};}
+    if(current())renderDashboard();
+  }
+  window.crmLoadDashboardWork=async function(){
+    if(!currentUser||!currentProfile)return;
+    const session=crmSessionGeneration+':'+currentUser.id;
+    if(session!==dashboardSession){dashboardScopes.clear();dashboardScope='branches';dashboardCategory='all';dashboardSession=session;}
+    const owner=currentProfile.role==='owner';
+    if(!owner)dashboardScopes.delete('investment');
+    const title=$id('opsDashboardTitle');if(title)title.textContent=owner?'لوحة الإدارة':'لوحة العمل';
+    const description=$id('opsDashboardScopeNote');if(description)description.textContent=owner?'متابعة الفرعين وأعمال المستثمرين، كل مسار في مساحة واضحة.':'المتابعات والزيارات والمهام الخاصة بنطاق حسابك.';
+    const date=$id('opsDashboardDate');if(date)date.textContent=new Date().toLocaleDateString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat',weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    const panel=$id('opsPerformanceDetails');if(panel){panel.hidden=!['owner','manager','agent'].includes(currentProfile.role);const heading=panel.querySelector('summary>span');if(heading)heading.textContent=owner||currentProfile.role==='manager'?'أداء الفريق خلال الفترة':'أدائي خلال الفترة';}
+    if(typeof loadEmployeeTargetReminder==='function')loadEmployeeTargetReminder();
+    const scopes=owner?['branches','investment']:['branches'];scopes.forEach(scope=>dashboardScopes.set(scope,{status:'loading'}));renderDashboard();
+    await Promise.allSettled(scopes.map(loadDashboardScope));
   };
+  window.loadDashboard=window.crmLoadDashboardWork;
+  const propertyActionQueue=window.loadPropertyActionQueue;
+  if(typeof propertyActionQueue==='function')window.loadPropertyActionQueue=function(target){if(target==='dashboard')return Promise.resolve();return propertyActionQueue.apply(this,arguments);};
+  document.addEventListener('click',e=>{
+    const more=e.target.closest('[data-dashboard-more]');if(more){loadDashboardMore(more.dataset.dashboardMore);return;}
+    const performanceRetry=e.target.closest('[data-performance-retry]');if(performanceRetry){renderPerformance(performanceRetry.dataset.performanceRetry,performanceRetry.dataset.performanceBox);return;}
+    const retry=e.target.closest('[data-dashboard-retry]');if(retry){loadDashboardScope(retry.dataset.dashboardRetry);return;}
+    const control=e.target.closest('[data-dashboard-scope],[data-dashboard-category]');if(!control)return;
+    const scope=control.dataset.dashboardScope,category=control.dataset.dashboardCategory;
+    if(scope&&dashboardScopes.has(scope)){dashboardScope=scope;dashboardCategory=category||'all';}
+    else if(category)dashboardCategory=category;
+    renderDashboard();
+  });
   const oldPhone=window.formatPhoneDisplay;
   if(typeof oldPhone==='function')window.formatPhoneDisplay=function(v){return oldPhone(v).replace(/<span dir="ltr"/g,'<bdi dir="ltr"').replace(/<\/span>/g,'</bdi>')};
   let propertySearch='',propertyBranch='',propertyArea='',propertyStatus='';
@@ -155,7 +246,7 @@
     }).join('');
   };
   window.crmResetOperations=function(){
-    teamPerformancePeriod='month';
+    teamPerformancePeriod='month';dashboardScopes.clear();dashboardSession='';dashboardScope='branches';dashboardCategory='all';
     clientBranch='all';clientWorkFilter='all';propertySearch='';propertyBranch='';propertyArea='';propertyStatus='';
     ['opsPropertySearch','opsPropertyBranch','opsPropertyArea','opsPropertyStatus'].forEach(id=>{if($id(id))$id(id).value='';});
   };
@@ -172,6 +263,7 @@
     const action=button.dataset.workAction,id=button.dataset.workId,client=button.dataset.clientId,request=button.dataset.requestId;
     try{
       if(action==='refresh-day')await loadDashboard();
+      else if(action==='new-investor'&&isOwner()){openCreateModal('mClient');const investor=$id('cRoleInvestor');if(investor){investor.checked=true;updateClientInvestmentForm();}}
       else if(action==='clients'||action==='due-clients'){navigate('clients',null);clientWorkFilter=action==='due-clients'?'due':'all';}
       else if(action==='client')await viewClient(client);
       else if(action==='request'){await viewClient(client);if(canEdit()&&viewingClient&&viewingClient.id===client)await openClientRequestForm(request,client);else if(typeof client360SwitchTab==='function')client360SwitchTab('requests');}
@@ -181,7 +273,7 @@
       else if(action==='visits')navigate('viewings',null);
       else if(action==='task'){if(canEdit())await editTask(id);else navigate('daily',null);}
       else if(action==='tasks')navigate('daily',null);
-      else if(action==='deal')navigate('deals',null);
+      else if(action==='deal'){if(canEdit()&&typeof editDeal==='function')await editDeal(id);else navigate('deals',null);}
       else if(['property','edit-property','archive-property','restore-property'].includes(action)){
         e.preventDefault();e.stopPropagation();
         const property=allProperties.find(p=>p.id===id);
@@ -216,4 +308,5 @@
     }catch(e){if(crmSessionCurrent(generation,user))showToast('تعذر إعداد التقرير: '+e.message,'error')}
   };
   addPerformance();
+  if(window.crmDashboardPending){window.crmDashboardPending=false;window.loadDashboard();}
 })();
