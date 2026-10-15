@@ -43,7 +43,8 @@
   }
   function requestBlock(r,index,teams){
     var summary=r.ai_extracted&&r.ai_extracted.request_summary?r.ai_extracted.request_summary:'';
-    var title=index===0?'الطلب الحالي':'طلب حالي آخر';
+    var investment=r.route_key==='investment'||r.branch_key==='investment';
+    var title=investment?'الطلب الاستثماري':(index===0?'الطلب الحالي':'طلب حالي آخر');
     var h='<div class="crm-current-request" style="border:1px solid var(--cream-deeper);border-radius:14px;padding:14px;margin-top:12px;background:white">';
     h+='<div style="font-weight:800;color:var(--espresso);margin-bottom:8px">'+title+(r.id&&typeof canEdit==='function'&&canEdit()?' <button class="btn-secondary" onclick="editClientRequest(\''+r.id+'\')">تعديل الطلب</button>':'')+'</div>';
     h+=row('نوع الطلب',reqType(r.request_type));
@@ -58,11 +59,22 @@
     h+=row('طريقة الدفع / التمويل',payment(r.payment_method));
     h+=row('موعد الشراء',timing(r.purchase_timing));
     h+=row('الغرض',purpose(r.purpose));
-    h+=row('الفريق المسؤول',teamText(teams,r));
+    h+=row('الفريق المسؤول',investment?'المالك — خاص بالمالك':teamText(teams,r));
+    if(investment){
+      h+=row('جاهزية التمويل',({cash_confirmed:'السيولة مؤكدة',preapproved:'موافقة تمويل مسبقة',in_progress:'قيد التجهيز',not_started:'لم يبدأ',rejected:'رُفض التمويل',unknown:'غير معروف'}[r.financing_readiness]||r.financing_readiness||'غير محدد'));
+      h+=row('صاحب القرار',({self:'العميل نفسه',joint_family:'قرار مشترك مع الأسرة',not_decision_maker:'ليس صاحب القرار',unknown:'غير معروف'}[r.decision_maker_status]||r.decision_maker_status||'غير محدد'));
+      h+=row('الأولوية',({1:'عالية',2:'متوسطة',3:'منخفضة'}[r.priority]||'غير محدد'));
+      h+=row('المرحلة الحالية',typeof pipelineLabel==='function'?pipelineLabel(r.pipeline_stage):r.pipeline_stage);
+      h+=row('المتابعة القادمة',plainDate(r.next_followup));
+    }
     if(r.search_status)h+=row('حالة البحث',searchStatus(r.search_status));
     h+=row('حالة الطلب',status(r.status));
     if(summary)h+=row('ملخص الطلب',summary);
     if(r.next_action)h+=row('الإجراء التالي',r.next_action);
+    if(investment&&typeof crmInvestmentMilestones==='function'){
+      h+='<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:700">تواريخ مراحل المستثمر</summary><div style="font-size:11px;line-height:1.8;margin:8px 0;color:var(--umber)">التواريخ الموثقة فقط؛ تاريخ التسجيل ليس دليلاً على أول تواصل. عدم الرد لا يعني رفض الطلب.</div>';
+      crmInvestmentMilestones().forEach(function(x){var date=r[x[0]],formatted='غير موثق';if(date){try{formatted=new Intl.DateTimeFormat('ar-OM-u-nu-latn',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Muscat',numberingSystem:'latn'}).format(new Date(date))}catch(_){formatted='تاريخ غير صالح'}}h+=row(x[1],formatted)});h+='</details>';
+    }
     h+='</div>';return h;
   }
   function fallbackRequest(c){
@@ -83,29 +95,34 @@
 
   window.renderClientInfo=async function(){
     var c=typeof viewingClient!=='undefined'?viewingClient:null,root=el('cdTabInfo');if(!c||!root)return;
+    var session=typeof crmSessionGeneration!=='undefined'?crmSessionGeneration:null,user=typeof currentUser!=='undefined'&&currentUser?currentUser.id:null;
+    function current(){return typeof viewingClient!=='undefined'&&viewingClient&&viewingClient.id===c.id&&(typeof crmSessionCurrent!=='function'||crmSessionCurrent(session,user))}
     var source=(typeof sourceAr==='function'?stripKnownMarkup(sourceAr(c.source)):c.source)||'—';
     var h='';
     h+=row('الهاتف',plainPhone(c.phone));
     h+=row('البريد',c.email||'—');
     h+=row('المصدر',source);
     h+=row('تاريخ التسجيل',plainDate(c.created_at));
+    if(c.lead_route==='investment')h+=row('المسار والخصوصية','المستثمرين — المسؤول: المالك — خاص بالمالك');
     h+='<div id="crmCurrentRequests" style="margin-top:14px"><div style="font-size:12px;color:var(--umber)">جاري تحميل طلب العميل…</div></div>';
     root.innerHTML=h;repairVisibleFormattingArtifacts(root);
     try{
-      var q=await supa.from('client_requests').select('*').eq('client_id',c.id).in('status',['active','paused']).order('updated_at',{ascending:false}).limit(20);
+      var query=supa.from('client_requests').select('*').eq('client_id',c.id);
+      if(c.lead_route!=='investment')query=query.in('status',['active','paused']);
+      var q=await query.order('updated_at',{ascending:false}).limit(20);
       if(q.error)throw q.error;
-      if(typeof viewingClient==='undefined'||!viewingClient||viewingClient.id!==c.id)return;
+      if(!current())return;
       var reqs=q.data||[],box=el('crmCurrentRequests');if(!box)return;
       if(!reqs.length){
         var fb=fallbackRequest(c),has=fb.property_type||fb.preferred_area||Number(fb.budget_min)>0||Number(fb.budget_max)>0||fb.payment_method||fb.purchase_timing||fb.purpose;
         box.innerHTML=has?requestBlock(fb,0,[]):'<div style="border:1px solid var(--cream-deeper);border-radius:12px;padding:14px;background:white;color:var(--umber)">لا يوجد طلب عقاري حالي مسجل لهذا العميل.</div>';
       }else{
-        var teams=await loadTeams(reqs);
+        var teams=await loadTeams(reqs);if(!current())return;
         box.innerHTML=reqs.map(function(r,i){return requestBlock(r,i,teams[r.id]||[])}).join('');
       }
       repairVisibleFormattingArtifacts(root);
     }catch(e){
-      var box=el('crmCurrentRequests');if(box)box.innerHTML='<div style="color:var(--ruby);font-size:12px">تعذر تحميل تفاصيل الطلب الحالية.</div>';console.warn('[client unified info]',e);
+      if(!current())return;var box=el('crmCurrentRequests');if(box)box.innerHTML='<div style="color:var(--ruby);font-size:12px">تعذر تحميل تفاصيل الطلب الحالية.</div>';console.warn('[client unified info]',e);
     }
   };
 })();

@@ -707,12 +707,13 @@ window.fbAsyncInit = function(){
 <div class="role-checkbox">
 <label class="role-cb buyer" id="cbBuyer"><input type="checkbox" id="cRoleBuyer" onchange="toggleRoleCB(this,'cbBuyer')">🛒 مشتري</label>
 <label class="role-cb seller" id="cbSeller"><input type="checkbox" id="cRoleSeller" onchange="toggleRoleCB(this,'cbSeller')">🏠 بائع</label>
-<label class="role-cb investor" id="cbInvestor"><input type="checkbox" id="cRoleInvestor" onchange="toggleRoleCB(this,'cbInvestor')">💼 مستثمر</label>
+<label class="role-cb investor" id="cbInvestor"><input type="checkbox" id="cRoleInvestor" onchange="toggleRoleCB(this,'cbInvestor');updateClientInvestmentForm()">💼 مستثمر</label>
 <label class="role-cb tenant" id="cbTenant"><input type="checkbox" id="cRoleTenant" onchange="toggleRoleCB(this,'cbTenant')">🔑 مستأجر</label>
 <label class="role-cb landlord" id="cbLandlord"><input type="checkbox" id="cRoleLandlord" onchange="toggleRoleCB(this,'cbLandlord')">📋 مؤجر</label>
 <label class="role-cb consultation" id="cbConsultation"><input type="checkbox" id="cRoleConsultation" onchange="toggleRoleCB(this,'cbConsultation')">💡 استشارة</label>
 </div>
 </div>
+<div class="fg full" id="cInvestmentNotice" role="status" hidden style="display:none;padding:12px;border:1px solid var(--gold);border-radius:10px;line-height:1.8"></div>
 <div class="fg"><label class="fl">🏘 نوع العقار المطلوب</label><select class="fs" id="cPropType" onchange="updateLeadScorePreview()">
 <option value="">اختر</option>
 <option value="villa">🏡 فيلا</option>
@@ -2256,7 +2257,8 @@ function openModal(id){
     var isMgr2 = (typeof canViewFinancials==='function') && canViewFinancials();
     ['pOwnerNet','pExpectedCommission'].forEach(function(id){var field=$(id);if(field&&field.parentElement)field.parentElement.style.display=isMgr2?'':'none';});
   }
-  setTimeout(function(){if(id==='mClient'&&!editingClient&&typeof setupPhoneField==='function'){setupPhoneField('cPhoneCountry','cPhoneLocal','');}if(id==='mOwner'&&!editingOwner&&typeof setupPhoneField==='function'){setupPhoneField('oPhoneCountry','oPhoneLocal','');if($('oType'))$('oType').value='owner';}},50);if(id==='mDeal'){var dt=document.getElementById('mDealTitle');if(dt)dt.textContent=window.editingDealId?'✏️ تعديل الصفقة':'➕ صفقة جديدة';populateDealSelects();populateDealLossReasons();if(!window.editingDealId){['dClient','dProperty','dValue','dNotes','dCreatedDate','dCommission','dCompanyShare','dAgentShare','dBroker','dBrokerCommission'].forEach(id=>{if($(id))$(id).value='';});if($('dCommissionStatus'))$('dCommissionStatus').value='pending';window.editingDealOriginalStage=null;if($('dStage'))$('dStage').value='viewing_scheduled';if($('dLostReason'))$('dLostReason').value='';if($('dLostReasonNote'))$('dLostReasonNote').value='';updateDealLossFields();}setTimeout(function(){if(typeof calcCompanyShare==='function')calcCompanyShare();},100);}if(id==='mTask'){if(!window.editingTask){$('mTaskTitle').textContent='⏰ مهمة جديدة';['tTitle','tDueDate','tNotes'].forEach(i=>$(i).value='');$('tPriority').value='medium';$('tClient').value='';$('tDeal').value=''}populateTaskSelects()}if(id==='mClient'){if(!editingClient){['cArea','cPropType','cBudgetMin','cBudgetMax','cPaymentMethod','cPurchaseTiming','cPurpose','cWilayat','cNextFollowup'].forEach(x=>$(x).disabled=false);if($('clientRequestEditNotice'))$('clientRequestEditNotice').style.display='none';['cName','cEmail','cArea','cPropType','cBudgetMin','cBudgetMax','cNotes','cNextFollowup'].forEach(x=>$(x).value='');$('cSource').value='whatsapp';}populateClientForm();}if(id==='mProperty'){if(!window.editingProperty){['pTitle','pArea','pPrice','pBeds','pBaths','pLandSize','pBuiltSize','pDesc','pPublicDetails','pMapUrl','pOwnerNet','pWilayat','pExpectedCommission','pCreatedDate'].forEach(i=>{const e=$(i);if(e)e.value=''});if($('pType'))$('pType').value='';if($('pStatus'))$('pStatus').value='available';if($('pSourceType'))$('pSourceType').value='owner';if($('pMarketingStatus'))$('pMarketingStatus').value='ready_to_advertise';currentPropertyImages=[];propertyImageOriginal=[];propertyDraftUploads=[];propertyDraftId=null;}populatePropertyOwnerSelect(null);if($('pInlineOwnerBox'))$('pInlineOwnerBox').style.display='none';renderPropertyImages()}if(id==='mExpense'&&!editingExpense){$('exDate').value=toLocalDateStr(new Date())}if(id==='mViewing'&&!editingViewing){populateViewingForm();$('vDate').value=toLocalDateStr(new Date());['vTime','vLocation','vNextStep','vFollowupDate','vNotes','vOutcomeNote'].forEach(i=>{const e=$(i);if(e)e.value=''});$('vStatus').value='scheduled';$('vDuration').value=60;$('vFeedbackFG').style.display='none';if($('vPipelineOutcomeFG'))$('vPipelineOutcomeFG').style.display='none';if($('vOutcomeNoteFG'))$('vOutcomeNoteFG').style.display='none';if($('vPipelineOutcome'))$('vPipelineOutcome').value='';$('mViewingTitle').textContent='👁 زيارة جديدة'}if(id==='mDeposit'&&!editingDeposit){populateDepositForm();$('dpPaymentDate').value=toLocalDateStr(new Date());['dpAmount','dpLegalNotes','dpNotes'].forEach(i=>{const e=$(i);if(e)e.value=''});$('dpDuration').value=30;$('mDepositTitle').textContent='💰 عربون جديد'}$(id).classList.add('on')}
+  if(id==='mClient'&&!editingClient&&typeof setupPhoneField==='function')setupPhoneField('cPhoneCountry','cPhoneLocal','');
+  setTimeout(function(){if(id==='mOwner'&&!editingOwner&&typeof setupPhoneField==='function'){setupPhoneField('oPhoneCountry','oPhoneLocal','');if($('oType'))$('oType').value='owner';}},50);if(id==='mDeal'){var dt=document.getElementById('mDealTitle');if(dt)dt.textContent=window.editingDealId?'✏️ تعديل الصفقة':'➕ صفقة جديدة';populateDealSelects();populateDealLossReasons();if(!window.editingDealId){['dClient','dProperty','dValue','dNotes','dCreatedDate','dCommission','dCompanyShare','dAgentShare','dBroker','dBrokerCommission'].forEach(id=>{if($(id))$(id).value='';});if($('dCommissionStatus'))$('dCommissionStatus').value='pending';window.editingDealOriginalStage=null;if($('dStage'))$('dStage').value='viewing_scheduled';if($('dLostReason'))$('dLostReason').value='';if($('dLostReasonNote'))$('dLostReasonNote').value='';updateDealLossFields();}setTimeout(function(){if(typeof calcCompanyShare==='function')calcCompanyShare();},100);}if(id==='mTask'){if(!window.editingTask){$('mTaskTitle').textContent='⏰ مهمة جديدة';['tTitle','tDueDate','tNotes'].forEach(i=>$(i).value='');$('tPriority').value='medium';$('tClient').value='';$('tDeal').value=''}populateTaskSelects()}if(id==='mClient'){if(!editingClient){['cArea','cPropType','cBudgetMin','cBudgetMax','cPaymentMethod','cPurchaseTiming','cPurpose','cWilayat','cNextFollowup'].forEach(x=>$(x).disabled=false);if($('clientRequestEditNotice'))$('clientRequestEditNotice').style.display='none';['cName','cEmail','cArea','cPropType','cBudgetMin','cBudgetMax','cNotes','cNextFollowup'].forEach(x=>$(x).value='');$('cSource').value='whatsapp';}populateClientForm();}if(id==='mProperty'){if(!window.editingProperty){['pTitle','pArea','pPrice','pBeds','pBaths','pLandSize','pBuiltSize','pDesc','pPublicDetails','pMapUrl','pOwnerNet','pWilayat','pExpectedCommission','pCreatedDate'].forEach(i=>{const e=$(i);if(e)e.value=''});if($('pType'))$('pType').value='';if($('pStatus'))$('pStatus').value='available';if($('pSourceType'))$('pSourceType').value='owner';if($('pMarketingStatus'))$('pMarketingStatus').value='ready_to_advertise';currentPropertyImages=[];propertyImageOriginal=[];propertyDraftUploads=[];propertyDraftId=null;}populatePropertyOwnerSelect(null);if($('pInlineOwnerBox'))$('pInlineOwnerBox').style.display='none';renderPropertyImages()}if(id==='mExpense'&&!editingExpense){$('exDate').value=toLocalDateStr(new Date())}if(id==='mViewing'&&!editingViewing){populateViewingForm();$('vDate').value=toLocalDateStr(new Date());['vTime','vLocation','vNextStep','vFollowupDate','vNotes','vOutcomeNote'].forEach(i=>{const e=$(i);if(e)e.value=''});$('vStatus').value='scheduled';$('vDuration').value=60;$('vFeedbackFG').style.display='none';if($('vPipelineOutcomeFG'))$('vPipelineOutcomeFG').style.display='none';if($('vOutcomeNoteFG'))$('vOutcomeNoteFG').style.display='none';if($('vPipelineOutcome'))$('vPipelineOutcome').value='';$('mViewingTitle').textContent='👁 زيارة جديدة'}if(id==='mDeposit'&&!editingDeposit){populateDepositForm();$('dpPaymentDate').value=toLocalDateStr(new Date());['dpAmount','dpLegalNotes','dpNotes'].forEach(i=>{const e=$(i);if(e)e.value=''});$('dpDuration').value=30;$('mDepositTitle').textContent='💰 عربون جديد'}$(id).classList.add('on')}
 function closeModal(id,force){if(crmSavingForms.has(id)&&!force){showToast('انتظر اكتمال الحفظ','warning');return;}const modal=$(id);if(!modal)return;modal.classList.remove('on');if(id==='mClient'){editingClient=null;$('mClientTitle').textContent='➕ إضافة عميل جديد'}if(id==='mDeal'){
   window.editingDealId=null;window.editingDealOriginalStage=null;
   // مسح حقول البحث الذكي
@@ -2355,7 +2357,22 @@ async function loadDashboard(){
 function renderDashTasks(tasks){var card=$('dashTasksCard');if(!tasks.length){if(card)card.style.display='none';$('dashTasksList').innerHTML='';return}if(card)card.style.display='';let h='';tasks.forEach(function(t){const d=daysUntil(t.due_date);const ov=d!==null&&d<0,td=d===0;h+='<div class="task-item"><div class="task-check '+(t.done?'done':'')+'" onclick="toggleTask(\''+t.id+'\','+(!t.done)+')">'+(t.done?'✓':'')+'</div><div class="task-content"><div class="task-title">'+escapeHtml(t.title)+'</div><div class="task-meta">'+(t.due_date?'<span class="task-due '+(ov?'overdue':'')+'">📅 '+(ov?'متأخّرة '+(-d)+' يوم':td?'اليوم':'بعد '+d+' يوم')+'</span>':'')+'<span class="task-priority tp-'+(t.priority==='high'?'high':t.priority==='low'?'low':'med')+'">'+(t.priority==='high'?'🔴 عاجلة':t.priority==='low'?'⚪ منخفضة':'🟡 متوسطة')+'</span></div></div></div>'});$('dashTasksList').innerHTML=h}
 function renderDashHot(clients){if(!clients.length){$('dashHotList').innerHTML='<div class="empty" style="padding:25px"><div class="empty-ico" style="font-size:32px">🔥</div><div class="empty-desc">لا يوجد عملاء حارون الآن</div></div>';return}let h='<div style="padding:6px 0">';clients.forEach(function(c){h+='<div style="padding:12px 18px;border-bottom:1px solid var(--cream-dark);display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="viewClient(\''+c.id+'\')"><div><div style="font-weight:700;font-size:13px;color:var(--espresso)">'+escapeHtml(c.name)+'</div><div style="font-size:11px;color:var(--umber);margin-top:2px">'+escapeHtml(c.preferred_area||'—')+' · '+(clientTypeAr(c.client_type)||'')+'</div></div><div style="font-size:12px;color:var(--gold);font-weight:700">'+(c.budget_max?fmtMoneyShort(c.budget_max):'فتح العميل ←')+'</div></div>'});$('dashHotList').innerHTML=h+'</div>'}
 function populateClientForm(){if(!editingClient&&$('cCreatedDate'))$('cCreatedDate').value='';if(editingClient){const c=(viewingClient&&viewingClient.id===editingClient?viewingClient:allClients.find(x=>x.id===editingClient));if(c){if($('cPaymentMethod'))$('cPaymentMethod').value=c.payment_method||'';if($('cPurchaseTiming'))$('cPurchaseTiming').value=c.purchase_timing||'';if($('cPurpose'))$('cPurpose').value=c.purpose||'';if($('cWilayat'))$('cWilayat').value=c.wilayat||'';if($('cNationality'))$('cNationality').value=c.nationality||'';if($('cCountry'))$('cCountry').value=c.country||''}}else{['cPaymentMethod','cPurchaseTiming','cPurpose','cWilayat','cNationality','cCountry'].forEach(i=>{const e=$(i);if(e)e.value=''})}setTimeout(updateLeadScorePreview,100);if($('cAssignedFG')){if(canManage()){$('cAssignedFG').style.display='';const sel=$('cAssignedTo');sel.innerHTML='<option value="">— تلقائي (أنت) —</option>';allMembers.forEach(function(m){if(m.is_active!==false)sel.innerHTML+='<option value="'+m.id+'">'+escapeHtml(m.full_name)+'</option>'})}else{$('cAssignedFG').style.display='none'}}
-if(!editingClient){['cRoleBuyer','cRoleSeller','cRoleInvestor','cRoleTenant','cRoleLandlord','cRoleConsultation'].forEach(id=>{var e=$(id);if(e){e.checked=false;if(e.parentElement)e.parentElement.classList.remove('checked')}});var rb=$('cRoleBuyer');if(rb)rb.checked=true;var cbB=$('cbBuyer');if(cbB)cbB.classList.add('checked');var ph=document.getElementById('duplicatePhoneWarn');if(ph)ph.style.display='none'}}
+if(!editingClient){['cRoleBuyer','cRoleSeller','cRoleInvestor','cRoleTenant','cRoleLandlord','cRoleConsultation'].forEach(id=>{var e=$(id);if(e){e.checked=false;if(e.parentElement)e.parentElement.classList.remove('checked')}});var rb=$('cRoleBuyer');if(rb)rb.checked=true;var cbB=$('cbBuyer');if(cbB)cbB.classList.add('checked');var ph=document.getElementById('duplicatePhoneWarn');if(ph)ph.style.display='none'}if(typeof updateClientInvestmentForm==='function')updateClientInvestmentForm();}
+function updateClientInvestmentForm(){
+  const notice=$('cInvestmentNotice'),select=$('cAssignedTo');if(!notice||!select)return;
+  const original=editingClient?(viewingClient&&viewingClient.id===editingClient?viewingClient:allClients.find(c=>c.id===editingClient)):null;
+  const privateClient=original?original.lead_route==='investment':(isOwner()&&$('cRoleInvestor').checked);
+  notice.hidden=!privateClient;notice.style.display=privateClient?'':'none';
+  if(privateClient){
+    notice.textContent='المسار: المستثمرين · المسؤول: المالك · الخصوصية: خاص بالمالك';
+    if(!select.disabled)select.dataset.beforeInvestment=select.value;
+    const ownerId=original&&original.assigned_to||currentUser.id;
+    if(!Array.from(select.options||[]).some(o=>o.value===ownerId)){const option=document.createElement('option');option.value=ownerId;option.textContent='المالك';select.appendChild(option);}
+    select.value=ownerId;select.disabled=true;
+  }else{if(select.disabled)select.value=select.dataset.beforeInvestment||'';select.disabled=false;
+    if(original&&$('cRoleInvestor').checked){notice.hidden=false;notice.style.display='';notice.textContent='تصنيف العميل: مستثمر. مساره الحالي '+({muscat:'مسقط',barka:'بركاء',general:'عام'}[original.lead_route]||'الحالي')+'؛ تعديل بياناته لا ينقله إلى المسار الخاص.';}
+  }
+}
 function setClientArchiveView(archived,btn){showArchivedClients=archived;document.querySelectorAll('.archive-toggle button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadClients()}
 function filterClientRole(f,el){clientRoleFilter=f;document.querySelectorAll('#clientRoleTabs .role-tab').forEach(t=>{t.classList.remove('active','buyer','seller','investor')});el.classList.add('active');if(f==='buyer')el.classList.add('buyer');if(f==='seller')el.classList.add('seller');if(f==='investor')el.classList.add('investor');renderClients()}
 function updateRoleCounts(){
@@ -2497,22 +2514,31 @@ let h='<table class="tbl"><thead><tr><th>الاسم</th><th>الأدوار</th><
 
 async function saveClient(){
   if(!canEdit()||!crmBeginSave('mClient'))return;
+  const session=crmSessionGeneration,actor=currentUser&&currentUser.id;
   try{
     const fullPhone=crmValidatedPhone('cPhoneCountry','cPhoneLocal',false),original=viewingClient&&viewingClient.id===editingClient?viewingClient:allClients.find(c=>c.id===editingClient);
     const n=$('cName').value.trim()||(original&&original.name)||(fullPhone?'عميل واتساب '+fullPhone.slice(-4):'');if(!n)throw new Error('أدخل الاسم أو رقم الهاتف');
     const roles=[['buyer','cRoleBuyer'],['seller','cRoleSeller'],['investor','cRoleInvestor'],['tenant','cRoleTenant'],['landlord','cRoleLandlord'],['consultation','cRoleConsultation']].filter(x=>$(x[1]).checked).map(x=>x[0]);
     if(!roles.length)throw new Error('اختر نوع العميل');
     const special=roles.filter(x=>['tenant','landlord','consultation'].includes(x));if(special.length>1)throw new Error('اختر نوعاً أساسياً واحداً من مستأجر أو مؤجر أو استشارة؛ أضف بقية الاحتياجات كطلبات مستقلة');
-    const cid=await ensureCompany(),editingId=editingClient;
+    const cid=await ensureCompany(),editingId=editingClient,privateInvestor=!editingClient&&isOwner()&&roles.includes('investor');
+    if(!crmSessionCurrent(session,actor))return;
+    if(privateInvestor&&fullPhone){
+      const existing=await supa.from('clients').select('id,name,lead_route,archived').eq('company_id',cid).eq('phone_normalized',fullPhone).limit(2);if(!crmSessionCurrent(session,actor))return;if(existing.error)throw existing.error;
+      if((existing.data||[]).length>1)throw new Error('يوجد أكثر من سجل لهذا الرقم؛ راجع ملف العميل قبل الإضافة');
+      if(existing.data&&existing.data[0]){const row=existing.data[0];crmFinishSave('mClient');showToast('الرقم مسجل مسبقاً؛ تم فتح ملفه الحالي دون تغيير مساره'+(row.archived?' (مؤرشف)':''),'success');await viewClient(row.id);return;}
+    }
     const data={company_id:cid,name:n,phone:fullPhone,email:$('cEmail').value.trim()||null,client_type:special[0]||(original&&roles.includes(original.client_type)?original.client_type:roles[0]),is_buyer:roles.includes('buyer'),is_seller:roles.includes('seller'),is_investor:roles.includes('investor'),source:$('cSource').value,notes:$('cNotes').value.trim()||null,nationality:$('cNationality').value.trim()||null,country:$('cCountry').value.trim()||null};
     if(!editingId||canManage())data.assigned_to=canManage()&&$('cAssignedTo').value?$('cAssignedTo').value:((original&&original.assigned_to)||currentUser.id);
+    if(privateInvestor){data.client_type='investor';data.lead_route='investment';data.assigned_to=currentUser.id;}
+    if(original&&original.lead_route==='investment'){data.lead_route='investment';data.assigned_to=original.assigned_to||currentUser.id;}
     // Existing independent requests own search preferences. Editing contact data must not diverge them.
-    const requests=editingId?await supa.from('client_requests').select('id').eq('client_id',editingId).in('status',['active','paused']).limit(1):{data:[]};if(requests.error)throw requests.error;
+    const requests=editingId?await supa.from('client_requests').select('id').eq('client_id',editingId).in('status',['active','paused']).limit(1):{data:[]};if(!crmSessionCurrent(session,actor))return;if(requests.error)throw requests.error;
     if(!(requests.data||[]).length){const budget=crmReadBudget('cBudgetMin','cBudgetMax');Object.assign(data,{preferred_area:$('cArea').value.trim()||null,property_type:$('cPropType').value||null,budget_min:budget.min,budget_max:budget.max,payment_method:$('cPaymentMethod').value||null,purchase_timing:$('cPurchaseTiming').value||null,purpose:$('cPurpose').value||null,wilayat:$('cWilayat').value.trim()||null,next_followup:$('cNextFollowup').value||null});data.lead_score=calcLeadScore(data);data.lead_temperature=calcLeadTemperature(data.lead_score);data.status=data.lead_temperature;}
     if(!editingId)data.pipeline_stage='new';const date=$('cCreatedDate').value;if(date)data.created_at=new Date(date+'T12:00:00').toISOString();
     let r;if(editingId)r=await supa.from('clients').update(data).eq('id',editingId).select('id').single();else{data.id=crmSaveKey('mClient',data);r=await supa.from('clients').insert(data).select('id').single();}
-    if(r.error)throw r.error;const savedId=r.data.id;crmFinishSave('mClient');showToast('تم حفظ بيانات العميل','success');await logSystemActivity(editingId?'edit':'create','client',savedId,'حفظ بيانات العميل');await loadClients();loadDashboard();if(viewingClient&&viewingClient.id===savedId)await viewClient(savedId);
-  }catch(err){showToast(err.code==='23505'?'هذا الرقم أو السجل موجود مسبقاً؛ ابحث عنه لفتح ملفه':'تعذر الحفظ: '+err.message,'error');}finally{crmEndSave('mClient');}
+    if(!crmSessionCurrent(session,actor))return;if(r.error)throw r.error;const savedId=r.data.id;crmFinishSave('mClient');showToast('تم حفظ بيانات العميل','success');await logSystemActivity(editingId?'edit':'create','client',savedId,'حفظ بيانات العميل');if(!crmSessionCurrent(session,actor))return;await loadClients();if(!crmSessionCurrent(session,actor))return;loadDashboard();if(viewingClient&&viewingClient.id===savedId)await viewClient(savedId);
+  }catch(err){if(!crmSessionCurrent(session,actor))return;showToast(err.code==='23505'?'هذا الرقم أو السجل موجود مسبقاً؛ ابحث عنه لفتح ملفه':'تعذر الحفظ: '+err.message,'error');}finally{crmEndSave('mClient');}
 }
 
 function archiveClientById(id){const c=allClients.find(x=>x.id===id);if(!c){showToast('⚠️ العميل غير موجود','error');return}deleteClient(id,c.name)}
@@ -2555,32 +2581,72 @@ function requestStatusAr(v){return({active:'نشط',paused:'متوقف مؤقت�
 function requestSearchAr(v){return({active:'يبحث بنشاط',active_no_match:'يبحث ولا يوجد مطابق',waiting_new_property:'ينتظر عقارًا جديدًا',financing_in_progress:'التمويل قيد التجهيز',not_ready:'غير جاهز حاليًا',deferred:'مؤجل',stopped:'توقف عن البحث',bought_with_us:'اشترى عن طريقنا',bought_elsewhere:'اشترى من جهة أخرى',no_response:'لا يرد',unknown:'غير معروف'}[v]||v||'—')}
 async function renderClientRequestsTab(){
   const el=$('cdTabRequests');if(!el||!viewingClient)return;
+  const clientId=viewingClient.id,session=crmSessionGeneration,actor=currentUser&&currentUser.id;
+  const current=()=>crmSessionCurrent(session,actor)&&viewingClient&&viewingClient.id===clientId;
   el.innerHTML='<div class="empty" style="padding:22px"><div class="loader-spinner"></div></div>';
   try{
-    const r=await supa.from('client_requests').select('*').eq('client_id',viewingClient.id).order('created_at',{ascending:false});
-    if(r.error)throw r.error;const rows=r.data||[];
+    const r=await supa.from('client_requests').select('*').eq('client_id',clientId).order('created_at',{ascending:false});
+    if(!current())return;if(r.error)throw r.error;const rows=r.data||[];
     let h='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px"><strong>طلبات العميل ('+rows.length+')</strong><button class="btn-gold" style="width:auto;padding:7px 14px" onclick="openNewRequestForClient()">+ إنشاء طلب جديد لنفس العميل</button></div>';
     if(!rows.length){el.innerHTML=h+'<div class="empty" style="padding:24px"><div class="empty-desc">لا توجد طلبات مستقلة مسجلة لهذا العميل بعد.</div></div>';return}
     rows.forEach(function(x){const areas=(x.preferred_areas&&x.preferred_areas.length?x.preferred_areas.join('، '):(x.preferred_area||'—'));const budget=(x.budget_min||x.budget_max)?fmtMoney(x.budget_min||0)+' — '+fmtMoney(x.budget_max||0):'—';h+='<div style="border:1px solid var(--cream-deeper);border-radius:12px;padding:13px;margin-bottom:10px;background:white"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><strong style="color:var(--espresso)">🎯 '+escapeHtml(requestTypeAr(x.request_type))+'</strong> <span class="badge b-em">'+escapeHtml(requestStatusAr(x.status))+'</span> '+(canEdit()?'<button class="btn-secondary" onclick="editClientRequest(\''+x.id+'\')">تعديل الطلب</button>':'')+'</div><div style="font-size:11px;color:var(--umber)">'+fmtDate(x.created_at)+'</div></div><div style="font-size:12px;margin-top:8px;line-height:1.8">📍 '+escapeHtml(areas)+' · 🏠 '+escapeHtml(propTypeAr(x.property_type)||x.property_type||'—')+' · 💰 '+budget+'<br>🔀 '+escapeHtml(({barka:'بركاء',muscat:'مسقط',investment:'استثمار',general:'عام'}[x.branch_key]||x.branch_key||'—'))+' · 🔎 '+escapeHtml(requestSearchAr(x.search_status))+(x.next_followup?' · 📅 متابعة '+fmtDate(x.next_followup):'')+(x.next_action?'<br>➡️ '+escapeHtml(x.next_action):'')+'</div></div>'});
     el.innerHTML=h;
-  }catch(e){el.innerHTML='<div class="empty"><div class="empty-desc">'+escapeHtml(e.message)+'</div></div>'}
+  }catch(e){if(current())el.innerHTML='<div class="empty"><div class="empty-desc">'+escapeHtml(e.message)+'</div></div>'}
 }
 
-let editingClientRequest=null,clientRequestFormClientId=null,clientRequestFormGeneration=0;
+let editingClientRequest=null,clientRequestFormClientId=null,clientRequestFormGeneration=0,clientRequestFormInvestment=false;
+function crmInvestmentMilestones(){return [
+  ['first_human_response_at','أول تواصل بشري من المكتب'],['first_mutual_dialogue_at','أول رد فعلي من العميل'],
+  ['requirements_completed_at','اكتمال بيانات الطلب'],['qualified_at','اكتمال التأهيل'],['first_appointment_booked_at','حجز الموعد'],
+  ['first_attended_at','حضور الاجتماع'],['first_match_sent_at','إرسال / عرض وحدة محددة'],['serious_interest_at','اهتمام جاد'],
+  ['negotiation_started_at','بداية التفاوض'],['deposit_paid_at','دفع العربون'],['contract_completed_at','اكتمال العقد'],['closed_won_at','Closed Won — إغلاق ناجح']
+];}
+function crmInvestmentDateInput(value){
+  if(!value)return '';const d=new Date(value);if(Number.isNaN(d.getTime()))return '';
+  // The form explicitly uses Oman time, independent of the browser's timezone.
+  return new Date(d.getTime()+4*60*60*1000).toISOString().slice(0,16);
+}
+function crmInvestmentRequestFields(request){
+  const r=request||{},esc=escapeHtml;
+  const choices=(id,label,list,value)=>'<div class="fg"><label class="fl" for="'+id+'">'+label+'</label><select class="fs" id="'+id+'">'+list.map(x=>'<option value="'+esc(x[0])+'"'+(String(x[0])===String(value||'')?' selected':'')+'>'+esc(x[1])+'</option>').join('')+'</select></div>';
+  let html='<div class="fg full" style="padding:12px;border:1px solid var(--gold);border-radius:10px;line-height:1.8">المسار: المستثمرين · المسؤول: المالك · الخصوصية: خاص بالمالك<br><small>بيانات التأهيل اختيارية ويمكن استكمالها لاحقاً. عدم الرد يبقى حالة متابعة ولا يعني الرفض.</small></div>';
+  html+=choices('nrFinanceReadiness','جاهزية التمويل',[['','غير محدد'],['cash_confirmed','السيولة مؤكدة'],['preapproved','موافقة تمويل مسبقة'],['in_progress','قيد التجهيز'],['not_started','لم يبدأ'],['rejected','رُفض التمويل'],['unknown','غير معروف']],r.financing_readiness);
+  html+=choices('nrDecisionMaker','صاحب القرار',[['','غير محدد'],['self','العميل نفسه'],['joint_family','قرار مشترك مع الأسرة'],['not_decision_maker','ليس صاحب القرار'],['unknown','غير معروف']],r.decision_maker_status);
+  html+=choices('nrPriority','الأولوية',[['1','عالية'],['2','متوسطة'],['3','منخفضة']],r.priority||2);
+  const stages=PIPELINE_STAGES.map(x=>[x.key,x.label]);if(r.pipeline_stage&&!stages.some(x=>x[0]===r.pipeline_stage))stages.push([r.pipeline_stage,r.pipeline_stage]);
+  html+=choices('nrPipelineStage','المرحلة الحالية',stages,r.pipeline_stage||'new');
+  html+='<details class="fg full"><summary style="cursor:pointer;font-weight:700">تواريخ مراحل المستثمر (اختيارية)</summary><p style="font-size:12px;line-height:1.8;margin:10px 0">أدخل وقت الحدث الحقيقي بتوقيت سلطنة عمان. اترك التاريخ غير المعروف فارغاً؛ تغيير المرحلة وحده لا يثبت حدوث المراحل السابقة.</p><div class="fgrid">';
+  crmInvestmentMilestones().forEach(x=>{html+='<div class="fg"><label class="fl" for="nrMilestone_'+x[0]+'">'+esc(x[1])+'</label><input class="fi" type="datetime-local" dir="ltr" id="nrMilestone_'+x[0]+'" value="'+crmInvestmentDateInput(r[x[0]])+'"></div>';});
+  return html+'</div></details>';
+}
+function crmReadInvestmentRequestFields(old){
+  const data={financing_readiness:$('nrFinanceReadiness').value||null,decision_maker_status:$('nrDecisionMaker').value||null,priority:Number($('nrPriority').value||2),pipeline_stage:$('nrPipelineStage').value||'new'};
+  crmInvestmentMilestones().forEach(([field,label])=>{
+    const input=$('nrMilestone_'+field),value=input?input.value:'';
+    if(value===crmInvestmentDateInput(old&&old[field]))return; // Avoid changing timestamp precision on unrelated edits.
+    if(!value){data[field]=null;return;}
+    if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))throw new Error('راجع تاريخ '+label);
+    const date=new Date(value+':00+04:00');if(Number.isNaN(date.getTime()))throw new Error('راجع تاريخ '+label);
+    data[field]=date.toISOString();
+  });return data;
+}
 function openNewRequestForClient(){if(viewingClient)openClientRequestForm(null,viewingClient.id);}
 async function editClientRequest(id){if(viewingClient)await openClientRequestForm(id,viewingClient.id);}
 async function openClientRequestForm(requestId,clientId){
-  if(!canEdit()||crmSavingForms.has('mClientRequest'))return;const generation=++clientRequestFormGeneration;
+  if(!canEdit()||crmSavingForms.has('mClientRequest'))return;const generation=++clientRequestFormGeneration,session=crmSessionGeneration,actor=currentUser&&currentUser.id;
   try{
     let request=null;if(requestId){const r=await supa.from('client_requests').select('*').eq('id',requestId).eq('client_id',clientId).single();if(r.error)throw r.error;request=r.data;}
-    if(generation!==clientRequestFormGeneration)return;
+    if(generation!==clientRequestFormGeneration||!crmSessionCurrent(session,actor))return;
+    const client=viewingClient&&viewingClient.id===clientId?viewingClient:allClients.find(c=>c.id===clientId);
+    const investment=!!(client&&client.lead_route==='investment');if(investment&&!isOwner())throw new Error('مسار المستثمرين خاص بالمالك');
+    clientRequestFormInvestment=investment;
     let modal=$('mClientRequest');if(!modal){modal=document.createElement('div');modal.className='modal-ov';modal.id='mClientRequest';document.body.appendChild(modal);}
     const options=(items)=>items.map(x=>'<option value="'+x[0]+'">'+escapeHtml(x[1])+'</option>').join('');
     const field=(label,id,type)=>'<div class="fg"><label class="fl" for="'+id+'">'+label+'</label><input class="fi" id="'+id+'" type="'+(type||'text')+'"></div>';
     const select=(label,id,items)=>'<div class="fg"><label class="fl" for="'+id+'">'+label+'</label><select class="fs" id="'+id+'">'+options(items)+'</select></div>';
     modal.innerHTML='<div class="modal-box lg"><div class="modal-title">'+(request?'تعديل الطلب':'طلب جديد لنفس العميل')+'</div><div class="fgrid">'+
       select('نوع الطلب','nrType',[['buyer','شراء'],['seller','بيع'],['tenant','استئجار'],['landlord','تأجير'],['investor','استثمار'],['consultation','استشارة']])+
-      select('الفرع','nrBranch',[['','اختر الفرع'],['muscat','مسقط'],['barka','بركاء'],['investment','استثمار'],['general','عام']])+
+      select('الفرع','nrBranch',[['','اختر الفرع'],['muscat','مسقط'],['barka','بركاء'],...(investment?[['investment','المستثمرين']]:[]),['general','عام']])+
       (canManage()?select('الموظف المسؤول (اختياري)','nrManualAssignee',[['','تلقائي حسب المنطقة — غير المحدد إلى مسقط'],...(allMembers||[]).filter(m=>m.is_active!==false&&['owner','manager','agent'].includes(m.role)).map(m=>[m.id,m.full_name||'موظف'])]):'')+
       select('نوع العقار','nrPropType',[['','غير محدد'],['villa','فيلا'],['apartment','شقة'],['house','منزل'],['land','أرض'],['land_residential','أرض سكنية'],['land_commercial','أرض تجارية'],['twin_villa','توين فيلا'],['townhouse','تاون هاوس'],['penthouse','بنتهاوس'],['resthouse','استراحة'],['chalet','شاليه'],['farm','مزرعة'],['office','مكتب'],['shop','محل'],['warehouse','مخزن'],['building','مبنى']])+
       field('المناطق المطلوبة (افصل بفاصلة)','nrAreas')+field('الولاية','nrWilayat')+field('الميزانية الدنيا','nrBudgetMin')+field('الميزانية القصوى','nrBudgetMax')+
@@ -2590,29 +2656,37 @@ async function openClientRequestForm(requestId,clientId){
       select('الغرض','nrPurpose',[['','غير محدد'],['residence','سكن'],['investment','استثمار'],['rental','تأجير'],['residency','إقامة'],['resale','إعادة بيع']])+
       select('حالة الطلب','nrStatus',[['active','نشط'],['paused','متوقف مؤقتاً'],['won','تم بنجاح'],['lost','لم يكتمل'],['cancelled','ملغي'],['archived','مؤرشف']])+
       select('حالة البحث','nrSearchStatus',[['active','يبحث بنشاط'],['active_no_match','لا يوجد مطابق'],['waiting_new_property','ينتظر عقاراً'],['financing_in_progress','يجهز التمويل'],['not_ready','غير جاهز'],['deferred','مؤجل'],['stopped','توقف عن البحث'],['bought_with_us','اشترى معنا'],['bought_elsewhere','اشترى من جهة أخرى'],['no_response','لا يرد'],['unknown','غير معروف']])+
-      field('موعد المتابعة','nrNextFollowup','date')+field('الإجراء التالي','nrNextAction')+'</div><div class="modal-foot"><button class="btn-secondary" onclick="closeModal(\'mClientRequest\')">إلغاء</button><button class="btn-gold" onclick="saveNewClientRequest()">حفظ الطلب</button></div></div>';
+      field('موعد المتابعة','nrNextFollowup','date')+field('الإجراء التالي','nrNextAction')+(investment?crmInvestmentRequestFields(request):'')+'</div><div class="modal-foot"><button class="btn-secondary" onclick="closeModal(\'mClientRequest\')">إلغاء</button><button class="btn-gold" onclick="saveNewClientRequest()">حفظ الطلب</button></div></div>';
     editingClientRequest=request;clientRequestFormClientId=clientId;crmSaveAttempts.delete('mClientRequest');
     const r=request||{},area=(r.preferred_areas&&r.preferred_areas.length?r.preferred_areas.join('، '):r.preferred_area)||'';
-    const values={nrType:r.request_type||'buyer',nrBranch:r.branch_key||(viewingClient&&viewingClient.id===clientId?viewingClient.lead_route:'')||'',nrPropType:r.property_type||'',nrAreas:area,nrWilayat:r.wilayat||'',nrBudgetMin:r.budget_min,nrBudgetMax:r.budget_max,nrBedrooms:r.bedrooms_min,nrBathrooms:r.bathrooms_min,nrLandMin:r.land_size_min,nrLandMax:r.land_size_max,nrBuiltMin:r.built_size_min,nrBuiltMax:r.built_size_max,nrPayment:r.payment_method||'',nrTiming:r.purchase_timing||'',nrPurpose:r.purpose||'',nrStatus:r.status||'active',nrSearchStatus:r.search_status||'active',nrNextFollowup:r.next_followup||'',nrNextAction:r.next_action||''};if(canManage())values.nrManualAssignee=r.manual_assigned_to||'';
-    Object.keys(values).forEach(id=>$(id).value=values[id]==null?'':values[id]);modal.classList.add('on');
-  }catch(e){showToast('تعذر فتح الطلب: '+e.message,'error');}
+    const values={nrType:r.request_type||(investment?'investor':'buyer'),nrBranch:r.branch_key||(viewingClient&&viewingClient.id===clientId?viewingClient.lead_route:'')||'',nrPropType:r.property_type||'',nrAreas:area,nrWilayat:r.wilayat||'',nrBudgetMin:r.budget_min,nrBudgetMax:r.budget_max,nrBedrooms:r.bedrooms_min,nrBathrooms:r.bathrooms_min,nrLandMin:r.land_size_min,nrLandMax:r.land_size_max,nrBuiltMin:r.built_size_min,nrBuiltMax:r.built_size_max,nrPayment:r.payment_method||'',nrTiming:r.purchase_timing||'',nrPurpose:r.purpose||'',nrStatus:r.status||'active',nrSearchStatus:r.search_status||'active',nrNextFollowup:r.next_followup||'',nrNextAction:r.next_action||''};if(canManage())values.nrManualAssignee=r.manual_assigned_to||'';
+    Object.keys(values).forEach(id=>$(id).value=values[id]==null?'':values[id]);
+    if(investment){$('nrType').value='investor';$('nrType').disabled=true;$('nrBranch').value='investment';$('nrBranch').disabled=true;if($('nrManualAssignee')){$('nrManualAssignee').value=currentUser.id;$('nrManualAssignee').disabled=true;}}
+    modal.classList.add('on');
+  }catch(e){if(crmSessionCurrent(session,actor)&&generation===clientRequestFormGeneration)showToast('تعذر فتح الطلب: '+e.message,'error');}
 }
 async function saveNewClientRequest(){
   if(!canEdit()||!clientRequestFormClientId||!crmBeginSave('mClientRequest'))return;
+  const session=crmSessionGeneration,actor=currentUser&&currentUser.id;
   try{
     const clientId=clientRequestFormClientId,old=editingClientRequest,cid=await ensureCompany(),budget=crmReadBudget('nrBudgetMin','nrBudgetMax');
+    if(!crmSessionCurrent(session,actor))return;
     const areas=($('nrAreas').value||'').split(/[,،]/).map(x=>x.trim()).filter(Boolean),pt=$('nrPropType').value,next=$('nrNextAction').value.trim();
-    if(!$('nrBranch').value)throw new Error('حدد الفرع المسؤول عن الطلب');if(!areas.length&&!next)throw new Error('أدخل المنطقة المطلوبة أو الإجراء التالي للطلب');
+    const investment=typeof clientRequestFormInvestment!=='undefined'&&clientRequestFormInvestment;
+    if(investment&&!isOwner())throw new Error('مسار المستثمرين خاص بالمالك');
+    if(!investment&&$('nrBranch').value==='investment')throw new Error('مسار المستثمرين يتطلب ملف عميل في مسار المستثمرين؛ لن يتغير مسار هذا العميل تلقائياً');
+    if(!$('nrBranch').value)throw new Error('حدد الفرع المسؤول عن الطلب');if(!investment&&!areas.length&&!next)throw new Error('أدخل المنطقة المطلوبة أو الإجراء التالي للطلب');
     const landMin=crmReadNumber('nrLandMin','أدنى مساحة الأرض'),landMax=crmReadNumber('nrLandMax','أقصى مساحة الأرض'),builtMin=crmReadNumber('nrBuiltMin','أدنى مساحة البناء'),builtMax=crmReadNumber('nrBuiltMax','أقصى مساحة البناء');
     if(landMin!==null&&landMax!==null&&landMin>landMax||builtMin!==null&&builtMax!==null&&builtMin>builtMax)throw new Error('الحد الأدنى للمساحة أكبر من الحد الأعلى');
     const data={request_type:$('nrType').value,branch_key:$('nrBranch').value,route_key:$('nrBranch').value,property_type:pt||null,property_types:pt?[pt]:[],preferred_area:areas[0]||null,preferred_areas:areas,wilayat:$('nrWilayat').value.trim()||null,budget_min:budget.min,budget_max:budget.max,bedrooms_min:crmReadNumber('nrBedrooms','غرف النوم',{integer:true}),bathrooms_min:crmReadNumber('nrBathrooms','دورات المياه',{integer:true}),land_size_min:landMin,land_size_max:landMax,built_size_min:builtMin,built_size_max:builtMax,payment_method:$('nrPayment').value||null,purchase_timing:$('nrTiming').value||null,purpose:$('nrPurpose').value||null,status:$('nrStatus').value,search_status:$('nrSearchStatus').value,next_action:next||null,next_followup:$('nrNextFollowup').value||null,updated_by:currentUser.id};
     if(canManage())data.manual_assigned_to=$('nrManualAssignee').value||null;
+    if(investment){Object.assign(data,crmReadInvestmentRequestFields(old),{request_type:'investor',branch_key:'investment',route_key:'investment',assigned_to:currentUser.id,manual_assigned_to:currentUser.id});}
     // Preserve additional types extracted by the assistant unless the primary type was actually changed.
     if(old&&old.property_type===data.property_type&&Array.isArray(old.property_types))data.property_types=old.property_types.slice();
     let r;if(old){r=await supa.from('client_requests').update(data).eq('id',old.id).eq('client_id',clientId).select('id').single();}
-    else{Object.assign(data,{company_id:cid,client_id:clientId,pipeline_stage:'new',created_by:currentUser.id,created_via:'manual',source:'manual'});data.id=crmSaveKey('mClientRequest',data);r=await supa.from('client_requests').insert(data).select('id').single();}
-    if(r.error)throw r.error;crmFinishSave('mClientRequest');showToast('تم حفظ الطلب','success');await logSystemActivity(old?'edit':'create','request',r.data.id,'حفظ طلب مستقل للعميل');if(viewingClient&&viewingClient.id===clientId){await renderClientRequestsTab();await renderClientInfo();}loadDashboard();
-  }catch(e){showToast('تعذر حفظ الطلب: '+e.message,'error');}finally{crmEndSave('mClientRequest');}
+    else{Object.assign(data,{company_id:cid,client_id:clientId,pipeline_stage:data.pipeline_stage||'new',created_by:currentUser.id,created_via:'manual',source:'manual'});data.id=crmSaveKey('mClientRequest',data);r=await supa.from('client_requests').insert(data).select('id').single();}
+    if(!crmSessionCurrent(session,actor))return;if(r.error)throw r.error;crmFinishSave('mClientRequest');showToast('تم حفظ الطلب','success');await logSystemActivity(old?'edit':'create','request',r.data.id,'حفظ طلب مستقل للعميل');if(!crmSessionCurrent(session,actor))return;if(viewingClient&&viewingClient.id===clientId){await renderClientRequestsTab();await renderClientInfo();}loadDashboard();
+  }catch(e){if(crmSessionCurrent(session,actor))showToast('تعذر حفظ الطلب: '+e.message,'error');}finally{crmEndSave('mClientRequest');}
 }
 async function renderClientDealsTab(){if(!viewingClient)return;const r=await crmDataFrom('deals').select('*, property:properties(title), loss_reason:rejection_reasons!deals_lost_reason_id_fkey(label_ar)').eq('client_id',viewingClient.id).order('created_at',{ascending:false});const deals=r.data||[];if(!deals.length){$('cdTabDeals').innerHTML='<div class="empty" style="padding:30px"><div class="empty-ico" style="font-size:32px">🤝</div><div class="empty-desc">لا توجد رحلات عقارية لهذا العميل</div></div>';return}let h='';deals.forEach(function(d){var lr=Array.isArray(d.loss_reason)?d.loss_reason[0]:d.loss_reason;h+='<div style="padding:12px;border:1px solid var(--cream-deeper);border-radius:10px;margin-bottom:10px;cursor:pointer" onclick="editDeal(\''+d.id+'\')"><div style="display:flex;justify-content:space-between;align-items:start;gap:10px"><div style="flex:1"><div style="font-weight:700;color:var(--espresso);font-size:13px">'+escapeHtml(d.property&&d.property.title||'بدون عقار')+'</div><div style="font-size:11px;color:var(--umber);margin-top:3px">'+dealStageAr(d.stage)+' · '+(['closed','commission_collected'].includes(d.stage)?'تاريخ البيع: '+(d.closed_at?fmtDate(d.closed_at):'غير مسجل'):'تاريخ التسجيل: '+fmtDate(d.created_at))+'</div>'+(d.stage==='lost'?'<div style="font-size:10px;color:var(--ruby);margin-top:5px">السبب: '+escapeHtml(lr&&lr.label_ar||'غير موثق')+(d.lost_reason_note?' — '+escapeHtml(d.lost_reason_note):'')+'</div>':'')+'</div><div style="font-weight:700;color:var(--gold);font-size:13px">'+fmtMoney(d.deal_value)+'</div></div></div>'});$('cdTabDeals').innerHTML=h}
 async function renderClientTasksTab(){
@@ -2637,7 +2711,7 @@ if($('cRoleConsultation'))$('cRoleConsultation').checked=(ct==='consultation');
   var el=document.getElementById(cb);if(!el)return;
   var inp=document.getElementById(cb.replace('cb','cRole'));
   if(inp&&inp.checked)el.classList.add('checked');else el.classList.remove('checked');
-});;$('cbSeller').classList.toggle('checked',isS);$('cRoleInvestor').checked=isI;$('cbInvestor').classList.toggle('checked',isI);openModal('mClient');if($('cAssignedTo'))$('cAssignedTo').value=c.assigned_to||'';configureClientRequestFields(c.id);}
+});;$('cbSeller').classList.toggle('checked',isS);$('cRoleInvestor').checked=isI;$('cbInvestor').classList.toggle('checked',isI);openModal('mClient');if($('cAssignedTo'))$('cAssignedTo').value=c.assigned_to||'';updateClientInvestmentForm();configureClientRequestFields(c.id);}
 
 async function configureClientRequestFields(clientId){
   const fields=['cArea','cPropType','cBudgetMin','cBudgetMax','cPaymentMethod','cPurchaseTiming','cPurpose','cWilayat','cNextFollowup'];

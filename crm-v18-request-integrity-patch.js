@@ -65,14 +65,15 @@
     try{
       if(typeof viewingClient==='undefined'||!viewingClient)return;
       var root=el('cdTabRequests');if(!root)return;
-      var q=await supa.from('client_requests').select('id,budget_min,budget_max').eq('client_id',viewingClient.id).order('created_at',{ascending:false});
-      if(q.error)return;
+      var session=crmSessionGeneration,actor=currentUser&&currentUser.id,clientId=viewingClient.id;
+      var q=await supa.from('client_requests').select('id,budget_min,budget_max').eq('client_id',clientId).order('created_at',{ascending:false});
+      if(!crmSessionCurrent(session,actor)||!viewingClient||viewingClient.id!==clientId||q.error)return;
       var cards=Array.from(root.children).slice(1);
       (q.data||[]).forEach(function(r,i){var card=cards[i];if(!card)return;var txt=budgetText(r.budget_min,r.budget_max,false);card.innerHTML=card.innerHTML.replace(/💰\s*[^<]*<br>/,'💰 '+(typeof escapeHtml==='function'?escapeHtml(txt):txt)+'<br>');});
     }catch(e){console.warn('[budget display requests]',e)}
   }
   var oldRenderRequests=window.renderClientRequestsTab;
-  if(typeof oldRenderRequests==='function')window.renderClientRequestsTab=async function(){var r=await oldRenderRequests.apply(this,arguments);await fixRequestCards();return r};
+  if(typeof oldRenderRequests==='function')window.renderClientRequestsTab=async function(){var session=crmSessionGeneration,actor=currentUser&&currentUser.id,clientId=typeof viewingClient!=='undefined'&&viewingClient&&viewingClient.id;var r=await oldRenderRequests.apply(this,arguments);if(crmSessionCurrent(session,actor)&&viewingClient&&viewingClient.id===clientId)await fixRequestCards();return r};
 
   function fixDashHot(clients){
     try{

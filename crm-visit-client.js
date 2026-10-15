@@ -59,6 +59,7 @@
       if(!currentProfile||!currentProfile.company_id)throw new Error('الحساب غير مربوط بالشركة. راجع المدير.');
       const type=['buyer','tenant','investor'].includes(el('vRequestType').value)?el('vRequestType').value:'buyer';
       data={company_id:currentProfile.company_id,assigned_to:currentUser.id,name,phone,client_type:type,is_buyer:type==='buyer',is_seller:false,is_investor:type==='investor',source:'other',pipeline_stage:'new'};
+      if(type==='investor'&&typeof isOwner==='function'&&isOwner())data.lead_route='investment';
       data.id=crmSaveKey(attemptKey,data);
     }catch(error){status(error.message,true);return;}
     if(!crmBeginSave('mViewing'))return;

@@ -20,9 +20,11 @@ const clients=[
 {id:uuid(101),name:'عميل مسقط التجريبي',phone:'+96800000001',assigned_to:muscat,lead_route:'muscat',client_type:'buyer',is_buyer:true,lead_temperature:'warm',status:'warm',preferred_area:'الخوض',budget_max:95000,next_followup:relative(-2),human_contact_at:now},
 {id:uuid(102),name:'عميلة بطلبين مستقلين',phone:'+96800000002',assigned_to:muscat,lead_route:'muscat',client_type:'buyer',is_buyer:true,lead_temperature:'hot',status:'hot',preferred_area:'الموالح',budget_max:130000,human_contact_at:now},
 {id:uuid(103),name:'عميل متابعة بركاء',phone:'+96800000003',assigned_to:barka,lead_route:'barka',client_type:'buyer',is_buyer:true,lead_temperature:'warm',status:'warm',preferred_area:'الصومحان',budget_max:68000,next_followup:relative(0),human_contact_at:now},
+{id:uuid(105),name:'المستثمر الخاص الاصطناعي',phone:'+96800000005',assigned_to:owner,lead_route:'investment',client_type:'investor',is_investor:true,lead_temperature:'cold',status:'cold'},
 {id:uuid(104),name:'بائعة بركاء التجريبية',phone:'+96800000004',assigned_to:barka,lead_route:'barka',client_type:'seller',is_seller:true,lead_temperature:'cold',status:'cold',preferred_area:'حي عاصم',human_contact_at:null}
 ].map((c,i)=>({...c,phone_normalized:c.phone,company_id:company,archived:false,followup_suppressed:false,created_at:relative(-i-2)+'T08:00:00Z',lead_score:i===1?80:40,notes:'بيانات اصطناعية؛ لا يوجد عميل حقيقي'}));
 const requests=[
+{id:uuid(205),client_id:uuid(105),assigned_to:owner,branch_key:'investment',route_key:'investment',request_type:'investor',preferred_area:null,pipeline_stage:'new'},
 {id:uuid(201),client_id:uuid(101),assigned_to:muscat,branch_key:'muscat',route_key:'muscat',request_type:'buyer',preferred_area:'الخوض',budget_min:70000,budget_max:95000,next_followup:relative(-2),pipeline_stage:'qualified',qualified_at:now},
 {id:uuid(202),client_id:uuid(102),assigned_to:muscat,branch_key:'muscat',route_key:'muscat',request_type:'buyer',preferred_area:'الموالح',budget_min:100000,budget_max:130000,next_followup:relative(0),pipeline_stage:'negotiation'},
 {id:uuid(203),client_id:uuid(102),assigned_to:muscat,branch_key:'muscat',route_key:'muscat',request_type:'tenant',preferred_area:'المعبيلة',budget_min:200,budget_max:350,next_followup:relative(3),pipeline_stage:'new'},
@@ -69,6 +71,12 @@ const state={actor,mode,profile,db,calls:[],failNext:null,externalRequests:0,syn
 window.CRMPREVIEW=state;
 function allowed(row,table){
  if(!row)return false;
+ // Model owner-only investment reads for UI tests; real RLS is tested separately in SQL.
+ if(profile.role!=='owner'){
+  const privateClient=id=>clients.some(c=>c.id===id&&c.lead_route==='investment');
+  const request=requests.find(r=>r.id===row.request_id);
+  if(row.lead_route==='investment'||row.route_key==='investment'||row.branch_key==='investment'||privateClient(row.client_id)||request&&(request.route_key==='investment'||request.branch_key==='investment'||privateClient(request.client_id)))return false;
+ }
  if(profile.role!=='agent')return true;
  const branch=actor;
  if(['properties'].includes(table))return row.branch_key===branch;

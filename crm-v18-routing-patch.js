@@ -30,10 +30,10 @@
   async function showActiveChatMissingRequirements(){
     try{
       if(typeof waInboxActiveConversation==='undefined'||!waInboxActiveConversation||!waInboxActiveConversation.client_id)return;
-      var conversationId=waInboxActiveConversation.id,clientId=waInboxActiveConversation.client_id;
+      var conversationId=waInboxActiveConversation.id,clientId=waInboxActiveConversation.client_id,session=crmSessionGeneration,actor=currentUser&&currentUser.id;
       var q=await supa.from('client_requests').select('id,missing_required_fields,status,updated_at').eq('client_id',clientId).in('status',['active','paused']).order('updated_at',{ascending:false}).limit(20);
       if(q.error)throw q.error;
-      if(typeof waInboxActiveConversation==='undefined'||!waInboxActiveConversation||waInboxActiveConversation.id!==conversationId)return;
+      if(!crmSessionCurrent(session,actor)||typeof waInboxActiveConversation==='undefined'||!waInboxActiveConversation||waInboxActiveConversation.id!==conversationId||waInboxActiveConversation.client_id!==clientId)return;
       var rows=(q.data||[]).filter(function(r){return Array.isArray(r.missing_required_fields)&&r.missing_required_fields.length});
       var old=el('waMissingRequirements');if(old)old.remove();
       if(!rows.length)return;
@@ -47,19 +47,21 @@
   }
   var oldRenderWhatsApp=window.renderWhatsAppChat;
   if(typeof oldRenderWhatsApp==='function'){
-    window.renderWhatsAppChat=function(){var r=oldRenderWhatsApp.apply(this,arguments);setTimeout(showActiveChatMissingRequirements,0);return r};
+    window.renderWhatsAppChat=function(){var session=crmSessionGeneration,actor=currentUser&&currentUser.id;var r=oldRenderWhatsApp.apply(this,arguments);setTimeout(function(){if(crmSessionCurrent(session,actor))showActiveChatMissingRequirements()},0);return r};
   }
 
   var oldFollowUp=window.runFollowUpEngine;
   if(typeof oldFollowUp==='function'){
     window.runFollowUpEngine=async function(){
-      var result=await oldFollowUp.apply(this,arguments);
+      var session=crmSessionGeneration,actor=currentUser&&currentUser.id;
+      var result=await oldFollowUp.apply(this,arguments);if(!crmSessionCurrent(session,actor))return result;
       try{
         var since=new Date(Date.now()-7*86400000).toISOString();
         var q=await supa.from('client_requests')
           .select('id,client_id,missing_required_fields,last_contact_at,client:clients(id,name,phone)')
           .in('status',['active','paused']).gte('last_contact_at',since)
           .order('last_contact_at',{ascending:false}).limit(200);
+        if(!crmSessionCurrent(session,actor))return result;
         if(q.error)throw q.error;
         var rows=(q.data||[]).filter(function(r){return Array.isArray(r.missing_required_fields)&&r.missing_required_fields.length>0});
         if(rows.length){

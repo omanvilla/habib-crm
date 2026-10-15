@@ -511,6 +511,8 @@ async function processTestKrookiImage(args: {
       }
       await supabase.from("notifications").insert({
         user_id: target.assigned_to,
+        client_id: args.clientId,
+        request_id: target.id,
         title: "تنبيه: اختلاف بيانات الكروكي",
         body: summary,
         type: "warning",
@@ -536,13 +538,30 @@ async function upsertClientIdentity(args: { phone: string; customerName: string 
   if (error) throw new Error(`client identity: ${error.message}`);
   return data;
 }
-async function getExistingRequests(clientId: string) {
-  const { data, error } = await supabase.from("client_requests")
+async function getExistingRequests(clientId: string, physicalRoute: string) {
+  let query = supabase.from("client_requests")
     .select("id,request_type,property_type,property_types,preferred_area,preferred_areas,wilayat,budget_min,budget_max,payment_method,purchase_timing,purpose,bedrooms_min,bathrooms_min,land_size_min,land_size_max,built_size_min,built_size_max,furnished,status,pipeline_stage,priority,assigned_to,route_key,branch_key,closed_reason,updated_at")
-    .eq("company_id", CRM_COMPANY_ID).eq("client_id", clientId).in("status", ["active", "paused", "cancelled"])
-    .order("priority", { ascending: false }).order("updated_at", { ascending: false }).limit(12);
+    .eq("company_id", CRM_COMPANY_ID).eq("client_id", clientId).in("status", ["active", "paused", "cancelled"]);
+  // A reused phone may retain a public branch contact. Keep its investment
+  // journey out of branch AI context, and never feed old branch requests to it.
+  if (physicalRoute === "investment") query = query.or("route_key.eq.investment,branch_key.eq.investment");
+  else query = query.or("and(or(route_key.is.null,route_key.neq.investment),or(branch_key.is.null,branch_key.neq.investment))");
+  const { data, error } = await query.order("priority", { ascending: false }).order("updated_at", { ascending: false }).limit(12);
   if (error) throw new Error(`requests select: ${error.message}`);
   return data || [];
+}
+function enforceInvestmentRequestBoundary(extracted: any, existingRequests: any[], physicalRoute: string) {
+  if (physicalRoute !== "investment" || !Array.isArray(extracted?.requests)) return extracted;
+  const privateIds = new Set(existingRequests.filter((r: any) => [r.route_key, r.branch_key].includes("investment")).map((r: any) => String(r.id)));
+  extracted.requests = extracted.requests.map((item: any) => {
+    if (String(item?.action) === "create") return { ...item, request_type: "investor", existing_request_id: null };
+    if (["update", "close", "pause", "resume"].includes(String(item?.action)) && !privateIds.has(String(item?.existing_request_id))) {
+      extracted.needs_human_review = true;
+      return { ...item, action: "none", existing_request_id: null, needs_human_review: true };
+    }
+    return { ...item, request_type: "investor" };
+  });
+  return extracted;
 }
 
 const fieldNames = ["request_type", "property_types", "property_type", "preferred_areas", "preferred_area", "wilayat", "budget", "payment_method", "purchase_timing", "purpose", "bedrooms_min", "bathrooms_min", "land_size", "built_size", "furnished"] as const;
@@ -1170,9 +1189,11 @@ async function postProcessLinkedRequests(args: { clientId: string; conversationI
     // Missing requirements do not transfer a Barka contact to Muscat. Explicit
     // geography remains authoritative; otherwise retain the receiving branch.
     const branch = physicalBranch === "investment" || existingBranch === "investment" ? "investment" : (inferBranch(r) || physicalBranch || existingBranch || "general");
-    const assignee = r.manual_assigned_to || assignments[branch] || (existingBranch === branch ? r.assigned_to : null) || null;
-    const missing = requestMissingFields(r);
+    const assignee = branch === "investment" ? assignments.investment : (r.manual_assigned_to || assignments[branch] || (existingBranch === branch ? r.assigned_to : null) || null);
+    if (branch === "investment" && !assignee) throw new Error("investment owner assignment missing");
+    const missing = requestMissingFields(branch === "investment" ? { ...r, request_type: "investor" } : r);
     const patch: any = { branch_key: branch, assigned_to: assignee, missing_required_fields: missing, updated_at: new Date().toISOString() };
+    if (branch === "investment") Object.assign(patch, { request_type: "investor", route_key: "investment", manual_assigned_to: null });
     if (missing.length) patch.requirements_completed_at = null; else if (!r.requirements_completed_at) patch.requirements_completed_at = new Date().toISOString();
     const saved = await supabase.from("client_requests").update(patch).eq("id", r.id).eq("company_id", CRM_COMPANY_ID).select("id").single();
     if (saved.error || !saved.data?.id) throw new Error(`postprocess request update: ${saved.error?.message || "request not found"}`);
@@ -1371,10 +1392,11 @@ async function processInboundMessage(value: any, m: any) {
   }
   let extracted: any = null;
   try {
-    const existingRequests = await getExistingRequests(clientId);
+    const existingRequests = await getExistingRequests(clientId, route.route_key);
     if (messageRow?.ai_extracted && Array.isArray(messageRow.ai_extracted?.requests)) extracted = messageRow.ai_extracted;
     else extracted = await extractRequestsWithOpenAI(body, customerName, existingRequests, route.route_key);
     extracted = enforceCrossBranchRequestSeparation(extracted, existingRequests, route.route_key, body);
+    extracted = enforceInvestmentRequestBoundary(extracted, existingRequests, route.route_key);
     if (await isAllowedTestCustomer(customerPhone)) {
       extracted = bindAmbiguousFieldsToSingleRouteRequest(extracted, existingRequests, route.route_key);
     }

@@ -1,11 +1,12 @@
 # Habib CRM — current state
 
-Updated 2026-10-11. Read this with `AGENTS.md` before work. This file distinguishes deployed changes, direct verification and remaining work. Older dated reports remain evidence, not competing product rules.
+Updated 2026-10-15. Read this with `AGENTS.md` before work. This file distinguishes deployed changes, direct verification and remaining work. Older dated reports remain evidence, not competing product rules.
 
 ## Where the work is
 
 | Surface | State |
 |---|---|
+| October 15 investment work | In validation: owner-only `investment` manual workflow, existing request qualification/milestones, linked-record/RPC/Edge isolation, and future investment-line preparation. No historical investor conversion or Meta onboarding attempt. See `docs/investment-owner-only-20261015.md`. |
 | October 11 WhatsApp follow-up | Deployed and verified: receiving-line fallback replaces the unknown-geography Muscat default; 48 affected clients and 53 linked requests repaired with private before/after evidence; complete Clients-page pagination published. See `docs/whatsapp-client-routing-20261011.md`. |
 | October 11 visit update | Deployed and verified: inline client creation/selection in New Visit and automatic loading of all permitted client options. Frontend-only; no database migration. See `docs/visit-client-20261011.md`. |
 | October 3 release | Completed: matching database changes and frontend deployed. Ahmed's standing instruction now authorizes direct deployment after validation, followed by his live review. See `docs/release-20261003.md`. |
@@ -23,6 +24,7 @@ The October 2 conversation mentioned local Codex commit `d3c7481` on `work`. It 
 
 - From October 3, ordinary requested CRM changes proceed through implementation, meaningful tests, coordinated deployment and live checks without asking Ahmed to approve publication again. He reviews the live result and requests changes or reversal if needed. His silence does not prove testing or acceptance. Newer explicit release exceptions still apply; permission to deploy the CRM does not authorize destructive deletion or external customer messages.
 - Each employee sees her branch; owner sees both. A stale assignment does not override the branch boundary.
+- October 15: canonical `investment` is owner-only across all CRM data, including against manager/viewer access. New owner-selected investors use that route and owner assignment; qualification remains optional in existing requests. Preserve old branch investor labels, shared-phone identities, existing Muscat/Barka workflows and current route configuration. Private investment evidence must not enter shared summaries or AI caches. No Meta connection attempt or old-client backfill.
 - Standing active inventory is 10. Shortage is `max(0,10-active inventory)`. Monthly additions remain descriptive, not a second target scoring the same shortage.
 - Work since 2026-08-01 uses approved branch reporting attribution while preserving original dates, authors, senders and amounts. Lifetime reporting is not a one-year substitute.
 - Other targets need actual owner-entered values. Cross-month weekly target allocation remains undecided; the deployed UI suppresses its score.

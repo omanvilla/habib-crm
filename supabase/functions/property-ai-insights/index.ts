@@ -40,6 +40,31 @@ function latestIso(values: Array<string | null | undefined>): string | null {
   return valid.sort((a,b) => new Date(b).getTime() - new Date(a).getTime())[0];
 }
 
+// Owner-visible private evidence must not be copied to a shared AI cache.
+// The database classifies actual rows and all indirect references centrally.
+async function investmentSafeSharedEvidence(db: any, companyId: string, groups: Record<string, any[]>, privateTarget: boolean, parentClientId: string | null = null) {
+  const role = await db.rpc("my_role");
+  if (role.error || !role.data) throw new Error("privacy_evidence_unavailable");
+  // Non-owner source queries already obey the restrictive database policies.
+  if (role.data !== "owner" || privateTarget) return groups;
+  const tables: Record<string, string> = {
+    requests: "client_requests", inquiries: "property_inquiries", allRelations: "property_inquiries",
+    viewings: "viewings", rejections: "property_rejection_reasons", deals: "deals",
+    messages: "whatsapp_messages", properties: "properties", marketing: "property_marketing_events",
+  };
+  const refs: Array<{ table: string; id: string }> = [];
+  for (const [group, rows] of Object.entries(groups)) for (const row of rows) {
+    if (!tables[group] || !row.id) throw new Error("privacy_evidence_unavailable");
+    refs.push({ table: tables[group], id: String(row.id) });
+  }
+  if (!refs.length) return groups;
+  if (refs.length > 1000) throw new Error("privacy_evidence_limit");
+  const result = await db.rpc("crm_shared_ai_evidence_mask", { p_rows: refs });
+  if (result.error || !Array.isArray(result.data) || result.data.length !== refs.length || result.data.some((allowed: any) => typeof allowed !== "boolean")) throw new Error("privacy_evidence_unavailable");
+  let index = 0;
+  return Object.fromEntries(Object.entries(groups).map(([group, rows]) => [group, rows.filter(() => result.data[index++] === true)]));
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ ok: false, error: "method_not_allowed" }, 405);
@@ -62,11 +87,11 @@ Deno.serve(async (req) => {
   if (!propertyId) return json({ ok: false, error: "property_id_required" }, 400);
 
   const [propertyR, inquiriesR, viewingsR, rejectionsR, marketingR, dealsR] = await Promise.all([
-    supabase.from("crm_properties_access").select("id,company_id,title,property_code,internal_name,branch_key,type,area,wilayat,price,owner_net,bedrooms,bathrooms,land_size,built_size,status,description,created_at,updated_at,performance_tracking_started_at,photography_status,photography_reason,photography_required_at,photography_completed_at,marketing_review_status,marketing_reviewed_at,marketing_review_note").eq("id", propertyId).single(),
+    supabase.from("crm_properties_access").select("id,company_id,title,property_code,internal_name,branch_key,owner_client_id,type,area,wilayat,price,owner_net,bedrooms,bathrooms,land_size,built_size,status,description,created_at,updated_at,performance_tracking_started_at,photography_status,photography_reason,photography_required_at,photography_completed_at,marketing_review_status,marketing_reviewed_at,marketing_review_note").eq("id", propertyId).single(),
     supabase.from("property_inquiries").select("id,client_id,request_id,source,status,first_inquiry_at,last_inquiry_at,inquiry_count,rejection_reason,rejection_notes,last_message,match_status,match_notes,client_response,viewing_booked,viewing_completed,post_visit_interest,outcome,has_inbound_inquiry").eq("property_id", propertyId).order("last_inquiry_at", { ascending: false }).limit(100),
     supabase.from("viewings").select("id,client_id,request_id,viewing_date,status,attendance,client_feedback,rejection_reason,liked,next_step,notes").eq("property_id", propertyId).eq("archived", false).order("viewing_date", { ascending: false }).limit(100),
-    supabase.from("property_rejection_reasons").select("client_id,request_id,phase,note,is_primary,created_at,reason:rejection_reasons(code,label_ar,category)").eq("property_id", propertyId).order("created_at", { ascending: false }).limit(100),
-    supabase.from("property_marketing_events").select("channel,event_type,published_at,views,reach,likes,comments,shares,saves,total_interactions,plays,notes,url,created_at").eq("property_id", propertyId).order("created_at", { ascending: false }).limit(50),
+    supabase.from("property_rejection_reasons").select("id,client_id,request_id,phase,note,is_primary,created_at,reason:rejection_reasons(code,label_ar,category)").eq("property_id", propertyId).order("created_at", { ascending: false }).limit(100),
+    supabase.from("property_marketing_events").select("id,channel,event_type,published_at,views,reach,likes,comments,shares,saves,total_interactions,plays,notes,url,created_at").eq("property_id", propertyId).order("created_at", { ascending: false }).limit(50),
     supabase.from("crm_deals_access").select("id,client_id,request_id,stage,deal_value,closing_probability,created_at,closed_at").eq("property_id", propertyId).order("created_at", { ascending: false }).limit(50),
   ]);
 
@@ -79,12 +104,23 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: "evidence_load_failed", failed_sources: failedSources,
       message: "تعذر تحميل بعض بيانات العقار ولم يتم إنشاء تحليل ناقص. حاول مرة أخرى بعد اكتمال الاتصال.", saved: false }, 503);
   }
-  const allRelations = inquiriesR.data || [];
+  let safeEvidence: Record<string, any[]>;
+  try {
+    let privateTarget = property.branch_key === "investment";
+    if (!privateTarget && property.owner_client_id) {
+      const owner = await supabase.from("clients").select("id,lead_route").eq("company_id", property.company_id).eq("id", property.owner_client_id).maybeSingle();
+      if (owner.error) throw new Error("privacy_evidence_unavailable");
+      privateTarget = owner.data?.lead_route === "investment";
+    }
+    safeEvidence = await investmentSafeSharedEvidence(supabase, property.company_id, {
+      allRelations: inquiriesR.data || [], viewings: viewingsR.data || [],
+      rejections: rejectionsR.data || [], deals: dealsR.data || [], marketing: marketingR.data || [],
+    }, privateTarget);
+  } catch {
+    return json({ ok: false, error: "privacy_evidence_unavailable", saved: false }, 503);
+  }
+  const { allRelations, viewings, rejections, deals, marketing } = safeEvidence;
   const inquiries = allRelations.filter((x:any) => x.has_inbound_inquiry !== false);
-  const viewings = viewingsR.data || [];
-  const rejections = rejectionsR.data || [];
-  const marketing = marketingR.data || [];
-  const deals = dealsR.data || [];
 
   const uniqueInquirers = new Set(inquiries.map((x:any) => x.client_id).filter(Boolean)).size;
   const inquiryEvents = inquiries.reduce((n:number,x:any) => n + Number(x.inquiry_count || 1), 0);
