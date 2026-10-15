@@ -27,10 +27,14 @@ RESET ROLE;
 -- Current-day synthetic action records. Disable triggers only to construct old/stale
 -- assignments; the assertions themselves exercise the actual RLS and new invoker RPC.
 SET session_replication_role=replica;
-UPDATE viewings SET viewing_date=(now() AT TIME ZONE 'Asia/Muscat')::date,status=CASE WHEN id=test_id(600) THEN 'done' ELSE 'scheduled' END;
-UPDATE deals SET stage='negotiation';
+UPDATE viewings SET viewing_date=(now() AT TIME ZONE 'Asia/Muscat')::date,status=CASE WHEN id=test_id(600) THEN 'done' ELSE 'scheduled' END
+ WHERE id IN(test_id(600),test_id(601),test_id(602),test_id(603));
+UPDATE deals SET stage='negotiation' WHERE id IN(test_id(800),test_id(801),test_id(802),test_id(803));
 UPDATE client_requests SET next_followup=(now() AT TIME ZONE 'Asia/Muscat')::date,lead_temperature='hot' WHERE id IN(test_id(200),test_id(201),test_id(202),test_id(206));
-UPDATE tasks SET due_date=(now() AT TIME ZONE 'Asia/Muscat')::date,priority='high';
+-- Other suites may have committed their own owner follow-up fixture. Change only
+-- the six records this suite owns; never turn unrelated synthetic tasks urgent.
+UPDATE tasks SET due_date=(now() AT TIME ZONE 'Asia/Muscat')::date,priority='high'
+ WHERE id IN(test_id(900),test_id(901),test_id(902),test_id(903),test_id(904),test_id(905));
 INSERT INTO tasks(id,company_id,user_id,client_id,title,due_date) SELECT test_id(3000+n),test_id(1),test_id(11),test_id(100),'Synthetic page task '||n,(now() AT TIME ZONE 'Asia/Muscat')::date FROM generate_series(1,25)n;
 SET session_replication_role=origin;
 CREATE FUNCTION test_dashboard_no_private(p_result jsonb) RETURNS void LANGUAGE plpgsql AS $$

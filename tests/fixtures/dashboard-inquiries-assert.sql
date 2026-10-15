@@ -3,22 +3,30 @@
 BEGIN;
 SELECT set_config('test.actor',test_id(10)::text,true);
 INSERT INTO clients(id,company_id,assigned_to,name,phone,lead_route,client_type)
-VALUES(test_id(4100),test_id(1),test_id(12),'Synthetic saved-link client','+96891104100','barka','buyer');
+VALUES(test_id(4100),test_id(1),test_id(12),'Synthetic saved-link client','+96891104100','barka','buyer'),
+(test_id(4101),test_id(1),test_id(11),'Synthetic shared branch parent','+96891104101','muscat','buyer'),
+(test_id(4102),test_id(1),test_id(12),'Synthetic unclassified parent','+96891104102','barka',NULL);
 INSERT INTO properties(id,company_id,title,type,branch_key,sourced_by,added_by,area,price,status)
 VALUES(test_id(4200),test_id(1),'Synthetic saved-link property','villa','barka',test_id(12),test_id(12),'بركاء',100000,'available');
 INSERT INTO whatsapp_conversations(id,company_id,client_id,assigned_to,route_key,meta_phone_number_id,customer_wa_id,customer_phone)
 VALUES(test_id(4300),test_id(1),test_id(4100),test_id(12),'barka','synthetic-barka','96891104100','+96891104100'),
 (test_id(4301),test_id(1),test_id(4100),test_id(11),'muscat','synthetic-muscat','96891104100','+96891104100'),
-(test_id(4302),test_id(1),test_id(4100),test_id(10),'investment','synthetic-investment','96891104100','+96891104100');
+(test_id(4302),test_id(1),test_id(4100),test_id(10),'investment','synthetic-investment','96891104100','+96891104100'),
+(test_id(4304),test_id(1),test_id(4101),test_id(12),'barka','synthetic-barka','96891104101','+96891104101'),
+(test_id(4307),test_id(1),test_id(4102),test_id(12),'barka','synthetic-barka','96891104102','+96891104102');
 SELECT set_config('test.actor','',true);
 INSERT INTO whatsapp_messages(id,company_id,conversation_id,client_id,whatsapp_message_id,direction,message_type,body,message_timestamp)
 VALUES(test_id(4400),test_id(1),test_id(4300),test_id(4100),'wamid.synthetic.savedlink4400','inbound','text','https://instagram.com/reel/SYNTHLINK4200/','2026-10-04T08:10:00Z'),
 (test_id(4401),test_id(1),test_id(4301),test_id(4100),'wamid.synthetic.savedlink4401','inbound','text','https://instagram.com/reel/SYNTHLINK4200/','2026-10-04T09:10:00Z'),
 (test_id(4402),test_id(1),test_id(4302),test_id(4100),'wamid.synthetic.savedlink4402','inbound','text','https://instagram.com/reel/SYNTHLINK4200/','2026-10-04T10:10:00Z'),
 (test_id(4403),test_id(1),test_id(4300),test_id(4100),'wamid.synthetic.savedlink4403','inbound','text','https://instagram.com/reel/SYNTHLINK4203/','2026-10-04T11:10:00Z');
+INSERT INTO whatsapp_messages(id,company_id,conversation_id,client_id,whatsapp_message_id,direction,message_type,body,message_timestamp)
+VALUES(test_id(4406),test_id(1),test_id(4304),test_id(4101),'wamid.synthetic.savedlink4406','inbound','text','https://instagram.com/reel/SYNTHLINK4200/','2026-10-04T12:10:00Z');
+INSERT INTO whatsapp_messages(id,company_id,conversation_id,client_id,whatsapp_message_id,direction,message_type,body,message_timestamp)
+VALUES(test_id(4407),test_id(1),test_id(4307),test_id(4102),'wamid.synthetic.savedlink4407','inbound','text','https://instagram.com/reel/SYNTHLINK4200/','2026-10-04T13:10:00Z');
 SELECT test_assert((SELECT count(*) FROM unmatched_property_links WHERE whatsapp_message_id IN(test_id(4400),test_id(4401),test_id(4402),test_id(4403)) AND status='pending')=4,'four unknown references must wait before a link is saved');
 CREATE TEMP TABLE inquiry_other_before AS
-SELECT 'clients' table_name,id row_id,to_jsonb(c) row_data FROM clients c WHERE id IN(test_id(100),test_id(101))
+SELECT 'clients' table_name,id row_id,to_jsonb(c) row_data FROM clients c WHERE id IN(test_id(100),test_id(101),test_id(4101),test_id(4102))
 UNION ALL SELECT 'company_lead_routes',id,to_jsonb(r) FROM company_lead_routes r WHERE company_id=test_id(1);
 
 -- The Barka employee saving a known link can resolve only her own ordinary inbox.
@@ -28,7 +36,7 @@ INSERT INTO property_marketing_events(id,company_id,property_id,channel,event_ty
 VALUES(test_id(4500),test_id(1),test_id(4200),'instagram','publish','https://instagram.com/reel/SYNTHLINK4200/',test_id(12));
 RESET ROLE;
 SELECT test_assert((SELECT count(*) FROM property_message_attributions WHERE message_id=test_id(4400) AND method='exact_link')=1,'saved link did not reconcile exact own-branch reference');
-SELECT test_assert(NOT EXISTS(SELECT 1 FROM property_message_attributions WHERE message_id IN(test_id(4401),test_id(4402),test_id(4403))),'staff link save crossed branch/private/unknown boundary');
+SELECT test_assert(NOT EXISTS(SELECT 1 FROM property_message_attributions WHERE message_id IN(test_id(4401),test_id(4402),test_id(4403),test_id(4406))),'staff link save crossed branch/private/unknown/shared-parent boundary');
 SELECT test_assert((SELECT first_inquiry_at='2026-10-04T08:10:00Z'::timestamptz AND last_inquiry_at='2026-10-04T08:10:00Z'::timestamptz AND has_inbound_inquiry FROM property_inquiries WHERE source_whatsapp_message_id=test_id(4400)),'business timestamp or real inbound marker changed');
 SELECT test_assert((SELECT property_match_status='auto_matched' FROM whatsapp_messages WHERE id=test_id(4400)),'exact saved link must not claim human manual resolution');
 SELECT test_assert((SELECT resolved_by IS NULL AND status='resolved' FROM unmatched_property_links WHERE whatsapp_message_id=test_id(4400)),'automatic reconciliation invented a manual resolver');
@@ -40,8 +48,14 @@ UPDATE property_marketing_events SET url=url WHERE id=test_id(4500);
 RESET ROLE;
 SELECT test_assert(EXISTS(SELECT 1 FROM property_inquiries i JOIN client_requests r ON r.id=i.request_id WHERE i.source_whatsapp_message_id=test_id(4402)
  AND r.request_type='investor' AND r.route_key='investment' AND r.branch_key='investment' AND i.assigned_to=test_id(10)),'owner link-save did not preserve canonical private investment request');
-SELECT test_assert(NOT EXISTS(SELECT 1 FROM property_message_attributions WHERE message_id IN(test_id(4401),test_id(4403))),'owner auto reconciliation guessed a cross-branch or unmapped link');
+SELECT test_assert(NOT EXISTS(SELECT 1 FROM property_message_attributions WHERE message_id IN(test_id(4401),test_id(4403),test_id(4406))),'owner auto reconciliation guessed a cross-branch/shared-parent/unmapped link');
 SELECT test_assert((SELECT count(*) FROM property_inquiries WHERE client_id=test_id(4100))=2,'ordinary/private inquiry compartments were merged');
+SELECT test_assert((SELECT status='pending' FROM unmatched_property_links WHERE whatsapp_message_id=test_id(4407)),'identity-changing attribution did not remain pending');
+SELECT test_assert(NOT EXISTS(SELECT 1 FROM client_requests WHERE client_id=test_id(4102))
+ AND NOT EXISTS(SELECT 1 FROM property_inquiries WHERE client_id=test_id(4102))
+ AND NOT EXISTS(SELECT 1 FROM property_message_attributions WHERE message_id=test_id(4407))
+ AND NOT EXISTS(SELECT 1 FROM client_request_events WHERE client_id=test_id(4102)),
+ 'identity conflict subtransaction left partial requests/inquiry/history');
 CREATE TEMP TABLE saved_link_retry_before AS SELECT to_jsonb(i) row_data FROM property_inquiries i WHERE client_id=test_id(4100);
 UPDATE property_marketing_events SET url=url WHERE id=test_id(4500);
 SELECT test_assert((SELECT count(*) FROM property_message_attributions WHERE message_id IN(test_id(4400),test_id(4402)))=2,'repeated link save duplicated attribution');
@@ -75,4 +89,34 @@ SELECT test_assert(crm_repair_private.reconcile_saved_property_link(test_id(4503
 RESET ROLE;
 SELECT test_assert((SELECT status='pending' FROM unmatched_property_links WHERE whatsapp_message_id=test_id(4405)),'bounded repair changed an older unreviewed occurrence');
 SELECT test_assert(NOT EXISTS(SELECT 1 FROM property_message_attributions WHERE message_id=test_id(4405)),'bounded repair guessed historical attribution');
+
+-- Filling a blank classification is allowed only for an explicitly sale listing;
+-- all existing identity/routing values remain unchanged.
+INSERT INTO clients(id,company_id,assigned_to,name,phone,lead_route,client_type)
+VALUES(test_id(4103),test_id(1),test_id(12),'Synthetic sale inquiry parent','+96891104103','barka',NULL),
+(test_id(4104),test_id(1),test_id(12),'Synthetic seller parent','+96891104104','barka','seller');
+INSERT INTO properties(id,company_id,title,type,branch_key,sourced_by,added_by,area,price,status,description)
+VALUES(test_id(4208),test_id(1),'Synthetic verified sale','villa','barka',test_id(12),test_id(12),'بركاء',80000,'available','فيلا للبيع');
+INSERT INTO whatsapp_conversations(id,company_id,client_id,assigned_to,route_key,meta_phone_number_id,customer_wa_id,customer_phone)
+VALUES(test_id(4308),test_id(1),test_id(4103),test_id(12),'barka','synthetic-barka','96891104103','+96891104103'),
+(test_id(4309),test_id(1),test_id(4104),test_id(12),'barka','synthetic-barka','96891104104','+96891104104');
+INSERT INTO whatsapp_messages(id,company_id,conversation_id,client_id,whatsapp_message_id,direction,message_type,body,message_timestamp)
+VALUES(test_id(4408),test_id(1),test_id(4308),test_id(4103),'wamid.synthetic.savedlink4408','inbound','text','https://instagram.com/reel/SYNTHSALE4208/','2026-10-04T13:10:00Z'),
+(test_id(4409),test_id(1),test_id(4309),test_id(4104),'wamid.synthetic.savedlink4409','inbound','text','https://instagram.com/reel/SYNTHSALE4208/','2026-10-04T14:10:00Z');
+CREATE TEMP TABLE sale_parent_before AS SELECT to_jsonb(c) row_data FROM clients c WHERE id=test_id(4103);
+CREATE TEMP TABLE seller_parent_before AS SELECT to_jsonb(c) row_data FROM clients c WHERE id=test_id(4104);
+INSERT INTO property_marketing_events(id,company_id,property_id,channel,event_type,url,created_by)
+VALUES(test_id(4508),test_id(1),test_id(4208),'instagram','publish','https://instagram.com/reel/SYNTHSALE4208/',test_id(10));
+SELECT test_assert((SELECT client_type='buyer' FROM clients WHERE id=test_id(4103)),'blank sale inquiry classification was not filled by existing request summary');
+SELECT test_assert(EXISTS(SELECT 1 FROM property_message_attributions WHERE message_id=test_id(4408)),'verified sale inquiry was not recorded');
+SELECT test_assert(NOT EXISTS(SELECT 1 FROM clients c CROSS JOIN sale_parent_before b
+ CROSS JOIN unnest(ARRAY['lead_route','assigned_to','name','phone','phone_normalized','created_at']) fields(field_name)
+ WHERE c.id=test_id(4103) AND to_jsonb(c)->fields.field_name IS DISTINCT FROM b.row_data->fields.field_name),
+ 'blank classification fill changed parent identity or routing');
+SELECT test_assert((SELECT to_jsonb(c)=b.row_data FROM clients c CROSS JOIN seller_parent_before b WHERE c.id=test_id(4104)),
+ 'existing nonempty classification or seller identity was overwritten');
+SELECT test_assert((SELECT status='pending' FROM unmatched_property_links WHERE whatsapp_message_id=test_id(4409))
+ AND NOT EXISTS(SELECT 1 FROM client_requests WHERE client_id=test_id(4104))
+ AND NOT EXISTS(SELECT 1 FROM property_inquiries WHERE client_id=test_id(4104)),
+ 'seller conflict did not roll back request/inquiry and remain pending');
 ROLLBACK;
