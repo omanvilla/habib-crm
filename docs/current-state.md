@@ -6,6 +6,7 @@ Updated 2026-10-15. Read this with `AGENTS.md` before work. This file distinguis
 
 | Surface | State |
 |---|---|
+| October 15 semantic inquiry follow-up | Implementation under validation: text/shorthand, image OCR facts, human-response context, atomic evidence/RLS guards. See `docs/semantic-inquiries-20261015.md`; deployment and repair results will be recorded after verification. |
 | October 15 dashboard work | Deployed: professional ordinary/investment workspaces, bounded independent loading, faster contact queue, sale-period visit conversion and exact saved-link inquiry reconciliation. Seven evidenced messages repaired; five conflicting/insufficiently evidenced candidates remain pending. See `docs/dashboard-workspace-20261015.md`. |
 | October 15 investment work | Deployed: owner-only `investment` manual workflow, existing request qualification/milestones, linked-record/RPC/Edge isolation, and future investment-line preparation. No historical investor conversion or Meta onboarding attempt. See `docs/investment-owner-only-20261015.md`. |
 | October 11 WhatsApp follow-up | Deployed and verified: receiving-line fallback replaces the unknown-geography Muscat default; 48 affected clients and 53 linked requests repaired with private before/after evidence; complete Clients-page pagination published. See `docs/whatsapp-client-routing-20261011.md`. |

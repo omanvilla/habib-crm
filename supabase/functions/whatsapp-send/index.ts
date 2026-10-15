@@ -1,10 +1,13 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { createPropertyInquiryService } from "../_shared/property-inquiry-service.mjs";
 const SUPABASE_URL=Deno.env.get("SUPABASE_URL")??"";
 const SUPABASE_ANON_KEY=Deno.env.get("SUPABASE_ANON_KEY")??"";
 const SUPABASE_SERVICE_ROLE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??"";
 const CRM_COMPANY_ID=Deno.env.get("CRM_COMPANY_ID")??"";
 const WHATSAPP_ACCESS_TOKEN=Deno.env.get("WHATSAPP_ACCESS_TOKEN")??"";
 const META_APP_SECRET=Deno.env.get("META_APP_SECRET")??"";
+const OPENAI_API_KEY=Deno.env.get("OPENAI_API_KEY")??"";
+const OPENAI_MODEL=Deno.env.get("OPENAI_MODEL")||"gpt-5.6-luna";
 const META_GRAPH_VERSION=Deno.env.get("META_GRAPH_VERSION")||"v25.0";
 const corsHeaders={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS"};
 function json(data:unknown,status=200){if(data&&typeof data==="object"&&(data as any).ok===false)data={sent:false,retry_safe:true,...data};return new Response(JSON.stringify(data),{status,headers:{...corsHeaders,"content-type":"application/json; charset=utf-8"}})}
@@ -170,6 +173,16 @@ Deno.serve(async(req)=>{
   if(wamid){
     const ins=await admin.from("whatsapp_messages").insert({company_id:profile.company_id,conversation_id:conversation.id,client_id:clientId,request_id:resolvedRequestId,sent_by_user_id:user.id,actor_type:"human",channel_source:"crm",whatsapp_message_id:wamid,direction:"outbound",message_type:"text",sender_wa_id:senderPhoneNumberId,recipient_wa_id:to,body:messageBody,message_timestamp:now,delivery_status:"sent",raw_payload:{source:"crm_direct_send_idempotent",credential_source:sendSource,sent_by:user.id,request_link_state:requestLinkState,request_id:resolvedRequestId,route_key:routeKey,sender_phone_number_id:senderPhoneNumberId,operation_id:operationId,graph_response:graphPayload}});
     if(ins.error&&ins.error.code!=="23505")failures.push("message_history");
+    if(!ins.error || ins.error.code==="23505") {
+      // Attribution must never turn an accepted send into a retryable send.
+      const reconcile = async()=>{
+        const recorded=await admin.from("whatsapp_messages").select("id").eq("company_id",profile.company_id).eq("whatsapp_message_id",wamid).single();
+        if(recorded.error)throw new Error(`inquiry_message_lookup:${recorded.error.message}`);
+        await createPropertyInquiryService({db:admin,companyId:profile.company_id,apiKey:OPENAI_API_KEY,model:OPENAI_MODEL}).attributeOutbound(recorded.data.id);
+      };
+      const pending=reconcile().catch(error=>console.error("[whatsapp-send] inquiry review pending",String(error?.message||error).slice(0,200)));
+      EdgeRuntime.waitUntil(pending);
+    }
   }else failures.push("provider_message_id");
   // Conversation timestamps are maintained atomically by the message-insert trigger.
   const clientUpdate=await admin.from("clients").update({last_contact_at:now}).eq("id",clientId).eq("company_id",profile.company_id);

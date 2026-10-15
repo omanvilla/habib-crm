@@ -3,19 +3,40 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const ops=fs.readFileSync('crm-operations-v6.js','utf8');
-const webhook=fs.readFileSync('supabase/functions/whatsapp-webhook/index.ts','utf8');
+const matcherModule=import('../supabase/functions/_shared/property-inquiry-matcher.mjs');
+const serviceModule=import('../supabase/functions/_shared/property-inquiry-service.mjs');
 function calendar(now,company={created_at:'2026-05-06T15:00:00Z'}){
   class FixedDate extends Date { constructor(...args){super(...(args.length?args:[now]));} }
   const start=ops.indexOf('  const omanDate'),end=ops.indexOf('  async function renderPerformance');
   return new Function('Date','currentCompany',ops.slice(start,end)+';return {period,targetScore};')(FixedDate,company);
 }
-function attribution(db,fetchMock){
-  const begin=webhook.indexOf('function listingText'),end=webhook.indexOf('const BARKA_RE',begin);
-  const js=webhook.slice(begin,end).replace('value: unknown','value')
-    .replace('candidates: any[], candidate: any, message: string','candidates, candidate, message')
-    .replaceAll('args:{messageId:string;clientId:string;conversationId:string;body:string;routeKey:string;messageAt:string}','args')
-    .replaceAll('(x:any)','(x)').replaceAll('(p:any)','(p)').replaceAll('(value:string)','(value)');
-  return new Function('supabase','CRM_COMPANY_ID','OPENAI_API_KEY','OPENAI_MODEL','fetch',js+';return {listingCandidateCorroborated,attributeSpecificListingText,queueListingReview};')(db,'test-company','mock-key','mock-model',fetchMock);
+function inquiryFixture(body,{inventory=candidates,reviewError=null}={}){
+  const message={id:'msg1',company_id:'test-company',client_id:'client',conversation_id:'conv',
+    direction:'inbound',message_type:'text',body,message_timestamp:'2026-09-30T08:00:00Z',matched_property_id:null};
+  const conversation={id:'conv',company_id:'test-company',client_id:'client',route_key:'muscat',
+    human_handoff_required:false,handoff_reason:null};
+  const writes=[],calls=[];
+  function query(table){
+    const filters={};let operation='select',value;
+    const q={select(){return q},eq(key,v){filters[key]=v;return q},is(){return q},
+      update(v){operation='update';value=v;return q},upsert(v){operation='upsert';value=v;return q},
+      maybeSingle(){return q},then(resolve,reject){return Promise.resolve().then(()=>{
+        if(operation==='select'){
+          assert.equal(filters.company_id,'test-company');
+          return {data:table==='whatsapp_messages'?message:conversation,error:null};
+        }
+        writes.push({table,operation,value});
+        return {data:null,error:table==='unmatched_property_links'?reviewError:null};
+      }).then(resolve,reject)}};return q;
+  }
+  const db={from:query,rpc:async(name,args)=>{
+    calls.push({name,args});
+    if(name==='crm_property_inquiry_candidates')return {data:{candidates:inventory,has_more:false},error:null};
+    assert.equal(name,'crm_apply_verified_property_inquiries');
+    return {data:{matched_count:args.p_matches.length,property_ids:args.p_matches.map(x=>x.property_id),review_required:args.p_needs_review},error:null};
+  }};
+  return {writes,calls,service:async()=> (await serviceModule).createPropertyInquiryService({db,companyId:'test-company',
+    fetchImpl:async()=>{throw new Error('A direct reference must not call or send to an external service');}})};
 }
 const candidates=[
   {id:'p1',property_code:'HB123',title:'فيلا اختبار في الخوض',area:'الخوض',price:120000},
@@ -32,37 +53,39 @@ test('Monthly targets scale by the actual month including leap February',()=>{
   assert.match(calendar('2026-09-30T09:00:00Z').targetScore({active_inventory:10,inquiries:1,targets:{inquiries_target:30}},'day'),/100%/);
   assert.match(calendar('2024-02-29T09:00:00Z').targetScore({active_inventory:10,inquiries:1,targets:{inquiries_target:29}},'day'),/100%/);
 });
-test('Listing evidence uses complete unique references and Arabic grouped prices',()=>{
-  const f=attribution().listingCandidateCorroborated;
-  assert.equal(f(candidates,candidates[0],'اريد تفاصيل HB123'),true);
-  assert.equal(f(candidates,candidates[0],'اريد تفاصيل HB1234'),false);
-  assert.equal(f(candidates,candidates[0],'الفيلا في الخوض سعرها ١٢٠٬٠٠٠ ريال'),true);
-  assert.equal(f(candidates,candidates[0],'الفيلا في الخوض سعرها 1200000'),false);
-  assert.equal(f(candidates,candidates[0],'اريد فيلا في الخوض'),false);
-  assert.equal(f([candidates[0],{...candidates[1],title:candidates[0].title}],candidates[0],'اريد فيلا اختبار في الخوض'),false);
+test('Listing evidence uses complete unique references and Arabic grouped prices',async()=>{
+  const {matchListingReferences}=await matcherModule;
+  const matches=(body,inventory=candidates)=>matchListingReferences(body,inventory).matches.map(x=>x.property_id);
+  assert.deepEqual(matches('اريد تفاصيل HB123'),['p1']);
+  assert.deepEqual(matches('اريد تفاصيل HB1234'),[]);
+  assert.deepEqual(matches('الفيلا في الخوض سعرها ١٢٠٬٠٠٠ ريال'),['p1']);
+  assert.deepEqual(matches('الفيلا في الخوض سعرها 1200000'),[]);
+  assert.deepEqual(matches('اريد فيلا في الخوض'),[]);
+  assert.deepEqual(matches('اريد فيلا اختبار في الخوض',[candidates[0],{...candidates[1],title:candidates[0].title}]),[]);
 });
-test('Unique no-link mention is recorded; ambiguity queues review and alerts without a send',async()=>{
-  let writes=[],links=[],answer={references_specific_listing:true,property_id:'p1',confidence:.99,evidence:'الخوض'};
-  function query(table){
-    const q={select(){return q},eq(){return q},is(){return q},limit(){return Promise.resolve({data:candidates,error:null})},
-      update(v){writes.push({table,v});return q},upsert(v){writes.push({table,v});return q},
-      then(a,b){return Promise.resolve({error:null}).then(a,b)}};return q;
-  }
-  const db={from:query,rpc:async(name,args)=>{assert.equal(name,'record_property_link_inquiry_internal');links.push(args);return {error:null}}};
-  const api=attribution(db,async()=>({ok:true,json:async()=>({output_text:JSON.stringify(answer)})}));
-  const args={messageId:'msg1',clientId:'client',conversationId:'conv',body:'الفيلا في الخوض سعرها ١٢٠٬٠٠٠ ريال',routeKey:'muscat',messageAt:'2026-09-30'};
-  await api.attributeSpecificListingText(args);
-  assert.equal(links.length,1);
-  assert.equal(writes.some(x=>x.v.property_match_status==='ai_verified'),true);
-  writes=[];links=[];answer={...answer,property_id:null,confidence:.4};
-  await api.attributeSpecificListingText({...args,messageId:'msg2',body:'الفيلا في الخوض اريدها'});
-  assert.equal(links.length,0);
-  assert.equal(writes.some(x=>x.table==='unmatched_property_links'),true);
-  assert.equal(writes.some(x=>x.v.human_handoff_required===true),true);
+test('Unique no-link mention is recorded atomically; ambiguity queues review and alerts without a send',async()=>{
+  const direct=inquiryFixture('الفيلا في الخوض سعرها ١٢٠٬٠٠٠ ريال');
+  const result=await (await direct.service()).attributeInbound('msg1');
+  assert.deepEqual(result.property_ids,['p1']);
+  const applied=direct.calls.filter(x=>x.name==='crm_apply_verified_property_inquiries');
+  assert.equal(applied.length,1);
+  assert.equal(applied[0].args.p_message_id,'msg1');
+  assert.equal(applied[0].args.p_matches[0].method,'ai_verified');
+  assert.deepEqual(applied[0].args.p_matches[0].evidence.source_message_ids,['msg1']);
+  assert.equal(direct.writes.length,0,'Atomic RPC owns attribution and valid message status together');
+  const ambiguous=inquiryFixture('الفيلا في الخوض اريدها');
+  const review=await (await ambiguous.service()).attributeInbound('msg1');
+  assert.equal(review.review_required,true);
+  assert.equal(ambiguous.calls.some(x=>x.name==='crm_apply_verified_property_inquiries'),false);
+  assert.equal(ambiguous.writes.some(x=>x.table==='unmatched_property_links'&&x.value.status==='pending'),true);
+  assert.equal(ambiguous.writes.some(x=>x.table==='whatsapp_messages'&&x.value.property_match_status==='pending_manual'),true);
+  assert.equal(ambiguous.writes.some(x=>x.table==='whatsapp_conversations'&&x.value.human_handoff_required===true),true);
 });
-test('Review write failure is surfaced for webhook retry',async()=>{
-  const q={upsert(){return Promise.resolve({error:{message:'database unavailable'}})}};
-  await assert.rejects(attribution({from:()=>q}).queueListingReview({messageId:'msg',body:'عقار',clientId:'client',conversationId:'conv'}),/property_ai_review/);
+test('Review write failure is surfaced for webhook retry without reporting a successful alert',async()=>{
+  const fixture=inquiryFixture('ممكن تفاصيل العقار',{reviewError:{message:'database unavailable'}});
+  await assert.rejects((await fixture.service()).queueReview('msg1'),/property_inquiry_review_queue:database unavailable/);
+  assert.equal(fixture.writes.length,1);
+  assert.equal(fixture.writes[0].table,'unmatched_property_links');
 });
 
 test('Standing inventory goal is explicitly 10; other missing goals are excluded',()=>{
