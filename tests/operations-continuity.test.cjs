@@ -42,16 +42,14 @@ const candidates=[
   {id:'p1',property_code:'HB123',title:'فيلا اختبار في الخوض',area:'الخوض',price:120000},
   {id:'p2',property_code:'HB124',title:'فيلا ثانية في الخوض',area:'الخوض',price:125000}
 ];
-test('Oman daily, Sunday week and month boundaries',()=>{
+test('Current month remains the full Oman calendar month',()=>{
   const {period}=calendar('2026-09-30T09:00:00Z');
-  assert.deepEqual(period('day'),{from:'2026-09-30',to:'2026-10-01'});
-  assert.deepEqual(period('week'),{from:'2026-09-27',to:'2026-10-04'});
   assert.deepEqual(period('month'),{from:'2026-09-01',to:'2026-10-01'});
-  assert.deepEqual(calendar('2026-09-30T21:00:00Z').period('day'),{from:'2026-10-01',to:'2026-10-02'});
+  assert.deepEqual(calendar('2026-09-30T21:00:00Z').period('month'),{from:'2026-10-01',to:'2026-11-01'});
 });
-test('Monthly targets scale by the actual month including leap February',()=>{
-  assert.match(calendar('2026-09-30T09:00:00Z').targetScore({active_inventory:10,inquiries:1,targets:{inquiries_target:30}},'day'),/100%/);
-  assert.match(calendar('2024-02-29T09:00:00Z').targetScore({active_inventory:10,inquiries:1,targets:{inquiries_target:29}},'day'),/100%/);
+test('Monthly targets use the full configured goal, including leap February',()=>{
+  assert.match(calendar('2026-09-30T09:00:00Z').targetScore({active_inventory:10,inquiries:15,targets:{inquiries_target:30}},'month'),/75%/);
+  assert.match(calendar('2024-02-29T09:00:00Z').targetScore({active_inventory:10,inquiries:29,targets:{inquiries_target:29}},'month'),/100%/);
 });
 test('Listing evidence uses complete unique references and Arabic grouped prices',async()=>{
   const {matchListingReferences}=await matcherModule;
@@ -93,15 +91,18 @@ test('Standing inventory goal is explicitly 10; other missing goals are excluded
  assert.match(targetScore({active_inventory:7,targets:{}},'month'),/70%.*1 من 5/);
  assert.match(targetScore({active_inventory:1,inquiries:30,targets:{inquiries_target:30}},'month'),/55%.*2 من 5/);
 });
-test('Cross-month weekly score waits for approved target allocation',()=>{
+test('Longer periods do not compare their totals to one monthly target',()=>{
  const {targetScore}=calendar('2026-09-30T09:00:00Z');
- assert.match(targetScore({active_inventory:10,targets:{inventory_target:10}},'week'),/يعبر شهرين/);
- assert(!targetScore({active_inventory:10,targets:{inventory_target:10}},'week').includes('%'));
+ for(const kind of ['quarter','halfyear','nine_months','year']){
+  const score=targetScore({active_inventory:10,inquiries:999,targets:{inquiries_target:10}},kind);
+  assert.match(score,/متاحة للشهر فقط/);
+  assert(!score.includes('%'));
+ }
 });
 
-test('Lifetime starts at company inception and does not compare to monthly goals',()=>{
+test('Lifetime lets the backend determine inception and does not compare to monthly goals',()=>{
  const {period,targetScore}=calendar('2026-10-01T10:00:00Z');
- assert.deepEqual(period('all'),{from:'2026-05-06',to:'2026-10-02'});
+ assert.deepEqual(period('all'),{from:null,to:'2026-10-02'});
  assert.match(targetScore({active_inventory:12,targets:{inventory_target:10}},'all'),/إجمالي تاريخي/);
  assert(!targetScore({},'all').includes('%'));
 });

@@ -171,8 +171,14 @@ jobs:
           psql -d crm_investment_test -v ON_ERROR_STOP=1 -f db/changes/22-semantic-inquiries.forward.sql
           psql -d crm_investment_test -v ON_ERROR_STOP=1 -f db/changes/22-semantic-inquiries.forward.sql
           psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/semantic-inquiries-assert.sql
+          psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/performance-clients-before.sql
+          psql -d crm_investment_test -v ON_ERROR_STOP=1 -f db/changes/23-performance-client-metrics.forward.sql
+          psql -d crm_investment_test -v ON_ERROR_STOP=1 -f db/changes/23-performance-client-metrics.forward.sql
+          psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/performance-clients-assert.sql
           psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/investment-rpc-assert.sql
           psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/investment-attribution-assert.sql
+          psql -d crm_investment_test -v ON_ERROR_STOP=1 -f db/changes/23-performance-client-metrics.rollback.sql
+          psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/performance-clients-rollback-assert.sql
           psql -d crm_investment_test -v ON_ERROR_STOP=1 -f db/changes/22-semantic-inquiries.rollback.sql
           psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/semantic-inquiries-rollback-assert.sql
           psql -d crm_investment_test -v ON_ERROR_STOP=1 -f db/changes/20-dashboard-performance.rollback.sql

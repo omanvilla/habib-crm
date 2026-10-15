@@ -3,57 +3,72 @@
   const $id=id=>document.getElementById(id);
   const safe=v=>escapeHtml(String(v==null?'':v));
   const n=v=>Number(v||0).toLocaleString('en-US');
-  const omanDate=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'});
+  const omanDate=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat',numberingSystem:'latn'});
   const dateText=d=>d?new Date(d).toLocaleDateString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat'}):'—';
-  // Calendar arithmetic uses UTC components of the Oman-local date.
-  // Browser/device timezone must not move the period boundary.
+  const performancePeriods=new Set(['month','quarter','halfyear','nine_months','year','all']);
+  const validPerformancePeriod=kind=>performancePeriods.has(kind)?kind:'month';
+  // Use the Oman calendar date even when the browser is in another timezone.
+  // Rolling ranges include today; this month includes the whole calendar month.
   function period(kind){
+    kind=validPerformancePeriod(kind);
     const today=omanDate(new Date()),date=new Date(today+'T12:00:00Z');
-    const day=date.getUTCDay();
     const iso=d=>d.toISOString().slice(0,10);
     let from=today,to=iso(new Date(date.getTime()+86400000));
-    if(kind==='week'){from=iso(new Date(date.getTime()-day*86400000));to=iso(new Date(date.getTime()+(7-day)*86400000));}
     if(kind==='month'){from=today.slice(0,7)+'-01';to=iso(new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,1)));}
-    if(kind==='all')from=typeof currentCompany!=='undefined'&&currentCompany?.created_at?omanDate(currentCompany.created_at):null;
+    const months={quarter:3,halfyear:6,nine_months:9,year:12}[kind];
+    if(months){
+      const first=new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()-months,1));
+      const lastDay=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0)).getUTCDate();
+      from=iso(new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth(),Math.min(date.getUTCDate(),lastDay))));
+    }
+    if(kind==='all')from=null; // Backend includes genuine historical deals before technical company creation.
     return {from,to};
   }
-  const metric=(label,value,hint='')=>'<span class="ops-metric"><strong>'+n(value)+'</strong><small>'+label+'</small>'+(hint?'<span class="ops-metric-help">'+hint+'</span>':'')+'</span>';
+  function performanceDateLabel(value){
+    const match=String(value||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return match?Number(match[3])+'/'+Number(match[2])+'/'+match[1]:'بداية الشركة';
+  }
+  function performanceRangeLabel(span,actualFrom){
+    const through=new Date(Date.parse(span.to+'T00:00:00Z')-86400000).toISOString().slice(0,10);
+    return 'من '+performanceDateLabel(actualFrom||span.from)+' إلى '+performanceDateLabel(through);
+  }
+  const metric=(label,value,hint='')=>'<span class="ops-metric"><strong>'+(value==null?'—':n(value))+'</strong><small>'+label+'</small>'+(hint?'<span class="ops-metric-help">'+hint+'</span>':'')+'</span>';
   function targetScore(row,kind){
     if(kind==='all')return 'إجمالي تاريخي؛ لا يُقارن بهدف شهر واحد';
-    const t={...(row.targets||{}),inventory_target:10},span=period(kind),month=period('month');
-    const monthDays=(Date.parse(month.to+'T00:00:00Z')-Date.parse(month.from+'T00:00:00Z'))/86400000;
-    const days=(Date.parse(span.to+'T00:00:00Z')-Date.parse(span.from+'T00:00:00Z'))/86400000;
-    const goals=[['active_inventory','inventory_target',false],['inquiries','inquiries_target',true],['visits_done','visits_target',true],['sales','sold_target',true],['company_commission','commission_target',true]];
-    if(kind==='week'&&span.from.slice(0,7)!==new Date(Date.parse(span.to+'T00:00:00Z')-86400000).toISOString().slice(0,7))return 'الأسبوع يعبر شهرين؛ مقارنة الأهداف تحتاج اعتماد طريقة توزيعها';
-    const valid=goals.map(([key,target,flow])=>{let goal=t[target];if(goal==null||Number(goal)<=0||(key==='company_commission'&&row[key]==null))return null;goal=Number(goal)*(flow?days/monthDays:1);return Math.min(1,Number(row[key]||0)/goal)}).filter(x=>x!==null);
+    if(kind!=='month')return 'أرقام الفترة المختارة؛ نسبة إنجاز الأهداف متاحة للشهر فقط';
+    const t={...(row.targets||{}),inventory_target:10};
+    const goals=[['active_inventory','inventory_target'],['inquiries','inquiries_target'],['visits_done','visits_target'],['sales','sold_target'],['company_commission','commission_target']];
+    const valid=goals.map(([key,target])=>{const goal=Number(t[target]);if(!Number.isFinite(goal)||goal<=0||(key==='company_commission'&&row[key]==null))return null;return Math.min(1,Number(row[key]||0)/goal)}).filter(x=>x!==null);
     return valid.length?'متوسط إنجاز الأهداف المعتمدة: '+Math.round(100*valid.reduce((a,b)=>a+b,0)/valid.length)+'% · محدد '+valid.length+' من '+goals.length+' أهداف؛ البقية غير محددة':'لم تُحدد أهداف كافية للتقييم';
   }
   const performanceLoads=new WeakMap();
   let teamPerformancePeriod='month';
-  async function renderPerformance(kind,boxId='employeePerformanceResults'){
+  async function renderPerformance(kind,boxId='employeePerformanceResults',explicitSpan){
+    kind=validPerformancePeriod(kind);
     const generation=crmSessionGeneration,user=currentUser&&currentUser.id;
     const box=$id(boxId);if(!box)return;
-    const request={};performanceLoads.set(box,request);
+    const request={span:explicitSpan||period(kind)};performanceLoads.set(box,request);
     const isCurrent=()=>performanceLoads.get(box)===request&&crmSessionCurrent(generation,user);
     box.innerHTML='<p class="ops-state" role="status">جاري تحميل الأداء…</p>';
     try{
-      const span=period(kind),r=await bounded(supa.rpc('crm_employee_performance',{p_from:span.from,p_to:span.to}));
+      const span=request.span,r=await bounded(supa.rpc('crm_employee_performance',{p_from:span.from,p_to:span.to}));
       if(!isCurrent())return;
       if(r.error)throw r.error;
       const employees=r.data.employees||[];
-      box.innerHTML='<div class="ops-performance-caption"><span>'+safe(r.data.from||span.from||'بداية الشركة')+' — '+safe(new Date(Date.parse(span.to+'T00:00:00Z')-86400000).toISOString().slice(0,10))+'</span><small>العقارات النشطة رصيد حالي؛ بقية الأرقام للفترة المختارة.</small></div>'+
+      box.innerHTML='<div class="ops-performance-caption"><span>'+safe(performanceRangeLabel(span,r.data.from))+'</span><small>العقارات النشطة رصيد حالي؛ بقية الأرقام للفترة المختارة.</small></div>'+
       (employees.map(x=>'<article class="ops-person"><div class="ops-person-title"><strong>'+safe(x.name)+'</strong><span>'+safe(targetScore(x,kind))+'</span></div><div class="ops-metrics">'+
-        metric('عقارات نشطة الآن',x.active_inventory,'مسندة للموظفة')+metric('عقارات أُضيفت خلال الفترة',x.new_properties,'إضافة عقار جديد إلى CRM')+metric('استفسارات عن عقار محدد',x.inquiries,'رسائل واردة رُبطت بعقار')+metric('استفسارات الفترة التي وصلت لزيارة',x.inquiry_to_visit,'قد تكون الزيارة في فترة لاحقة')+metric('زيارات حُجزت',x.visits_booked)+metric('زيارات تمت',x.visits_done)+metric('مبيعات الفترة المرتبطة بزيارة',x.visit_to_sale,'يشمل الزيارات السابقة للفترة')+metric('مبيعات أُغلقت',x.sales)+metric('أنشطة متابعة موثقة',x.activities,'مكالمات واجتماعات ومتابعات مسجلة')+metric('رسائل واتساب صادرة من الفريق',x.outbound_messages,'رسائل أرسلها موظف، دون الآلية')+'</div>'+
+        metric('عملاء استفسروا عن عقار',x.inquiry_clients,'كل عميل مرة واحدة خلال الفترة')+metric('مستفسرون ردّت عليهم الموظفة',x.replied_inquiry_clients,'من العملاء أعلاه؛ رد بشري بعد الاستفسار وخلال الفترة')+metric('رسائل أرسلتها الموظفة',x.successful_staff_messages,'أُرسلت فعليًا؛ بدون الآلية أو الفاشلة')+metric('عقارات نشطة الآن',x.active_inventory,'مسندة للموظفة')+metric('عقارات أُضيفت خلال الفترة',x.new_properties,'إضافة عقار جديد إلى CRM')+metric('استفسارات عقارية جديدة',x.inquiries,'لكل عميل وعقار؛ حسب أول استفسار مثبت')+metric('استفسارات عقارية جديدة وصلت لزيارة',x.inquiry_to_visit,'قد تكون الزيارة في فترة لاحقة')+metric('زيارات حُجزت',x.visits_booked)+metric('زيارات تمت',x.visits_done)+metric('مبيعات الفترة المرتبطة بزيارة',x.visit_to_sale,'يشمل الزيارات السابقة للفترة')+metric('مبيعات أُغلقت',x.sales)+metric('أنشطة متابعة موثقة',x.activities,'مكالمات واجتماعات ومتابعات مسجلة')+'</div>'+
         (x.company_commission==null?'':'<div class="ops-commission"><span>عمولة الشركة من صفقات الفترة</span><strong>'+n(x.company_commission)+' <small>ر.ع</small></strong></div>')+'</article>').join('')||'<p class="ops-empty">لا يوجد موظفون نشطون.</p>')+
-        '<details class="ops-metric-definitions"><summary>كيف تُحسب هذه الأرقام؟</summary><p>الاستفسار يُحسب عند وجود رسالة واردة مرتبطة بعقار محدد. الزيارة اليدوية تُحسب زيارة، ولا تتحول وحدها إلى استفسار وارد. مبيعات الفترة المرتبطة بزيارة تشمل البيع الذي أُغلق خلالها وكانت له زيارة مكتملة، حتى لو تمت الزيارة في شهر سابق. أنشطة المتابعة هي السجلات البشرية الفعلية؛ رسائل واتساب الآلية مستبعدة.</p><p>الإسناد المعتمد للعمل منذ 1 أغسطس 2026: مسقط لهديل وبركاء لمرام. رصيد العقارات المستهدف 10، وبقية الأهداف حسب اعتماد المالك.</p></details>';
+        '<details class="ops-metric-definitions"><summary>كيف تُحسب هذه الأرقام؟</summary><p>عملاء الاستفسارات هم أشخاص أرسلوا خلال الفترة رسالة واردة ثبت ارتباطها بعقار؛ يُحسب العميل مرة واحدة ولو سأل عن عدة عقارات، ويشمل العملاء السابقين الذين عادوا للاستفسار. المستفسرون الذين رُدّ عليهم هم من هؤلاء العملاء، ولهم رسالة بشرية أُرسلت بعد استفسارهم في المحادثة نفسها وخلال الفترة؛ يُستبعد الرد المقتبس على رسالة أخرى. رسائل الموظفة هي جميع رسائلها البشرية التي أُرسلت بنجاح خلال الفترة، وليست عدد العملاء، وقد تشمل متابعة بدأت بها الموظفة. تُستبعد الرسائل الآلية والفاشلة والمعلقة.</p><p>الاستفسارات العقارية الجديدة تُحسب لكل عميل مع عقار حسب أول استفسار مثبت؛ قد يسأل عميل واحد عن أكثر من عقار. الزيارة اليدوية تُحسب زيارة، ولا تتحول وحدها إلى استفسار وارد. مبيعات الفترة المرتبطة بزيارة تشمل البيع الذي أُغلق خلالها وكانت له زيارة مكتملة، حتى لو تمت الزيارة في شهر سابق. أنشطة المتابعة هي المكالمات والاجتماعات والمتابعات البشرية المسجلة.</p><p>الإسناد المعتمد للعمل منذ 1 أغسطس 2026: مسقط لهديل وبركاء لمرام. رصيد العقارات المستهدف 10، وبقية الأهداف حسب اعتماد المالك. بيانات المستثمرين الخاصة لا تدخل في أداء الفريق.</p></details>';
     }catch(e){if(!isCurrent())return;box.innerHTML='<div class="ops-error" role="alert"><strong>تعذر تحميل الأداء</strong><span>'+safe(e.message)+'</span><button class="ops-action" data-performance-retry="'+safe(kind)+'" data-performance-box="'+safe(boxId)+'">إعادة المحاولة</button></div>'}
   }
-  window.crmDashboardPerformancePeriod=function(kind){const panel=$id('opsPerformanceDetails');if(!currentProfile||!['owner','manager','agent'].includes(currentProfile.role))return;if(panel)panel.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('active',b.dataset.period===kind));renderPerformance(kind,'opsDashboardPerformanceResults')};
-  window.crmPerformancePeriod=function(kind){teamPerformancePeriod=kind;document.querySelectorAll('.ops-period').forEach(b=>b.classList.toggle('active',b.dataset.period===kind));return renderPerformance(kind)};
+  window.crmDashboardPerformancePeriod=function(kind){kind=validPerformancePeriod(kind);const panel=$id('opsPerformanceDetails');if(!currentProfile||!['owner','manager','agent'].includes(currentProfile.role))return;if(panel)panel.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('active',b.dataset.period===kind));renderPerformance(kind,'opsDashboardPerformanceResults')};
+  window.crmPerformancePeriod=function(kind){kind=validPerformancePeriod(kind);teamPerformancePeriod=kind;document.querySelectorAll('.ops-period').forEach(b=>b.classList.toggle('active',b.dataset.period===kind));return renderPerformance(kind)};
+  window.crmReportPerformance=function(kind,span){if(currentProfile?.role!=='owner')return;return renderPerformance(kind,'teamLeaderboard',span)};
   function addPerformance(){
     const target=$id('employeeTargetsPanel'),team=$id('page-team');if(!team||$id('employeePerformancePanel'))return;
     const card=document.createElement('div');card.className='card';card.id='employeePerformancePanel';
-    card.innerHTML='<div class="card-body"><h3>أداء الفريق</h3><div class="ops-periods"><button class="btn-secondary ops-period" data-period="day" onclick="crmPerformancePeriod(\'day\')">اليوم</button><button class="btn-secondary ops-period" data-period="week" onclick="crmPerformancePeriod(\'week\')">هذا الأسبوع</button><button class="btn-secondary ops-period active" data-period="month" onclick="crmPerformancePeriod(\'month\')">هذا الشهر</button><button class="btn-secondary ops-period" data-period="all" onclick="crmPerformancePeriod(\'all\')">من بداية الشركة</button></div><div id="employeePerformanceResults"></div></div>';
+    card.innerHTML='<div class="card-body"><h3>أداء الفريق</h3><div class="ops-periods"><button class="btn-secondary ops-period active" data-period="month" onclick="crmPerformancePeriod(\'month\')">هذا الشهر</button><button class="btn-secondary ops-period" data-period="quarter" onclick="crmPerformancePeriod(\'quarter\')">آخر 3 أشهر</button><button class="btn-secondary ops-period" data-period="halfyear" onclick="crmPerformancePeriod(\'halfyear\')">آخر 6 أشهر</button><button class="btn-secondary ops-period" data-period="nine_months" onclick="crmPerformancePeriod(\'nine_months\')">آخر 9 أشهر</button><button class="btn-secondary ops-period" data-period="year" onclick="crmPerformancePeriod(\'year\')">آخر سنة</button><button class="btn-secondary ops-period" data-period="all" onclick="crmPerformancePeriod(\'all\')">من بداية الشركة</button></div><div id="employeePerformanceResults"></div></div>';
     if(target)target.closest('.card').after(card);else team.append(card);
   }
   const oldTeam=window.loadTeam;
@@ -177,7 +192,7 @@
   if(typeof propertyActionQueue==='function')window.loadPropertyActionQueue=function(target){if(target==='dashboard')return Promise.resolve();return propertyActionQueue.apply(this,arguments);};
   document.addEventListener('click',e=>{
     const more=e.target.closest('[data-dashboard-more]');if(more){loadDashboardMore(more.dataset.dashboardMore);return;}
-    const performanceRetry=e.target.closest('[data-performance-retry]');if(performanceRetry){renderPerformance(performanceRetry.dataset.performanceRetry,performanceRetry.dataset.performanceBox);return;}
+    const performanceRetry=e.target.closest('[data-performance-retry]');if(performanceRetry){const boxId=performanceRetry.dataset.performanceBox;renderPerformance(performanceRetry.dataset.performanceRetry,boxId,performanceLoads.get($id(boxId))?.span);return;}
     const retry=e.target.closest('[data-dashboard-retry]');if(retry){loadDashboardScope(retry.dataset.dashboardRetry);return;}
     const control=e.target.closest('[data-dashboard-scope],[data-dashboard-category]');if(!control)return;
     const scope=control.dataset.dashboardScope,category=control.dataset.dashboardCategory;

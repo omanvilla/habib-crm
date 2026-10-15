@@ -206,7 +206,7 @@ window.fbAsyncInit = function(){
 <div class="ops-dashboard-intro"><div><h2>أعمال اليوم</h2><p id="opsDashboardScopeNote">المتابعات والزيارات والمهام التي تحتاج انتباهك.</p></div><div class="ops-day-meta"><time id="opsDashboardDate"></time><button class="ops-action" data-work-action="refresh-day">تحديث</button></div></div>
 <div class="card" id="employeeInventoryReminder" style="display:none"><div class="card-body" id="employeeInventoryReminderText"></div></div>
 <div id="opsDailyWork" aria-live="polite"><p class="ops-state" role="status">جاري تحميل أعمال اليوم…</p></div>
-<div class="ops-secondary"><details id="opsPerformanceDetails" ontoggle="if(this.open)crmDashboardPerformancePeriod('month')"><summary><span>أداء الفريق خلال الفترة</span><small>العقارات، الاستفسارات، الزيارات والمبيعات</small></summary><div class="ops-periods"><button class="btn-secondary" data-period="day" onclick="crmDashboardPerformancePeriod('day')">اليوم</button><button class="btn-secondary" data-period="week" onclick="crmDashboardPerformancePeriod('week')">الأسبوع</button><button class="btn-secondary" data-period="month" onclick="crmDashboardPerformancePeriod('month')">هذا الشهر</button><button class="btn-secondary" data-period="all" onclick="crmDashboardPerformancePeriod('all')">من بداية الشركة</button></div><div id="opsDashboardPerformanceResults"></div></details></div>
+<div class="ops-secondary"><details id="opsPerformanceDetails" ontoggle="if(this.open)crmDashboardPerformancePeriod('month')"><summary><span>أداء الفريق خلال الفترة</span><small>العقارات، الاستفسارات، الزيارات والمبيعات</small></summary><div class="ops-periods"><button class="btn-secondary" data-period="month" onclick="crmDashboardPerformancePeriod('month')">هذا الشهر</button><button class="btn-secondary" data-period="quarter" onclick="crmDashboardPerformancePeriod('quarter')">آخر 3 أشهر</button><button class="btn-secondary" data-period="halfyear" onclick="crmDashboardPerformancePeriod('halfyear')">آخر 6 أشهر</button><button class="btn-secondary" data-period="nine_months" onclick="crmDashboardPerformancePeriod('nine_months')">آخر 9 أشهر</button><button class="btn-secondary" data-period="year" onclick="crmDashboardPerformancePeriod('year')">آخر سنة</button><button class="btn-secondary" data-period="all" onclick="crmDashboardPerformancePeriod('all')">من بداية الشركة</button></div><div id="opsDashboardPerformanceResults"></div></details></div>
 <!-- Property action reminders are paused on the dashboard only, at the owner's request. -->
 <div id="dashPropertyActionQueue" hidden></div>
 </div>
@@ -299,12 +299,12 @@ window.fbAsyncInit = function(){
 <div class="page" id="page-reports">
 <div class="page-header"><div><div class="page-title">التقارير <span>والتحليلات</span></div><div class="page-sub" id="reportsSub">نظرة شاملة على أداء العمل</div></div>
 <div class="period-selector">
-<button class="period-btn" onclick="setReportPeriod('day',this)">اليوم</button>
-<button class="period-btn" onclick="setReportPeriod('week',this)">الأسبوع</button>
-<button class="period-btn active" onclick="setReportPeriod('month',this)">الشهر</button>
-<button class="period-btn" onclick="setReportPeriod('quarter',this)">الربع</button>
-<button class="period-btn" onclick="setReportPeriod('year',this)">السنة</button>
-<button class="period-btn" onclick="setReportPeriod('all',this)">الكل</button>
+<button class="period-btn active" data-report-period="month" onclick="setReportPeriod('month',this)">هذا الشهر</button>
+<button class="period-btn" data-report-period="quarter" onclick="setReportPeriod('quarter',this)">آخر 3 أشهر</button>
+<button class="period-btn" data-report-period="halfyear" onclick="setReportPeriod('halfyear',this)">آخر 6 أشهر</button>
+<button class="period-btn" data-report-period="nine_months" onclick="setReportPeriod('nine_months',this)">آخر 9 أشهر</button>
+<button class="period-btn" data-report-period="year" onclick="setReportPeriod('year',this)">آخر سنة</button>
+<button class="period-btn" data-report-period="all" onclick="setReportPeriod('all',this)">من بداية الشركة</button>
 </div>
 <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap;padding:0 10px">
 <label style="font-size:13px;color:var(--umber);font-weight:600">📅 أو اختر شهراً محدداً:</label>
@@ -363,7 +363,7 @@ window.fbAsyncInit = function(){
 
 <div id="reportTeam" style="display:none">
 <div class="leaderboard-card">
-<div style="padding:18px;border-bottom:1px solid var(--cream-deeper);font-weight:700;font-size:16px">🏆 لوحة ترتيب الموظفين</div>
+<div style="padding:18px;border-bottom:1px solid var(--cream-deeper);font-weight:700;font-size:16px">أداء الفريق خلال الفترة</div>
 <div id="teamLeaderboard"><div class="empty" style="padding:30px"><div class="loader-spinner"></div></div></div>
 </div>
 </div>
@@ -4195,54 +4195,53 @@ async function updateExpenseSummary(){const monthStart=new Date();monthStart.set
 try{const dealsR=await crmDataFrom('deals').select('deal_value, company_share, commission_status, closed_at, stage').in('stage',['closed','commission_collected']);let income=0,pending=0;(dealsR.data||[]).forEach(d=>{const val=parseFloat(d.company_share||0);const closedDate=d.closed_at?new Date(d.closed_at):null;if(closedDate&&closedDate>=monthStart){if(d.stage==='commission_collected'||d.commission_status==='received')income+=val;else pending+=val}});const monthExpenses=allExpenses.filter(e=>new Date(e.expense_date)>=monthStart).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);$('sumIncome').textContent=fmtMoneyShort(income);$('sumExpenses').textContent=fmtMoneyShort(monthExpenses);$('sumProfit').textContent=fmtMoneyShort(income-monthExpenses);$('sumPending').textContent=fmtMoneyShort(pending)}catch(e){console.warn(e)}}
 async function saveExpense(){const desc=$('exDesc').value.trim(),amount=parseFloat($('exAmount').value),date=$('exDate').value;if(!desc||!amount||!date){showToast('⚠️ الوصف والمبلغ والتاريخ مطلوبة','error');return}try{const cid=await ensureCompany();const data={company_id:cid,user_id:currentUser.id,description:desc,category:$('exCategory').value,amount:amount,expense_date:date,payment_method:$('exPaymentMethod').value,notes:$('exNotes').value.trim()||null,archived:false};let r;if(editingExpense){r=await supa.from('expenses').update(data).eq('id',editingExpense);await logSystemActivity('edit','expense',editingExpense,'تعديل مصروف: '+desc+' ('+fmtMoney(amount)+')')}else{r=await supa.from('expenses').insert(data).select().single();if(!r.error)await logSystemActivity('create','expense',r.data.id,'مصروف جديد: '+desc+' ('+fmtMoney(amount)+')')}if(r.error)throw r.error;closeModal('mExpense');showToast('✅ تم الحفظ','success');['exDesc','exAmount','exDate','exNotes'].forEach(i=>$(i).value='');editingExpense=null;loadExpenses()}catch(err){showToast('خطأ: '+err.message,'error')}}
 function archiveExpense(id,desc){confirmAction('حذف المصروف','هل تريد حذف <strong>'+escapeHtml(desc)+'</strong>؟','🗑',async function(){try{const r=await supa.from('expenses').update({archived:true}).eq('id',id);if(r.error)throw r.error;await logSystemActivity('delete','expense',id,'حذف مصروف: '+desc);showToast('🗑 تم','success');loadExpenses()}catch(err){showToast('خطأ: '+err.message,'error')}})}
-function setReportPeriod(p,el){reportPeriod=p;document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');loadReports()}
+function setReportPeriod(p,el){
+ reportPeriod=['month','quarter','halfyear','nine_months','year','all'].includes(p)?p:'month';
+ window.specificMonth=null;
+ const input=$('reportMonthPicker'),label=$('reportMonthLabel');if(input)input.value='';if(label)label.textContent='';
+ document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));if(el)el.classList.add('active');loadReports();
+}
 function switchReportTab(tab,el){if(tab==='revenue'&&!canViewFinancials()){showPermissionDenied();return}reportTab=tab;document.querySelectorAll('.report-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['Overview','Revenue','Team','Funnel','Thirtyday','Heatmap'].forEach(t=>{const e=$('report'+t);if(e)e.style.display=tab===t.toLowerCase()?'':'none'});loadReports()}
-function getPeriodRange(){
-  // إذا اختار شهر محدد، نستخدمه
-  if(window.specificMonth){
-    var parts=window.specificMonth.split('-');
-    var year=parseInt(parts[0]),month=parseInt(parts[1])-1;
-    var start=new Date(year,month,1,0,0,0,0);
-    var end=new Date(year,month+1,1,0,0,0,0);
-    return {start:start,end:end};
+function getPeriodRange(history){
+  const iso=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat',numberingSystem:'latn'});
+  const midnight=d=>new Date(d+'T00:00:00+04:00');
+  const calendar=d=>d.toISOString().slice(0,10);
+  const today=iso(new Date()),now=new Date(today+'T12:00:00Z');
+  if(/^\d{4}-(0[1-9]|1[0-2])$/.test(window.specificMonth||'')){
+    const [year,month]=window.specificMonth.split('-').map(Number);
+    return {start:midnight(window.specificMonth+'-01'),end:midnight(calendar(new Date(Date.UTC(year,month,1))))};
   }
-  var now=new Date();
-  var end=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1,0,0,0,0); // غداً 00:00 = نهاية اليوم
-  if(reportPeriod==='day'){
-    var d=new Date(now);d.setHours(0,0,0,0);
-    return {start:d,end:end};
+  const kind=['month','quarter','halfyear','nine_months','year','all'].includes(reportPeriod)?reportPeriod:'month';
+  let start=today,end=calendar(new Date(now.getTime()+86400000));
+  if(kind==='month'){
+    start=today.slice(0,7)+'-01';end=calendar(new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+1,1)));
   }
-  if(reportPeriod==='week'){
-    var d=new Date(now);d.setDate(d.getDate()-6);d.setHours(0,0,0,0);
-    return {start:d,end:end};
+  const months={quarter:3,halfyear:6,nine_months:9,year:12}[kind];
+  if(months){
+    const first=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()-months,1));
+    const last=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0)).getUTCDate();
+    start=calendar(new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth(),Math.min(now.getUTCDate(),last))));
   }
-  if(reportPeriod==='month'){
-    var d=new Date(now.getFullYear(),now.getMonth(),1,0,0,0,0);
-    return {start:d,end:end};
+  if(kind==='all'){
+    const data=history||{},dates=[];
+    if(typeof currentCompany!=='undefined'&&currentCompany?.created_at)dates.push(currentCompany.created_at);
+    (data.deals||[]).forEach(d=>{if(d.created_at)dates.push(d.created_at);if(['closed','commission_collected'].includes(d.stage)&&d.closed_at)dates.push(d.closed_at);});
+    [...(data.clients||[]),...(data.properties||[])].forEach(r=>{if(r.created_at)dates.push(r.created_at);});
+    const known=dates.filter(d=>Number.isFinite(Date.parse(d))).map(iso).sort();
+    start=known[0]||'2020-01-01'; // Preserve the old fallback only when there is no dated company/report evidence.
   }
-  if(reportPeriod==='quarter'){
-    var d=new Date(now);d.setMonth(d.getMonth()-3);d.setHours(0,0,0,0);
-    return {start:d,end:end};
-  }
-  if(reportPeriod==='year'){
-    var d=new Date(now.getFullYear(),0,1,0,0,0,0);
-    return {start:d,end:end};
-  }
-  return {start:new Date(2020,0,1),end:end};
+  return {start:midnight(start),end:midnight(end)};
 }
 
 // للتوافق مع الكود القديم
 function getPeriodDate(){return getPeriodRange().start;}
-function getPreviousPeriodRange(){
-  if(window.specificMonth){
-    var parts=window.specificMonth.split('-');
-    var year=parseInt(parts[0]),month=parseInt(parts[1])-1;
-    var start=new Date(year,month-1,1,0,0,0,0);
-    var end=new Date(year,month,1,0,0,0,0);
-    return {start:start,end:end};
+function getPreviousPeriodRange(history){
+  if(/^\d{4}-(0[1-9]|1[0-2])$/.test(window.specificMonth||'')){
+    const [year,month]=window.specificMonth.split('-').map(Number);
+    const previous=new Date(Date.UTC(year,month-2,1)).toISOString().slice(0,10);
+    return {start:new Date(previous+'T00:00:00+04:00'),end:new Date(window.specificMonth+'-01T00:00:00+04:00')};
   }
-  var range=getPeriodRange();
-  var duration=range.end-range.start;
+  const range=getPeriodRange(history),duration=range.end-range.start;
   return {start:new Date(range.start.getTime()-duration),end:range.start};
 }
 function getPreviousPeriodDate(){return getPreviousPeriodRange().start;}
@@ -4343,7 +4342,7 @@ function clearReportMonth(){
   // إعادة تفعيل زر "الشهر" الافتراضي
   document.querySelectorAll('.period-btn').forEach(function(b){
     b.classList.remove('active');
-    if(b.textContent.trim()==='الشهر')b.classList.add('active');
+    if(b.dataset.reportPeriod==='month')b.classList.add('active');
   });
   if(typeof reportPeriod!=='undefined')reportPeriod='month';
   loadReports();
@@ -4398,14 +4397,22 @@ function showReportNotice(message,isError){
 }
 async function loadReports(){
  if(!isOwner()){showPermissionDenied();return}
- if(reportTab==='thirtyday')return load30DayReport();const seq=++reportLoadSeq;
+ const seq=++reportLoadSeq;
+ if(reportTab==='thirtyday')return load30DayReport();
+ if(reportTab==='team'){
+  if(!canManage()){showPermissionDenied();return}
+  const range=getPeriodRange(),omanDay=d=>d.toLocaleDateString('en-CA',{timeZone:'Asia/Muscat',numberingSystem:'latn'});
+  const kind=window.specificMonth?'month':reportPeriod;
+  showReportNotice('أداء الفريق حسب الاستفسارات المثبتة والعمل الفعلي؛ بيانات المستثمرين الخاصة غير مشمولة.',false);
+  return crmReportPerformance(kind,{from:kind==='all'?null:omanDay(range.start),to:omanDay(range.end)});
+ }
  try{
- const range=getPeriodRange(),previous=getPreviousPeriodRange();
  const [clients,deals,properties]=await Promise.all([
  crmReadAll(()=>supa.from('clients').select('*',{count:'exact'}).neq('archived',true).order('id')),
  crmReadAll(()=>(typeof crmDataFrom==='function'?crmDataFrom('deals'):crmDataFrom('deals')).select('*, agent:profiles!deals_agent_id_fkey(full_name), property:properties(title,type,area)',{count:'exact'}).order('id')),
  crmReadAll(()=>(typeof crmDataFrom==='function'?crmDataFrom('properties'):crmDataFrom('properties')).select('*',{count:'exact'}).neq('archived',true).order('id'))]);
  if(seq!==reportLoadSeq)return;
+ const range=getPeriodRange({deals,clients,properties}),previous=getPreviousPeriodRange({deals,clients,properties});
  const periodDeals=deals.filter(d=>dealInClosingPeriod(d,range)),prevDeals=deals.filter(d=>dealInClosingPeriod(d,previous));
  const inRange=(v,r)=>{const d=new Date(v);return d>=r.start&&d<r.end};
  const periodClients=clients.filter(c=>inRange(c.created_at,range));
@@ -4419,7 +4426,6 @@ async function loadReports(){
  showReportNotice('قيمة المبيعات حسب تاريخ الإغلاق. معدل التحويل لفرص أُنشئت في الفترة. العمولات بحسب حالة التحصيل الحالية لصفقات الفترة وليست تدفقات نقدية بتاريخ التحصيل.'+(missing?' هناك '+missing+' صفقة مغلقة بلا تاريخ إغلاق مستبعدة من أرقام الفترة.':''),false);
  if(reportTab==='overview'){renderRevenueLineChart(deals);renderClientStatusChart(clients);renderPropTypesChart(properties);renderClientSourcesChart(periodClients)}
  else if(reportTab==='revenue'&&canViewFinancials())renderRevenueDetails(periodDeals,properties);
- else if(reportTab==='team'&&canManage())renderLeaderboard(periodDeals,periodClients);
  else if(reportTab==='funnel')renderFunnel(clients,deals);
  else if(reportTab==='heatmap')renderHeatmap(deals);
  }catch(e){if(seq!==reportLoadSeq)return;showReportNotice('تعذر تحميل التقرير. الأرقام المعروضة قد تكون من آخر تحميل ناجح: '+(e.message||e),true);showToast('تعذر تحديث التقرير','error')}
@@ -4444,8 +4450,6 @@ if(typeof isOwner==='function'&&isOwner()){
 }
 const byType={};closedDeals.forEach(d=>{const t=d.property?d.property.type:'unknown';if(!byType[t])byType[t]=0;byType[t]+=parseFloat(d.deal_value)||0});const maxT=Math.max.apply(null,Object.values(byType).concat([1]));let hT='';Object.keys(byType).sort((a,b)=>byType[b]-byType[a]).forEach(t=>{const v=byType[t];const w=Math.max((v/maxT)*100,3);hT+='<div class="bar-row"><div class="bar-label">'+propTypeAr(t)+'</div><div class="bar-track"><div class="bar-fill" style="width:'+w+'%">'+fmtMoneyShort(v)+'</div></div><div class="bar-value">'+fmtMoneyShort(v)+'</div></div>'});$('chartRevByType').innerHTML=hT||'<div class="empty-desc" style="text-align:center">لا توجد بيانات</div>';
 const byArea={};closedDeals.forEach(d=>{const a=d.property?d.property.area:'غير محدد';if(!byArea[a])byArea[a]=0;byArea[a]+=parseFloat(d.deal_value)||0});const maxA=Math.max.apply(null,Object.values(byArea).concat([1]));let hA='';Object.keys(byArea).sort((a,b)=>byArea[b]-byArea[a]).slice(0,10).forEach(a=>{const v=byArea[a];const w=Math.max((v/maxA)*100,3);hA+='<div class="bar-row"><div class="bar-label">'+escapeHtml(a)+'</div><div class="bar-track"><div class="bar-fill em" style="width:'+w+'%">'+fmtMoneyShort(v)+'</div></div><div class="bar-value">'+fmtMoneyShort(v)+'</div></div>'});$('chartRevByArea').innerHTML=hA||'<div class="empty-desc" style="text-align:center">لا توجد بيانات</div>'}
-function renderLeaderboard(deals,clients){const perf={};deals.forEach(d=>{const id=d.agent_id;if(!id)return;const name=(d.agent&&d.agent.full_name)||'غير محدد';if(!perf[id])perf[id]={name,deals:0,closed:0,revenue:0,role:''};perf[id].deals++;if(d.stage==='closed'||d.stage==='commission_collected'){perf[id].closed++;perf[id].revenue+=parseFloat(d.deal_value)||0}});clients.forEach(c=>{const id=c.assigned_to;if(!id||!perf[id])perf[id]&&(perf[id].clients=(perf[id].clients||0)+1)||(perf[id]={name:'غير محدد',deals:0,closed:0,revenue:0,clients:1})});
-(allMembers||[]).forEach(m=>{if(perf[m.id]){perf[m.id].role=roleAr(m.role)}});const arr=Object.entries(perf).map(([id,p])=>({id,...p,clients:p.clients||0})).sort((a,b)=>b.revenue-a.revenue);if(!arr.length){$('teamLeaderboard').innerHTML='<div class="empty" style="padding:30px"><div class="empty-desc">لا توجد بيانات أداء بعد</div></div>';return}let h='';arr.forEach((p,i)=>{const cls=i===0?'gold':i===1?'silver':i===2?'bronze':'';const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);h+='<div class="lb-row '+cls+'"><div class="lb-rank">'+medal+'</div><div><div class="lb-name">'+escapeHtml(p.name)+'</div><div class="lb-role">'+p.role+'</div></div><div class="lb-stat"><div class="lb-stat-num">'+p.clients+'</div><div class="lb-stat-lbl">عميل</div></div><div class="lb-stat"><div class="lb-stat-num">'+p.closed+'/'+p.deals+'</div><div class="lb-stat-lbl">صفقات</div></div><div class="lb-revenue">'+fmtMoney(p.revenue)+'</div></div>'});$('teamLeaderboard').innerHTML=h}
 function renderFunnel(clients,deals){const totalClients=clients.length;const withDeal=clients.filter(c=>deals.some(d=>d.client_id===c.id)).length;const withVisit=deals.filter(d=>['visit','negotiation','deposit','closed'].indexOf(d.stage)>=0).length;const negotiation=deals.filter(d=>['negotiation','deposit','closed'].indexOf(d.stage)>=0).length;const closed=deals.filter(d=>d.stage==='closed'||d.stage==='commission_collected').length;const stages=[{label:'👥 عملاء',count:totalClients,max:totalClients},{label:'🤝 صفقات',count:withDeal,max:totalClients},{label:'🏠 معاينات',count:withVisit,max:totalClients},{label:'💬 تفاوض',count:negotiation,max:totalClients},{label:'✅ مكتملة',count:closed,max:totalClients}];let h='';stages.forEach((s,i)=>{const pct=s.max?(s.count/s.max*100):0;const prevPct=i>0?(stages[i-1].count?stages[i].count/stages[i-1].count*100:0):100;h+='<div class="funnel-row"><div class="funnel-label">'+s.label+'</div><div class="funnel-bar"><div class="funnel-fill '+(i===stages.length-1?'em':'')+'" style="width:'+Math.max(pct,5)+'%">'+s.count+'</div></div><div class="funnel-rate">'+(i===0?'بداية':prevPct.toFixed(0)+'% من السابق')+'</div></div>'});$('conversionFunnel').innerHTML=h}
 function renderHeatmap(deals){const today=new Date();const months=[];for(let i=11;i>=0;i--){const d=new Date(today.getFullYear(),today.getMonth()-i,1);months.push({label:d.toLocaleDateString('ar-OM-u-nu-latn',{month:'short'}),year:d.getFullYear(),month:d.getMonth(),days:{}})}deals.forEach(d=>{if(d.stage!=='closed')return;const dt=new Date(d.closed_at||d.created_at);const monthObj=months.find(m=>m.year===dt.getFullYear()&&m.month===dt.getMonth());if(monthObj){const day=dt.getDate();monthObj.days[day]=(monthObj.days[day]||0)+1}});
 let maxDay=0;months.forEach(m=>Object.values(m.days).forEach(v=>{if(v>maxDay)maxDay=v}));

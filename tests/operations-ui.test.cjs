@@ -6,7 +6,7 @@ const vm=require('node:vm');
 const source=fs.readFileSync('crm-operations-v6.js','utf8');
 
 function fixture(){
-  const nodes=new Map(['employeePerformanceResults','opsDashboardPerformanceResults','opsPerformanceDetails'].map(id=>[id,{id,innerHTML:'',textContent:'',querySelectorAll:()=>[]}]));
+  const nodes=new Map(['employeePerformanceResults','opsDashboardPerformanceResults','opsPerformanceDetails','teamLeaderboard'].map(id=>[id,{id,innerHTML:'',textContent:'',querySelectorAll:()=>[]}]));
   const pending=[];
   let finishTeam;
   const context={document:{getElementById:id=>nodes.get(id)||null,querySelectorAll:()=>[],addEventListener(){}},
@@ -59,6 +59,37 @@ test('empty employee list displays a clear empty state',async()=>{
   const f=fixture();f.context.crmPerformancePeriod('month');
   f.pending[0].resolve({data:{employees:[]},error:null});await f.flush();
   assert.match(f.nodes.get('employeePerformanceResults').innerHTML,/لا يوجد موظفون نشطون/);
+});
+
+test('Reports Team uses the selected custom month and shares client-versus-message definitions',async()=>{
+  const f=fixture(),span={from:'2024-02-01',to:'2024-03-01'};
+  const loading=f.context.crmReportPerformance('month',span);
+  assert.deepEqual({...f.pending[0].args},{p_from:span.from,p_to:span.to});
+  f.pending[0].resolve({data:{from:span.from,employees:[{name:'TEST employee',inquiry_clients:13,replied_inquiry_clients:10,successful_staff_messages:794,inquiries:16,targets:{}}]}});
+  await loading;
+  const html=f.nodes.get('teamLeaderboard').innerHTML;
+  assert.match(html,/من 1\/2\/2024 إلى 29\/2\/2024/);
+  assert.match(html,/<strong>13<\/strong><small>عملاء استفسروا عن عقار/);
+  assert.match(html,/<strong>10<\/strong><small>مستفسرون ردّت عليهم الموظفة/);
+  assert.match(html,/<strong>794<\/strong><small>رسائل أرسلتها الموظفة/);
+  assert.match(html,/<strong>16<\/strong><small>استفسارات عقارية جديدة/);
+  assert.doesNotMatch(html,/رسائل واتساب صادرة من الفريق/);
+});
+test('Reports performance rejects other roles and stale account responses',async()=>{
+  const f=fixture();
+  f.context.currentProfile.role='agent';await f.context.crmReportPerformance('month');
+  assert.equal(f.pending.length,0);
+  f.context.currentProfile.role='owner';const loading=f.context.crmReportPerformance('all',{from:null,to:'2026-10-16'});
+  f.context.crmSessionGeneration++;f.context.currentUser={id:'TEST-other'};
+  f.pending[0].resolve(result('TEST stale private report'));await loading;
+  assert.doesNotMatch(f.nodes.get('teamLeaderboard').innerHTML,/TEST stale private report/);
+});
+test('A missing new metric is unavailable, while a measured zero stays zero',async()=>{
+  const f=fixture(),loading=f.context.crmPerformancePeriod('month');
+  f.pending[0].resolve({data:{employees:[{name:'TEST employee',replied_inquiry_clients:0,targets:{}}]}});await loading;
+  const html=f.nodes.get('employeePerformanceResults').innerHTML;
+  assert.match(html,/<strong>—<\/strong><small>عملاء استفسروا عن عقار/);
+  assert.match(html,/<strong>0<\/strong><small>مستفسرون ردّت عليهم الموظفة/);
 });
 
 function exportFixture(){

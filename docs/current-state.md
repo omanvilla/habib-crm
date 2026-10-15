@@ -24,13 +24,15 @@ The October 2 conversation mentioned local Codex commit `d3c7481` on `work`. It 
 
 ## Latest agreed behavior
 
+- October 15 performance follow-up: current calendar month, rolling last 3/6/9 months, rolling year and company inception; no day/week performance filters. Oman dates include the displayed final day. Dashboard, Team and Reports→Team share unique property-inquiring clients, their human-response subset and successful human-message volume. Returning clients count by actual period message evidence; automation/failures/pending sends do not. Preserve separately labeled new client/property inquiry cohorts and existing commission/visit metrics. See `docs/performance-periods-clients-20261015.md`.
+
 - From October 3, ordinary requested CRM changes proceed through implementation, meaningful tests, coordinated deployment and live checks without asking Ahmed to approve publication again. He reviews the live result and requests changes or reversal if needed. His silence does not prove testing or acceptance. Newer explicit release exceptions still apply; permission to deploy the CRM does not authorize destructive deletion or external customer messages.
 - Each employee sees her branch; owner sees both. A stale assignment does not override the branch boundary.
 - October 15 dashboard: professional workspaces separate combined ordinary Muscat/Barka/general work from owner-only investment work. Retain top client/property/WhatsApp/task shortcuts; use independent bounded loading/retry. Hide only dashboard property-action/publishing reminders pending redesign. New-property additions and staff outbound messages have explicit labels; a period sale backed by an actual older completed visit counts as a visit-linked sale. Manual visits still do not invent inbound inquiries.
 - October 15: canonical `investment` is owner-only across all CRM data, including against manager/viewer access. New owner-selected investors use that route and owner assignment; qualification remains optional in existing requests. Preserve old branch investor labels, shared-phone identities, existing Muscat/Barka workflows and current route configuration. Private investment evidence must not enter shared summaries or AI caches. No Meta connection attempt or old-client backfill.
 - Standing active inventory is 10. Shortage is `max(0,10-active inventory)`. Monthly additions remain descriptive, not a second target scoring the same shortage.
 - Work since 2026-08-01 uses approved branch reporting attribution while preserving original dates, authors, senders and amounts. Lifetime reporting is not a one-year substitute.
-- Other targets need actual owner-entered values. Cross-month weekly target allocation remains undecided; the deployed UI suppresses its score.
+- Other targets need actual owner-entered values. Target percentages are shown for a selected month only; longer periods show activity without a misleading comparison to one monthly target.
 - Owner must see company commission by employee. Employee commission is an owner-selected percentage per deal of company commission, never sale price. The deployed deal workflow supports an explicit per-deal percentage without retroactively recalculating historical amounts; actual employee UI-use verification remains outstanding.
 - Latest October 2 request: one-screen deal entry with inline client/property/owner; historical 2020/2022 sales may omit an unknown visit. New completed sales require an actual visit and a collection date when commission is received. Record-creation timestamps remain audit evidence, separate from sale dates. A refusal has one primary reason plus optional customer words.
 - A new visit resolves or creates its property request atomically; manual request choice is optional. Remove the detailed meeting-address field while preserving stored historical values. Preserve date/time, status, attendance, next action and automatic follow-up task behavior.
@@ -59,7 +61,7 @@ Live read-only RPC checks executed client 360, property action queue, property p
 
 The matching server changes and frontend are now deployed and verified within the scope above. The prior requirement for Ahmed's review before release is superseded; he reviews the result on the live site. The new property-layout design still awaits his reference and is not part of this release.
 
-Still needed: actual employee list/detail/export/mobile/account-switch walkthroughs; isolated backend for business writes/uploads; live inbound WhatsApp attribution/ambiguity proof; fresh Instagram metrics and direct-message connection; configured targets and cross-month goal rule. Mock SDK, SQL role tests and successful CI are distinct evidence and do not replace actual authenticated UI use.
+Still needed: actual employee list/detail/export/mobile/account-switch walkthroughs; isolated backend for business writes/uploads; live inbound WhatsApp attribution/ambiguity proof; fresh Instagram metrics and direct-message connection; configured targets. Mock SDK, SQL role tests and successful CI are distinct evidence and do not replace actual authenticated UI use.
 
 ## Tools and next-start rule
 
