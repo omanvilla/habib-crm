@@ -1402,6 +1402,7 @@ async function processInboundMessage(value: any, m: any) {
   if (!isNewMessage && messageRow?.ai_processed_at && !messageRow?.processing_error) return;
   if (!body.trim() && propertyEvidence.data?.property_match_status) {
     await finalizePropertyAttribution(messageRow.id);
+    await alertUnresolvedListingReference({messageId:messageRow.id,clientId,conversationId:conversation.id,body,routeKey:route.route_key,messageAt});
     const saved = await supabase.from("whatsapp_messages").update({ ai_processed_at: new Date().toISOString(), processing_error: null }).eq("id", messageRow.id);
     if (saved.error) throw new Error(`property message finalize: ${saved.error.message}`);
     return;

@@ -32,3 +32,10 @@ test('Webhook checks pending references after attribution even when AI creates n
  const done=source.indexOf('const finalized = await supabase.from("whatsapp_messages").update',batch);
  assert(batch>=0&&finalizer>batch&&alert>finalizer&&done>alert);
 });
+test('Captionless media checks a pending referral URL before its early success return',()=>{
+ const begin=source.indexOf('if (!body.trim() && propertyEvidence.data?.property_match_status)');
+ const end=source.indexOf('let extracted: any = null;',begin);
+ const block=source.slice(begin,end);
+ assert.match(block,/await finalizePropertyAttribution\(messageRow.id\);\s*await alertUnresolvedListingReference\(/);
+ assert(block.indexOf('await alertUnresolvedListingReference(')<block.indexOf('ai_processed_at:'));
+});
