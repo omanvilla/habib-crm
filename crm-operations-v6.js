@@ -19,7 +19,7 @@
   }
   const metric=(label,value,hint='')=>'<span class="ops-metric"><strong>'+n(value)+'</strong><small>'+label+'</small>'+(hint?'<span class="ops-metric-help">'+hint+'</span>':'')+'</span>';
   function targetScore(row,kind){
-    if(kind==='all')return 'إجمالي تاريخي؛ لا يُقارن بهدف شهر واحد';
+    if(kind!=='month')return 'نتائج الفترة المختارة؛ لا تُقارن بهدف شهر واحد';
     const t={...(row.targets||{}),inventory_target:10},span=period(kind),month=period('month');
     const monthDays=(Date.parse(month.to+'T00:00:00Z')-Date.parse(month.from+'T00:00:00Z'))/86400000;
     const days=(Date.parse(span.to+'T00:00:00Z')-Date.parse(span.from+'T00:00:00Z'))/86400000;
