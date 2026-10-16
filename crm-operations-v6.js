@@ -12,7 +12,7 @@
     const day=date.getUTCDay();
     const iso=d=>d.toISOString().slice(0,10);
     let from=today,to=iso(new Date(date.getTime()+86400000));
-    if(kind==='week'){from=iso(new Date(date.getTime()-day*86400000));to=iso(new Date(date.getTime()+(7-day)*86400000));}
+    if(['months3','months6','months9','year'].includes(kind)){const months={months3:3,months6:6,months9:9,year:12}[kind];from=iso(new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()-months,date.getUTCDate())));to=iso(new Date(date.getTime()+86400000));}
     if(kind==='month'){from=today.slice(0,7)+'-01';to=iso(new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,1)));}
     if(kind==='all')from=typeof currentCompany!=='undefined'&&currentCompany?.created_at?omanDate(currentCompany.created_at):null;
     return {from,to};
