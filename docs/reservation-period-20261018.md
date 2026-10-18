@@ -24,4 +24,8 @@ The existing `sales` field continues to mean completed sales by closing date. Ne
 
 ## Release state
 
-Prepared from production main `0866d5190c4d6f83aa4326f375c03c5c7e9bf53a`. Deployment and post-release evidence will be recorded after validation. No real client booking, receipt or customer message is created by the test workflows.
+Deployed frontend runtime `0d201a1b4854ce290bc5fafb2104d3922d3aff0c`, cache version `20261018-reservation-period-v4`. All six CI jobs passed in [run39130879340](https://github.com/omanvilla/habib-crm/actions/runs/39130879340), including isolated PostgreSQL16 reservation/receipt/rollback tests and synthetic browsers. GitHub Pages deployment [39136079780](https://github.com/omanvilla/habib-crm/actions/runs/39136079780) succeeded. Backup branch `backup/pre-reservation-period-20261018` retains the prior frontend.
+
+Supabase migration `20261018142647_reservation_period_performance_20261018` is applied. Its local migration filename is aligned with the actual server history. Post-deployment owner, Barka and Muscat authenticated SQL-role RPC reads succeeded; each employee received exactly her own performance and target row. Protected booking columns remain inaccessible directly to authenticated users; the private audit/receipt tables and metrics helper are not directly exposed. Anonymous booking execution remains denied. The 55 existing deal rows have an identical full-row fingerprint before and after deployment. No real booking, receipt or customer message was created for tests.
+
+Security advisor warning/error categories and counts are unchanged; the only extra INFO entries are the three deliberately inaccessible private tables. The live browser reached the login screen; no actual authenticated employee browser session was available. The real employee UI walkthrough remains unverified; SQL-role and synthetic evidence do not replace it.
