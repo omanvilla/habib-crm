@@ -202,7 +202,7 @@
     const scopes=owner?['branches','investment']:['branches'];scopes.forEach(scope=>dashboardScopes.set(scope,{status:'loading'}));renderDashboard();
     await Promise.allSettled(scopes.map(loadDashboardScope));
   };
-  window.loadDashboard=window.crmLoadDashboardWork;
+  window.loadDashboard=function(){const result=window.crmLoadDashboardWork.apply(this,arguments);mountTargetDashboard();return result;};
   const propertyActionQueue=window.loadPropertyActionQueue;
   if(typeof propertyActionQueue==='function')window.loadPropertyActionQueue=function(target){if(target==='dashboard')return Promise.resolve();return propertyActionQueue.apply(this,arguments);};
   document.addEventListener('click',e=>{
