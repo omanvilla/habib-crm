@@ -27,7 +27,8 @@
     if(raw==null||String(raw).trim()==='')return null;
     const text=String(raw).trim().replace(/[٠-٩]/g,c=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).replace(/[۰-۹]/g,c=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c))).replace(/[٬,]/g,'').replace(/٫/g,'.');
     if(!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(text))throw new Error('أدخل '+label+' كرقم صحيح');
-    const n=Number(text);if(!Number.isFinite(n)||n<0)throw new Error(label+' يجب ألا يكون سالباً');return n;
+    const n=Number(text);if(!Number.isFinite(n)||n<0)throw new Error(label+' يجب ألا يكون سالباً');
+    if((text.split('.')[1]||'').length>3)throw new Error(label+' يقبل حتى 3 منازل عشرية');return n;
   }
   function customerNotes(raw){return typeof crmDealCustomerNotes==='function'?crmDealCustomerNotes(raw):String(raw||'');}
   function mergeNotes(original,edited){
@@ -35,13 +36,16 @@
     return provenance.concat(edited&&String(edited).trim()?[String(edited).trim()]:[]).join('\n')||null;
   }
   function commission(total,broker,percent,fixed){
-    const base=Number(total||0)-Number(broker||0);
+    const base=Math.round((Number(total||0)-Number(broker||0))*1000)/1000;
     if(base<0)throw new Error('عمولة الوسيط أعلى من العمولة الكاملة');
     if(percent!=null&&(percent<0||percent>100))throw new Error('نسبة الموظفة يجب أن تكون بين 0 و100');
-    const employee=percent==null?Number(fixed||0):Math.round((base*percent/100+Number.EPSILON)*100)/100;
+    const employee=percent==null?Number(fixed||0):Math.round((base*percent/100+Number.EPSILON)*1000)/1000;
     if(employee>base)throw new Error('نصيب الموظفة أعلى من عمولة الشركة قبل توزيعها');
-    return {base,employee,company:Math.round((base-employee+Number.EPSILON)*100)/100};
+    return {base,employee,company:Math.round((base-employee+Number.EPSILON)*1000)/1000};
   }
+  const changeName=key=>({reservation_confirmed_at:'تاريخ الحجز',reservation_cancelled_at:'إلغاء الحجز',reservation_cancellation_reason:'سبب الإلغاء',reservation_evidence_note:'مصدر التسجيل',reservation_reference:'مرجع الإثبات',deposit_amount:'العربون',agent_id:'المسؤول',expected_company_commission_at_reservation:'العمولة المتوقعة',commission_entitled_at:'تاريخ استحقاق المكتب',commission_total:'العمولة الكاملة',broker_commission:'عمولة الوسيط',agent_share:'نصيب الموظفة',company_share:'صافي الشركة',commission_received_at:'تاريخ التحصيل',company_commission_received_amount:'المحصّل',commission_status:'حالة التحصيل'}[key]||'تعديل بيانات الصفقة');
+  const changeValue=v=>v==null?'غير مسجل':/^\d{4}-\d{2}-\d{2}T/.test(String(v))?day(v):String(v);
+  const allRows=make=>typeof crmReadAll==='function'?crmReadAll(make).then(data=>({data,error:null})):make();
   function active(s=state){return Boolean(s&&state===s&&s.sequence===sequence&&crmSessionCurrent(s.generation,s.user));}
   function error(message){const el=$('dwError');if(el){el.textContent=message;el.hidden=!message;}else if(message)showToast(message,'error');}
   function set(id,v){if($(id))$(id).value=v==null?'':String(v);}
@@ -74,6 +78,15 @@
       '<div id="dwNotesSection" class="full">'+field('dwNotes','ملاحظات العميل أو الصفقة','<textarea class="fta" id="dwNotes" rows="3"></textarea>')+'</div>'+
       (editing?'<details id="dwProvenance" class="dw-provenance full"><summary>مصدر السجل</summary><p>'+esc(d.viewing_id?'أنشئت أو ربطت هذه البطاقة بزيارة للعميل والعقار. مصدر التسجيل محفوظ في السجل.':'مصدر وتاريخ إنشاء السجل محفوظان، وهما مستقلان عن تاريخ البيع.')+'</p><p>تاريخ التسجيل: <bdi>'+esc(day(d.created_at)||'غير مسجل')+'</bdi></p></details>':'')+
       '</div><div class="modal-foot"><button class="btn-secondary" type="button" data-dw-cancel>إلغاء</button><button class="btn-primary" id="dwSave" type="submit">حفظ الصفقة</button></div></form></div>';
+    $('dwPaidDeposit').insertAdjacentHTML('beforeend',field('dwBookingReference','مرجع إثبات اختياري',input('dwBookingReference'))+
+      (own()&&d.reservation_confirmed_at?'<details><summary>تصحيح الحجز أو إعادة تفعيله</summary><p class="dw-hint">التصحيح يحدّث فترة التقرير ويحفظ القيمة السابقة وسبب التعديل. إعادة التفعيل لا تنشئ حجزًا جديدًا.</p><div class="fgrid">'+field('dwCorrectionDate','تاريخ دفع مصحح (اختياري)',input('dwCorrectionDate','date','dir="ltr"'))+field('dwCorrectionAmount','مبلغ عربون مصحح (اختياري)',input('dwCorrectionAmount','text','inputmode="decimal" dir="ltr"'))+field('dwCorrectionReason','سبب التصحيح أو إعادة التفعيل',input('dwCorrectionReason'))+'</div>'+(d.reservation_cancelled_at?'<label class="dw-hint"><input id="dwReactivate" type="checkbox"> إعادة تفعيل الحجز نفسه</label>':'')+'</details>':''));
+    set('dwBookingReference',d.reservation_reference);
+    if(own()){
+      const received=d.company_commission_received_amount??(d.commission_status==='received'?Number(d.commission_total||0)-Number(d.broker_commission||0):0);
+      const remaining=d.company_commission_remaining??Math.max(0,Number(d.commission_total??d.expected_company_commission_at_reservation??0)-Number(d.broker_commission||0)-Number(received));
+      $('dwReceiptSection').insertAdjacentHTML('beforeend','<p class="dw-hint" id="dwReceiptBalance">المحصّل فعليًا: '+esc(received)+' ر.ع · المتبقي: '+esc(remaining)+' ر.ع. نصيب الموظفة منفصل ولا يصبح مستحق الدفع من العمولة المتوقعة.</p>'+
+        ((d.milestone_history||[]).length?'<details><summary>سجل تعديلات الحجز والعمولة</summary>'+(d.milestone_history||[]).map(x=>'<p class="dw-hint">'+esc(day(x.recorded_at))+' · '+esc(x.actor||'النظام')+' · '+esc(changeName(x.event_type))+'<br>'+esc(changeValue(x.before?.[x.event_type]))+' ← '+esc(changeValue(x.after?.[x.event_type]))+(x.after?.reason?' · السبب: '+esc(x.after.reason):'')+'</p>').join('')+'</details>':''));
+    }
     set('dwMode',d.entry_mode||'current');set('dwStage',d.stage||'closed');set('dwClientChoice',d.client_id||s.initialClient||'');set('dwPropertyChoice',d.property_id||'');
     set('dwDealValue',d.deal_value);set('dwClosedOn',day(d.closed_at));set('dwNotes',customerNotes(d.notes));set('dwLostReason',d.lost_reason_id);set('dwLostWords',d.lost_reason_note);set('dwAgent',d.agent_id);
     if(s.branches.length===1)set('dwPropertyBranch',s.branches[0]);
@@ -92,6 +105,7 @@
       $('dwReceiptHistory').innerHTML=receipts.length?receipts.map(x=>'<p class="dw-hint">'+esc(x.received_on)+' · '+esc(x.amount)+' ر.ع · '+esc(x.source_note)+'</p>').join(''):(d.commission_status==='received'||Number(d.company_commission_received_amount)>0?'<p class="dw-hint">تحصيل سابق محفوظ؛ راجع السجل القديم قبل إضافة دفعة جديدة.</p>':'<p class="dw-hint">لا توجد دفعات مسجلة في سجل التحصيل الجديد.</p>');
     }
     s.financeBaseline=financialSnapshot();s.milestoneBaseline=[value('dwExpectedBookingCommission'),value('dwEntitledOn')].join('\u0000');
+    sync();
     modal.querySelector('[data-dw-cancel]').addEventListener('click',()=>closeModal('mDeal'));
   }
   function syncProperty(){
@@ -103,6 +117,11 @@
   }
   function sync(){
     if(!state)return;const stage=value('dwStage'),mode=value('dwMode'),isLost=stage==='lost';
+    if(!state.deal?.reservation_confirmed_at&&$('dwConfirmPaid')){
+      if(stage==='deposit'&&state.deal?.stage!=='deposit'){$('dwConfirmPaid').checked=true;state.autoConfirm=true;}
+      else if(state.autoConfirm){$('dwConfirmPaid').checked=false;state.autoConfirm=false;}
+      $('dwConfirmPaid').disabled=stage==='deposit'&&state.deal?.stage!=='deposit';
+    }
     toggle('dwLossSection',isLost);toggle('dwNotesSection',!isLost);toggle('dwSaleSection',!isLost);toggle('dwVisitSection',!isLost);toggle('dwFinanceSection',!isLost);
     $('dwModeHint').textContent=mode==='historical'?'يمكن تسجيل صفقة من 2020 أو 2022 بتواريخها الحقيقية؛ اترك الزيارة فارغة إذا لم تعرف تاريخها.':mode==='legacy'?'احتفظ بالمعلومات والتواريخ المعروفة. لا يلزم اختراع تاريخ زيارة لسجل قديم.':'عند تسجيل البيع نحتاج تاريخ البيع وزيارة فعلية، مسجلة أو بتاريخها هنا.';
     $('dwVisitHint').textContent=mode==='current'&&sold(stage)?'اختر زيارة تمت، أو أدخل تاريخ الزيارة الفعلي. لا نطلب تاريخ التفاوض أو العربون.':'اختياري إذا كانت الزيارة غير معروفة. إدخال تاريخ هنا يعني أن الزيارة تمت فعلاً.';
@@ -142,7 +161,7 @@
     window.editingDealId=dealId||null;
     $('mDeal').innerHTML='<div class="modal-box lg dw-modal"><p>جاري تحميل الصفقة...</p><div id="dwError" role="alert" hidden></div><button class="btn-secondary" type="button" onclick="closeModal(\'mDeal\')">إغلاق</button></div>';$('mDeal').classList.add('on');
     try{
-      const queries=[supa.from('clients').select('id,name,phone').order('name'),crmDataFrom('properties').select('id,title,area,type,price,owner_id,branch_key,archived').order('title'),supa.from('rejection_reasons').select('id,label_ar,is_active').order('sort_order'),supa.from('company_lead_routes').select('route_key,assigned_to,is_active').eq('is_active',true)];
+    const queries=[allRows(()=>supa.from('clients').select('id,name,phone').order('name').order('id')),allRows(()=>crmDataFrom('properties').select('id,title,area,type,price,owner_id,branch_key,archived').order('title').order('id')),supa.from('rejection_reasons').select('id,label_ar,is_active').order('sort_order'),supa.from('company_lead_routes').select('route_key,assigned_to,is_active').eq('is_active',true)];
       if(dealId)queries.push(supa.rpc('crm_get_deal_workflow',{p_deal_id:dealId}));
       if(manage())queries.push(supa.from('profiles').select('id,full_name,role,is_active').eq('company_id',currentProfile.company_id).eq('is_active',true).order('full_name'));
       const results=await Promise.all(queries);if(!active(s))return;results.forEach(r=>{if(r.error)throw r.error;});
@@ -152,7 +171,7 @@
       if(dealId){s.deal=results[4].data&&results[4].data.deal;if(!s.deal)throw new Error('الصفقة غير متاحة');}
       s.members=manage()?(results[dealId?5:4].data||[]):[];
       const ownerIds=[...new Set(s.properties.map(p=>p.owner_id).filter(Boolean))];
-      let ownerResult={data:[]};if(manage())ownerResult=await supa.from('owners').select('id,name,phone,owner_type').order('name');else if(ownerIds.length)ownerResult=await supa.from('owners').select('id,name,phone,owner_type').in('id',ownerIds).order('name');
+      let ownerResult={data:[]};if(manage())ownerResult=await allRows(()=>supa.from('owners').select('id,name,phone,owner_type').order('name').order('id'));else if(ownerIds.length)ownerResult=await allRows(()=>supa.from('owners').select('id,name,phone,owner_type').in('id',ownerIds).order('name').order('id'));
       if(!active(s))return;if(ownerResult.error)throw ownerResult.error;s.owners=ownerResult.data||[];
       if(s.deal){
         if(!s.clients.some(x=>x.id===s.deal.client_id)||!s.properties.some(x=>x.id===s.deal.property_id))throw new Error('تعذر تحميل العميل أو العقار المرتبط بالصفقة');
@@ -190,7 +209,7 @@
       if(f.commission_received_on&&payload.deal.closed_on&&f.commission_received_on<payload.deal.closed_on)throw new Error('تاريخ استلام العمولة يجب ألا يسبق تاريخ البيع');
       payload.deal.financials=f;
     }
-    if($('dwConfirmPaid')?.checked&&!d.reservation_confirmed_at){
+    if((stage==='deposit'||$('dwConfirmPaid')?.checked)&&!d.reservation_confirmed_at&&!(d.id&&d.stage==='deposit'&&!$('dwConfirmPaid')?.checked)){
       const paid=value('dwPaidDate'),deposit=amount(value('dwPaidAmount'),'العربون المدفوع');
       if(!validDate(paid)||!deposit||paid>day(new Date()))throw new Error('أدخل تاريخ دفع فعلي ومبلغ عربون موجب');
       if(payload.deal.closed_on&&paid>payload.deal.closed_on)throw new Error('تاريخ الحجز يجب ألا يأتي بعد تاريخ البيع');
@@ -200,6 +219,18 @@
     if(d.reservation_confirmed_at&&value('dwCancelledOn')&&!d.reservation_cancelled_at){
       if(!validDate(value('dwCancelledOn'))||!value('dwCancellationReason'))throw new Error('أدخل تاريخ الإلغاء وسببه');
       payload.deal.reservation={cancelled_on:value('dwCancelledOn'),cancellation_reason:value('dwCancellationReason')};
+    }
+    if(value('dwBookingReference')!==String(d.reservation_reference||'')){
+      payload.deal.reservation=payload.deal.reservation||{};payload.deal.reservation.reference=value('dwBookingReference')||null;
+    }
+    if(own()&&d.reservation_confirmed_at&&(value('dwCorrectionDate')||value('dwCorrectionAmount')||$('dwReactivate')?.checked)){
+      const date=value('dwCorrectionDate'),raw=value('dwCorrectionAmount'),why=value('dwCorrectionReason');
+      if(!why)throw new Error('اكتب سبب تصحيح الحجز أو إعادة تفعيله');
+      if(date&&(!validDate(date)||date>day(new Date())||payload.deal.closed_on&&date>payload.deal.closed_on))throw new Error('راجع تاريخ الحجز المصحح');
+      const paid=raw?amount(raw,'العربون المصحح'):null;if(raw&&!paid)throw new Error('أدخل عربوناً موجباً');
+      if($('dwReactivate')?.checked&&(stage==='lost'||payload.deal.reservation?.cancelled_on))throw new Error('اختر مرحلة سارية وأزل الإلغاء الجديد قبل إعادة التفعيل');
+      const b=payload.deal.reservation=payload.deal.reservation||{};b.correction_reason=why;
+      if(date)b.correct_paid_on=date;if(raw)b.correct_amount=paid;if($('dwReactivate')?.checked)b.reactivate=true;
     }
     if(own()&&[value('dwExpectedBookingCommission'),value('dwEntitledOn')].join('\u0000')!==state.milestoneBaseline){
       payload.deal.financials=payload.deal.financials||{};

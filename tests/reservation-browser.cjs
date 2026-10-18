@@ -9,7 +9,7 @@ const server=require('../preview/serve.cjs'),out=path.resolve('preview-results/r
    const context=await browser.newContext({viewport:{width:390,height:844}}),page=await context.newPage();
    await context.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
    page.on('pageerror',e=>report.errors.push(role+': '+e.message));
-   await page.goto('http://127.0.0.1:4189/after/'+role+'/');await page.locator('#loaderScreen').waitFor({state:'hidden'});
+   await page.goto('http://127.0.0.1:4189/after/'+role+'/');await page.locator('#page-dash').waitFor();await page.locator('#loaderScreen').waitFor({state:'hidden'});
    await page.evaluate(()=>openModal('mDeal'));await page.locator('#dealWorkflowForm').waitFor();
    await page.locator('#dwStage').selectOption('negotiation');
    await page.locator('#dwClientChoice').selectOption('__new__');await page.locator('#dwClientName').fill('عميل حجز اصطناعي');await page.locator('#dwClientPhone').fill('+96800000881');

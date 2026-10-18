@@ -1,0 +1,5708 @@
+{
+  "scope": "static inventory with explicitly separate execution evidence; no real client data",
+  "routes": [
+    "activityLog",
+    "ai",
+    "backup",
+    "calendar",
+    "clientDetail",
+    "clients",
+    "daily",
+    "dash",
+    "deals",
+    "deposits",
+    "expenses",
+    "instagram",
+    "owners",
+    "properties",
+    "propertyDetail",
+    "reports",
+    "settings",
+    "team",
+    "viewings",
+    "whatsapp"
+  ],
+  "modals": [
+    "mActivity",
+    "mClient",
+    "mDayDetails",
+    "mDeal",
+    "mDeposit",
+    "mEditMember",
+    "mEvent",
+    "mExpense",
+    "mInquiryFollowup",
+    "mOwner",
+    "mProperty",
+    "mPropertyInquiry",
+    "mPropertyMarketing",
+    "mTagFilter",
+    "mTask",
+    "mViewing",
+    "mWATemplate"
+  ],
+  "forms": [
+    "dealWorkflowForm",
+    "loginForm",
+    "recoveryForm",
+    "resetForm",
+    "signupForm"
+  ],
+  "inline_events": [
+    {
+      "file": "crm-v18-task-priority-patch.js",
+      "line": 47,
+      "event": "click",
+      "handler": "closeModal(\\'mTaskDetails\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v18-task-priority-patch.js",
+      "line": 47,
+      "event": "click",
+      "handler": "closeModal(\\'mTaskDetails\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v18-task-priority-patch.js",
+      "line": 47,
+      "event": "click",
+      "handler": "openTaskDetailsClient()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v18-task-priority-patch.js",
+      "line": 47,
+      "event": "click",
+      "handler": "editTaskFromDetails()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v18-task-priority-patch.js",
+      "line": 93,
+      "event": "click",
+      "handler": "openTaskDetails(\\''+task.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v18-task-priority-patch.js",
+      "line": 93,
+      "event": "click",
+      "handler": "event.stopPropagation();if(canEdit())toggleTask(\\''+task.id+'\\','+(!task.done)+')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v18-task-priority-patch.js",
+      "line": 102,
+      "event": "click",
+      "handler": "event.stopPropagation();editTask(\\''+task.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v18-task-priority-patch.js",
+      "line": 102,
+      "event": "click",
+      "handler": "event.stopPropagation();deleteTask(\\''+task.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v18-task-priority-patch.js",
+      "line": 125,
+      "event": "click",
+      "handler": "openModal(\\'mTask\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v18-task-priority-patch.js",
+      "line": 136,
+      "event": "click",
+      "handler": "loadTasks()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "instagram-crm.js",
+      "line": 84,
+      "event": "input",
+      "handler": "renderInstagramConversations()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "instagram-crm.js",
+      "line": 84,
+      "event": "click",
+      "handler": "sendInstagramMessage()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "instagram-crm.js",
+      "line": 130,
+      "event": "click",
+      "handler": "connectInstagram()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "instagram-crm.js",
+      "line": 142,
+      "event": "click",
+      "handler": "connectInstagram()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v18-client-info-patch.js",
+      "line": 50,
+      "event": "click",
+      "handler": "editClientRequest(\\''+r.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 120,
+      "event": "click",
+      "handler": "showAuthTab('login')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 120,
+      "event": "click",
+      "handler": "showAuthTab('signup')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 123,
+      "event": "submit",
+      "handler": "event.preventDefault();handleLogin()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 126,
+      "event": "click",
+      "handler": "showResetForm()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 129,
+      "event": "submit",
+      "handler": "event.preventDefault();handleSignup()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 138,
+      "event": "submit",
+      "handler": "event.preventDefault();handleReset()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 142,
+      "event": "click",
+      "handler": "showAuthTab('login')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 148,
+      "event": "click",
+      "handler": "closeMobile()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 155,
+      "event": "click",
+      "handler": "navigate('dash',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 156,
+      "event": "click",
+      "handler": "navigate('daily',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 160,
+      "event": "click",
+      "handler": "navigate('clients',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 161,
+      "event": "click",
+      "handler": "navigate('whatsapp',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 162,
+      "event": "click",
+      "handler": "navigate('properties',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 163,
+      "event": "click",
+      "handler": "navigate('deals',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 164,
+      "event": "click",
+      "handler": "navigate('calendar',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 165,
+      "event": "click",
+      "handler": "navigate('viewings',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 166,
+      "event": "click",
+      "handler": "navigate('deposits',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 167,
+      "event": "click",
+      "handler": "navigate('ai',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 171,
+      "event": "click",
+      "handler": "navigate('reports',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 175,
+      "event": "click",
+      "handler": "navigate('owners',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 176,
+      "event": "click",
+      "handler": "navigate('expenses',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 177,
+      "event": "click",
+      "handler": "navigate('activityLog',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 178,
+      "event": "click",
+      "handler": "navigate('team',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 179,
+      "event": "click",
+      "handler": "navigate('backup',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 180,
+      "event": "click",
+      "handler": "navigate('settings',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 183,
+      "event": "click",
+      "handler": "navigate('settings',null)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 183,
+      "event": "click",
+      "handler": "forceLogout()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 187,
+      "event": "click",
+      "handler": "openMobile()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 189,
+      "event": "click",
+      "handler": "toggleNotifPanel(event)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 191,
+      "event": "click",
+      "handler": "markAllNotifsRead()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 195,
+      "event": "click",
+      "handler": "logout()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 201,
+      "event": "click",
+      "handler": "openCreateModal('mClient')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 202,
+      "event": "click",
+      "handler": "openCreateModal('mProperty')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 203,
+      "event": "click",
+      "handler": "navigate('whatsapp',null)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 204,
+      "event": "click",
+      "handler": "openCreateModal('mTask')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 209,
+      "event": "click",
+      "handler": "crmDashboardPerformancePeriod('month')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 209,
+      "event": "click",
+      "handler": "crmDashboardPerformancePeriod('months3')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 209,
+      "event": "click",
+      "handler": "crmDashboardPerformancePeriod('months6')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 209,
+      "event": "click",
+      "handler": "crmDashboardPerformancePeriod('months9')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 209,
+      "event": "click",
+      "handler": "crmDashboardPerformancePeriod('year')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 209,
+      "event": "click",
+      "handler": "crmDashboardPerformancePeriod('all')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 215,
+      "event": "click",
+      "handler": "openCreateModal('mTask')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 217,
+      "event": "click",
+      "handler": "filterTasks('all',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 218,
+      "event": "click",
+      "handler": "filterTasks('today',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 219,
+      "event": "click",
+      "handler": "filterTasks('overdue',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 220,
+      "event": "click",
+      "handler": "filterTasks('upcoming',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 221,
+      "event": "click",
+      "handler": "filterTasks('done',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 228,
+      "event": "click",
+      "handler": "loadWhatsAppInbox(true)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 231,
+      "event": "input",
+      "handler": "renderWhatsAppConversations()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 238,
+      "event": "click",
+      "handler": "sendWhatsAppInboxMessage()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 246,
+      "event": "click",
+      "handler": "exportClients()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 247,
+      "event": "click",
+      "handler": "openCreateModal('mClient')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 250,
+      "event": "click",
+      "handler": "filterClientRole('all',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 251,
+      "event": "click",
+      "handler": "filterClientRole('buyer',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 252,
+      "event": "click",
+      "handler": "filterClientRole('seller',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 253,
+      "event": "click",
+      "handler": "filterClientRole('investor',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 254,
+      "event": "click",
+      "handler": "filterClientRole('tenant',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 255,
+      "event": "click",
+      "handler": "filterClientRole('landlord',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 256,
+      "event": "click",
+      "handler": "filterClientRole('consultation',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 257,
+      "event": "click",
+      "handler": "filterClientRole('hot',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 258,
+      "event": "click",
+      "handler": "filterClientRole('followup',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 259,
+      "event": "click",
+      "handler": "filterClientRole('unassigned',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 263,
+      "event": "click",
+      "handler": "setClientArchiveView(false,this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 263,
+      "event": "click",
+      "handler": "setClientArchiveView(true,this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 267,
+      "event": "input",
+      "handler": "applyClientSmartSearch()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 268,
+      "event": "change",
+      "handler": "applyClientSmartSearch()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 269,
+      "event": "input",
+      "handler": "applyClientSmartSearch()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 270,
+      "event": "input",
+      "handler": "applyClientSmartSearch()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 273,
+      "event": "click",
+      "handler": "clearClientSmartSearch()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 283,
+      "event": "click",
+      "handler": "exportProperties()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 284,
+      "event": "click",
+      "handler": "openCreateModal('mProperty')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 286,
+      "event": "click",
+      "handler": "setPropView('active',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 286,
+      "event": "click",
+      "handler": "setPropView('sold',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 286,
+      "event": "click",
+      "handler": "setPropView('archived',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 294,
+      "event": "click",
+      "handler": "switchDealView('table')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 294,
+      "event": "click",
+      "handler": "switchDealView('pipeline')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 294,
+      "event": "click",
+      "handler": "switchDealView('inquiries')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 294,
+      "event": "click",
+      "handler": "exportDeals()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 294,
+      "event": "click",
+      "handler": "window.editingDealId=null;openModal('mDeal')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 302,
+      "event": "click",
+      "handler": "setReportPeriod('day',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 303,
+      "event": "click",
+      "handler": "setReportPeriod('week',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 304,
+      "event": "click",
+      "handler": "setReportPeriod('month',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 305,
+      "event": "click",
+      "handler": "setReportPeriod('quarter',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 306,
+      "event": "click",
+      "handler": "setReportPeriod('year',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 307,
+      "event": "click",
+      "handler": "setReportPeriod('all',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 311,
+      "event": "change",
+      "handler": "setReportMonth(this.value)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 312,
+      "event": "click",
+      "handler": "clearReportMonth()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 318,
+      "event": "click",
+      "handler": "switchReportTab('overview',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 319,
+      "event": "click",
+      "handler": "switchReportTab('revenue',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 320,
+      "event": "click",
+      "handler": "switchReportTab('team',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 321,
+      "event": "click",
+      "handler": "switchReportTab('funnel',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 322,
+      "event": "click",
+      "handler": "switchReportTab('thirtyday',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 323,
+      "event": "click",
+      "handler": "switchReportTab('heatmap',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 360,
+      "event": "click",
+      "handler": "recalculateOldCommissions()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 381,
+      "event": "change",
+      "handler": "load30DayReport()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 409,
+      "event": "click",
+      "handler": "createEmployeeInvite()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 411,
+      "event": "click",
+      "handler": "copyInviteLink()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 426,
+      "event": "click",
+      "handler": "setCalView('month')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 426,
+      "event": "click",
+      "handler": "setCalView('week')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 426,
+      "event": "click",
+      "handler": "setCalView('list')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 427,
+      "event": "click",
+      "handler": "openModal('mEvent')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 431,
+      "event": "click",
+      "handler": "navCalendar(-1)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 431,
+      "event": "click",
+      "handler": "navCalendar(0)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 431,
+      "event": "click",
+      "handler": "navCalendar(1)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 445,
+      "event": "click",
+      "handler": "askAI('اكتب لي رسالة ترحيب لعميل جديد بحث عن فيلا')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 446,
+      "event": "click",
+      "handler": "askAI('اكتب لي وصف احترافي لعقار: فيلا في الموج، 4 غرف، 250 ألف ريال')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 447,
+      "event": "click",
+      "handler": "askAI('اعطني نصائح لزيادة معدل إغلاق الصفقات')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 448,
+      "event": "click",
+      "handler": "askAI('حلل لي أداء الفريق وأعطني توصيات')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 452,
+      "event": "click",
+      "handler": "sendAIMsg()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 460,
+      "event": "click",
+      "handler": "exportOwners()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 461,
+      "event": "click",
+      "handler": "openCreateModal('mOwner')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 463,
+      "event": "click",
+      "handler": "setOwnerType('all',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 463,
+      "event": "click",
+      "handler": "setOwnerType('owner',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 463,
+      "event": "click",
+      "handler": "setOwnerType('broker',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 463,
+      "event": "click",
+      "handler": "setOwnerType('agency',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 463,
+      "event": "click",
+      "handler": "setOwnerType('developer',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 465,
+      "event": "input",
+      "handler": "renderOwners()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 472,
+      "event": "click",
+      "handler": "openModal('mExpense')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 482,
+      "event": "change",
+      "handler": "loadExpenses()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 491,
+      "event": "change",
+      "handler": "loadActivityLog()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 504,
+      "event": "click",
+      "handler": "openCreateModal('mViewing')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 507,
+      "event": "click",
+      "handler": "setViewingTab('upcoming',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 508,
+      "event": "click",
+      "handler": "setViewingTab('overdue',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 509,
+      "event": "click",
+      "handler": "setViewingTab('today',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 510,
+      "event": "click",
+      "handler": "setViewingTab('done',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 511,
+      "event": "click",
+      "handler": "setViewingTab('no_show',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 512,
+      "event": "click",
+      "handler": "setViewingTab('all',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 519,
+      "event": "click",
+      "handler": "openModal('mDeposit')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 522,
+      "event": "click",
+      "handler": "setDepositTab('active',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 523,
+      "event": "click",
+      "handler": "setDepositTab('ending_soon',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 524,
+      "event": "click",
+      "handler": "setDepositTab('expired',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 525,
+      "event": "click",
+      "handler": "setDepositTab('applied',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 526,
+      "event": "click",
+      "handler": "setDepositTab('all',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 539,
+      "event": "click",
+      "handler": "navigate('properties',document.querySelector('[onclick*=properties]'))",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 540,
+      "event": "click",
+      "handler": "editPropertyFromDetail()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 554,
+      "event": "click",
+      "handler": "saveProfile()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 560,
+      "event": "click",
+      "handler": "saveLeadRouting()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 567,
+      "event": "click",
+      "handler": "copyLeadFormLink()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 569,
+      "event": "click",
+      "handler": "copyLeadFormLink()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 570,
+      "event": "click",
+      "handler": "shareLeadFormWA()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 588,
+      "event": "click",
+      "handler": "copyGSheetScript()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 592,
+      "event": "click",
+      "handler": "saveGSheetUrl()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 597,
+      "event": "click",
+      "handler": "syncToGSheet()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 598,
+      "event": "click",
+      "handler": "testGSheet()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 610,
+      "event": "click",
+      "handler": "saveCompany()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 615,
+      "event": "click",
+      "handler": "enableNotifications()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 622,
+      "event": "click",
+      "handler": "changePassword()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 623,
+      "event": "click",
+      "handler": "logoutAll()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 630,
+      "event": "click",
+      "handler": "navigate('clients',document.querySelector('[onclick*=clients]'))",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 631,
+      "event": "click",
+      "handler": "editClient()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 640,
+      "event": "click",
+      "handler": "switchClientTab('info',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 641,
+      "event": "click",
+      "handler": "switchClientTab('journey',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 642,
+      "event": "click",
+      "handler": "switchClientTab('listings',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 643,
+      "event": "click",
+      "handler": "switchClientTab('requests',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 644,
+      "event": "click",
+      "handler": "switchClientTab('interests',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 645,
+      "event": "click",
+      "handler": "switchClientTab('deals',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 646,
+      "event": "click",
+      "handler": "switchClientTab('tasks',this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 657,
+      "event": "click",
+      "handler": "openAddActivity()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 678,
+      "event": "change",
+      "handler": "updatePhonePlaceholder('cPhoneCountry','cPhoneLocal')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 694,
+      "event": "change",
+      "handler": "toggleRoleCB(this,'cbBuyer')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 695,
+      "event": "change",
+      "handler": "toggleRoleCB(this,'cbSeller')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 696,
+      "event": "change",
+      "handler": "toggleRoleCB(this,'cbInvestor');updateClientInvestmentForm()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 697,
+      "event": "change",
+      "handler": "toggleRoleCB(this,'cbTenant')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 698,
+      "event": "change",
+      "handler": "toggleRoleCB(this,'cbLandlord')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 699,
+      "event": "change",
+      "handler": "toggleRoleCB(this,'cbConsultation')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 703,
+      "event": "change",
+      "handler": "updateLeadScorePreview()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 723,
+      "event": "input",
+      "handler": "updateLeadScorePreview()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 724,
+      "event": "input",
+      "handler": "updateLeadScorePreview()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 725,
+      "event": "input",
+      "handler": "updateLeadScorePreview()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 726,
+      "event": "change",
+      "handler": "updateLeadScorePreview()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 741,
+      "event": "change",
+      "handler": "updateLeadScorePreview()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 748,
+      "event": "change",
+      "handler": "updateLeadScorePreview()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 793,
+      "event": "click",
+      "handler": "closeModal('mClient')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 793,
+      "event": "click",
+      "handler": "saveClient()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 874,
+      "event": "click",
+      "handler": "toggleInlinePropertyOwner(true)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 882,
+      "event": "click",
+      "handler": "toggleInlinePropertyOwner(false)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 886,
+      "event": "change",
+      "handler": "updatePhonePlaceholder('pNewOwnerPhoneCountry','pNewOwnerPhoneLocal')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 889,
+      "event": "click",
+      "handler": "toggleInlinePropertyOwner(false)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 889,
+      "event": "click",
+      "handler": "saveInlinePropertyOwner()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 913,
+      "event": "click",
+      "handler": "document.getElementById('pPhotos').click()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 918,
+      "event": "click",
+      "handler": "closeModal('mProperty')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 918,
+      "event": "click",
+      "handler": "saveProperty()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 926,
+      "event": "input",
+      "handler": "filterClientDropdown(this.value)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 934,
+      "event": "input",
+      "handler": "filterPropertyDropdown(this.value)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 942,
+      "event": "change",
+      "handler": "updateDealLossFields()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 962,
+      "event": "input",
+      "handler": "calcCompanyShare()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 964,
+      "event": "input",
+      "handler": "calcCompanyShare()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 966,
+      "event": "input",
+      "handler": "calcCompanyShare()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 970,
+      "event": "click",
+      "handler": "closeModal('mDeal')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 970,
+      "event": "click",
+      "handler": "saveDeal()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 978,
+      "event": "change",
+      "handler": "updatePhonePlaceholder('oPhoneCountry','oPhoneLocal')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 987,
+      "event": "click",
+      "handler": "closeModal('mOwner')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 987,
+      "event": "click",
+      "handler": "saveOwner()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1010,
+      "event": "click",
+      "handler": "closeModal('mExpense')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1010,
+      "event": "click",
+      "handler": "saveExpense()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1026,
+      "event": "click",
+      "handler": "closeModal('mTask')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1026,
+      "event": "click",
+      "handler": "saveTask()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1043,
+      "event": "click",
+      "handler": "closeModal('mActivity')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1043,
+      "event": "click",
+      "handler": "saveActivity()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1061,
+      "event": "click",
+      "handler": "closeModal('mEditMember')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1061,
+      "event": "click",
+      "handler": "saveMemberChanges()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1071,
+      "event": "click",
+      "handler": "closeModal('mWATemplate')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1071,
+      "event": "click",
+      "handler": "sendWAMessage()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1077,
+      "event": "click",
+      "handler": "closeModal('mTagFilter')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1091,
+      "event": "click",
+      "handler": "closeModal('mEvent')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1091,
+      "event": "click",
+      "handler": "saveEvent()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1097,
+      "event": "click",
+      "handler": "closeModal('mDayDetails')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1097,
+      "event": "click",
+      "handler": "addEventForDay()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1102,
+      "event": "input",
+      "handler": "cmdSearch()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1108,
+      "event": "click",
+      "handler": "closeLightbox()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1109,
+      "event": "click",
+      "handler": "lightboxNav(-1)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1111,
+      "event": "click",
+      "handler": "lightboxNav(1)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1118,
+      "event": "input",
+      "handler": "scheduleViewingSearch('client')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1118,
+      "event": "change",
+      "handler": "loadViewingClientProperty()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1118,
+      "event": "click",
+      "handler": "loadViewingChoices('client',false)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1118,
+      "event": "click",
+      "handler": "toggleViewingNewClient()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1120,
+      "event": "input",
+      "handler": "scheduleViewingSearch('property')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1120,
+      "event": "click",
+      "handler": "loadViewingChoices('property',true)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1169,
+      "event": "change",
+      "handler": "updateViewingOutcomeFields()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1181,
+      "event": "click",
+      "handler": "closeModal('mViewing')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1181,
+      "event": "click",
+      "handler": "saveViewing()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1208,
+      "event": "click",
+      "handler": "closeModal('mDeposit')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1208,
+      "event": "click",
+      "handler": "saveDeposit()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1235,
+      "event": "click",
+      "handler": "closeModal('mPropertyInquiry')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1235,
+      "event": "click",
+      "handler": "savePropertyInquiry()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1243,
+      "event": "change",
+      "handler": "updateInquiryFollowupFields()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1250,
+      "event": "click",
+      "handler": "closeModal('mInquiryFollowup')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1250,
+      "event": "click",
+      "handler": "saveInquiryFollowup()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1256,
+      "event": "change",
+      "handler": "updatePropertyMarketingHint()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1257,
+      "event": "change",
+      "handler": "updatePropertyMarketingHint()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1260,
+      "event": "input",
+      "handler": "updatePropertyMarketingHint()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1264,
+      "event": "click",
+      "handler": "closeModal('mPropertyMarketing')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1264,
+      "event": "click",
+      "handler": "savePropertyMarketingEvent()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1272,
+      "event": "click",
+      "handler": "closeConfirm()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1374,
+      "event": "click",
+      "handler": "location.reload()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1459,
+      "event": "click",
+      "handler": "lfSelectService(this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1460,
+      "event": "click",
+      "handler": "lfSelectService(this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1461,
+      "event": "click",
+      "handler": "lfSelectService(this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1462,
+      "event": "click",
+      "handler": "lfSelectService(this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1463,
+      "event": "click",
+      "handler": "lfSelectService(this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1468,
+      "event": "click",
+      "handler": "lfGoToStep(2)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1476,
+      "event": "click",
+      "handler": "submitLead(\\''+companyId+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1502,
+      "event": "click",
+      "handler": "lfGoBackToStep1()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1508,
+      "event": "click",
+      "handler": "lfGoToStep(3)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 1555,
+      "event": "change",
+      "handler": "lfToggleCustomBudget()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2210,
+      "event": "submit",
+      "handler": "event.preventDefault();saveRecoveredPassword()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2271,
+      "event": "click",
+      "handler": "revokeEmployeeInvite(\\''+i.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2307,
+      "event": "click",
+      "handler": "toggleTask(\\''+t.id+'\\','+(!t.done)+')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2308,
+      "event": "click",
+      "handler": "viewClient(\\''+c.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2351,
+      "event": "click",
+      "handler": "filterClientRole(\\'followup\\',document.querySelector(\\'#clientRoleTabs .role-tab:nth-child(6)\\'))",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2363,
+      "event": "click",
+      "handler": "loadClients()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2445,
+      "event": "click",
+      "handler": "openModal(\\'mClient\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2452,
+      "event": "click",
+      "handler": "viewClient(\\''+c.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2458,
+      "event": "click",
+      "handler": "event.stopPropagation()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2458,
+      "event": "click",
+      "handler": "restoreClientById(\\''+c.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2458,
+      "event": "click",
+      "handler": "permanentDeleteClientById(\\''+c.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2458,
+      "event": "click",
+      "handler": "archiveClientById(\\''+c.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2463,
+      "event": "click",
+      "handler": "viewClient(\\''+c.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2463,
+      "event": "click",
+      "handler": "event.stopPropagation()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2463,
+      "event": "click",
+      "handler": "event.stopPropagation();restoreClientById(\\''+c.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2463,
+      "event": "click",
+      "handler": "event.stopPropagation();permanentDeleteClientById(\\''+c.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2463,
+      "event": "click",
+      "handler": "event.stopPropagation();archiveClientById(\\''+c.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2514,
+      "event": "click",
+      "handler": "openClientWhatsAppHistory()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2516,
+      "event": "click",
+      "handler": "markViewingClientContacted()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2516,
+      "event": "click",
+      "handler": "suppressViewingClientFollowup()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2517,
+      "event": "click",
+      "handler": "resumeViewingClientFollowup()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2518,
+      "event": "click",
+      "handler": "runClientAIInsight()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2519,
+      "event": "click",
+      "handler": "openAddActivity()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2520,
+      "event": "click",
+      "handler": "addTaskForClient(\\''+c.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2521,
+      "event": "click",
+      "handler": "addDealForClient(\\''+c.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2522,
+      "event": "click",
+      "handler": "openNewRequestForClient()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2540,
+      "event": "click",
+      "handler": "openNewRequestForClient()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2542,
+      "event": "click",
+      "handler": "editClientRequest(\\''+x.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2609,
+      "event": "click",
+      "handler": "closeModal(\\'mClientRequest\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2609,
+      "event": "click",
+      "handler": "saveNewClientRequest()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2648,
+      "event": "click",
+      "handler": "editDeal(\\''+d.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2727,
+      "event": "click",
+      "handler": "openModal(\\'mProperty\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2734,
+      "event": "click",
+      "handler": "viewProperty(\\''+p.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2740,
+      "event": "click",
+      "handler": "event.stopPropagation()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2740,
+      "event": "click",
+      "handler": "editProperty(\\''+p.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2740,
+      "event": "click",
+      "handler": "restorePropertyById(\\''+p.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2740,
+      "event": "click",
+      "handler": "permanentDeletePropertyById(\\''+p.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2740,
+      "event": "click",
+      "handler": "archivePropertyById(\\''+p.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2745,
+      "event": "click",
+      "handler": "viewProperty(\\''+p.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2745,
+      "event": "click",
+      "handler": "editProperty(\\''+p.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2745,
+      "event": "click",
+      "handler": "restorePropertyById(\\''+p.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2745,
+      "event": "click",
+      "handler": "permanentDeletePropertyById(\\''+p.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2745,
+      "event": "click",
+      "handler": "archivePropertyById(\\''+p.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2745,
+      "event": "click",
+      "handler": "loadProperties()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2852,
+      "event": "click",
+      "handler": "copyCurrentPropertyPublicMessage()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2892,
+      "event": "click",
+      "handler": "viewClient(\\''+c.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2897,
+      "event": "click",
+      "handler": "event.stopPropagation();openPropertySendToClient(\\''+window.viewingProperty.id+'\\',\\''+c.id+'\\',\\''+c.request_id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2950,
+      "event": "click",
+      "handler": "runClientAIInsight()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2950,
+      "event": "click",
+      "handler": "runClientAIInsight()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2953,
+      "event": "click",
+      "handler": "viewProperty(\\''+p.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2953,
+      "event": "click",
+      "handler": "openPropertySendToClient(\\''+p.id+'\\',\\''+viewingClient.id+'\\',null)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2977,
+      "event": "click",
+      "handler": "navigate(\\'properties\\',document.querySelector(\\'[onclick*=properties]\\'))",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 2978,
+      "event": "click",
+      "handler": "viewProperty(\\''+x.property_id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3001,
+      "event": "click",
+      "handler": "runPropertyAIInsight(\\''+propId+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3001,
+      "event": "click",
+      "handler": "setPropertyPhotographyStatus(\\''+propId+'\\',\\'scheduled\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3001,
+      "event": "click",
+      "handler": "setPropertyPhotographyStatus(\\''+propId+'\\',\\'completed\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3001,
+      "event": "click",
+      "handler": "setPropertyPhotographyStatus(\\''+propId+'\\',\\'needs_refresh\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3001,
+      "event": "click",
+      "handler": "savePropertyDecisionNote(\\''+propId+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3021,
+      "event": "click",
+      "handler": "'+action+'",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3024,
+      "event": "click",
+      "handler": "viewProperty(\\''+x.property_id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3025,
+      "event": "click",
+      "handler": "client360SwitchTab(\\'requests\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3026,
+      "event": "click",
+      "handler": "$(\\'client360Drilldown\\').innerHTML=\\'\\'",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3052,
+      "event": "click",
+      "handler": "client360SwitchTab(\\'requests\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3056,
+      "event": "click",
+      "handler": "openClientWhatsAppHistory()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3058,
+      "event": "click",
+      "handler": "viewProperty(\\''+x.property_id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3060,
+      "event": "click",
+      "handler": "client360SwitchTab(\\'tasks\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3075,
+      "event": "change",
+      "handler": "toggleStructuredReason(this)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3122,
+      "event": "click",
+      "handler": "openPropertyInquiryModal()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3122,
+      "event": "click",
+      "handler": "openPropertyMarketingModal()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3122,
+      "event": "click",
+      "handler": "syncInstagramForCurrentProperty()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3122,
+      "event": "click",
+      "handler": "exportPropertyOwnerReport()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3128,
+      "event": "click",
+      "handler": "viewClient(\\''+x.client_id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3128,
+      "event": "click",
+      "handler": "openPropertyInquiryModal(\\''+x.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3417,
+      "event": "click",
+      "handler": "openModal(\\'mDeal\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3418,
+      "event": "click",
+      "handler": "editDeal(\\''+d.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3418,
+      "event": "click",
+      "handler": "event.stopPropagation()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3418,
+      "event": "click",
+      "handler": "deleteDeal(\\''+d.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3423,
+      "event": "click",
+      "handler": "openInquiryFollowup(\\''+x.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3428,
+      "event": "click",
+      "handler": "viewProperty(\\''+x.property_id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3458,
+      "event": "drop",
+      "handler": "onDrop(event)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3463,
+      "event": "dragstart",
+      "handler": "onDragStart(event)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3463,
+      "event": "click",
+      "handler": "editDeal(\\''+d.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3484,
+      "event": "click",
+      "handler": "event.stopPropagation();deleteDeal(\\''+d.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3610,
+      "event": "click",
+      "handler": "loadTasks()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3612,
+      "event": "click",
+      "handler": "openModal(\\'mTask\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3612,
+      "event": "click",
+      "handler": "toggleTask(\\''+t.id+'\\','+(!t.done)+')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3612,
+      "event": "click",
+      "handler": "event.stopPropagation();viewClient(\\''+t.client_id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3612,
+      "event": "click",
+      "handler": "editTask(\\''+t.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3612,
+      "event": "click",
+      "handler": "deleteTask(\\''+t.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3644,
+      "event": "click",
+      "handler": "viewClient(\\''+c.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3644,
+      "event": "click",
+      "handler": "viewClient(\\''+(de.client_id||'')+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3686,
+      "event": "click",
+      "handler": "editMember(&quot;'+m.id+'&quot;)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3687,
+      "event": "click",
+      "handler": "reassignMember(&quot;'+m.id+'&quot;)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3688,
+      "event": "click",
+      "handler": "removeMember(&quot;'+m.id+'&quot;)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3721,
+      "event": "click",
+      "handler": "viewProperty(\\''+m.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3721,
+      "event": "click",
+      "handler": "event.stopPropagation();openPropertySendToClient(\\''+m.id+'\\',\\''+client.id+'\\','+(request.id?'\\''+request.id+'\\'':'null')+')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3725,
+      "event": "click",
+      "handler": "viewClient(\\''+b.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3850,
+      "event": "click",
+      "handler": "loadWhatsAppInbox(true)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3862,
+      "event": "click",
+      "handler": "openWhatsAppConversation(\\''+c.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3863,
+      "event": "click",
+      "handler": "loadWhatsAppInbox(false,true)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3947,
+      "event": "click",
+      "handler": "viewClient(\\''+c.client_id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3950,
+      "event": "click",
+      "handler": "clearWhatsAppHandoff()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3951,
+      "event": "click",
+      "handler": "selectWhatsAppRequest(\\''+r.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3952,
+      "event": "click",
+      "handler": "loadOlderWhatsAppMessages()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3989,
+      "event": "click",
+      "handler": "loadNotifications()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 3991,
+      "event": "click",
+      "handler": "'+(n.onclick||'')+';closeNotifPanel()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 4016,
+      "event": "click",
+      "handler": "launchWhatsAppEmbeddedSignup(\\''+def.key+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 4016,
+      "event": "click",
+      "handler": "copyTextValue(this.textContent)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 4117,
+      "event": "click",
+      "handler": "showDayDetails(\\''+dateStr+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 4120,
+      "event": "click",
+      "handler": "showDayDetails(\\''+dateStr+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 4121,
+      "event": "click",
+      "handler": "'+(e.client?'viewClient(\\''+(e.raw.client_id||'')+'\\')':'')+'",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 4169,
+      "event": "click",
+      "handler": "cmdExec('+i+')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 4214,
+      "event": "click",
+      "handler": "openModal(\\'mOwner\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 4215,
+      "event": "click",
+      "handler": "editOwner(\\''+o.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 4215,
+      "event": "click",
+      "handler": "event.stopPropagation()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 4215,
+      "event": "click",
+      "handler": "editOwner(\\''+o.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 4506,
+      "event": "click",
+      "handler": "openLightboxFromCurrent('+i+')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 4506,
+      "event": "click",
+      "handler": "event.stopPropagation()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 4506,
+      "event": "click",
+      "handler": "setCoverImage('+i+')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 4506,
+      "event": "click",
+      "handler": "removePropertyImage('+i+')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 4677,
+      "event": "click",
+      "handler": "editViewing(\\''+v.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 4682,
+      "event": "click",
+      "handler": "deleteViewing(\\''+v.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 4879,
+      "event": "click",
+      "handler": "editDeposit(\\''+d.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 4880,
+      "event": "click",
+      "handler": "deleteDeposit(\\''+d.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5033,
+      "event": "click",
+      "handler": "viewClient(\\''+c.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5040,
+      "event": "click",
+      "handler": "viewClient(\\''+c.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5047,
+      "event": "click",
+      "handler": "navigate(\\'viewings\\',null)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5054,
+      "event": "click",
+      "handler": "navigate(\\'viewings\\',null)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5061,
+      "event": "click",
+      "handler": "navigate(\\'deposits\\',null)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5068,
+      "event": "click",
+      "handler": "viewClient(\\''+c.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5075,
+      "event": "click",
+      "handler": "navigate(\\'daily\\',null)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5116,
+      "event": "click",
+      "handler": "closeModal(\\'mClient\\');viewClient(\\''+c.id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5185,
+      "event": "click",
+      "handler": "refreshFollowUpEngine()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5188,
+      "event": "click",
+      "handler": "'+action+'",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5188,
+      "event": "click",
+      "handler": "event.stopPropagation()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5207,
+      "event": "click",
+      "handler": "navigate(\\'dash\\',null)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5259,
+      "event": "click",
+      "handler": "forceUpdate()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5259,
+      "event": "click",
+      "handler": "dismissUpdate(\\\\\\''+String(newVersion).replace(/[^a-zA-Z0-9._-]/g,'')+'\\\\\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5421,
+      "event": "click",
+      "handler": "navigateToBackup();document.getElementById(\\'backupReminder\\').remove()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5421,
+      "event": "click",
+      "handler": "document.getElementById(\\'backupReminder\\').remove()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5468,
+      "event": "click",
+      "handler": "downloadFullBackup()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5477,
+      "event": "click",
+      "handler": "restoreFromBackup()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5499,
+      "event": "click",
+      "handler": "clearBackupHistory()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5543,
+      "event": "click",
+      "handler": "exportTableCSV(\\''+table+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5567,
+      "event": "click",
+      "handler": "closeModal('mUnknownPropertyLink')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5582,
+      "event": "click",
+      "handler": "openUnknownPropertyLinkUrl()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5583,
+      "event": "click",
+      "handler": "ignoreUnknownPropertyLink()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5584,
+      "event": "click",
+      "handler": "resolveUnknownPropertyLink()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5733,
+      "event": "click",
+      "handler": "navigate(\\'properties\\',null)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5738,
+      "event": "click",
+      "handler": "loadEmployeeTargetReminder()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5797,
+      "event": "click",
+      "handler": "navigate('dash',null)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5798,
+      "event": "click",
+      "handler": "navigate('clients',null)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5799,
+      "event": "click",
+      "handler": "openCreateModal('mProperty')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5800,
+      "event": "click",
+      "handler": "navigate('whatsapp',null)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "app-base-v15.html",
+      "line": 5801,
+      "event": "click",
+      "handler": "navigate('properties',null)",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v17-patch.js",
+      "line": 12,
+      "event": "change",
+      "handler": "updatePropertyAgreementFields()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v17-patch.js",
+      "line": 13,
+      "event": "change",
+      "handler": "updatePropertyAgreementHint()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v17-patch.js",
+      "line": 14,
+      "event": "input",
+      "handler": "updatePropertyAgreementHint()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v17-patch.js",
+      "line": 22,
+      "event": "click",
+      "handler": "previewPropertyClientMessage('details')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v17-patch.js",
+      "line": 22,
+      "event": "click",
+      "handler": "previewPropertyClientMessage('location')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-operations-v6.js",
+      "line": 89,
+      "event": "click",
+      "handler": "crmPerformancePeriod(\\'month\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-operations-v6.js",
+      "line": 89,
+      "event": "click",
+      "handler": "crmPerformancePeriod(\\'months3\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-operations-v6.js",
+      "line": 89,
+      "event": "click",
+      "handler": "crmPerformancePeriod(\\'months6\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-operations-v6.js",
+      "line": 89,
+      "event": "click",
+      "handler": "crmPerformancePeriod(\\'months9\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-operations-v6.js",
+      "line": 89,
+      "event": "click",
+      "handler": "crmPerformancePeriod(\\'year\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-operations-v6.js",
+      "line": 89,
+      "event": "click",
+      "handler": "crmPerformancePeriod(\\'all\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v18-routing-patch.js",
+      "line": 5,
+      "event": "click",
+      "handler": "copyLeadFormLink()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v18-routing-patch.js",
+      "line": 5,
+      "event": "click",
+      "handler": "shareLeadFormWA()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-visit-client.js",
+      "line": 23,
+      "event": "change",
+      "handler": "updatePhonePlaceholder(\\'vNewClientPhoneCountry\\',\\'vNewClientPhoneLocal\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-visit-client.js",
+      "line": 25,
+      "event": "click",
+      "handler": "saveViewingNewClient()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v18-property-monitoring-patch.js",
+      "line": 25,
+      "event": "click",
+      "handler": "navigate(\\'properties\\',document.querySelector(\\'[onclick*=properties]\\'))",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-v18-property-monitoring-patch.js",
+      "line": 33,
+      "event": "click",
+      "handler": "viewProperty(\\''+x.property_id+'\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "index.html",
+      "line": 23,
+      "event": "click",
+      "handler": "location.reload()",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    },
+    {
+      "file": "crm-deal-workflow.js",
+      "line": 162,
+      "event": "click",
+      "handler": "closeModal(\\'mDeal\\')",
+      "verification": "inventoried; individual invocation not implied by route/test suite success"
+    }
+  ],
+  "runtime_scripts": [
+    "crm-v18-task-priority-patch.js",
+    "instagram-crm.js",
+    "whatsapp-direct-bind-ui.js",
+    "crm-v18-client-info-patch.js",
+    "crm-funnel.js",
+    "crm-v17-patch.js",
+    "crm-operations-v6.js",
+    "crm-v18-routing-patch.js",
+    "modern-v17.js",
+    "crm-visit-client.js",
+    "crm-v18-property-monitoring-patch.js",
+    "crm-deal-workflow.js",
+    "crm-v18-request-integrity-patch.js"
+  ],
+  "database": {
+    "tables": [
+      "events",
+      "profiles",
+      "companies",
+      "deals",
+      "expenses",
+      "notifications",
+      "owners",
+      "company_lead_routes",
+      "deposits",
+      "viewings",
+      "tasks",
+      "clients",
+      "company_invites",
+      "property_marketing_events",
+      "whatsapp_conversations",
+      "whatsapp_messages",
+      "whatsapp_webhook_events",
+      "whatsapp_message_requests",
+      "client_request_events",
+      "client_requests",
+      "property_inquiries",
+      "appointments",
+      "appointment_properties",
+      "activities",
+      "rejection_reasons",
+      "property_rejection_reasons",
+      "property_action_reviews",
+      "measurement_periods",
+      "measurement_targets",
+      "whatsapp_onboarding_events",
+      "deal_stage_history",
+      "properties",
+      "whatsapp_automation_events",
+      "unmatched_property_links",
+      "client_request_assignees",
+      "instagram_outbound_operations",
+      "employee_monthly_targets",
+      "whatsapp_followup_optouts",
+      "whatsapp_template_registry",
+      "whatsapp_followup_events",
+      "whatsapp_followup_optins",
+      "whatsapp_automation_runtime",
+      "instagram_accounts",
+      "instagram_account_credentials",
+      "instagram_webhook_events",
+      "instagram_conversations",
+      "instagram_messages",
+      "property_message_attributions",
+      "whatsapp_send_operations",
+      "whatsapp_route_credentials"
+    ],
+    "rpc_and_internal_functions": [
+      {
+        "schema": "public",
+        "name": "crm_whatsapp_inbox_counts",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "handle_new_user",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_dashboard_work",
+        "args": "p_scope text, p_limit integer, p_offset integer",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_employee_performance",
+        "args": "p_from date, p_to date",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "get_public_company_name",
+        "args": "p_company_id uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "is_company_owner",
+        "args": "target_company uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "protect_profile_sensitive_fields",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "apply_company_invite_to_new_user",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "submit_public_lead",
+        "args": "p_company_id uuid, p_payload jsonb",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "calc_client_request_score",
+        "args": "p_request jsonb",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "upsert_whatsapp_client",
+        "args": "p_company_id uuid, p_phone text, p_customer_name text, p_route_key text, p_assigned_to uuid, p_inbound_number text, p_message_body text, p_extracted jsonb, p_message_at timestamp with time zone",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "resolve_whatsapp_route",
+        "args": "p_company_id uuid, p_meta_phone_number_id text",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "touch_property_inquiry_updated_at",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "sync_client_pipeline_from_property_inquiry",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "touch_client_request_updated_at",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "sync_client_summary_after_request_change",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "audit_client_request_change",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "submit_public_lead",
+        "args": "p_company_id uuid, p_payload jsonb, p_route_key text",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "refresh_client_request_summary",
+        "args": "p_client_id uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "apply_whatsapp_client_request",
+        "args": "p_company_id uuid, p_client_id uuid, p_action text, p_existing_request_id uuid, p_assigned_to uuid, p_route_key text, p_inbound_number text, p_message_id uuid, p_request jsonb, p_message_at timestamp with time zone",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "disable_missing_requirements_auto_reply_guard",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_infer_request_branches",
+        "args": "p_route_key text, p_branch_key text, p_wilayat text, p_preferred_area text, p_preferred_areas text[], p_alternative_areas text[]",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "apply_whatsapp_client_request_guarded",
+        "args": "p_company_id uuid, p_client_id uuid, p_action text, p_existing_request_id uuid, p_assigned_to uuid, p_route_key text, p_inbound_number text, p_message_id uuid, p_request jsonb, p_message_at timestamp with time zone",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_refresh_client_primary_assignment",
+        "args": "p_company_id uuid, p_client_id uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "normalize_crm_phone",
+        "args": "p_phone text",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "sync_activity_compat_fields",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "prevent_new_client_phone_duplicate",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "set_client_phone_normalized",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "initialize_property_monitoring",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "my_company",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "my_role",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "capture_request_response_milestones",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_funnel_cohort_metrics",
+        "args": "p_period_id uuid, p_branch_key text, p_assigned_to uuid, p_request_type text, p_source text, p_new_client boolean",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "record_request_milestone_events",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "apply_whatsapp_request_batch_guarded",
+        "args": "p_company_id uuid, p_client_id uuid, p_assigned_to uuid, p_route_key text, p_inbound_number text, p_message_id uuid, p_requests jsonb, p_message_at timestamp with time zone",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_activity_metrics",
+        "args": "p_start_date date, p_end_date date, p_branch_key text, p_assigned_to uuid",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_qualified_attendance_opportunity_7d",
+        "args": "p_branch_key text, p_assigned_to uuid, p_new_client boolean",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "validate_client_request_refs",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_data_quality_summary",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "sync_request_from_appointment",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_sync_property_status",
+        "args": "p_property_id uuid",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "sync_request_from_property_inquiry",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_set_client_followup_state",
+        "args": "p_client_id uuid, p_action text, p_reason text",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_whatsapp_latest_messages",
+        "args": "p_conversation_ids uuid[]",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "sync_request_from_deposit",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "sync_request_from_deal",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "set_property_marketing_link_identity",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "sync_property_interest_from_appointment_property",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "property_link_provider",
+        "args": "p_url text",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_client_360",
+        "args": "p_client_id uuid",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_property_performance",
+        "args": "p_start_date date, p_end_date date, p_branch_key text",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_due_whatsapp_followups",
+        "args": "p_limit integer",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "record_property_link_inquiry_internal",
+        "args": "p_company_id uuid, p_client_id uuid, p_property_id uuid, p_marketing_event_id uuid, p_whatsapp_message_id uuid, p_raw_url text, p_link_key text, p_message_at timestamp with time zone, p_manual boolean",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_client_contact_queue",
+        "args": "p_limit integer",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "sync_deposits_when_deal_closed",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "enforce_applied_deposit_on_completed_deal",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "normalize_property_listing_agreement",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "touch_client_contact_from_whatsapp",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "reset_stale_requirement_prompt_on_new_inbound",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "sync_viewing_to_crm",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "record_deal_stage_history",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "sync_followup_delivery_status",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "exclude_internal_numbers_from_followups",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "sync_property_monitoring_from_marketing_event",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_property_action_queue",
+        "args": "p_branch_key text",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "process_followup_reply_from_whatsapp",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_property_source_guard",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "normalize_property_marketing_link",
+        "args": "p_url text",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "process_property_links_from_whatsapp",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_finalize_property_message",
+        "args": "p_message_id uuid",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_replace_rejection_reasons",
+        "args": "p_inquiry_id uuid, p_reason_ids uuid[], p_primary_id uuid, p_phase text, p_note text",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "ignore_unmatched_property_link",
+        "args": "p_unmatched_id uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_set_request_geography",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_save_viewing_atomic",
+        "args": "p_payload jsonb, p_idempotency_key uuid",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_delete_deal_atomic",
+        "args": "p_deal_id uuid",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_verify_followup_cron_secret",
+        "args": "p_secret text",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_add_property_marketing_links",
+        "args": "p_property_id uuid, p_urls text[]",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_guard_instagram_conversation_counters",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_get_deal_workflow",
+        "args": "p_deal_id uuid",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_apply_property_image_evidence",
+        "args": "p_message_id uuid, p_evidence jsonb",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_touch_whatsapp_conversation",
+        "args": "p_conversation_id uuid, p_message_id uuid",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_touch_whatsapp_after_insert",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_mark_whatsapp_read",
+        "args": "p_conversation_id uuid, p_message_id uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_touch_instagram_after_insert",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_mark_instagram_read",
+        "args": "p_conversation_id uuid, p_message_id uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_claim_instagram_send",
+        "args": "p_company_id uuid, p_operation_id uuid, p_conversation_id uuid, p_actor_id uuid, p_body_sha256 text",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_property_acquisition_funnel",
+        "args": "p_property_id uuid",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_public_business_routes",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "resolve_unmatched_property_link",
+        "args": "p_unmatched_id uuid, p_property_id uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_guard_whatsapp_conversation_counters",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_save_deal_workflow",
+        "args": "p_payload jsonb, p_idempotency_key uuid",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "normalize_request_branch_when_location_missing",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_sync_request_assignees",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_shared_ai_evidence_mask",
+        "args": "p_rows jsonb",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "upsert_whatsapp_client_identity",
+        "args": "p_company_id uuid, p_phone text, p_customer_name text, p_route_key text, p_assigned_to uuid, p_inbound_number text, p_message_at timestamp with time zone",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_property_inquiry_candidates",
+        "args": "p_message_id uuid, p_offset integer, p_limit integer",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_apply_verified_property_inquiries",
+        "args": "p_message_id uuid, p_matches jsonb, p_needs_review boolean",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_employee_target_snapshot",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "public",
+        "name": "crm_confirm_paid_reservation",
+        "args": "p_deal_id uuid, p_payment_date date, p_amount numeric, p_expected_company_commission numeric",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "investment_row_allowed",
+        "args": "p_company uuid, p_row jsonb",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "dashboard_row_in_scope",
+        "args": "p_company uuid, p_row jsonb, p_scope text",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "staff_can_access_branch",
+        "args": "p_company uuid, p_branch text",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "guard_property_branch",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "reconcile_saved_property_link",
+        "args": "p_event_id uuid, p_message_ids uuid[]",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "reconcile_property_link_after_save",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "semantic_property_is_private",
+        "args": "p_company uuid, p_property uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "apply_property_branch_employee",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "can_access_client",
+        "args": "p_company_id uuid, p_client_id uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "can_access_whatsapp_conversation",
+        "args": "p_company_id uuid, p_conversation_id uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "stamp_first_client_request",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "guard_property_deal_state",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "sync_property_after_deal_change",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "performance_employee",
+        "args": "p_company uuid, p_branch text, p_at timestamp with time zone, p_original uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "property_image_draft_target_available",
+        "args": "p_property_id text",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "guard_request_manual_assignment",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "validate_viewing_refs_and_version",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "sync_property_status_internal",
+        "args": "p_property_id uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "sync_property_status_checked",
+        "args": "p_property_id uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "can_access_property_image",
+        "args": "p_name text, p_owner_id text, p_operation text",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "get_deal_workflow",
+        "args": "p_deal_id uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "guard_deals_financial_fields",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "guard_properties_financial_fields",
+        "args": "",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "link_viewing_interest",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "guard_deal_workflow",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "save_deal_workflow",
+        "args": "p_payload jsonb, p_idempotency_key uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "audit_rejection_change",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "set_primary_rejection",
+        "args": "p_company uuid, p_client uuid, p_property uuid, p_request uuid, p_inquiry uuid, p_reason uuid, p_note text, p_phase text, p_actor uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "sync_deal_primary_rejection",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "investment_owner",
+        "args": "p_company uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "investment_link_is_private",
+        "args": "p_company uuid, p_row jsonb, p_seen text[]",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "replace_primary_rejection",
+        "args": "p_inquiry_id uuid, p_reason_ids uuid[], p_primary_id uuid, p_phase text, p_note text",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "whatsapp_request_physical_branch",
+        "args": "p_company_id uuid, p_client_id uuid, p_origin_message_id uuid, p_inbound_number text",
+        "definer": false,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "shared_ai_evidence_mask",
+        "args": "p_rows jsonb",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "guard_investment_client",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "guard_investment_request",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "guard_investment_route",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "guard_investment_linked_write",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "can_access_request",
+        "args": "p_company_id uuid, p_request_id uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "can_access_deal_workflow",
+        "args": "p_deal_id uuid",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "audit_reservation_milestones",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "guard_reservation_milestones",
+        "args": "",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "save_deal_milestones",
+        "args": "p_deal_id uuid, p_payload jsonb, p_key uuid, p_previous jsonb",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      },
+      {
+        "schema": "crm_repair_private",
+        "name": "deal_period_metrics",
+        "args": "p_from date, p_to date",
+        "definer": true,
+        "verification": "catalog inspected; see audit report for executed paths"
+      }
+    ],
+    "policies": [
+      {
+        "schema": "public",
+        "table": "events",
+        "name": "events_delete_allowed",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "events",
+        "name": "events_insert_allowed",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "events",
+        "name": "events_select_allowed",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "events",
+        "name": "events_update_allowed",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "events",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "profiles",
+        "name": "profiles_owner_manage_company",
+        "operation": "ALL",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "profiles",
+        "name": "profiles_select_same_company",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "profiles",
+        "name": "profiles_update_own_basic",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "companies",
+        "name": "companies_owner_update",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "companies",
+        "name": "companies_select_own_company",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "deals",
+        "name": "deals_delete_admin",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "deals",
+        "name": "deals_insert_staff",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "deals",
+        "name": "deals_related_branch_boundary",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "deals",
+        "name": "deals_select_by_role",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "deals",
+        "name": "deals_update_allowed",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "deals",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "expenses",
+        "name": "expenses_owner_delete",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "expenses",
+        "name": "expenses_owner_insert",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "expenses",
+        "name": "expenses_owner_select",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "expenses",
+        "name": "expenses_owner_update",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "notifications",
+        "name": "Own notifications only",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "notifications",
+        "name": "Update own notifications",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "notifications",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "notifications",
+        "name": "notifications_insert_own",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "owners",
+        "name": "owners_delete_admin",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "owners",
+        "name": "owners_insert_staff",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "owners",
+        "name": "owners_select_company",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "owners",
+        "name": "owners_update_staff",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "company_lead_routes",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "company_lead_routes",
+        "name": "lead_routes_owner_manage",
+        "operation": "ALL",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "company_lead_routes",
+        "name": "lead_routes_select_company",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "deposits",
+        "name": "deposits_delete_admin",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "deposits",
+        "name": "deposits_insert_staff",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "deposits",
+        "name": "deposits_select_by_role",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "deposits",
+        "name": "deposits_update_allowed",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "deposits",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "viewings",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "viewings",
+        "name": "viewings_delete_admin",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "viewings",
+        "name": "viewings_insert_staff",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "viewings",
+        "name": "viewings_related_branch_boundary",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "viewings",
+        "name": "viewings_select_company",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "viewings",
+        "name": "viewings_update_staff",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "tasks",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "tasks",
+        "name": "tasks_delete_allowed",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "tasks",
+        "name": "tasks_insert_allowed",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "tasks",
+        "name": "tasks_related_branch_boundary",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "tasks",
+        "name": "tasks_select_allowed",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "tasks",
+        "name": "tasks_update_allowed",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "clients",
+        "name": "clients_branch_boundary",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "clients",
+        "name": "clients_delete_admin",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "clients",
+        "name": "clients_insert_staff",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "clients",
+        "name": "clients_select_by_role",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "clients",
+        "name": "clients_select_via_assigned_request",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "clients",
+        "name": "clients_select_via_request_team",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "clients",
+        "name": "clients_update_allowed",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "clients",
+        "name": "clients_update_via_request_team",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "clients",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "company_invites",
+        "name": "company_invites_owner_delete",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "company_invites",
+        "name": "company_invites_owner_insert",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "company_invites",
+        "name": "company_invites_owner_select",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "company_invites",
+        "name": "company_invites_owner_update",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_marketing_events",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_marketing_events",
+        "name": "property_marketing_branch_boundary",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_marketing_events",
+        "name": "property_marketing_delete_admin",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_marketing_events",
+        "name": "property_marketing_insert_staff",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_marketing_events",
+        "name": "property_marketing_select_company",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_marketing_events",
+        "name": "property_marketing_update_admin",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_conversations",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_conversations",
+        "name": "whatsapp_conversations_select_by_role",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_messages",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_messages",
+        "name": "whatsapp_messages_select_by_role",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_webhook_events",
+        "name": "whatsapp_webhook_events_owner_select",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_message_requests",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_message_requests",
+        "name": "whatsapp_message_requests_select_allowed",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "client_request_events",
+        "name": "client_request_events_select_allowed",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "client_request_events",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "client_requests",
+        "name": "client_requests_delete_admin",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "client_requests",
+        "name": "client_requests_insert_staff",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "client_requests",
+        "name": "client_requests_select_allowed",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "client_requests",
+        "name": "client_requests_select_via_team",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "client_requests",
+        "name": "client_requests_update_allowed",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "client_requests",
+        "name": "client_requests_update_via_team",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "client_requests",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "client_requests",
+        "name": "requests_branch_boundary",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_inquiries",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_inquiries",
+        "name": "property_inquiries_branch_boundary",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_inquiries",
+        "name": "property_inquiries_delete_admin",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_inquiries",
+        "name": "property_inquiries_insert_staff",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_inquiries",
+        "name": "property_inquiries_select_allowed",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_inquiries",
+        "name": "property_inquiries_update_allowed",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "appointments",
+        "name": "appointments_delete_admin",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "appointments",
+        "name": "appointments_insert_allowed",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "appointments",
+        "name": "appointments_related_branch_boundary",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "appointments",
+        "name": "appointments_select_allowed",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "appointments",
+        "name": "appointments_update_allowed",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "appointments",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "appointment_properties",
+        "name": "appointment_properties_delete_admin",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "appointment_properties",
+        "name": "appointment_properties_insert_allowed",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "appointment_properties",
+        "name": "appointment_properties_select_allowed",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "appointment_properties",
+        "name": "appointment_properties_update_allowed",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "appointment_properties",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "activities",
+        "name": "activities_delete_admin",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "activities",
+        "name": "activities_insert_staff",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "activities",
+        "name": "activities_related_branch_boundary",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "activities",
+        "name": "activities_select_allowed",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "activities",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "rejection_reasons",
+        "name": "rejection_reasons_manage",
+        "operation": "ALL",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "rejection_reasons",
+        "name": "rejection_reasons_select",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_rejection_reasons",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_rejection_reasons",
+        "name": "property_rejections_delete",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_rejection_reasons",
+        "name": "property_rejections_insert",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_rejection_reasons",
+        "name": "property_rejections_select",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_rejection_reasons",
+        "name": "property_rejections_update",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_action_reviews",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_action_reviews",
+        "name": "property_action_reviews_delete",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_action_reviews",
+        "name": "property_action_reviews_insert",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_action_reviews",
+        "name": "property_action_reviews_select",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_action_reviews",
+        "name": "property_action_reviews_update",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "measurement_periods",
+        "name": "measurement_periods_manage",
+        "operation": "ALL",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "measurement_periods",
+        "name": "measurement_periods_select",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "measurement_targets",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "measurement_targets",
+        "name": "measurement_targets_manage",
+        "operation": "ALL",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "measurement_targets",
+        "name": "measurement_targets_select",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "storage",
+        "table": "objects",
+        "name": "crm_property_images_delete",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "storage",
+        "table": "objects",
+        "name": "crm_property_images_insert",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "storage",
+        "table": "objects",
+        "name": "crm_property_images_select",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_onboarding_events",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_onboarding_events",
+        "name": "whatsapp_onboarding_events_select",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "deal_stage_history",
+        "name": "deal_stage_history_select_company",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "deal_stage_history",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "properties",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "properties",
+        "name": "properties_delete_admin",
+        "operation": "DELETE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "properties",
+        "name": "properties_insert_branch",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "properties",
+        "name": "properties_select_branch",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "properties",
+        "name": "properties_update_branch",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_automation_events",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_automation_events",
+        "name": "whatsapp_automation_events_insert",
+        "operation": "INSERT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_automation_events",
+        "name": "whatsapp_automation_events_select",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_automation_events",
+        "name": "whatsapp_automation_events_update",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "unmatched_property_links",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "unmatched_property_links",
+        "name": "unmatched_property_links_select",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "unmatched_property_links",
+        "name": "unmatched_property_links_update",
+        "operation": "UPDATE",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "client_request_assignees",
+        "name": "client_request_assignees_manage",
+        "operation": "ALL",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "client_request_assignees",
+        "name": "client_request_assignees_select",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "client_request_assignees",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "instagram_outbound_operations",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "employee_monthly_targets",
+        "name": "employee_targets_owner_manage",
+        "operation": "ALL",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "employee_monthly_targets",
+        "name": "employee_targets_staff_read",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_followup_optouts",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_followup_optouts",
+        "name": "whatsapp_followup_optouts_manage_owner",
+        "operation": "ALL",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_followup_optouts",
+        "name": "whatsapp_followup_optouts_select_admin",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_template_registry",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_template_registry",
+        "name": "whatsapp_template_registry_manage_owner",
+        "operation": "ALL",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_template_registry",
+        "name": "whatsapp_template_registry_select_admin",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_followup_events",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_followup_events",
+        "name": "whatsapp_followup_events_manage_owner",
+        "operation": "ALL",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_followup_events",
+        "name": "whatsapp_followup_events_select_admin",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_followup_optins",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_followup_optins",
+        "name": "whatsapp_followup_optins_manage_owner",
+        "operation": "ALL",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_followup_optins",
+        "name": "whatsapp_followup_optins_select_admin",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "instagram_accounts",
+        "name": "instagram_accounts_select_company",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "instagram_conversations",
+        "name": "instagram_conversations_select_company",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "instagram_conversations",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "instagram_messages",
+        "name": "instagram_messages_select_company",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "instagram_messages",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_message_attributions",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "property_message_attributions",
+        "name": "property_message_attributions_read",
+        "operation": "SELECT",
+        "mode": "PERMISSIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_send_operations",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      },
+      {
+        "schema": "public",
+        "table": "whatsapp_route_credentials",
+        "name": "investment_owner_only",
+        "operation": "ALL",
+        "mode": "RESTRICTIVE"
+      }
+    ]
+  },
+  "delegated_data_attributes": [
+    "data-client-branch",
+    "data-client-id",
+    "data-client-name",
+    "data-crm-action",
+    "data-crm-was-disabled",
+    "data-current-stage",
+    "data-dashboard-card",
+    "data-dashboard-category",
+    "data-dashboard-list",
+    "data-dashboard-more",
+    "data-dashboard-retry",
+    "data-dashboard-scope",
+    "data-deal-id",
+    "data-deletion",
+    "data-disabled",
+    "data-dw-cancel",
+    "data-employee-goal-save",
+    "data-example",
+    "data-funnel-action",
+    "data-group",
+    "data-id",
+    "data-ig-conversation",
+    "data-invite-email",
+    "data-invite-token",
+    "data-page",
+    "data-performance-box",
+    "data-performance-retry",
+    "data-period",
+    "data-prefix",
+    "data-prop-id",
+    "data-prop-title",
+    "data-property-id",
+    "data-record-id",
+    "data-request-id",
+    "data-review-id",
+    "data-service",
+    "data-smart-budget",
+    "data-stage",
+    "data-tag",
+    "data-target-go",
+    "data-target-retry",
+    "data-work-action",
+    "data-work-filter",
+    "data-work-id"
+  ],
+  "named_form_controls": [
+    "' + escape(id) + '",
+    "' + escape(row.id) + '",
+    "'+escapeHtml(e.id)+'",
+    "'+escapeHtml(message.id)+'",
+    "'+escapeHtml(o.id)+'",
+    "'+id+'",
+    "'+safe(c.id)+'",
+    "'+safe(id||'')+'",
+    "'+safe(p.id)+'",
+    "aNextAction",
+    "aNextFollowup",
+    "aOutcome",
+    "aText",
+    "aType",
+    "aiInput",
+    "aiSendBtn",
+    "alogFilter",
+    "btnDownloadBackup",
+    "cArea",
+    "cAssignedTo",
+    "cBudgetMax",
+    "cBudgetMin",
+    "cCountry",
+    "cCreatedDate",
+    "cEmail",
+    "cName",
+    "cNationality",
+    "cNextFollowup",
+    "cNotes",
+    "cPaymentMethod",
+    "cPhone",
+    "cPhoneCountry",
+    "cPhoneLocal",
+    "cPropType",
+    "cPurchaseTiming",
+    "cPurpose",
+    "cRoleBuyer",
+    "cRoleConsultation",
+    "cRoleInvestor",
+    "cRoleLandlord",
+    "cRoleSeller",
+    "cRoleTenant",
+    "cSource",
+    "cStatus",
+    "cWilayat",
+    "calVList",
+    "calVMonth",
+    "calVWeek",
+    "cdListingsTab",
+    "cfBusinessPhone",
+    "cfLinksInput",
+    "cfPropertySearch",
+    "cfReviewProperty-' + escape(row.id) + '",
+    "cfRoute",
+    "cfSourceMedia",
+    "cfWaUrl",
+    "cmdInput",
+    "confOkBtn",
+    "createInviteBtn",
+    "csArea",
+    "csBudget",
+    "csText",
+    "csType",
+    "dAgentShare",
+    "dBroker",
+    "dBrokerCommission",
+    "dClient",
+    "dClientSearch",
+    "dCommission",
+    "dCommissionStatus",
+    "dCompanyShare",
+    "dCreatedDate",
+    "dLostReason",
+    "dLostReasonNote",
+    "dNotes",
+    "dProperty",
+    "dPropertySearch",
+    "dStage",
+    "dValue",
+    "dpAmount",
+    "dpDeal",
+    "dpDuration",
+    "dpLegalNotes",
+    "dpMethod",
+    "dpNotes",
+    "dpPaymentDate",
+    "dpReceivedBy",
+    "dpRefundable",
+    "dwConfirmPaid",
+    "dwLostWords",
+    "dwNotes",
+    "dwReactivate",
+    "dwSave",
+    "emActive",
+    "emRole",
+    "et'+suffix+'_'+m.id+'",
+    "evClient",
+    "evDate",
+    "evDuration",
+    "evNotes",
+    "evTime",
+    "evTitle",
+    "evType",
+    "exAmount",
+    "exCategory",
+    "exDate",
+    "exDesc",
+    "exNotes",
+    "exPaymentMethod",
+    "expenseMonth",
+    "f30Branch",
+    "gsheetSyncBtn",
+    "gsheetWebhookUrl",
+    "ifNextFollowup",
+    "ifNote",
+    "ifRejectPhase",
+    "ifRejectReason",
+    "ifStatus",
+    "igInboxTab",
+    "igPerformanceTab",
+    "igRefreshPage",
+    "igReply",
+    "igSearch",
+    "igSendBtn",
+    "inviteEmail",
+    "inviteRole",
+    "lfAge",
+    "lfArea",
+    "lfAskingPrice",
+    "lfBaths",
+    "lfBeds",
+    "lfBestTime",
+    "lfBudgetRange",
+    "lfCondition",
+    "lfConsultType",
+    "lfCustomBudget",
+    "lfDocCrokie",
+    "lfDocOwnership",
+    "lfDocPermit",
+    "lfFlexibleLocation",
+    "lfFloors",
+    "lfFurnished",
+    "lfGovernorate",
+    "lfIsRented",
+    "lfMonthlyRent",
+    "lfMoveDate",
+    "lfName",
+    "lfNationality",
+    "lfNegotiable",
+    "lfNewOnly",
+    "lfNotes",
+    "lfOwnerAgreement",
+    "lfOwnerRole",
+    "lfPaymentMethod",
+    "lfPhoneCountry",
+    "lfPhoneLocal",
+    "lfPlotNumber",
+    "lfPropType",
+    "lfPurpose",
+    "lfReadyOnly",
+    "lfReason",
+    "lfRentDuration",
+    "lfSize",
+    "lfTiming",
+    "lfUseType",
+    "lfWACountry",
+    "lfWALocal",
+    "lfWASame",
+    "lfWilayat",
+    "loginBtn",
+    "loginEmail",
+    "loginPwd",
+    "nrMilestone_'+x[0]+'",
+    "oAddress",
+    "oEmail",
+    "oExclusive",
+    "oIdNumber",
+    "oName",
+    "oNationality",
+    "oNotes",
+    "oPhone",
+    "oPhoneCountry",
+    "oPhoneLocal",
+    "oTerms",
+    "oType",
+    "opsPropertyArea",
+    "opsPropertyBranch",
+    "opsPropertySearch",
+    "opsPropertyStatus",
+    "ownerSearchQ",
+    "pAgreementDuration",
+    "pAgreementStart",
+    "pArea",
+    "pBaths",
+    "pBeds",
+    "pBuiltSize",
+    "pCreatedDate",
+    "pDesc",
+    "pExpectedCommission",
+    "pHasAgreement",
+    "pInlineOwnerSaveBtn",
+    "pLandSize",
+    "pMapUrl",
+    "pMarketingInstagramUrl",
+    "pMarketingOmanReelUrl",
+    "pMarketingStatus",
+    "pMarketingYoutubeUrl",
+    "pNewOwnerEmail",
+    "pNewOwnerName",
+    "pNewOwnerPhoneCountry",
+    "pNewOwnerPhoneLocal",
+    "pNewOwnerType",
+    "pOwnerId",
+    "pOwnerNet",
+    "pPhotos",
+    "pPrice",
+    "pPublicDetails",
+    "pSourceType",
+    "pSourcedBy",
+    "pStatus",
+    "pTitle",
+    "pType",
+    "pWilayat",
+    "pdAiBtn",
+    "pdDecisionNote",
+    "pdEditBtn",
+    "piClient",
+    "piFollowupNote",
+    "piLastAt",
+    "piLastMessage",
+    "piNextFollowup",
+    "piRejectNotes",
+    "piRejectPhase",
+    "piRejectReason",
+    "piSource",
+    "piSourceDetail",
+    "piStatus",
+    "pmChannel",
+    "pmEventType",
+    "pmNotes",
+    "pmPublishedAt",
+    "pmUrl",
+    "pmViews",
+    "recoveryConfirm",
+    "recoveryPassword",
+    "recoverySaveBtn",
+    "repTeamTab",
+    "reportMonthPicker",
+    "resetBtn",
+    "resetEmail",
+    "routeAgent_'+def.key+'",
+    "routePhone_'+def.key+'",
+    "setCompanyAddress",
+    "setCompanyCR",
+    "setCompanyEmail",
+    "setCompanyName",
+    "setCompanyPhone",
+    "setEmail",
+    "setName",
+    "setPhone",
+    "setRole",
+    "signupBtn",
+    "signupEmail",
+    "signupName",
+    "signupPhone",
+    "signupPwd",
+    "tAssignedTo",
+    "tClient",
+    "tDeal",
+    "tDueDate",
+    "tNotes",
+    "tPriority",
+    "tTitle",
+    "taskDetailsClientBtn",
+    "taskDetailsEditBtn",
+    "unassignedClientsTab",
+    "uplPropertySelect",
+    "vAgent",
+    "vAttendance",
+    "vClient",
+    "vClientMore",
+    "vClientSearch",
+    "vDate",
+    "vDuration",
+    "vFeedback",
+    "vFollowupDate",
+    "vNewClientName",
+    "vNewClientPhoneCountry",
+    "vNewClientPhoneLocal",
+    "vNewClientToggle",
+    "vNextStep",
+    "vNotes",
+    "vOutcomeNote",
+    "vPipelineOutcome",
+    "vProperty",
+    "vPropertyMore",
+    "vPropertySearch",
+    "vRejectionReason",
+    "vRequest",
+    "vRequestType",
+    "vStatus",
+    "vTime",
+    "viewInquiryPipeline",
+    "viewPipeline",
+    "viewTable",
+    "waInboxMessage",
+    "waInboxRefreshBtn",
+    "waInboxSearch",
+    "waInboxSendBtn",
+    "waMsgArea",
+    "waSendBtn"
+  ],
+  "verification_note": "Detailed functional and security evidence: docs/comprehensive-audit-20261018.md. Catalog inventory alone is not a pass."
+}

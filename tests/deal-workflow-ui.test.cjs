@@ -22,8 +22,9 @@ test('employee commission percentage uses commission after broker, never propert
 test('fixed historical employee amounts remain fixed without a chosen percentage',()=>{
   const {helpers:h}=harness();assert.equal(h.commission(1000,100,null,275).employee,275);assert.equal(h.commission(2000,100,null,275).employee,275);assert.equal(h.commission(1000,100,0,275).employee,0);
 });
-test('percentage preview matches the two-decimal database commission amounts',()=>{
-  const {helpers:h}=harness(),result=h.commission(1,0,12.5,0);assert.equal(result.employee,0.13);assert.equal(result.company,0.87);
+test('percentage preview preserves three-decimal OMR commission amounts',()=>{
+  const {helpers:h}=harness(),result=h.commission(1,0,12.5,0);assert.equal(result.employee,0.125);assert.equal(result.company,0.875);
+  assert.equal(h.commission(0.3,0.1,10,0).base,0.2);assert.equal(h.amount('١٫٠٠٥','مبلغ'),1.005);assert.throws(()=>h.amount('1.0005','مبلغ'));
 });
 test('customer note edits retain the original system visit provenance',()=>{
   const {helpers:h}=harness(),origin='تم إنشاؤها تلقائياً من زيارة بتاريخ 2020-06-10';assert.equal(h.mergeNotes(origin+'\nكلام قديم','كلام جديد'),origin+'\nكلام جديد');assert.equal(h.mergeNotes(origin,''),origin);assert.equal(h.mergeNotes('بطاقة Pipeline مرتبطة بزيارة CRM','نص العميل'),'بطاقة Pipeline مرتبطة بزيارة CRM\nنص العميل');

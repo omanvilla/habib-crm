@@ -12,7 +12,11 @@
     const day=date.getUTCDay();
     const iso=d=>d.toISOString().slice(0,10);
     let from=today,to=iso(new Date(date.getTime()+86400000));
-    if(['months3','months6','months9','year'].includes(kind)){const months={months3:3,months6:6,months9:9,year:12}[kind];from=iso(new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()-months,date.getUTCDate())));to=iso(new Date(date.getTime()+86400000));}
+    if(['months3','months6','months9','year'].includes(kind)){
+      const months={months3:3,months6:6,months9:9,year:12}[kind],first=new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()-months,1));
+      const lastDay=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0)).getUTCDate();
+      from=iso(new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth(),Math.min(date.getUTCDate(),lastDay))));
+    }
     if(kind==='month'){from=today.slice(0,7)+'-01';to=iso(new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,1)));}
     if(kind==='all')from=null;
     return {from,to};
@@ -20,13 +24,16 @@
   const metric=(label,value,hint='')=>'<span class="ops-metric"><strong>'+n(value)+'</strong><small>'+label+'</small>'+(hint?'<span class="ops-metric-help">'+hint+'</span>':'')+'</span>';
   function targetScore(row,kind){
     if(kind!=='month')return 'نتائج الفترة المختارة؛ لا تُقارن بهدف شهر واحد';
-    const bookings=Number(row.reservations||0),expected=Number(row.expected_commission||0);
-    return bookings>=2||expected>=4000?'هدف الحجوزات الشهري متحقق':'هدف الحجوزات: '+n(bookings)+' / 2 أو '+(row.expected_commission==null?'عمولة متوقعة محجوبة':n(expected)+' / 4,000 ر.ع');
+    const bookings=Number(row.reservations||0),expected=Number(row.expected_commission||0),goals=row.targets||{};
+    const bg='reservations_target' in goals?goals.reservations_target:2,cg='booking_commission_target' in goals?goals.booking_commission_target:4000;
+    return bg>0&&bookings>=bg||cg>0&&expected>=cg?'هدف الحجوزات الشهري متحقق':'هدف الحجوزات: '+n(bookings)+' / '+(bg>0?n(bg):'غير مفعّل')+' أو '+(row.expected_commission==null?'عمولة متوقعة محجوبة':n(expected)+' / '+(cg>0?n(cg):'غير مفعّل')+' ر.ع');
   }
 
   function targetMetric(label,value,goal,action){
+    if(goal==null||Number(goal)<=0)return '<span class="ops-metric"><strong>'+n(value)+'</strong><small>'+label+'</small><span class="ops-metric-help">'+(goal==null?'الهدف غير محدد':'الهدف موقوف')+'</span></span>';
     const v=Number(value||0),missing=Math.max(0,goal-v);
-    return '<button type="button" class="ops-metric ops-target-action" data-target-go="'+action+'" title="فتح السجلات المرتبطة"><strong>'+n(v)+' / '+n(goal)+'</strong><small>'+label+'</small><span class="ops-metric-help">'+(missing?'المتبقي '+n(missing):'تم تحقيق الهدف')+'</span></button>';
+    const percent=Math.round(v/goal*100);
+    return '<button type="button" class="ops-metric ops-target-action" data-target-go="'+action+'" title="فتح السجلات المرتبطة"><strong>'+n(v)+' / '+n(goal)+'</strong><small>'+label+'</small><span class="ops-metric-help">'+(missing?'المتبقي '+n(missing):'تم تحقيق الهدف')+' · '+n(percent)+'%</span></button>';
   }
   let targetLoadSeq=0;
   async function loadTargetDashboard(){
@@ -37,12 +44,12 @@
       const result=await bounded(supa.rpc('crm_employee_target_snapshot'));
       if(seq!==targetLoadSeq||!crmSessionCurrent(generation,user))return;
       if(result.error)throw result.error;
-      const data=result.data||{},employees=data.employees||[];
-      host.innerHTML='<div class="ops-performance-caption"><strong>أهداف العمل المعتمدة</strong><small>اليوم '+safe(data.today||'')+' · الأسبوع من '+safe(data.week_start||'')+' · الشهر من '+safe(data.month_start||'')+'</small></div>'+
+      const data=result.data;if(!data||!Array.isArray(data.employees))throw new Error('لم تصل بيانات الأهداف. أعد المحاولة');const employees=data.employees;
+      host.innerHTML='<div class="ops-performance-caption"><strong>أهداف العمل المعتمدة</strong><small>اليوم '+safe(data.today||'')+' · الأسبوع من '+safe(data.week_start||'')+' إلى '+safe(data.week_end||'')+' · الشهر من '+safe(data.month_start||'')+' إلى '+safe(data.month_end||'')+'</small></div>'+
       (employees.map(x=>'<article class="ops-person"><div class="ops-person-title"><strong>'+safe(x.name)+' · '+(x.branch==='muscat'?'مسقط':'بركاء')+'</strong><span>'+(x.sales_goal_met?'هدف الحجوزات الشهري متحقق':'هدف الحجوزات الشهري لم يتحقق بعد')+'</span></div><div class="ops-metrics">'+
-      targetMetric('المخزون المؤكد المتاح',x.inventory,10,'properties')+targetMetric('إضافات الأسبوع المؤكدة',x.new_properties,2,'properties')+targetMetric('المتابعات البشرية اليوم',x.followups,10,'daily')+targetMetric('المعاينات المكتملة أسبوعيًا',x.viewings,5,'viewings')+
-      targetMetric('الحجوزات المؤكدة هذا الشهر',x.bookings,2,'deals')+
-      (x.expected_commission==null?'<span class="ops-metric"><small>عمولات المكتب المتوقعة محجوبة لهذا الدور</small></span>':'<button type="button" class="ops-metric ops-target-action" data-target-go="deals"><strong>'+n(x.expected_commission)+' / 4,000</strong><small>عمولات المكتب المتوقعة من الحجوزات (ر.ع)</small><span class="ops-metric-help">يكفي تحقيق هذا الهدف أو حجزين</span></button>')+'</div><p class="ops-note">الحجوزات السارية: '+n(x.live_bookings)+' · الملغاة لاحقًا: '+n(x.cancelled_bookings)+' · لا يُحتسب التفاوض أو العربون غير المدفوع حجزًا.</p></article>').join('')||'<p class="ops-state">لا توجد بيانات موظفات متاحة لهذا الحساب.</p>');
+      targetMetric('المخزون المؤكد المتاح',x.inventory,x.goals?x.goals.inventory:10,'properties')+targetMetric('إضافات الأسبوع المؤكدة',x.new_properties,x.goals?x.goals.new_properties:2,'properties')+targetMetric('عملاء تمت متابعتهم بنتيجة اليوم',x.followups,x.goals?x.goals.followups:10,'daily')+targetMetric('المعاينات المكتملة أسبوعيًا',x.viewings,x.goals?x.goals.viewings:5,'viewings')+
+      targetMetric('الحجوزات المؤكدة هذا الشهر',x.bookings,x.goals?x.goals.bookings:2,'deals')+
+      (x.expected_commission==null?'<span class="ops-metric"><small>عمولات المكتب المتوقعة محجوبة لهذا الدور</small></span>':targetMetric('عمولات المكتب المتوقعة من الحجوزات (ر.ع)',x.expected_commission,x.goals?x.goals.expected_commission:4000,'deals'))+'</div><p class="ops-note">الحجوزات السارية: '+n(x.live_bookings)+' · الملغاة لاحقًا: '+n(x.cancelled_bookings)+' · لا يُحتسب التفاوض أو العربون غير المدفوع حجزًا.</p></article>').join('')||'<p class="ops-state">لا توجد بيانات موظفات متاحة لهذا الحساب.</p>');
     }catch(e){if(seq===targetLoadSeq&&crmSessionCurrent(generation,user))host.innerHTML='<div class="ops-error" role="alert">تعذر تحميل الأهداف: '+safe(e.message)+' <button type="button" class="ops-action" data-target-retry>إعادة المحاولة</button></div>';}
   }
   document.addEventListener('click',e=>{const b=e.target.closest('[data-target-go]');if(b){const page=b.dataset.targetGo;if(typeof navigate==='function')navigate(page,null);}if(e.target.closest('[data-target-retry]'))loadTargetDashboard()});

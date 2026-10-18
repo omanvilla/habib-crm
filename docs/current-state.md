@@ -2,6 +2,12 @@
 
 Updated 2026-10-18. Read this with `AGENTS.md` before work. This file distinguishes deployed changes, direct verification and remaining work. Older dated reports remain evidence, not competing product rules.
 
+## 2026-10-18 comprehensive audit candidate
+
+- Candidate branch `codex/comprehensive-audit-20261018`, frontend `20261018-audit-v5`, SQL25. Not yet deployed at the time of this checkpoint. Baseline `0df90ba` / v4 was verified against current GitHub and live catalog, with no open PR.
+- Fixes atomic deposit-stage booking, owner-audited date/amount correction/reactivation, milli-OMR financial columns, persistent correctly-periodic goals, route-based employee identity, unique outcome-documented contact activity, complete deal selectors, rolling month boundaries and client-detail RTL/date display. Tightens trigger-only function grants. No guessed business backfill or external sends.
+- Local Node248 + security26 and full-catalog SQL/rollback pass; existing synthetic suites plus new three-role route/activity/goal/booking/mobile checks pass. Actual employee authentication, live Meta delivery, Storage upload and physical backup restoration remain unverified. See `docs/comprehensive-audit-20261018.md` and the per-element `docs/audit-inventory-20261018.json`.
+
 ## 2026-10-18 reservation-period implementation
 
 - Current reservation runtime: `0d201a1b4854ce290bc5fafb2104d3922d3aff0c`, frontend `20261018-reservation-period-v4`; SQL24 is applied as migration `20261018142647`. Previous inspected production frontend: `0866d5190c4d6f83aa4326f375c03c5c7e9bf53a`. Earlier same-day paid-deposit UI and target snapshot were deployed, but SQL20/23 team performance still used closing dates; the deal script also had a syntax error and attempted a protected base-table read.

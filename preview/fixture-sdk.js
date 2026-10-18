@@ -160,6 +160,21 @@ rpc:async(name,args={})=>{
  state.calls.push({rpc:name,args:structuredClone(args)});
  if(signedOut)return {data:null,error:{message:'TEST signed out'}};
  if(state.failNext===name){state.failNext=null;return {data:null,error:{message:'TEST simulated RPC failure'}};}
+ if(name==='crm_employee_target_snapshot'){
+  if(profile.role==='viewer')return {data:null,error:{message:'TEST target access denied'}};
+  const month=today.slice(0,7)+'-01',week=new Date(today+'T12:00:00Z');week.setUTCDate(week.getUTCDate()-week.getUTCDay());
+  return {data:{today,week_start:week.toISOString().slice(0,10),week_end:new Date(week.getTime()+6*86400000).toISOString().slice(0,10),month_start:month,month_end:new Date(Date.UTC(Number(today.slice(0,4)),Number(today.slice(5,7)),0)).toISOString().slice(0,10),employees:profiles.filter(p=>p.role==='agent'&&(profile.role!=='agent'||p.id===profile.id)).map(p=>{
+   const row=(db.employee_monthly_targets||[]).find(t=>t.employee_id===p.id&&t.month_start===month),branch=p.id===muscat?'muscat':'barka';
+   return {id:p.id,name:p.full_name,branch,inventory:properties.filter(x=>x.branch_key===branch&&x.status==='available'&&!x.archived).length,new_properties:0,followups:new Set((db.activities||[]).filter(a=>a.user_id===p.id&&a.actor_type==='human'&&a.outcome&&a.type!=='note').map(a=>a.client_id)).size,viewings:0,bookings:0,live_bookings:0,cancelled_bookings:0,expected_commission:0,collected_commission:0,sales_goal_met:false,goals:row?{inventory:row.inventory_target,new_properties:row.weekly_new_properties_target,followups:row.daily_followups_target,viewings:row.weekly_viewings_target,bookings:row.reservations_target,expected_commission:row.booking_commission_target}:{inventory:10,new_properties:2,followups:10,viewings:5,bookings:2,expected_commission:4000}};
+  })},error:null};
+ }
+ if(name==='crm_log_human_activity'){
+  const p=args.p_payload,id=args.p_idempotency_key;
+  if(!['owner','manager','agent'].includes(profile.role)||!clients.some(c=>c.id===p.client_id&&allowed(c,'clients')))return {data:null,error:{message:'TEST activity scope denied'}};
+  db.activities=db.activities||[];
+  if(!db.activities.some(a=>a.id===id))db.activities.push({id,company_id:company,user_id:profile.id,...p,activity_type:p.type,activity_text:p.description,actor_type:'human',created_at:now,occurred_at:now});
+  return {data:{ok:true,activity_id:id},error:null};
+ }
  if(name==='crm_get_deal_workflow'){
   const deal=db.deals.find(d=>d.id===args.p_deal_id&&allowed(d,'deals'));
   return deal?{data:{deal:decorate(deal)},error:null}:{data:null,error:{message:'TEST fixture scope denial'}};

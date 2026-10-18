@@ -42,6 +42,12 @@ const candidates=[
   {id:'p1',property_code:'HB123',title:'فيلا اختبار في الخوض',area:'الخوض',price:120000},
   {id:'p2',property_code:'HB124',title:'فيلا ثانية في الخوض',area:'الخوض',price:125000}
 ];
+test('rolling months clamp to the last valid day in Oman, including leap years',()=>{
+ assert.deepEqual(calendar('2026-05-31T09:00:00Z').period('months3'),{from:'2026-02-28',to:'2026-06-01'});
+ assert.deepEqual(calendar('2024-05-31T09:00:00Z').period('months3'),{from:'2024-02-29',to:'2024-06-01'});
+ assert.deepEqual(calendar('2024-02-29T21:00:00Z').period('year'),{from:'2023-03-01',to:'2024-03-02'});
+ assert.deepEqual(calendar('2024-02-29T09:00:00Z').period('year'),{from:'2023-02-28',to:'2024-03-01'});
+});
 test('Oman monthly report boundaries and local midnight',()=>{
  const {period}=calendar('2026-09-30T09:00:00Z');
  assert.deepEqual(period('month'),{from:'2026-09-01',to:'2026-10-01'});

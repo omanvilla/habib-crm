@@ -5,9 +5,10 @@
     return s.replace(/<span\b[^>]*>/gi,'').replace(/<\/span>/gi,'').replace(/<br\s*\/?\s*>/gi,' ').trim();
   }
   function esc(v){var s=stripKnownMarkup(v);return typeof escapeHtml==='function'?escapeHtml(s):s.replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]})}
-  function row(label,value){return '<div class="info-row"><span class="info-label">'+esc(label)+'</span><span class="info-value">'+esc(value==null||value===''?'—':value)+'</span></div>'}
+  function row(label,value,ltr){return '<div class="info-row"><span class="info-label">'+esc(label)+'</span><span class="info-value">'+(ltr?'<bdi dir="ltr" style="direction:ltr;unicode-bidi:isolate;display:inline-block">':'')+esc(value==null||value===''?'—':value)+(ltr?'</bdi>':'')+'</span></div>'}
   function plainPhone(v){
-    var raw=stripKnownMarkup(v),digits=raw.replace(/\D/g,'');
+    var raw=stripKnownMarkup(v);if(typeof crmNormalizePhone==='function')raw=crmNormalizePhone(raw,'968')||raw;
+    var digits=raw.replace(/\D/g,'');
     if(!digits)return raw||'—';
     if(digits.length===11&&digits.indexOf('968')===0)return '+968 '+digits.slice(3,7)+' '+digits.slice(7);
     if(digits.length===8)return '+968 '+digits.slice(0,4)+' '+digits.slice(4);
@@ -15,7 +16,7 @@
   }
   function plainDate(v){
     if(!v)return '—';
-    try{var d=new Date(v);if(Number.isNaN(d.getTime()))return stripKnownMarkup(v);return new Intl.DateTimeFormat('ar-OM',{year:'numeric',month:'long',day:'numeric'}).format(d)}catch(_e){return stripKnownMarkup(v)}
+    try{var d=new Date(v);if(Number.isNaN(d.getTime()))return stripKnownMarkup(v);return new Intl.DateTimeFormat('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat',numberingSystem:'latn',year:'numeric',month:'long',day:'numeric'}).format(d)}catch(_e){return stripKnownMarkup(v)}
   }
   function money(v){var n=Number(v);return Number.isFinite(n)&&n>0?n.toLocaleString('en-US')+' ر.ع':'—'}
   function budget(min,max){
@@ -99,8 +100,8 @@
     function current(){return typeof viewingClient!=='undefined'&&viewingClient&&viewingClient.id===c.id&&(typeof crmSessionCurrent!=='function'||crmSessionCurrent(session,user))}
     var source=(typeof sourceAr==='function'?stripKnownMarkup(sourceAr(c.source)):c.source)||'—';
     var h='';
-    h+=row('الهاتف',plainPhone(c.phone));
-    h+=row('البريد',c.email||'—');
+    h+=row('الهاتف',plainPhone(c.phone),true);
+    h+=row('البريد',c.email||'—',true);
     h+=row('المصدر',source);
     h+=row('تاريخ التسجيل',plainDate(c.created_at));
     if(c.lead_route==='investment')h+=row('المسار والخصوصية','المستثمرين — المسؤول: المالك — خاص بالمالك');

@@ -244,14 +244,14 @@ async function verifyDealWorkflow(page,role,report){
    const original=await page.evaluate(()=>JSON.parse(JSON.stringify(CRMPREVIEW.db.properties)));
    await page.evaluate(()=>{
      const state=CRMPREVIEW,property=state.db.properties.find(p=>p.sourced_by===state.profile.id);
-     const active=state.db.properties.filter(p=>p.sourced_by===state.profile.id&&!p.archived&&!['sold','not_available'].includes(p.status)).length;
+     const active=state.db.properties.filter(p=>p.sourced_by===state.profile.id&&!p.archived&&p.status==='available').length;
      for(let i=active;i<10;i++)state.db.properties.push({...property,id:'SYNTHETIC-STOCK-'+i,status:'available',archived:false});
    });
    await page.evaluate(()=>loadEmployeeTargetReminder());assert(!(await page.locator('#employeeInventoryReminder').isVisible()));
-   await page.evaluate(()=>{const row=CRMPREVIEW.db.properties.find(p=>p.sourced_by===CRMPREVIEW.profile.id&&!p.archived&&!['sold','not_available'].includes(p.status));row.status='sold'});
+   await page.evaluate(()=>{const row=CRMPREVIEW.db.properties.find(p=>p.sourced_by===CRMPREVIEW.profile.id&&!p.archived&&p.status==='available');row.status='sold'});
    await page.evaluate(()=>loadEmployeeTargetReminder());assert(await page.locator('#employeeInventoryReminder').isVisible());
    assert.equal(await page.evaluate(()=>employeeInventoryState.needed),1);
-   await page.evaluate(()=>{CRMPREVIEW.failNext='properties';return loadEmployeeTargetReminder()});assert((await page.locator('#employeeInventoryReminder').innerText()).includes('تعذر'));
+   await page.evaluate(()=>{CRMPREVIEW.failNext='crm_employee_target_snapshot';return loadEmployeeTargetReminder()});assert((await page.locator('#employeeInventoryReminder').innerText()).includes('تعذر'));
    await page.evaluate(rows=>{CRMPREVIEW.db.properties.splice(0,CRMPREVIEW.db.properties.length,...rows)},original);
    await page.evaluate(()=>loadEmployeeTargetReminder());
    report.checks.push(role+': shortage reminder visible outside details, hidden at 10, restored at 9, load failure does not invent a shortage');
