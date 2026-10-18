@@ -1931,7 +1931,7 @@ window.formatPhoneDisplay = function(stored){
   if(local.length === 8) formatted = local.substring(0,4) + ' ' + local.substring(4);
   else if(local.length === 9) formatted = local.substring(0,3) + ' ' + local.substring(3,6) + ' ' + local.substring(6);
   else if(local.length === 10) formatted = local.substring(0,3) + ' ' + local.substring(3,6) + ' ' + local.substring(6);
-  return country.flag + ' <span dir="ltr" style="font-family:monospace">+' + country.code + ' ' + formatted + '</span>';
+  return '<bdi dir="ltr" style="display:inline-block;direction:ltr;unicode-bidi:isolate;white-space:nowrap;font-family:monospace">+' + country.code + ' ' + formatted + '</bdi>';
 };
 
 function safeExternalUrl(value){try{const u=new URL(String(value||''));return ['https:','http:'].includes(u.protocol)&&!u.username&&!u.password?u.href:''}catch(_){return ''}}
