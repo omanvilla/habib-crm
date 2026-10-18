@@ -156,7 +156,7 @@
       s.clients=results[0].data||[];s.properties=results[1].data||[];s.reasons=results[2].data||[];
       const routes=(results[3].data||[]).filter(r=>manage()||r.assigned_to===s.user);
       s.branches=[...new Set(routes.map(r=>r.route_key).filter(x=>['muscat','barka'].includes(x)))];if(manage())s.branches=['muscat','barka'];
-      if(dealId){s.deal=results[4].data&&results[4].data.deal;if(!s.deal)throw new Error('الصفقة غير متاحة');}
+      if(dealId){s.deal=results[4].data&&results[4].data.deal;if(!s.deal)throw new Error('الصفقة غير متاحة');const reservation=await supa.from('deals').select('reservation_confirmed_at,deposit_amount,expected_company_commission_at_reservation').eq('id',dealId).single();if(reservation.error)throw reservation.error;Object.assign(s.deal,reservation.data);}
       s.members=manage()?(results[dealId?5:4].data||[]):[];
       const ownerIds=[...new Set(s.properties.map(p=>p.owner_id).filter(Boolean))];
       let ownerResult={data:[]};if(manage())ownerResult=await supa.from('owners').select('id,name,phone,owner_type').order('name');else if(ownerIds.length)ownerResult=await supa.from('owners').select('id,name,phone,owner_type').in('id',ownerIds).order('name');
