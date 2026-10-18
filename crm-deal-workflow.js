@@ -65,10 +65,12 @@
       '<div id="dwNewOwner" class="dw-subform full" hidden><h4>المالك الجديد</h4><div class="fgrid">'+field('dwOwnerName','اسم المالك *',input('dwOwnerName'))+field('dwOwnerPhone','هاتف المالك *',input('dwOwnerPhone','tel','dir="ltr" placeholder="+968..." required'))+'</div></div>'+
       '<p class="dw-hint full" id="dwOwnerHint" hidden>المالك مرتبط بهذا العقار مسبقاً.</p>'+
       '<div id="dwSaleSection" class="full"><div class="fgrid">'+field('dwDealValue','قيمة البيع (ر.ع)',input('dwDealValue','text','inputmode="decimal" dir="ltr"'))+field('dwClosedOn','تاريخ البيع',input('dwClosedOn','date','dir="ltr"'))+'</div></div>'+
-      (editing?'<div class="dw-subform full" id="dwPaidDeposit"><h4>تأكيد حجز العقار بعد دفع العربون</h4><p class="dw-hint">لا يُحتسب الحجز إلا بعد دفع العربون فعليًا. احتساب الهدف بتاريخ الدفع، وليس بتاريخ إتمام البيع.</p><div class="fgrid">'+field('dwPaidDate','تاريخ دفع العربون',input('dwPaidDate','date','dir="ltr"'))+field('dwPaidAmount','العربون المدفوع (ر.ع)',input('dwPaidAmount','text','inputmode="decimal" dir="ltr"'))+(own()?field('dwExpectedBookingCommission','عمولة المكتب المتوقعة (ر.ع)',input('dwExpectedBookingCommission','text','inputmode="decimal" dir="ltr"')):'')+'</div><button class="btn-secondary" type="button" id="dwConfirmPaid">تأكيد دفع العربون والحجز</button><p class="dw-hint" id="dwPaidStatus"></p></div>':'')++
+      '<div class="dw-subform full" id="dwPaidDeposit"><h4>حجز العقار — مستقل عن إتمام البيع والتحصيل</h4><label class="dw-hint"><input type="checkbox" id="dwConfirmPaid"> أؤكد أن العميل دفع العربون فعليًا لحجز هذا العقار</label><p class="dw-hint">يُحتسب الحجز مرة واحدة في شهر الدفع بتوقيت سلطنة عمان. مصدر الإثبات: تأكيد الدفع في CRM، مع حفظ من سجّله وتاريخ التسجيل؛ لا يلزم رفع مستند.</p><div class="fgrid">'+field('dwPaidDate','تاريخ دفع العربون',input('dwPaidDate','date','dir="ltr"'))+field('dwPaidAmount','العربون المدفوع (ر.ع)',input('dwPaidAmount','text','inputmode="decimal" dir="ltr"'))+(own()?field('dwExpectedBookingCommission','عمولة المكتب المتوقعة من الحجز (ر.ع)',input('dwExpectedBookingCommission','text','inputmode="decimal" dir="ltr"')):'')+'</div><p class="dw-hint" id="dwPaidStatus"></p>'+
+      (d.reservation_confirmed_at?'<details><summary>إلغاء الحجز مع الاحتفاظ بتاريخه</summary><p class="dw-hint">الإلغاء يُظهر الحجز ملغى ولا يمسح إنجاز شهر الحجز.</p><div class="fgrid">'+field('dwCancelledOn','تاريخ الإلغاء',input('dwCancelledOn','date','dir="ltr"'))+field('dwCancellationReason','سبب الإلغاء',input('dwCancellationReason'))+'</div></details>':'')+'</div>'+
       '<div id="dwVisitSection" class="dw-subform full"><h4>الزيارة الفعلية</h4><p class="dw-hint" id="dwVisitHint"></p><div class="fgrid">'+field('dwViewingChoice','زيارة مسجلة للعميل والعقار',select('dwViewingChoice',option('','لا توجد زيارة مختارة')))+field('dwVisitDate','أو تاريخ الزيارة الفعلي',input('dwVisitDate','date','dir="ltr"'))+'</div></div>'+
       '<div id="dwLossSection" class="dw-subform dw-loss full" hidden><h4>سبب الخروج من العقار</h4>'+field('dwLostReason','السبب الرئيسي',select('dwLostReason',option('','اختر السبب الموثق')+s.reasons.map(x=>option(x.id,x.label_ar)).join('')))+field('dwLostWords','كلام العميل (اختياري)','<textarea class="fta" id="dwLostWords" rows="3"></textarea>')+'<p class="dw-hint" id="dwLossHint"></p></div>'+
-      (own()?'<div id="dwFinanceSection" class="dw-subform full"><h4>العمولة</h4><div class="fgrid">'+field('dwCommissionTotal','العمولة الكاملة (ر.ع)',input('dwCommissionTotal','text','inputmode="decimal" dir="ltr"'))+field('dwBroker','الوسيط (اختياري)',select('dwBroker',option('','بدون وسيط')+owners.map(x=>option(x.id,x.name)).join('')))+field('dwBrokerCommission','عمولة الوسيط (ر.ع)',input('dwBrokerCommission','text','inputmode="decimal" dir="ltr"'))+field('dwEmployeePercent','نسبة الموظفة من عمولة الشركة (%)',input('dwEmployeePercent','text','inputmode="decimal" dir="ltr" placeholder="اختياري"'))+'<p class="dw-hint full">أساس النسبة = العمولة الكاملة − عمولة الوسيط، قبل خصم نصيب الموظفة. اترك النسبة فارغة للحفاظ على مبلغ ثابت.</p>'+field('dwAgentShare','نصيب الموظفة (ر.ع)',input('dwAgentShare','text','inputmode="decimal" dir="ltr"'))+field('dwCompanyShare','المتبقي للشركة (ر.ع)',input('dwCompanyShare','text','dir="ltr" readonly'))+field('dwCommissionStatus','حالة العمولة',select('dwCommissionStatus',option('pending','معلّقة')+option('received','مستلمة')))+field('dwReceivedOn','تاريخ استلام العمولة',input('dwReceivedOn','date','dir="ltr"'))+'</div><p class="dw-hint" id="dwFinanceHint">الأرقام القديمة تبقى محفوظة إلى أن تعدّل بيانات العمولة.</p></div>':'')+
+      (own()?'<div id="dwFinanceSection" class="dw-subform full"><h4>العمولة</h4><div class="fgrid">'+field('dwCommissionTotal','العمولة الكاملة (ر.ع)',input('dwCommissionTotal','text','inputmode="decimal" dir="ltr"'))+field('dwBroker','الوسيط (اختياري)',select('dwBroker',option('','بدون وسيط')+owners.map(x=>option(x.id,x.name)).join('')))+field('dwBrokerCommission','عمولة الوسيط (ر.ع)',input('dwBrokerCommission','text','inputmode="decimal" dir="ltr"'))+field('dwEmployeePercent','نسبة الموظفة من عمولة الشركة (%)',input('dwEmployeePercent','text','inputmode="decimal" dir="ltr" placeholder="اختياري"'))+'<p class="dw-hint full">أساس النسبة = العمولة الكاملة − عمولة الوسيط، قبل خصم نصيب الموظفة. اترك النسبة فارغة للحفاظ على مبلغ ثابت.</p>'+field('dwAgentShare','نصيب الموظفة (ر.ع)',input('dwAgentShare','text','inputmode="decimal" dir="ltr"'))+field('dwCompanyShare','المتبقي للشركة (ر.ع)',input('dwCompanyShare','text','dir="ltr" readonly'))+field('dwCommissionStatus','حالة العمولة',select('dwCommissionStatus',option('pending','معلّقة')+option('received','مستلمة')))+field('dwReceivedOn','تاريخ استلام العمولة',input('dwReceivedOn','date','dir="ltr"'))+field('dwEntitledOn','تاريخ استحقاق عمولة المكتب (اختياري)',input('dwEntitledOn','date','dir="ltr"'))+'</div><p class="dw-hint" id="dwFinanceHint">الأرقام القديمة تبقى محفوظة إلى أن تعدّل بيانات العمولة.</p></div>':'')+
+      (own()?'<div class="dw-subform full" id="dwReceiptSection"><h4>تحصيل فعلي لعمولة المكتب</h4><p class="dw-hint">سجّل مبلغ كل دفعة بتاريخ استلامها بعد البيع. لا تُحسب العمولة المتوقعة مبلغًا مستلمًا. تكرار الحفظ لا يكرر الدفعة.</p><div id="dwReceiptHistory"></div><div class="fgrid">'+field('dwReceiptDate','تاريخ الدفعة المستلمة',input('dwReceiptDate','date','dir="ltr"'))+field('dwReceiptAmount','المبلغ المستلم في هذه الدفعة (ر.ع)',input('dwReceiptAmount','text','inputmode="decimal" dir="ltr"'))+field('dwReceiptSource','مرجع أو وصف التحصيل',input('dwReceiptSource'))+'</div></div>':'')+
       '<div id="dwNotesSection" class="full">'+field('dwNotes','ملاحظات العميل أو الصفقة','<textarea class="fta" id="dwNotes" rows="3"></textarea>')+'</div>'+
       (editing?'<details id="dwProvenance" class="dw-provenance full"><summary>مصدر السجل</summary><p>'+esc(d.viewing_id?'أنشئت أو ربطت هذه البطاقة بزيارة للعميل والعقار. مصدر التسجيل محفوظ في السجل.':'مصدر وتاريخ إنشاء السجل محفوظان، وهما مستقلان عن تاريخ البيع.')+'</p><p>تاريخ التسجيل: <bdi>'+esc(day(d.created_at)||'غير مسجل')+'</bdi></p></details>':'')+
       '</div><div class="modal-foot"><button class="btn-secondary" type="button" data-dw-cancel>إلغاء</button><button class="btn-primary" id="dwSave" type="submit">حفظ الصفقة</button></div></form></div>';
@@ -80,25 +82,16 @@
     $('dealWorkflowForm').addEventListener('submit',event=>{event.preventDefault();saveDeal();});
     $('dealWorkflowForm').addEventListener('input',event=>changed(event));
     $('dealWorkflowForm').addEventListener('change',event=>changed(event));
-    if($('dwConfirmPaid')){
-      set('dwPaidDate',day(d.reservation_confirmed_at));
-      set('dwPaidAmount',d.deposit_amount);
-      set('dwExpectedBookingCommission',d.expected_company_commission_at_reservation);
-      if(d.reservation_confirmed_at){$('dwConfirmPaid').disabled=true;$('dwPaidStatus').textContent='حجز مؤكد بتاريخ '+day(d.reservation_confirmed_at)+'؛ لا يمكن إعادة احتسابه.';}
-      $('dwConfirmPaid').addEventListener('click',async()=>{
-        if(!active(s)||!s.deal?.id)return;
-        const date=value('dwPaidDate'),amountPaid=amount(value('dwPaidAmount'),'العربون المدفوع');
-        if(!date||!validDate(date)||!amountPaid||amountPaid<=0){error('أدخل تاريخ الدفع الفعلي ومبلغ عربون موجب');return;}
-        const button=$('dwConfirmPaid');button.disabled=true;
-        try{
-          const response=await supa.rpc('crm_confirm_paid_reservation',{p_deal_id:s.deal.id,p_payment_date:date,p_amount:amountPaid,p_expected_company_commission:own()?amount(value('dwExpectedBookingCommission'),'عمولة المكتب المتوقعة'):null});
-          if(response.error)throw response.error;
-          $('dwPaidStatus').textContent='تم تأكيد الحجز بتاريخ '+date+'؛ سيظهر في الأهداف الشهرية.';
-          if(typeof loadDashboard==='function')loadDashboard();
-          if(typeof loadDeals==='function')loadDeals();
-        }catch(e){button.disabled=false;error('تعذر تأكيد العربون: '+e.message);}
-      });
+    set('dwPaidDate',day(d.reservation_confirmed_at));set('dwPaidAmount',d.deposit_amount);set('dwExpectedBookingCommission',d.expected_company_commission_at_reservation);
+    set('dwCancelledOn',day(d.reservation_cancelled_at));set('dwCancellationReason',d.reservation_cancellation_reason);set('dwEntitledOn',day(d.commission_entitled_at));
+    $('dwConfirmPaid').checked=Boolean(d.reservation_confirmed_at);$('dwConfirmPaid').disabled=Boolean(d.reservation_confirmed_at);
+    if(d.reservation_confirmed_at){$('dwPaidDate').readOnly=true;$('dwPaidAmount').readOnly=true;$('dwPaidStatus').textContent='حجز مؤكد بتاريخ '+day(d.reservation_confirmed_at)+' · المصدر: تأكيد دفع العربون في CRM'+(d.reservation_recorded_at?' · سُجّل في '+day(d.reservation_recorded_at):'')+(d.reservation_recorded_by_name?' · بواسطة '+d.reservation_recorded_by_name:'')+(d.reservation_cancelled_at?' · أُلغي بتاريخ '+day(d.reservation_cancelled_at):' · لا يُعاد احتسابه عند البيع أو التحصيل');}
+    if(d.reservation_cancelled_at){$('dwCancelledOn').readOnly=true;$('dwCancellationReason').readOnly=true;}
+    if(own()){
+      const receipts=d.receipts||[];
+      $('dwReceiptHistory').innerHTML=receipts.length?receipts.map(x=>'<p class="dw-hint">'+esc(x.received_on)+' · '+esc(x.amount)+' ر.ع · '+esc(x.source_note)+'</p>').join(''):(d.commission_status==='received'||Number(d.company_commission_received_amount)>0?'<p class="dw-hint">تحصيل سابق محفوظ؛ راجع السجل القديم قبل إضافة دفعة جديدة.</p>':'<p class="dw-hint">لا توجد دفعات مسجلة في سجل التحصيل الجديد.</p>');
     }
+    s.financeBaseline=financialSnapshot();s.milestoneBaseline=[value('dwExpectedBookingCommission'),value('dwEntitledOn')].join('\u0000');
     modal.querySelector('[data-dw-cancel]').addEventListener('click',()=>closeModal('mDeal'));
   }
   function syncProperty(){
@@ -156,7 +149,7 @@
       s.clients=results[0].data||[];s.properties=results[1].data||[];s.reasons=results[2].data||[];
       const routes=(results[3].data||[]).filter(r=>manage()||r.assigned_to===s.user);
       s.branches=[...new Set(routes.map(r=>r.route_key).filter(x=>['muscat','barka'].includes(x)))];if(manage())s.branches=['muscat','barka'];
-      if(dealId){s.deal=results[4].data&&results[4].data.deal;if(!s.deal)throw new Error('الصفقة غير متاحة');const reservation=await supa.from('deals').select('reservation_confirmed_at,deposit_amount,expected_company_commission_at_reservation').eq('id',dealId).single();if(reservation.error)throw reservation.error;Object.assign(s.deal,reservation.data);}
+      if(dealId){s.deal=results[4].data&&results[4].data.deal;if(!s.deal)throw new Error('الصفقة غير متاحة');}
       s.members=manage()?(results[dealId?5:4].data||[]):[];
       const ownerIds=[...new Set(s.properties.map(p=>p.owner_id).filter(Boolean))];
       let ownerResult={data:[]};if(manage())ownerResult=await supa.from('owners').select('id,name,phone,owner_type').order('name');else if(ownerIds.length)ownerResult=await supa.from('owners').select('id,name,phone,owner_type').in('id',ownerIds).order('name');
@@ -196,6 +189,27 @@
       if(f.commission_status==='received'&&((mode==='current'&&!f.commission_received_on)||(f.commission_received_on&&!validDate(f.commission_received_on))))throw new Error('أدخل تاريخ استلام العمولة الفعلي');
       if(f.commission_received_on&&payload.deal.closed_on&&f.commission_received_on<payload.deal.closed_on)throw new Error('تاريخ استلام العمولة يجب ألا يسبق تاريخ البيع');
       payload.deal.financials=f;
+    }
+    if($('dwConfirmPaid')?.checked&&!d.reservation_confirmed_at){
+      const paid=value('dwPaidDate'),deposit=amount(value('dwPaidAmount'),'العربون المدفوع');
+      if(!validDate(paid)||!deposit||paid>day(new Date()))throw new Error('أدخل تاريخ دفع فعلي ومبلغ عربون موجب');
+      if(payload.deal.closed_on&&paid>payload.deal.closed_on)throw new Error('تاريخ الحجز يجب ألا يأتي بعد تاريخ البيع');
+      payload.deal.reservation={confirm_paid:true,paid_on:paid,amount:deposit,expected_company_commission:own()?amount(value('dwExpectedBookingCommission'),'عمولة المكتب المتوقعة'):null};
+    }
+    if(stage==='deposit'&&!d.reservation_confirmed_at&&!payload.deal.reservation&&(d.stage!=='deposit'||!d.id))throw new Error('أكد دفع العربون وتاريخه لاحتساب الحجز');
+    if(d.reservation_confirmed_at&&value('dwCancelledOn')&&!d.reservation_cancelled_at){
+      if(!validDate(value('dwCancelledOn'))||!value('dwCancellationReason'))throw new Error('أدخل تاريخ الإلغاء وسببه');
+      payload.deal.reservation={cancelled_on:value('dwCancelledOn'),cancellation_reason:value('dwCancellationReason')};
+    }
+    if(own()&&[value('dwExpectedBookingCommission'),value('dwEntitledOn')].join('\u0000')!==state.milestoneBaseline){
+      payload.deal.financials=payload.deal.financials||{};
+      payload.deal.financials.expected_company_commission=amount(value('dwExpectedBookingCommission'),'عمولة المكتب المتوقعة');
+      payload.deal.financials.entitled_on=value('dwEntitledOn')||null;
+    }
+    if(own()&&(value('dwReceiptDate')||value('dwReceiptAmount')||value('dwReceiptSource'))){
+      const date=value('dwReceiptDate'),received=amount(value('dwReceiptAmount'),'المبلغ المستلم');
+      if(!validDate(date)||!received||!value('dwReceiptSource'))throw new Error('أكمل تاريخ الدفعة المستلمة ومبلغها ومرجعها');
+      payload.deal.receipt={received_on:date,amount:received,source_note:value('dwReceiptSource')};
     }
     return payload;
   }

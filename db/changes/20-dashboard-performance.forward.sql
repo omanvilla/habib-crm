@@ -1,3 +1,5 @@
+-- Historical migration: SQL24 adds reservation-period KPIs and separates receipts.
+-- `sales` deliberately continues to mean completed sales, never booking achievement.
 -- Correct dashboard conversion periods without changing any business records.
 -- SQL18 investment authorization and existing employee/branch credit remain intact.
 -- The employee team report excludes investment evidence even for the owner;

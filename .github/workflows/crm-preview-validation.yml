@@ -1,7 +1,7 @@
 name: CRM isolated preview checks
 on:
   push:
-    branches: ['codex/role-workflows-ui-preview-20260930']
+    branches: ['codex/role-workflows-ui-preview-20260930', 'codex/reservation-period-20261018']
 permissions:
   contents: read
 jobs:
@@ -34,6 +34,7 @@ jobs:
       - run: node tests/preview-browser.cjs
       - run: node tests/investment-browser.cjs
       - run: node tests/dashboard-browser.cjs
+      - run: node tests/reservation-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -177,3 +178,43 @@ jobs:
           psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/semantic-inquiries-rollback-assert.sql
           psql -d crm_investment_test -v ON_ERROR_STOP=1 -f db/changes/20-dashboard-performance.rollback.sql
           psql -d crm_investment_test -v ON_ERROR_STOP=1 -f tests/fixtures/dashboard-performance-rollback-assert.sql
+
+  reservations-sql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: synthetic-test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: synthetic-test-only
+      PGHOST: 127.0.0.1
+      PGUSER: postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify booking, completion, receipts and rollback on isolated PostgreSQL
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/investment-owner-only.sql
+          psql -v ON_ERROR_STOP=1 -f db/changes/18-investment-owner-only.forward.sql
+          psql -v ON_ERROR_STOP=1 -f db/changes/19-dashboard-workspace.forward.sql
+          psql -v ON_ERROR_STOP=1 -f db/changes/20-dashboard-performance.forward.sql
+          psql -v ON_ERROR_STOP=1 -f db/changes/23-performance-client-metrics.forward.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261018070412_employee_booking_milestones_20261018.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261018071206_employee_target_snapshot_20261018.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261018071343_confirm_paid_reservation_rpc_20261018.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261018072621_employee_target_snapshot_security_definer_fix_20261018.sql
+          psql -v ON_ERROR_STOP=1 -f db/changes/24-reservation-period-performance.forward.sql
+          psql -v ON_ERROR_STOP=1 -f db/changes/24-reservation-period-performance.forward.sql
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/reservation-period-assert.sql
+          psql -v ON_ERROR_STOP=1 -f db/changes/24-reservation-period-performance.rollback.sql
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/reservation-period-rollback-assert.sql

@@ -7,8 +7,8 @@ const matcherModule=import('../supabase/functions/_shared/property-inquiry-match
 const serviceModule=import('../supabase/functions/_shared/property-inquiry-service.mjs');
 function calendar(now,company={created_at:'2026-05-06T15:00:00Z'}){
   class FixedDate extends Date { constructor(...args){super(...(args.length?args:[now]));} }
-  const start=ops.indexOf('  const omanDate'),end=ops.indexOf('  async function renderPerformance');
-  return new Function('Date','currentCompany',ops.slice(start,end)+';return {period,targetScore};')(FixedDate,company);
+  const start=ops.indexOf('  const omanDate'),end=ops.indexOf('  function targetMetric');
+  return new Function('Date','currentCompany','n',ops.slice(start,end)+';return {period,targetScore};')(FixedDate,company,v=>Number(v||0).toLocaleString('en-US'));
 }
 function inquiryFixture(body,{inventory=candidates,reviewError=null}={}){
   const message={id:'msg1',company_id:'test-company',client_id:'client',conversation_id:'conv',
@@ -42,17 +42,18 @@ const candidates=[
   {id:'p1',property_code:'HB123',title:'فيلا اختبار في الخوض',area:'الخوض',price:120000},
   {id:'p2',property_code:'HB124',title:'فيلا ثانية في الخوض',area:'الخوض',price:125000}
 ];
-test('Oman daily, Sunday week and month boundaries',()=>{
-  const {period}=calendar('2026-09-30T09:00:00Z');
-  assert.deepEqual(period('day'),{from:'2026-09-30',to:'2026-10-01'});
-  assert.deepEqual(period('week'),{from:'2026-09-27',to:'2026-10-04'});
-  assert.deepEqual(period('month'),{from:'2026-09-01',to:'2026-10-01'});
-  assert.deepEqual(calendar('2026-09-30T21:00:00Z').period('day'),{from:'2026-10-01',to:'2026-10-02'});
+test('Oman monthly report boundaries and local midnight',()=>{
+ const {period}=calendar('2026-09-30T09:00:00Z');
+ assert.deepEqual(period('month'),{from:'2026-09-01',to:'2026-10-01'});
+ assert.deepEqual(calendar('2026-09-30T21:00:00Z').period('month'),{from:'2026-10-01',to:'2026-11-01'});
 });
-test('Monthly targets scale by the actual month including leap February',()=>{
-  assert.match(calendar('2026-09-30T09:00:00Z').targetScore({active_inventory:10,inquiries:1,targets:{inquiries_target:30}},'day'),/100%/);
-  assert.match(calendar('2024-02-29T09:00:00Z').targetScore({active_inventory:10,inquiries:1,targets:{inquiries_target:29}},'day'),/100%/);
+
+test('Only monthly reservation results are compared against the monthly goal',()=>{
+ const {targetScore}=calendar('2026-09-30T09:00:00Z');
+ assert.match(targetScore({reservations:2},'month'),/متحقق/);
+ assert.match(targetScore({reservations:2},'year'),/لا تُقارن بهدف شهر واحد/);
 });
+
 test('Listing evidence uses complete unique references and Arabic grouped prices',async()=>{
   const {matchListingReferences}=await matcherModule;
   const matches=(body,inventory=candidates)=>matchListingReferences(body,inventory).matches.map(x=>x.property_id);
@@ -88,27 +89,27 @@ test('Review write failure is surfaced for webhook retry without reporting a suc
   assert.equal(fixture.writes[0].table,'unmatched_property_links');
 });
 
-test('Standing inventory goal is explicitly 10; other missing goals are excluded',()=>{
+test('Closing a sale or receiving commission cannot independently meet the booking target',()=>{
  const {targetScore}=calendar('2026-09-30T09:00:00Z');
- assert.match(targetScore({active_inventory:7,targets:{}},'month'),/70%.*1 من 5/);
- assert.match(targetScore({active_inventory:1,inquiries:30,targets:{inquiries_target:30}},'month'),/55%.*2 من 5/);
-});
-test('Cross-month weekly score waits for approved target allocation',()=>{
- const {targetScore}=calendar('2026-09-30T09:00:00Z');
- assert.match(targetScore({active_inventory:10,targets:{inventory_target:10}},'week'),/يعبر شهرين/);
- assert(!targetScore({active_inventory:10,targets:{inventory_target:10}},'week').includes('%'));
+ assert.match(targetScore({reservations:0,sales:20,company_commission:9000,commission_collected:9000},'month'),/0 \/ 2/);
 });
 
-test('Lifetime starts at company inception and does not compare to monthly goals',()=>{
+test('Multi-month report keeps target comparisons separate',()=>{
+ const {targetScore}=calendar('2026-09-30T09:00:00Z');
+ assert.match(targetScore({reservations:20},'months3'),/لا تُقارن بهدف شهر واحد/);
+});
+
+test('Lifetime asks the backend for earliest historical business evidence and does not compare to monthly goals',()=>{
  const {period,targetScore}=calendar('2026-10-01T10:00:00Z');
- assert.deepEqual(period('all'),{from:'2026-05-06',to:'2026-10-02'});
- assert.match(targetScore({active_inventory:12,targets:{inventory_target:10}},'all'),/إجمالي تاريخي/);
+ assert.deepEqual(period('all'),{from:null,to:'2026-10-02'});
+ assert.match(targetScore({active_inventory:12,targets:{inventory_target:10}},'all'),/لا تُقارن بهدف شهر واحد/);
  assert(!targetScore({},'all').includes('%'));
 });
-test('Own company commission goal participates only when its value is visible',()=>{
+test('Expected booking commission OR reservation count meets the monthly target',()=>{
  const score=calendar('2026-10-01T10:00:00Z').targetScore;
- assert.match(score({active_inventory:10,company_commission:50,targets:{commission_target:100}},'month'),/75%.*2 من 5/);
- assert.match(score({active_inventory:10,company_commission:null,targets:{commission_target:100}},'month'),/100%.*1 من 5/);
+ assert.match(score({reservations:1,expected_commission:4000},'month'),/متحقق/);
+ assert.match(score({reservations:2,expected_commission:null},'month'),/متحقق/);
+ assert.match(score({reservations:1,expected_commission:null},'month'),/محجوبة/);
 });
 
 test('Target-month end is exclusive and does not lose the last day in Oman',()=>{
@@ -125,7 +126,7 @@ test('Acquisition requirement follows current shortage, not monthly additions',(
  const body=html.match(/function employeeInventoryDeficit\(active\)\{([^\n]+)\}/)[1],needed=new Function('active',body);
  assert.equal(needed(7),3);assert.equal(needed(8),2);assert.equal(needed(10),0);assert.equal(needed(12),0);assert.equal(needed(9),1);
  const score=calendar('2026-10-01T10:00:00Z').targetScore;
- assert.match(score({active_inventory:7,new_properties:0,targets:{new_properties_target:999}},'month'),/70%.*1 من 5/);
+ assert.match(score({active_inventory:7,new_properties:0,reservations:0,targets:{new_properties_target:999}},'month'),/0 \/ 2/);
 });
 test('Arabic date labels retain Western numerals',()=>{
  const rendered=new Date('2026-10-01T10:25:00Z').toLocaleString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat'});

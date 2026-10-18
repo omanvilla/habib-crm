@@ -1,13 +1,15 @@
 # Habib CRM — current state
 
-Updated 2026-10-15. Read this with `AGENTS.md` before work. This file distinguishes deployed changes, direct verification and remaining work. Older dated reports remain evidence, not competing product rules.
+Updated 2026-10-18. Read this with `AGENTS.md` before work. This file distinguishes deployed changes, direct verification and remaining work. Older dated reports remain evidence, not competing product rules.
 
-## 2026-10-18 employee target redesign — partial implementation
+## 2026-10-18 reservation-period implementation
 
-- Owner-approved targets supersede the earlier single inventory-shortfall objective: 10 active verified listings **and separately** 2 new verified listings per Oman-local week, 10 human-result follow-ups/day, 5 completed viewings/week, and either 2 confirmed reservations/month or OMR 4,000 expected company commission from confirmed reservations/month. No automatic salary penalties.
-- Supabase migration `employee_booking_milestones_20261018` applied: seven additive nullable deal columns for verified booking timestamp/evidence, later cancellation, expected company commission snapshot, entitlement and actual partial receipts. No legacy booking dates or monetary values were inferred or rewritten. This is a **schema-only** release, not a completed booking UI or report.
-- Still required: integrate booking entry with the existing atomic deal RPC and owner-approved evidence definition; ensure confirmation/cancellation event audit and idempotency; scoped reporting RPC, drill-downs, employee dashboard, manager comparisons, weekly targets, synthetic tests and authenticated live role verification. Do not score existing `deposit` stage as a confirmed reservation without evidence. Existing commission payout rules unchanged.
-- Last known frontend production main commit before this work: `165aebb1`; the older October 15 production/runtime statements above are historical and should not be treated as latest GitHub commit.
+- Latest inspected production frontend: `0866d5190c4d6f83aa4326f375c03c5c7e9bf53a`. Earlier same-day paid-deposit UI and target snapshot were deployed, but SQL20/23 team performance still used closing dates; the deal script also had a syntax error and attempted a protected base-table read.
+- SQL24 and the matching frontend now implement the owner-approved actual-paid-deposit definition: date + positive amount + explicit CRM confirmation, without a mandatory document. The existing atomic/idempotent deal workflow saves reservation data with the deal. Original confirmation date/amount/source are immutable; actor/recording time are audited. No old booking date or amount is guessed.
+- Monthly achievement is **2 confirmed bookings OR OMR 4,000 expected company commission** from those bookings, using Oman-local payment dates. Team performance, dashboard and owner target panel use that definition. Completed sales retain their own closing-period metric; actual commission receipts use separate dated, idempotent payment records. Cancellation retains original month achievement and expected snapshot while reducing active bookings. Owner-only investment stays outside branch totals.
+- Existing employee payout rules and historical financial amounts remain unchanged. Updating only a booking estimate does not recalculate old commission allocations. Old owner target configuration remains available as reference; it is not substituted for the approved booking target.
+- SQL24 includes guarded executable rollback while preserving all booking/receipt/audit rows. Recovered already-deployed SQL23 and October18 schema/RPC sources are now versioned. The divergent older validation branch was inspected and preserved; this work uses `codex/reservation-period-20261018` based on current main.
+- Validation and exact deployment evidence: `docs/reservation-period-20261018.md`. Actual authenticated employee browser sessions remain a separate outstanding verification; synthetic browser and SQL-role tests do not establish that evidence.
 
 ## Where the work is
 
@@ -35,9 +37,9 @@ The October 2 conversation mentioned local Codex commit `d3c7481` on `work`. It 
 - Each employee sees her branch; owner sees both. A stale assignment does not override the branch boundary.
 - October 15 dashboard: professional workspaces separate combined ordinary Muscat/Barka/general work from owner-only investment work. Retain top client/property/WhatsApp/task shortcuts; use independent bounded loading/retry. Hide only dashboard property-action/publishing reminders pending redesign. New-property additions and staff outbound messages have explicit labels; a period sale backed by an actual older completed visit counts as a visit-linked sale. Manual visits still do not invent inbound inquiries.
 - October 15: canonical `investment` is owner-only across all CRM data, including against manager/viewer access. New owner-selected investors use that route and owner assignment; qualification remains optional in existing requests. Preserve old branch investor labels, shared-phone identities, existing Muscat/Barka workflows and current route configuration. Private investment evidence must not enter shared summaries or AI caches. No Meta connection attempt or old-client backfill.
-- Standing active inventory is 10. Shortage is `max(0,10-active inventory)`. Monthly additions remain descriptive, not a second target scoring the same shortage.
+- Standing active verified inventory is 10; separately, two qualified new listings are required per Oman-local week, as approved October18. Earlier shortage-only rules are superseded.
 - Work since 2026-08-01 uses approved branch reporting attribution while preserving original dates, authors, senders and amounts. Lifetime reporting is not a one-year substitute.
-- Other targets need actual owner-entered values. Cross-month weekly target allocation remains undecided; the deployed UI suppresses its score.
+- October18 targets in AGENTS.md supersede the former unspecified monthly scoring. Multi-month performance shows period results without comparing them to one monthly denominator.
 - Owner must see company commission by employee. Employee commission is an owner-selected percentage per deal of company commission, never sale price. The deployed deal workflow supports an explicit per-deal percentage without retroactively recalculating historical amounts; actual employee UI-use verification remains outstanding.
 - Latest October 2 request: one-screen deal entry with inline client/property/owner; historical 2020/2022 sales may omit an unknown visit. New completed sales require an actual visit and a collection date when commission is received. Record-creation timestamps remain audit evidence, separate from sale dates. A refusal has one primary reason plus optional customer words.
 - A new visit resolves or creates its property request atomically; manual request choice is optional. Remove the detailed meeting-address field while preserving stored historical values. Preserve date/time, status, attendance, next action and automatic follow-up task behavior.
@@ -66,7 +68,7 @@ Live read-only RPC checks executed client 360, property action queue, property p
 
 The matching server changes and frontend are now deployed and verified within the scope above. The prior requirement for Ahmed's review before release is superseded; he reviews the result on the live site. The new property-layout design still awaits his reference and is not part of this release.
 
-Still needed: actual employee list/detail/export/mobile/account-switch walkthroughs; isolated backend for business writes/uploads; live inbound WhatsApp attribution/ambiguity proof; fresh Instagram metrics and direct-message connection; configured targets and cross-month goal rule. Mock SDK, SQL role tests and successful CI are distinct evidence and do not replace actual authenticated UI use.
+Still needed: actual employee list/detail/export/mobile/account-switch walkthroughs; isolated backend for business writes/uploads; live inbound WhatsApp attribution/ambiguity proof; fresh Instagram metrics and direct-message connection; remaining non-booking target semantics and full authenticated role walkthroughs. Mock SDK, SQL role tests and successful CI are distinct evidence and do not replace actual authenticated UI use.
 
 ## Tools and next-start rule
 
