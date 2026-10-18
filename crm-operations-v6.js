@@ -341,5 +341,6 @@
     }catch(e){if(crmSessionCurrent(generation,user))showToast('تعذر إعداد التقرير: '+e.message,'error')}
   };
   addPerformance();
+  if(currentUser)mountTargetDashboard();
   if(window.crmDashboardPending){window.crmDashboardPending=false;window.loadDashboard();}
 })();
