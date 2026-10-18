@@ -28,6 +28,36 @@
     const valid=goals.map(([key,target,flow])=>{let goal=t[target];if(goal==null||Number(goal)<=0||(key==='company_commission'&&row[key]==null))return null;goal=Number(goal)*(flow?days/monthDays:1);return Math.min(1,Number(row[key]||0)/goal)}).filter(x=>x!==null);
     return valid.length?'متوسط إنجاز الأهداف المعتمدة: '+Math.round(100*valid.reduce((a,b)=>a+b,0)/valid.length)+'% · محدد '+valid.length+' من '+goals.length+' أهداف؛ البقية غير محددة':'لم تُحدد أهداف كافية للتقييم';
   }
+  function targetMetric(label,value,goal,action){
+    const v=Number(value||0),missing=Math.max(0,goal-v);
+    return '<button type="button" class="ops-metric ops-target-action" data-target-go="'+action+'" title="فتح السجلات المرتبطة"><strong>'+n(v)+' / '+n(goal)+'</strong><small>'+label+'</small><span class="ops-metric-help">'+(missing?'المتبقي '+n(missing):'تم تحقيق الهدف')+'</span></button>';
+  }
+  let targetLoadSeq=0;
+  async function loadTargetDashboard(){
+    const host=$id('opsEmployeeTargets');if(!host||!currentUser)return;
+    const seq=++targetLoadSeq,user=currentUser.id,generation=crmSessionGeneration;
+    host.innerHTML='<p class="ops-state">جاري تحميل أهداف الموظفات…</p>';
+    try{
+      const result=await bounded(supa.rpc('crm_employee_target_snapshot'));
+      if(seq!==targetLoadSeq||!crmSessionCurrent(generation,user))return;
+      if(result.error)throw result.error;
+      const data=result.data||{},employees=data.employees||[];
+      host.innerHTML='<div class="ops-performance-caption"><strong>أهداف العمل المعتمدة</strong><small>اليوم '+safe(data.today||'')+' · الأسبوع من '+safe(data.week_start||'')+' · الشهر من '+safe(data.month_start||'')+'</small></div>'+
+      (employees.map(x=>'<article class="ops-person"><div class="ops-person-title"><strong>'+safe(x.name)+' · '+(x.branch==='muscat'?'مسقط':'بركاء')+'</strong><span>'+(x.sales_goal_met?'هدف الحجوزات الشهري متحقق':'هدف الحجوزات الشهري لم يتحقق بعد')+'</span></div><div class="ops-metrics">'+
+      targetMetric('المخزون المؤكد المتاح',x.inventory,10,'properties')+targetMetric('إضافات الأسبوع المؤكدة',x.new_properties,2,'properties')+targetMetric('المتابعات البشرية اليوم',x.followups,10,'daily')+targetMetric('المعاينات المكتملة أسبوعيًا',x.viewings,5,'viewings')+
+      targetMetric('الحجوزات المؤكدة هذا الشهر',x.bookings,2,'deals')+
+      '<button type="button" class="ops-metric ops-target-action" data-target-go="deals"><strong>'+n(x.expected_commission)+' / 4,000</strong><small>عمولات المكتب المتوقعة من الحجوزات (ر.ع)</small><span class="ops-metric-help">يكفي تحقيق هذا الهدف أو حجزين</span></button></div><p class="ops-note">الحجوزات السارية: '+n(x.live_bookings)+' · لا يُحتسب التفاوض أو العربون غير المدفوع حجزًا.</p></article>').join('')||'<p class="ops-state">لا توجد بيانات موظفات متاحة لهذا الحساب.</p>');
+    }catch(e){if(seq===targetLoadSeq&&crmSessionCurrent(generation,user))host.innerHTML='<div class="ops-error" role="alert">تعذر تحميل الأهداف: '+safe(e.message)+' <button type="button" class="ops-action" data-target-retry>إعادة المحاولة</button></div>';}
+  }
+  document.addEventListener('click',e=>{const b=e.target.closest('[data-target-go]');if(b){const page=b.dataset.targetGo;if(typeof navigate==='function')navigate(page,null);}if(e.target.closest('[data-target-retry]'))loadTargetDashboard()});
+  function mountTargetDashboard(){
+    const page=$id('page-dash');if(!page)return;
+    let host=$id('opsEmployeeTargets');
+    if(!host){host=document.createElement('section');host.id='opsEmployeeTargets';host.className='card';host.style.cssText='padding:16px;margin:12px 0';const anchor=$id('opsDailyWork');if(anchor&&anchor.parentNode)anchor.parentNode.insertBefore(host,anchor);else page.prepend(host);}
+    loadTargetDashboard();
+  }
+  const previousDashboardTargets=window.loadDashboard;
+  if(typeof previousDashboardTargets==='function')window.loadDashboard=function(){const result=previousDashboardTargets.apply(this,arguments);mountTargetDashboard();return result;};
   const performanceLoads=new WeakMap();
   let teamPerformancePeriod='month';
   async function renderPerformance(kind,boxId='employeePerformanceResults'){
