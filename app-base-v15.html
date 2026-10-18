@@ -5222,15 +5222,19 @@ window.addEventListener('error', function(e){
   console.error('🚨 Runtime error:', e.message, 'at', e.filename, ':', e.lineno);
 });
 
-window.APP_VERSION = '20260914-backup-reminder-v15';
+// The GitHub Pages bootstrap injects the current release version after loading.
+// Only notify when a newer deployment really exists; never compare with the
+// historical version baked into this shared HTML template.
 window.checkForUpdates = async function(){
   try{
-    if(sessionStorage.getItem('crm_update_checked')==='1')return;
-    sessionStorage.setItem('crm_update_checked','1');
-    var r=await fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'});
-    var text=await r.text();
-    var m=text.match(/<meta name="app-version" content="([^"]+)"/);
-    if(m&&m[1]&&m[1]!==window.APP_VERSION&&sessionStorage.getItem('crm_update_dismissed')!==m[1])showUpdateBanner(m[1]);
+    var response=await fetch(location.pathname+'?check='+Date.now(),{cache:'no-store'});
+    if(!response.ok)return;
+    var html=await response.text();
+    var match=html.match(/<meta name="app-version" content="([^"]+)"/);
+    var installed=(document.querySelector('meta[name="app-version"]')||{}).content||window.APP_VERSION;
+    if(!match||!match[1]||!installed||match[1]===installed)return;
+    if(sessionStorage.getItem('crm_update_dismissed')===match[1])return;
+    window.showUpdateBanner(match[1]);
   }catch(e){console.warn('Update check failed:',e);}
 };
 window.dismissUpdate=function(v){try{sessionStorage.setItem('crm_update_dismissed',v||'1')}catch(e){}var b=document.getElementById('updateBanner');if(b)b.remove();};
@@ -5238,11 +5242,11 @@ window.showUpdateBanner=function(newVersion){
   if(document.getElementById('updateBanner'))return;
   var banner=document.createElement('div');banner.id='updateBanner';
   banner.style.cssText='position:fixed;top:0;left:0;right:0;background:linear-gradient(90deg,#10B981,#059669);color:white;padding:12px 20px;text-align:center;font-weight:700;z-index:99999;box-shadow:0 4px 12px rgba(0,0,0,0.2);font-size:14px;display:flex;align-items:center;justify-content:center;gap:14px';
-  banner.innerHTML=`🎉 توجد نسخة أحدث للنظام <button onclick="forceUpdate()" style="background:white;color:#059669;border:none;padding:6px 16px;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px">🔄 تحديث الآن</button> <button onclick="dismissUpdate('${newVersion}')" style="background:transparent;color:white;border:1px solid rgba(255,255,255,0.5);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px">لاحقاً</button>`;
+  banner.innerHTML='🎉 توجد نسخة أحدث للنظام <button onclick="forceUpdate()" style="background:white;color:#059669;border:none;padding:6px 16px;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px">🔄 تحديث الآن</button> <button onclick="dismissUpdate(\\\''+String(newVersion).replace(/[^a-zA-Z0-9._-]/g,'')+'\\\')" style="background:transparent;color:white;border:1px solid rgba(255,255,255,0.5);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px">لاحقاً</button>';
   document.body.appendChild(banner);
 };
-window.forceUpdate=function(){try{if('caches' in window)caches.keys().then(keys=>keys.forEach(k=>caches.delete(k)));sessionStorage.removeItem('crm_update_checked');location.replace(location.pathname+'?v='+Date.now());}catch(e){location.reload();}};
-setTimeout(window.checkForUpdates, 60000);
+window.forceUpdate=function(){try{sessionStorage.removeItem('crm_update_dismissed');location.replace(location.pathname+'?v='+Date.now());}catch(e){location.reload();}};
+setTimeout(window.checkForUpdates,60000);
 
 // ===== BACKUP & PROTECTION SYSTEM =====
 
