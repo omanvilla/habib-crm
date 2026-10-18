@@ -2,6 +2,13 @@
 
 Updated 2026-10-15. Read this with `AGENTS.md` before work. This file distinguishes deployed changes, direct verification and remaining work. Older dated reports remain evidence, not competing product rules.
 
+## 2026-10-18 employee target redesign — partial implementation
+
+- Owner-approved targets supersede the earlier single inventory-shortfall objective: 10 active verified listings **and separately** 2 new verified listings per Oman-local week, 10 human-result follow-ups/day, 5 completed viewings/week, and either 2 confirmed reservations/month or OMR 4,000 expected company commission from confirmed reservations/month. No automatic salary penalties.
+- Supabase migration `employee_booking_milestones_20261018` applied: seven additive nullable deal columns for verified booking timestamp/evidence, later cancellation, expected company commission snapshot, entitlement and actual partial receipts. No legacy booking dates or monetary values were inferred or rewritten. This is a **schema-only** release, not a completed booking UI or report.
+- Still required: integrate booking entry with the existing atomic deal RPC and owner-approved evidence definition; ensure confirmation/cancellation event audit and idempotency; scoped reporting RPC, drill-downs, employee dashboard, manager comparisons, weekly targets, synthetic tests and authenticated live role verification. Do not score existing `deposit` stage as a confirmed reservation without evidence. Existing commission payout rules unchanged.
+- Last known frontend production main commit before this work: `165aebb1`; the older October 15 production/runtime statements above are historical and should not be treated as latest GitHub commit.
+
 ## Where the work is
 
 | Surface | State |
