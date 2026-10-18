@@ -2355,7 +2355,7 @@ async function loadClients(){
  try{
   const [clients,requests]=await Promise.all([
    crmReadAll(()=>supa.from('clients').select('*, agent:profiles!clients_assigned_to_fkey(full_name)',{count:'exact'}).order('created_at',{ascending:false}).order('id')),
-   crmReadAll(()=>supa.from('client_requests').select('id,client_id,request_type,status,pipeline_stage,qualified_at,preferred_area,budget_min,budget_max,next_followup,branch_key',{count:'exact'}).in('status',['active','paused']).order('id'))
+   crmReadAll(()=>supa.from('client_requests').select('id,client_id,request_type,status,pipeline_stage,qualified_at,preferred_area,property_type,subject_property_id,route_key,budget_min,budget_max,next_followup,branch_key',{count:'exact'}).in('status',['active','paused']).order('id'))
   ]);
   if(!crmSessionCurrent(generation,userId))return;
   clientWorkRequests=requests;allClients=clients.filter(c=>showArchivedClients?c.archived===true:c.archived!==true);
