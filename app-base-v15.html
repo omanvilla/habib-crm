@@ -2511,7 +2511,7 @@ function renderClientDetail(){
   $('cdSub').innerHTML=escapeHtml(c.preferred_area||'—')+' · '+contactStatusHTML(c)+(c.human_contact_at?' · ✅ تواصل بشري '+timeAgo(c.human_contact_at):' · ⚠️ لا يوجد تواصل بشري موثق')+(suppressed&&c.followup_suppressed_reason?' · '+escapeHtml(c.followup_suppressed_reason):'')+(c.importance?' · '+starsHTML(c.importance):'');
   const isSeller=getRoles(c).indexOf('seller')>=0;$('cdListingsTab').style.display=isSeller?'':'none';
   const phone=c.phone?c.phone.replace(/[^0-9+]/g,''):'';let actions='';
-  if(c.phone){actions+='<a class="qa-btn call" href="tel:'+phone+'">📞 اتصال</a>';actions+='<button class="qa-btn wa" onclick="openWATemplates()">💚 واتساب</button>'}
+  if(c.phone){actions+='<a class="qa-btn call" href="tel:'+phone+'">📞 اتصال</a>';actions+='<button class="qa-btn wa" onclick="openClientWhatsAppHistory()">💚 محادثة واتساب داخل CRM</button>'}
   if(c.email)actions+='<a class="qa-btn" href="mailto:'+escapeHtml(c.email)+'">📧 بريد</a>';
   if(!suppressed){actions+='<button class="qa-btn" onclick="markViewingClientContacted()" title="يسجل التواصل البشري بتاريخ اليوم">✅ تم التواصل سابقاً</button>';actions+='<button class="qa-btn" onclick="suppressViewingClientFollowup()">⏸ لا يحتاج متابعة</button>'}
   else actions+='<button class="qa-btn" onclick="resumeViewingClientFollowup()">▶️ إعادة للمتابعة</button>';
