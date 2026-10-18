@@ -80,6 +80,25 @@
     $('dealWorkflowForm').addEventListener('submit',event=>{event.preventDefault();saveDeal();});
     $('dealWorkflowForm').addEventListener('input',event=>changed(event));
     $('dealWorkflowForm').addEventListener('change',event=>changed(event));
+    if($('dwConfirmPaid')){
+      set('dwPaidDate',day(d.reservation_confirmed_at));
+      set('dwPaidAmount',d.deposit_amount);
+      set('dwExpectedBookingCommission',d.expected_company_commission_at_reservation);
+      if(d.reservation_confirmed_at){$('dwConfirmPaid').disabled=true;$('dwPaidStatus').textContent='حجز مؤكد بتاريخ '+day(d.reservation_confirmed_at)+'؛ لا يمكن إعادة احتسابه.';}
+      $('dwConfirmPaid').addEventListener('click',async()=>{
+        if(!active(s)||!s.deal?.id)return;
+        const date=value('dwPaidDate'),amountPaid=amount(value('dwPaidAmount'),'العربون المدفوع');
+        if(!date||!validDate(date)||!amountPaid||amountPaid<=0){error('أدخل تاريخ الدفع الفعلي ومبلغ عربون موجب');return;}
+        const button=$('dwConfirmPaid');button.disabled=true;
+        try{
+          const response=await supa.rpc('crm_confirm_paid_reservation',{p_deal_id:s.deal.id,p_payment_date:date,p_amount:amountPaid,p_expected_company_commission:own()?amount(value('dwExpectedBookingCommission'),'عمولة المكتب المتوقعة'):null});
+          if(response.error)throw response.error;
+          $('dwPaidStatus').textContent='تم تأكيد الحجز بتاريخ '+date+'؛ سيظهر في الأهداف الشهرية.';
+          if(typeof loadDashboard==='function')loadDashboard();
+          if(typeof loadDeals==='function')loadDeals();
+        }catch(e){button.disabled=false;error('تعذر تأكيد العربون: '+e.message);}
+      });
+    }
     modal.querySelector('[data-dw-cancel]').addEventListener('click',()=>closeModal('mDeal'));
   }
   function syncProperty(){
