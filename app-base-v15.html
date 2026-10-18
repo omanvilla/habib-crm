@@ -2641,7 +2641,7 @@ async function saveNewClientRequest(){
       const normalized=v=>String(v||'').trim().replace(/\\s+/g,' ').toLowerCase();
       const same=(existing.data||[]).find(x=>x.request_type===data.request_type&&(x.route_key||x.branch_key)===(data.route_key||data.branch_key)&&normalized(x.property_type)===normalized(data.property_type)&&normalized(x.preferred_area)===normalized(data.preferred_area)&&Number(x.budget_min||0)===Number(data.budget_min||0)&&Number(x.budget_max||0)===Number(data.budget_max||0)&&!x.subject_property_id);
       if(same)throw new Error('هذا الطلب موجود بالفعل في ملف العميل. افتح الطلب الحالي وعدّل تفاصيله بدلاً من إنشاء نسخة مكررة.');
-      Object.assign(data,{company_id:cid,client_id:clientId,pipeline_stage:data.pipeline_stage||'new',created_by:currentUser.id,created_via:'manual'});data.id=crmSaveKey('mClientRequest',data);r=await supa.from('client_requests').insert(data).select('id').single();}
+      Object.assign(data,{company_id:cid,client_id:clientId,pipeline_stage:data.pipeline_stage||'new',created_by:currentUser.id,created_via:'manual',source:'manual'});data.id=crmSaveKey('mClientRequest',data);r=await supa.from('client_requests').insert(data).select('id').single();}
     if(!crmSessionCurrent(session,actor))return;if(r.error)throw r.error;crmFinishSave('mClientRequest');showToast('تم حفظ الطلب','success');await logSystemActivity(old?'edit':'create','request',r.data.id,'حفظ طلب مستقل للعميل');if(!crmSessionCurrent(session,actor))return;if(viewingClient&&viewingClient.id===clientId){await renderClientRequestsTab();await renderClientInfo();}loadDashboard();
   }catch(e){if(crmSessionCurrent(session,actor))showToast('تعذر حفظ الطلب: '+e.message,'error');}finally{crmEndSave('mClientRequest');}
 }
