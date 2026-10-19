@@ -6,7 +6,7 @@ const vm=require('node:vm');
 const source=fs.readFileSync('crm-operations-v6.js','utf8');
 
 function fixture(){
-  const nodes=new Map(['employeePerformanceResults','opsDashboardPerformanceResults','opsPerformanceDetails'].map(id=>[id,{id,innerHTML:'',textContent:'',querySelectorAll:()=>[]}]));
+  const nodes=new Map(['employeePerformanceResults','opsDashboardPerformanceResults','opsPerformanceDetails','teamLeaderboard'].map(id=>[id,{id,innerHTML:'',textContent:'',querySelectorAll:()=>[]}]));
   const pending=[];
   let finishTeam;
   const context={document:{getElementById:id=>nodes.get(id)||null,querySelectorAll:()=>[],addEventListener(){}},
@@ -88,4 +88,23 @@ test('an owner CSV error from an old session does not surface in the next accoun
   f.context.currentUser={id:'TEST-other-user'};f.context.crmSessionGeneration++;
   f.queries.forEach(q=>q.resolve({data:null,error:{message:'TEST previous account error'}}));await exporting;
   assert.equal(f.downloads.length,0);assert.equal(f.toasts.length,0);
+});
+
+
+test('report team uses the selected complete month and the same reservation and human-message metrics',async()=>{
+  const f=fixture();
+  f.context.crmReportPerformance('month',{from:'2024-10-01',to:'2024-11-01'});
+  assert.deepEqual(JSON.parse(JSON.stringify(f.pending[0].args)),{p_from:'2024-10-01',p_to:'2024-11-01'});
+  f.pending[0].resolve({data:{from:'2024-10-01',employees:[{name:'TEST report employee',reservations:2,expected_commission:4500,commission_collected:0,inquiry_clients:7,replied_inquiry_clients:5,successful_staff_messages:13,targets:{}}]},error:null});
+  await f.flush();const html=f.nodes.get('teamLeaderboard').innerHTML;
+  assert.match(html,/2024-10-01/);assert.match(html,/2024-10-31/);
+  assert.match(html,/حجوزات مؤكدة في الفترة/);assert.match(html,/4,500/);
+  assert.match(html,/عملاء استفسروا عن عقار/);assert.match(html,/مستفسرون ردّت عليهم الموظفة/);assert.match(html,/رسائل أرسلتها الموظفة/);
+  assert.doesNotMatch(html,/رسائل واتساب صادرة من الفريق/);
+});
+test('missing performance response is an error, never an empty or zero result',async()=>{
+ const f=fixture();f.context.crmPerformancePeriod('month');
+ f.pending[0].resolve({data:{},error:null});await f.flush();
+ assert.match(f.nodes.get('employeePerformanceResults').innerHTML,/تعذر تحميل الأداء/);
+ assert.doesNotMatch(f.nodes.get('employeePerformanceResults').innerHTML,/لا يوجد موظفون نشطون/);
 });

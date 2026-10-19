@@ -47,6 +47,22 @@ async function test(name,fn){await fn();tests++;console.log('PASS',name)}
  await test('fresh dashboard task editor fetches uncached task',async()=>{const e=createEnv();e.state.query=async()=>({data:{id:'TEST_TASK',title:'TEST task',user_id:'TEST_USER',priority:'high'}});e.run('populateTaskSelects=async()=>{}');await e.run("editTask('TEST_TASK')");assert.equal(e.e('tTitle').value,'TEST task');assert.equal(e.e('mTask').classList.contains('on'),true)});
  await test('double task save performs one insert',async()=>{const e=createEnv();e.e('tTitle').value='TEST task';e.e('tPriority').value='high';e.state.query=async()=>({data:{id:'TEST_TASK'}});e.run('loadTasks=async()=>{};loadDashboard=async()=>{}');await Promise.all([e.run('saveTask()'),e.run('saveTask()')]);assert.equal(e.calls.queries.filter(q=>q.ops.some(x=>x[0]==='insert')).length,1)});
  await test('closing-period report includes collected old-created deal and excludes missing close date',async()=>{const e=createEnv();assert.equal(e.run("dealInClosingPeriod({stage:'commission_collected',created_at:'2025-01-01',closed_at:'2026-09-10'},{start:new Date('2026-09-01'),end:new Date('2026-10-01')})"),true);assert.equal(e.run("dealInClosingPeriod({stage:'closed',created_at:'2026-09-10'},{start:new Date('2026-09-01'),end:new Date('2026-10-01')})"),false)});
+ await test('session reset clears owner financial reports and rejects their late list response',async()=>{
+   const e=createEnv(),pending=[];e.ctx.testReportPending=pending;e.run("showReportNotice('SYNTHETIC PRIVATE NOTICE',false)");
+   const ids=['expensesList','ownersList','sumIncome','sumProfit','revReceived','revPending','revNet','commissionTable','commAgents','reportDataNotice'];
+   ids.forEach(id=>{e.e(id).textContent='SYNTHETIC PRIVATE FINANCE'});
+   e.run("reportTab='revenue';crmReadAll=()=>new Promise(resolve=>testReportPending.push(resolve));");
+   const loading=e.run('loadReports()');assert.equal(pending.length,3);e.run('clearSessionUI()');
+   pending.forEach(resolve=>resolve([]));await loading;
+   ids.forEach(id=>assert.equal(e.e(id).textContent,'',id));assert.equal(e.calls.toasts.length,0);
+ });
+ await test('late receipt totals cannot populate the next account after logout',async()=>{
+   const e=createEnv();let finish;e.ctx.testReadCash=()=>new Promise(resolve=>finish=resolve);
+   e.run("reportTab='revenue';crmReadAll=async()=>[];crmReadCommissionSummary=testReadCash;");
+   const loading=e.run('loadReports()');await new Promise(resolve=>setImmediate(resolve));assert.equal(typeof finish,'function');
+   e.run('clearSessionUI()');finish({expected_commission:4500,collected_commission:500.005,outstanding_commission:3999.995,undated_received_deals:0});await loading;
+   ['revReceived','revPending','revNet'].forEach(id=>assert.equal(e.e(id).textContent,''));assert.equal(e.calls.toasts.length,0);
+ });
  await test('backup manifest excludes secrets and includes compound relations and IG',async()=>{const e=createEnv();const m=e.run('CRM_EXPORT_MANIFEST');assert.ok(m.some(x=>x.table==='instagram_messages'));assert.equal(m.find(x=>x.table==='client_request_assignees').primary_key.length,3);assert.ok(!m.some(x=>x.table.includes('credentials')));assert.ok(!m.find(x=>x.table==='company_invites').columns.split(',').includes('token'))});
  await test('restore review rejects foreign company and never performs writes',async()=>{const e=createEnv();assert.throws(()=>e.run("reviewBusinessExport({version:BACKUP_VERSION,kind:'business_data_export',company_id:'OTHER',tables:{}},'TEST_COMPANY')"));assert.equal(e.calls.queries.length,0);assert.ok(!e.run('restoreFromBackup.toString()').includes('.upsert('))});
  await test('known partial WhatsApp success blocks duplicate sends',async()=>{const e=createEnv();e.state.invoke=async()=>({data:{ok:true,sent:true,recorded:false}});const a=await e.run("crmSendWhatsApp({client_id:'TEST_CLIENT',body:'TEST hello'})");assert.equal(a.recorded,false);assert.ok(a.warning.includes('لا تعِد'));await assert.rejects(e.run("crmSendWhatsApp({client_id:'TEST_CLIENT',body:'TEST hello'})"));assert.equal(e.calls.invokes.length,1)});

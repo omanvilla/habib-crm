@@ -1,6 +1,15 @@
 # Habib CRM — current state
 
-Updated 2026-10-18. Read this with `AGENTS.md` before work. This file distinguishes deployed changes, direct verification and remaining work. Older dated reports remain evidence, not competing product rules.
+Updated 2026-10-19. Read this with `AGENTS.md` before work. This file distinguishes deployed changes, direct verification and remaining work. Older dated reports remain evidence, not competing product rules.
+
+## 2026-10-19 comprehensive audit release checkpoint
+
+- SQL25 and SQL26 are applied to production as migrations `20261019042543` (`comprehensive_audit_repairs_20261018`) and `20261019042648` (`audit_financial_reporting_20261019`). Frontend `20261019-audit-v6` is prepared on `codex/comprehensive-audit-20261018`; its deployment verification is pending at this checkpoint. The preceding published main was `0df90ba902af5eaca2e73dd6fedeab421dd69406`, independently preserved as `backup/pre-audit-20261019`.
+- Direct post-migration comparison of every original field against the protected snapshot found **zero changes in all 55 deals and two deposits**. There are zero new receipt rows or milestone events; no production test records or guessed historical dates were inserted. Expense precision is now `numeric(13,3)`.
+- SQL26 preserves recorded employee/company shares when an estimate or unchanged full form is saved; actual allocation-term changes remain deliberate and audited. Receipt-ledger dates survive unrelated edits. Gross company receipts before employee share use their own dates and are independent of booking and closing periods. The owner-only `crm_commission_report` includes the owner's entire company, including private investment; employee performance continues to exclude private investment. Unknown legacy receipt dates/amounts are diagnostics, never invented monthly revenue.
+- UI fixes cover six approved team periods and explicit month selections, qualified weekly additions after sale, Arabic/Persian/formatted phone search, complete independent-request filters, filter-matching CSV, next-action display, stale-session goal/financial data, idempotent expense saves and three-decimal financial display. Revenue charts use actual Oman-local closing dates. Current served Supabase SDK version is pinned with integrity verification.
+- Current local validation: **267 Node assertions passed, two PostgreSQL-context tests deferred to their CI jobs; security harness 28 passed; new synthetic browser suite 56 grouped checks**. Full-catalog isolated SQL24/25/26 acceptance, repeat application, authorization and non-destructive rollback passed. The final GitHub CI and publication checks remain pending here. See `docs/audit-release-20261019.md` and `docs/audit-security-20261019.md`.
+- Ten historical received deals lack a collection date. Preserve them; the owner must supply real dates before monthly receipt attribution. Actual employee/owner browser authentication, recovery/refresh-token expiry, live Meta delivery and Storage upload remain separate unverified paths. Synthetic browser tests and SQL role claims do not establish actual login evidence.
 
 ## 2026-10-18 comprehensive audit candidate
 

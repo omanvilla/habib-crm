@@ -7,7 +7,12 @@
   const dateText=d=>d?new Date(d).toLocaleDateString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat'}):'—';
   // Calendar arithmetic uses UTC components of the Oman-local date.
   // Browser/device timezone must not move the period boundary.
+  function validPerformancePeriod(kind){
+    kind=({quarter:"months3",halfyear:"months6",nine_months:"months9"})[kind]||kind;
+    return ["month","months3","months6","months9","year","all"].includes(kind)?kind:"month";
+  }
   function period(kind){
+    kind=validPerformancePeriod(kind);
     const today=omanDate(new Date()),date=new Date(today+'T12:00:00Z');
     const day=date.getUTCDay();
     const iso=d=>d.toISOString().slice(0,10);
@@ -63,26 +68,29 @@
   if(typeof previousDashboardTargets==='function')window.loadDashboard=function(){const result=previousDashboardTargets.apply(this,arguments);mountTargetDashboard();return result;};
   const performanceLoads=new WeakMap();
   let teamPerformancePeriod='month';
-  async function renderPerformance(kind,boxId='employeePerformanceResults'){
+  async function renderPerformance(kind,boxId='employeePerformanceResults',explicitSpan){
+    kind=validPerformancePeriod(kind);
     const generation=crmSessionGeneration,user=currentUser&&currentUser.id;
     const box=$id(boxId);if(!box)return;
-    const request={};performanceLoads.set(box,request);
+    const request={span:explicitSpan||period(kind)};performanceLoads.set(box,request);
     const isCurrent=()=>performanceLoads.get(box)===request&&crmSessionCurrent(generation,user);
     box.innerHTML='<p class="ops-state" role="status">جاري تحميل الأداء…</p>';
     try{
-      const span=period(kind),r=await bounded(supa.rpc('crm_employee_performance',{p_from:span.from,p_to:span.to}));
+      const span=request.span,r=await bounded(supa.rpc('crm_employee_performance',{p_from:span.from,p_to:span.to}));
       if(!isCurrent())return;
       if(r.error)throw r.error;
-      const employees=r.data.employees||[];
+      if(!r.data||!Array.isArray(r.data.employees))throw new Error('لم تصل بيانات الأداء. أعد المحاولة');
+      const employees=r.data.employees;
       box.innerHTML='<div class="ops-performance-caption"><span>'+safe(r.data.from||span.from||'بداية الشركة')+' — '+safe(new Date(Date.parse(span.to+'T00:00:00Z')-86400000).toISOString().slice(0,10))+'</span><small>العقارات النشطة رصيد حالي؛ بقية الأرقام للفترة المختارة.</small></div>'+
       (employees.map(x=>'<article class="ops-person"><div class="ops-person-title"><strong>'+safe(x.name)+'</strong><span>'+safe(targetScore(x,kind))+'</span></div><div class="ops-metrics">'+
-        metric('عقارات نشطة الآن',x.active_inventory,'مسندة للموظفة')+metric('عقارات أُضيفت خلال الفترة',x.new_properties,'إضافة عقار جديد إلى CRM')+metric('استفسارات عن عقار محدد',x.inquiries,'رسائل واردة رُبطت بعقار')+metric('استفسارات الفترة التي وصلت لزيارة',x.inquiry_to_visit,'قد تكون الزيارة في فترة لاحقة')+metric('زيارات حُجزت',x.visits_booked)+metric('زيارات تمت',x.visits_done)+metric('مبيعات الفترة المرتبطة بزيارة',x.visit_to_sale,'يشمل الزيارات السابقة للفترة')+metric('حجوزات مؤكدة في الفترة',x.reservations,'بتاريخ دفع العربون، مرة واحدة')+metric('حجوزات الفترة التي لا تزال سارية',x.active_reservations)+metric('حجوزات الفترة الملغاة لاحقًا',x.cancelled_reservations)+metric('مبيعات أُغلقت',x.sales,'بتاريخ إتمام البيع؛ مستقلة عن هدف الحجوزات')+metric('أنشطة متابعة موثقة',x.activities,'مكالمات واجتماعات ومتابعات مسجلة')+metric('رسائل واتساب صادرة من الفريق',x.outbound_messages,'رسائل أرسلها موظف، دون الآلية')+'</div>'+
+        metric('عملاء استفسروا عن عقار',x.inquiry_clients,'كل عميل مرة واحدة خلال الفترة')+metric('مستفسرون ردّت عليهم الموظفة',x.replied_inquiry_clients,'رد بشري بعد الاستفسار وفي الفترة نفسها')+metric('رسائل أرسلتها الموظفة',x.successful_staff_messages,'رسائل أُرسلت بنجاح؛ بدون الآلية أو الفاشلة')+metric('عقارات نشطة الآن',x.active_inventory,'مسندة للموظفة')+metric('عقارات أُضيفت خلال الفترة',x.new_properties,'إضافة عقار جديد إلى CRM')+metric('استفسارات عن عقار محدد',x.inquiries,'رسائل واردة رُبطت بعقار')+metric('استفسارات الفترة التي وصلت لزيارة',x.inquiry_to_visit,'قد تكون الزيارة في فترة لاحقة')+metric('زيارات حُجزت',x.visits_booked)+metric('زيارات تمت',x.visits_done)+metric('مبيعات الفترة المرتبطة بزيارة',x.visit_to_sale,'يشمل الزيارات السابقة للفترة')+metric('حجوزات مؤكدة في الفترة',x.reservations,'بتاريخ دفع العربون، مرة واحدة')+metric('حجوزات الفترة التي لا تزال سارية',x.active_reservations)+metric('حجوزات الفترة الملغاة لاحقًا',x.cancelled_reservations)+metric('مبيعات أُغلقت',x.sales,'بتاريخ إتمام البيع؛ مستقلة عن هدف الحجوزات')+metric('أنشطة متابعة موثقة',x.activities,'مكالمات واجتماعات ومتابعات مسجلة')+'</div>'+
         (x.expected_commission==null?'':'<div class="ops-commission"><span>عمولات متوقعة من حجوزات الفترة</span><strong>'+n(x.expected_commission)+' <small>ر.ع</small></strong></div>')+(x.unknown_expected_commission?'<p class="ops-note">حجوزات لم تُحدد عمولتها المتوقعة: '+n(x.unknown_expected_commission)+'</p>':'')+(x.company_commission==null?'':'<div class="ops-commission"><span>عمولة الشركة من المبيعات المكتملة في الفترة</span><strong>'+n(x.company_commission)+' <small>ر.ع</small></strong></div>')+(x.commission_collected==null?'':'<div class="ops-commission"><span>عمولات المكتب المحصلة فعليًا في الفترة</span><strong>'+n(x.commission_collected)+' <small>ر.ع</small></strong></div>')+'</article>').join('')||'<p class="ops-empty">لا يوجد موظفون نشطون.</p>')+
-        '<details class="ops-metric-definitions"><summary>كيف تُحسب هذه الأرقام؟</summary><p>الحجز يُحسب مرة واحدة بتاريخ دفع العربون، وتبقى عمولته متوقعة إلى أن تُسجل دفعة فعلية بتاريخ تحصيلها. الانتقال للبيع أو التحصيل لا يكرر الحجز. الإلغاء يبقي التاريخ ظاهرًا ويُخرج الحجز من السارية. الاستفسار يُحسب عند وجود رسالة واردة مرتبطة بعقار محدد. الزيارة اليدوية تُحسب زيارة، ولا تتحول وحدها إلى استفسار وارد. مبيعات الفترة المرتبطة بزيارة تشمل البيع الذي أُغلق خلالها وكانت له زيارة مكتملة، حتى لو تمت الزيارة في شهر سابق. أنشطة المتابعة هي السجلات البشرية الفعلية؛ رسائل واتساب الآلية مستبعدة.</p><p>الإسناد المعتمد للعمل منذ 1 أغسطس 2026: مسقط لهديل وبركاء لمرام. رصيد العقارات المستهدف 10، وبقية الأهداف حسب اعتماد المالك.</p></details>';
+        '<details class="ops-metric-definitions"><summary>كيف تُحسب هذه الأرقام؟</summary><p>عملاء الاستفسارات يُحسبون مرة واحدة لكل عميل خلال الفترة، والردود هي ردود الموظفة البشرية بعد الاستفسار. رسائل الموظفة هي الرسائل البشرية التي أُرسلت بنجاح، وقد تتعدد للعميل الواحد؛ تُستبعد الآلية والفاشلة والمعلقة. الحجز يُحسب مرة واحدة بتاريخ دفع العربون، وتبقى عمولته متوقعة إلى أن تُسجل دفعة فعلية بتاريخ تحصيلها. الانتقال للبيع أو التحصيل لا يكرر الحجز. الإلغاء يبقي التاريخ ظاهرًا ويُخرج الحجز من السارية. الاستفسار يُحسب عند وجود رسالة واردة مرتبطة بعقار محدد. الزيارة اليدوية تُحسب زيارة، ولا تتحول وحدها إلى استفسار وارد. مبيعات الفترة المرتبطة بزيارة تشمل البيع الذي أُغلق خلالها وكانت له زيارة مكتملة، حتى لو تمت الزيارة في شهر سابق. أنشطة المتابعة هي السجلات البشرية الفعلية؛ رسائل واتساب الآلية مستبعدة.</p><p>الإسناد المعتمد للعمل منذ 1 أغسطس 2026: مسقط لهديل وبركاء لمرام. رصيد العقارات المستهدف 10، وبقية الأهداف حسب اعتماد المالك.</p></details>';
     }catch(e){if(!isCurrent())return;box.innerHTML='<div class="ops-error" role="alert"><strong>تعذر تحميل الأداء</strong><span>'+safe(e.message)+'</span><button class="ops-action" data-performance-retry="'+safe(kind)+'" data-performance-box="'+safe(boxId)+'">إعادة المحاولة</button></div>'}
   }
   window.crmDashboardPerformancePeriod=function(kind){const panel=$id('opsPerformanceDetails');if(!currentProfile||!['owner','manager','agent'].includes(currentProfile.role))return;if(panel)panel.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('active',b.dataset.period===kind));renderPerformance(kind,'opsDashboardPerformanceResults')};
   window.crmPerformancePeriod=function(kind){teamPerformancePeriod=kind;document.querySelectorAll('.ops-period').forEach(b=>b.classList.toggle('active',b.dataset.period===kind));return renderPerformance(kind)};
+  window.crmReportPerformance=function(kind,span){if(currentProfile?.role!=='owner')return;return renderPerformance(kind,'teamLeaderboard',span)};
   function addPerformance(){
     const target=$id('employeeTargetsPanel'),team=$id('page-team');if(!team||$id('employeePerformancePanel'))return;
     const card=document.createElement('div');card.className='card';card.id='employeePerformancePanel';
@@ -210,7 +218,7 @@
   if(typeof propertyActionQueue==='function')window.loadPropertyActionQueue=function(target){if(target==='dashboard')return Promise.resolve();return propertyActionQueue.apply(this,arguments);};
   document.addEventListener('click',e=>{
     const more=e.target.closest('[data-dashboard-more]');if(more){loadDashboardMore(more.dataset.dashboardMore);return;}
-    const performanceRetry=e.target.closest('[data-performance-retry]');if(performanceRetry){renderPerformance(performanceRetry.dataset.performanceRetry,performanceRetry.dataset.performanceBox);return;}
+    const performanceRetry=e.target.closest('[data-performance-retry]');if(performanceRetry){renderPerformance(performanceRetry.dataset.performanceRetry,performanceRetry.dataset.performanceBox,performanceLoads.get($id(performanceRetry.dataset.performanceBox))?.span);return;}
     const retry=e.target.closest('[data-dashboard-retry]');if(retry){loadDashboardScope(retry.dataset.dashboardRetry);return;}
     const control=e.target.closest('[data-dashboard-scope],[data-dashboard-category]');if(!control)return;
     const scope=control.dataset.dashboardScope,category=control.dataset.dashboardCategory;
@@ -220,6 +228,20 @@
   });
   const oldPhone=window.formatPhoneDisplay;
   if(typeof oldPhone==='function')window.formatPhoneDisplay=function(v){return oldPhone(v).replace(/<span dir="ltr"/g,'<bdi dir="ltr"').replace(/<\/span>/g,'</bdi>')};
+  const listExports={clients:{ready:false,snapshot:null},properties:{ready:false,snapshot:null}};
+  function captureListExport(kind,rows){
+    listExports[kind].snapshot={rows:rows.slice(),generation:crmSessionGeneration,user:currentUser&&currentUser.id};
+  }
+  function exportDisplayed(kind,callback){
+    const data=listExports[kind],snapshot=data.snapshot;
+    if(!data.ready||!snapshot||!crmSessionCurrent(snapshot.generation,snapshot.user)){showToast('تعذر تصدير القائمة الحالية. أكمل تحميلها أو أعد المحاولة أولًا.','error');return;}
+    const original=kind==='clients'?allClients:allProperties;
+    try{if(kind==='clients')allClients=snapshot.rows;else allProperties=snapshot.rows;return callback();}
+    finally{if(kind==='clients')allClients=original;else allProperties=original;}
+  }
+  const oldExportClients=window.exportClients,oldExportProperties=window.exportProperties;
+  if(typeof oldExportClients==='function')window.exportClients=function(){return exportDisplayed('clients',()=>oldExportClients.apply(this,arguments));};
+  if(typeof oldExportProperties==='function')window.exportProperties=function(){return exportDisplayed('properties',()=>oldExportProperties.apply(this,arguments));};
   let propertySearch='',propertyBranch='',propertyArea='',propertyStatus='';
   const propertyStatusLabel=s=>({available:'متوفر',reserved:'محجوز',deposit:'عربون',negotiating:'تفاوض',sold:'مباع',not_available:'غير متاح'}[s]||s||'غير محدد');
   function propertyActions(p){
@@ -234,11 +256,12 @@
       if(propertyArea&&!areas.includes(propertyArea))propertyArea='';
       areaSelect.innerHTML='<option value="">كل المناطق</option>'+areas.map(a=>'<option value="'+safe(a)+'">'+safe(a)+'</option>').join('');areaSelect.value=propertyArea;}
     const items=allProperties.filter(p=>(!propertyBranch||(p.branch_key||'unknown')===propertyBranch)&&(!propertyArea||(p.area||'غير محددة')===propertyArea)&&(!propertyStatus||p.status===propertyStatus)&&(!propertySearch||[p.title,p.property_code,p.area,p.wilayat].join(' ').toLowerCase().includes(propertySearch)));
-    if(!items.length){list.innerHTML='<div class="ops-state">لا توجد عقارات تطابق العرض الحالي.'+((propertySearch||propertyArea||propertyBranch||propertyStatus)?workButton('clear-properties','مسح الفلاتر'):'')+'</div>';return;}
+    if(!items.length){captureListExport('properties',[]);list.innerHTML='<div class="ops-state">لا توجد عقارات تطابق العرض الحالي.'+((propertySearch||propertyArea||propertyBranch||propertyStatus)?workButton('clear-properties','مسح الفلاتر'):'')+'</div>';return;}
     const groups=new Map();items.slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).forEach(p=>{
       const branch=p.branch_key==='barka'?'بركاء':p.branch_key==='muscat'?'مسقط':'غير محدد',area=p.area||'منطقة غير محددة',key=branch+'|'+area;
       if(!groups.has(key))groups.set(key,{branch,area,items:[]});groups.get(key).items.push(p);});
     const ordered=[...groups.values()].sort((a,b)=>['مسقط','بركاء','غير محدد'].indexOf(a.branch)-['مسقط','بركاء','غير محدد'].indexOf(b.branch)||a.area.localeCompare(b.area,'ar'));
+    captureListExport('properties',ordered.flatMap(g=>g.items));
     let last='';list.innerHTML=ordered.map(g=>{
       const heading=g.branch===last?'':'<h3 class="ops-branch">'+safe(g.branch)+'</h3>';last=g.branch;
       return heading+'<section class="ops-area"><h4>'+safe(g.area)+' <small>'+g.items.length+' عقارات</small></h4><div class="ops-property-grid">'+g.items.map(p=>'<article class="ops-property"><div class="ops-property-top"><span class="ops-status '+(!p.archived&&p.status==='available'?'ops-available':'')+'">'+safe((p.archived?'مؤرشف · ':'')+propertyStatusLabel(p.status))+'</span><bdi dir="ltr" class="ops-code">'+safe(p.property_code||'')+'</bdi></div><button type="button" class="ops-title" data-work-action="property" data-work-id="'+safe(p.id)+'">'+safe(p.title||'عقار')+'</button><div class="ops-property-price">'+n(p.price)+' <small>ر.ع</small></div><p>'+safe(typeof propTypeAr==='function'?propTypeAr(p.type):p.type||'')+(p.bedrooms?' · '+n(p.bedrooms)+' غرف':'')+(p.land_size?' · '+n(p.land_size)+' م²':'')+'</p><div class="ops-property-foot"><small>أضيف '+safe(dateText(p.created_at))+'</small>'+propertyActions(p)+'</div></article>').join('')+'</div></section>';
@@ -247,13 +270,23 @@
   const oldProperties=window.loadProperties;
   if(typeof oldProperties==='function')window.loadProperties=async function(){
     const user=currentUser&&currentUser.id,generation=crmSessionGeneration;
+    listExports.properties.ready=false;listExports.properties.snapshot=null;
     const loaded=await oldProperties.apply(this,arguments);
     if(loaded===false||!crmSessionCurrent(generation,user))return loaded;
-    renderOrganizedProperties();return loaded;
+    renderOrganizedProperties();listExports.properties.ready=true;return loaded;
+  };
+  const oldLoadClients=window.loadClients;
+  if(typeof oldLoadClients==='function')window.loadClients=async function(){
+    const user=currentUser&&currentUser.id,generation=crmSessionGeneration;
+    listExports.clients.ready=false;listExports.clients.snapshot=null;
+    const loaded=await oldLoadClients.apply(this,arguments);
+    if(loaded===false||!crmSessionCurrent(generation,user)){listExports.clients.snapshot=null;return loaded;}
+    listExports.clients.ready=true;return loaded;
   };
   const oldClients=window.renderClients;
   let clientBranch='all';
   if(typeof oldClients==='function')window.renderClients=function(){const list=$id('clientsList');if(!list)return oldClients.apply(this,arguments);
+    captureListExport('clients',[]);
     let bar=$id('opsClientBranches');if(!bar){bar=document.createElement('div');bar.id='opsClientBranches';bar.className='ops-periods';list.parentNode.insertBefore(bar,list)}
     if(isOwner())bar.innerHTML=['all','muscat','barka','investment','general'].map(k=>'<button class="btn-secondary '+(k===clientBranch?'active':'')+'" data-client-branch="'+k+'">'+({all:'الكل',muscat:'مسقط',barka:'بركاء',investment:'المستثمرين · خاص بالمالك',general:'غير محدد'}[k])+'</button>').join('');else bar.remove();
     if(clientBranch==='all'||!isOwner())return oldClients.apply(this,arguments);
@@ -270,6 +303,7 @@
     const sorted=clients.filter(c=>clientWorkFilter==='all'||(byClient.get(c.id)||[]).some(matches)).slice().sort((a,b)=>{
       const earliest=c=>(byClient.get(c.id)||[]).map(r=>workDate(r.next_followup)||'9999').sort()[0]||'9999';
       return earliest(a).localeCompare(earliest(b))||String(b.created_at).localeCompare(String(a.created_at));});
+    captureListExport('clients',sorted);
     if(!sorted.length){list.innerHTML='<div class="ops-state">لا يوجد عملاء يطابقون هذا العرض. '+workButton('clear-clients','عرض الكل')+'</div>';return;}
     list.innerHTML=sorted.map(c=>{
       const requests=(byClient.get(c.id)||[]).slice().sort((a,b)=>String(a.next_followup||'9999').localeCompare(String(b.next_followup||'9999')));
@@ -282,6 +316,11 @@
     }).join('');
   };
   window.crmResetOperations=function(){
+    targetLoadSeq++;
+    Object.values(listExports).forEach(state=>{state.ready=false;state.snapshot=null;});
+    if(typeof crmEndSave==='function')crmEndSave('employeeTargetsPanel');
+    if(typeof crmSaveAttempts!=='undefined')crmSaveAttempts.delete('employeeTargetsPanel');
+    ['opsEmployeeTargets','employeeTargetsPanel'].forEach(id=>{if($id(id))$id(id).textContent='';});
     teamPerformancePeriod='month';dashboardScopes.clear();dashboardSession='';dashboardScope='branches';dashboardCategory='all';
     clientBranch='all';clientWorkFilter='all';propertySearch='';propertyBranch='';propertyArea='';propertyStatus='';
     ['opsPropertySearch','opsPropertyBranch','opsPropertyArea','opsPropertyStatus'].forEach(id=>{if($id(id))$id(id).value='';});

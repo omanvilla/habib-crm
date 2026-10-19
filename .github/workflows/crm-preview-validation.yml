@@ -36,6 +36,7 @@ jobs:
       - run: node tests/dashboard-browser.cjs
       - run: node tests/reservation-browser.cjs
       - run: node tests/audit-browser.cjs
+      - run: node tests/audit-fault-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -260,5 +261,10 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f db/changes/25-comprehensive-audit-repairs.forward.sql
           psql -v ON_ERROR_STOP=1 -f db/changes/25-comprehensive-audit-repairs.forward.sql
           psql -v ON_ERROR_STOP=1 -f tests/fixtures/comprehensive-audit-assert.sql
+          psql -v ON_ERROR_STOP=1 -f db/changes/26-financial-reporting-preservation.forward.sql
+          psql -v ON_ERROR_STOP=1 -f db/changes/26-financial-reporting-preservation.forward.sql
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/financial-reporting-preservation-assert.sql
+          psql -v ON_ERROR_STOP=1 -f db/changes/26-financial-reporting-preservation.rollback.sql
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/financial-reporting-preservation-rollback-assert.sql
           psql -v ON_ERROR_STOP=1 -f db/changes/25-comprehensive-audit-repairs.rollback.sql
           psql -v ON_ERROR_STOP=1 -f tests/fixtures/comprehensive-audit-rollback-assert.sql

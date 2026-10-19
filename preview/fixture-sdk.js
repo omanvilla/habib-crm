@@ -190,6 +190,20 @@ rpc:async(name,args={})=>{
  if(name==='crm_client_contact_queue')return {data:clients.filter(c=>allowed(c,'clients')&&!c.human_contact_at).map(c=>({client_id:c.id})),error:null};
  if(name==='crm_property_action_queue')return {data:[],error:null};
  if(name==='crm_employee_performance')return {data:{from:args.p_from,to:args.p_to,employees:profiles.filter(p=>p.role==='agent'&&(profile.role!=='agent'||p.id===profile.id)).map(p=>({employee_id:p.id,name:p.full_name,active_inventory:properties.filter(x=>x.sourced_by===p.id&&!x.archived&&!['sold','not_available'].includes(x.status)).length,new_properties:0,inquiries:0,visits_booked:0,visits_done:0,sales:0,activities:0,outbound_messages:0,company_commission:20,targets:{inventory_target:10}}))},error:null};
+ if(name==='crm_commission_report'){
+  if(profile.role!=='owner')return {data:null,error:{message:'TEST company receipts are owner-only',code:'42501'}};
+  // Frontend-only ledger model: receipts carry their own date. Real accounting,
+  // role and concurrency behavior are verified by the independent SQL suites.
+  const day=value=>value?new Date(value).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'}):null;
+  const inPeriod=value=>value&&(!args.p_from||value>=args.p_from)&&(!args.p_to||value<args.p_to),milli=value=>Math.round(Number(value||0)*1000);
+  const deals=db.deals.filter(d=>allowed(d,'deals')&&(d.reservation_confirmed_at||['closed','commission_collected'].includes(d.stage)));
+  const ids=new Set(deals.map(d=>d.id)),receipts=(db.deal_commission_receipts||[]).filter(r=>ids.has(r.deal_id)&&!r.voided_at);
+  const expected=deals.filter(d=>inPeriod(day(d.reservation_confirmed_at))).reduce((sum,d)=>sum+milli(d.expected_company_commission_at_reservation),0);
+  const collected=receipts.filter(r=>inPeriod(r.received_on)).reduce((sum,r)=>sum+milli(r.amount),0);
+  const outstanding=deals.filter(d=>d.stage!=='lost'&&!d.reservation_cancelled_at).reduce((sum,d)=>sum+Math.max(0,milli(d.expected_company_commission_at_reservation??d.company_commission)-receipts.filter(r=>r.deal_id===d.id).reduce((paid,r)=>paid+milli(r.amount),0)),0);
+  const undated=deals.filter(d=>d.commission_status==='received'&&!d.commission_received_at&&!receipts.some(r=>r.deal_id===d.id)).length;
+  return {data:{expected_commission:expected/1000,collected_commission:collected/1000,outstanding_commission:outstanding/1000,undated_received_deals:undated},error:null};
+ }
  if(name==='crm_property_acquisition_funnel')return {data:[],error:null};
  if(name==='crm_client_360')return {data:{requests:requests.filter(r=>r.client_id===args.p_client_id&&allowed(r,'client_requests')),property_journey:[],appointments:[],activities:[],tasks:[],deals:[],whatsapp:[]},error:null};
  if(name==='crm_data_quality_summary')return {data:[],error:null};
