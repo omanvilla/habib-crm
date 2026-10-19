@@ -2441,7 +2441,7 @@ var rc=document.getElementById('csResultCount');if(rc)rc.textContent='🎯 '+fil
 }else{
 var rc2=document.getElementById('csResultCount');if(rc2)rc2.textContent='';
 }
-if(!filtered.length){list.innerHTML='<div class="empty"><div class="empty-ico">👥</div><div class="empty-title">لا يوجد عملاء '+(clientRoleFilter==='all'?'بعد':'في هذا التصنيف')+'</div>'+(clientRoleFilter==='all'&&canEdit()?'<button class="btn-primary" style="margin-top:14px;width:auto;padding:10px 22px" onclick="openModal(\'mClient\')">+ إضافة عميل جديد</button>':'')+'</div>';return}
+if(!filtered.length){const f=window.clientSmartFilter||{},hasFilter=allClients.length>0||clientRoleFilter!=='all'||showArchivedClients||f.text||f.type||f.area||f.budget!=null||(typeof window.crmClientFiltersActive==='function'&&window.crmClientFiltersActive());list.innerHTML='<div class="empty"><div class="empty-ico">👥</div><div class="empty-title">'+(hasFilter?'لا توجد نتائج مطابقة':'لا يوجد عملاء بعد')+'</div>'+(clientRoleFilter==='all'&&canEdit()?'<button class="btn-primary" style="margin-top:14px;width:auto;padding:10px 22px" onclick="openModal(\'mClient\')">+ إضافة عميل جديد</button>':'')+'</div>';return}
 if(typeof window.crmRenderClientWorkList==='function'){window.crmRenderClientWorkList(filtered);return;}
 if(typeof isMobileCRM==='function'&&isMobileCRM()){
   let mh='<div class="mobile-record-list">';
