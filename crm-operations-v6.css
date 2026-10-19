@@ -126,3 +126,22 @@
 #opsEmployeeTargets .ops-target-action:hover,#opsEmployeeTargets .ops-target-action:focus-visible{border-color:#2d7859;background:#eef7f0}
 #opsEmployeeTargets .ops-target-action strong{font-size:20px;direction:ltr;unicode-bidi:isolate}
 #opsEmployeeTargets .ops-note{font-size:12px;color:#58675d;margin:10px 0 0}
+
+/* Related results share a section; each event keeps its own reporting date. */
+.ops-performance-stages{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:16px}
+.ops-performance-stage{min-width:0;padding:14px 16px;background:#f9fbf8;border:1px solid #e5ebe3;border-radius:10px}
+.ops-performance-stage h4{margin:0 0 12px;color:#345340;font-size:12px;font-weight:800}
+.ops-performance-stage dl,.ops-performance-finance dl{margin:0}
+.ops-performance-stat{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:8px 0;color:#4c6555;font-size:11px;line-height:1.6}
+.ops-performance-stat dt{min-width:0;overflow-wrap:anywhere}
+.ops-performance-stat dt small{display:block;margin-top:3px;font-size:10px;font-weight:400;line-height:1.6;color:#7a887c}
+.ops-performance-stat dd{margin:0;flex-shrink:0;direction:ltr;unicode-bidi:isolate;color:#244c37;font-weight:750;font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ops-performance-primary{align-items:center;border-bottom:1px solid #e5eae1;padding:0 0 12px;margin-bottom:4px}
+.ops-performance-primary dt{font-size:12px;font-weight:700}.ops-performance-primary dd{font-size:30px;line-height:1.2}
+.ops-performance-breakdown{display:flex;flex-wrap:wrap;gap:5px 14px;font-size:11px;color:#768472;padding-top:6px}.ops-performance-breakdown b{font-size:13px;color:#45684c;direction:ltr;unicode-bidi:isolate}
+.ops-performance-stage dl.ops-performance-sale{margin-top:18px}.ops-performance-sale .ops-performance-primary{border-bottom:0;margin-bottom:0;padding-bottom:4px}.ops-performance-sale .ops-performance-primary dd{font-size:25px}
+.ops-performance-work{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin:16px 0 0;padding-top:12px;border-top:1px solid #e8ede5}.ops-performance-work .ops-performance-stat{gap:10px}.ops-performance-work dd{font-size:23px}
+.ops-performance-finance{margin-top:12px;padding-top:10px;border-top:1px solid #e5ebe2}.ops-performance-finance .ops-performance-stat{padding:9px 0}.ops-performance-finance dd{font-size:20px}.ops-performance-finance .ops-note{margin:7px 0 0}
+.ops-performance-diagnostic{font-size:11px;line-height:1.8;color:#8b642d;margin:12px 0 0;padding-top:10px;border-top:1px solid #e6dfce}
+@media(max-width:1000px){.ops-performance-stages{gap:10px}.ops-performance-stage{padding:12px}.ops-performance-work{gap:14px}.ops-performance-stat{gap:10px}}
+@media(max-width:700px){.ops-performance-stages{grid-template-columns:1fr;gap:10px}.ops-performance-stage{padding:14px}.ops-performance-work{grid-template-columns:1fr;gap:0}.ops-performance-work .ops-performance-stat{border-bottom:1px solid #edf0e9;padding:11px 0}.ops-performance-work .ops-performance-stat:last-child{border-bottom:0}.ops-performance-primary dd{font-size:28px}.ops-performance-finance .ops-performance-stat{gap:12px}.ops-performance-finance dd{font-size:18px}.ops-performance-finance .ops-performance-stat dt small{font-size:9px}}

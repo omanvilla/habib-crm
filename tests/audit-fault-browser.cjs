@@ -125,7 +125,7 @@ async function bookingForm(page,picked){
     const span=await page.evaluate(()=>CRMPREVIEW.calls.filter(c=>c.rpc==='crm_employee_performance').at(-1).args);
     assert.deepEqual(span,{p_from:'2024-02-01',p_to:'2024-03-01'});
     const team=await page.locator('#teamLeaderboard').innerText();
-    for(const label of ['عملاء استفسروا عن عقار','مستفسرون ردّت عليهم الموظفة','رسائل أرسلتها الموظفة','حجوزات مؤكدة في الفترة','عمولات متوقعة من حجوزات الفترة','عمولات المكتب المحصلة فعليًا في الفترة','4,500','500.005'])assert(team.includes(label),label);
+    for(const label of ['عملاء استفسروا عن عقار','مستفسرون ردّت عليهم الموظفة','رسائل أرسلتها الموظفة','حجوزات مؤكدة في الفترة','عمولات حجوزات الفترة','عمولات المكتب المحصلة فعليًا في الفترة','4,500','500.005'])assert(team.includes(label),label);
     await page.screenshot({path:path.join(out,'owner-report-team-desktop.png'),fullPage:true,animations:'disabled'});
     await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,'owner report mobile width');
     await page.screenshot({path:path.join(out,'owner-report-team-mobile.png'),fullPage:true,animations:'disabled'});await page.setViewportSize({width:1440,height:1000});

@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const source=fs.readFileSync(require('node:path').join(__dirname,'../app-base-v15.html'),'utf8');
 function fn(name){const start=source.indexOf('function '+name+'(');assert(start>=0);for(let end=source.indexOf('}',start);end>=0;end=source.indexOf('}',end+1)){const text=source.slice(start,end+1);try{new vm.Script(text);return text;}catch{}}throw Error(name);}
-function harness(){const nodes={dealsContent:{innerHTML:''}};const c={allDeals:[],canEdit:()=>true,canViewFinancials:()=>true,escapeHtml:x=>String(x),fmtDate:x=>String(x).slice(0,10),fmtMoney:x=>String(x),toLocalDateStr:()=> '2026-10-02',dealStageAr:x=>x,$:id=>nodes[id]};vm.createContext(c);vm.runInContext(fn('crmDealCustomerNotes')+'\n'+fn('renderPipeline'),c);return{c,nodes};}
+function harness(){const nodes={dealsContent:{innerHTML:''}};const c={allDeals:[],canEdit:()=>true,canViewFinancials:()=>true,escapeHtml:x=>String(x),fmtDate:x=>String(x).slice(0,10),fmtMoney:x=>String(x),toLocalDateStr:()=> '2026-10-02',dealStageAr:x=>x,$:id=>nodes[id]};vm.createContext(c);vm.runInContext(fn('crmDealCalendarDate')+'\n'+fn('crmDealDatesHtml')+'\n'+fn('crmDealCustomerNotes')+'\n'+fn('renderPipeline'),c);return{c,nodes};}
 test('system visit origin is not a rejection reason, and mixed customer notes survive unchanged',()=>{
  const {c}=harness(),origin='تم إنشاؤها تلقائياً من زيارة بتاريخ 2026-06-29';
  assert.equal(c.crmDealCustomerNotes(origin),'');assert.equal(c.crmDealCustomerNotes(origin+'\nالسعر أعلى من ميزانيتي'),'السعر أعلى من ميزانيتي');
@@ -13,7 +13,7 @@ test('lost card reports absent evidence honestly without changing the stored ori
  const before=JSON.stringify(c.allDeals);c.renderPipeline();assert(nodes.dealsContent.innerHTML.includes('لا يوجد سبب مسجل'));assert(!nodes.dealsContent.innerHTML.includes('توجد ملاحظة قديمة؛'));assert.equal(JSON.stringify(c.allDeals),before);
 });
 test('completed historical card shows actual sale date instead of the entry date',()=>{
- const {c,nodes}=harness();c.allDeals=[{id:'SYNTHETIC',stage:'closed',closed_at:'2020-02-10T08:00:00Z',created_at:'2026-10-02',updated_at:'2026-10-02'}];c.renderPipeline();assert(nodes.dealsContent.innerHTML.includes('بيع: 2020-02-10'));assert(!nodes.dealsContent.innerHTML.includes('تحديث: 2026-10-02'));
+ const {c,nodes}=harness();c.allDeals=[{id:'SYNTHETIC',stage:'closed',closed_at:'2020-02-10T08:00:00Z',created_at:'2026-10-02',updated_at:'2026-10-02'}];c.renderPipeline();assert(nodes.dealsContent.innerHTML.replace(/<[^>]*>/g,'').includes('بيع: 2020-02-10'));assert(!nodes.dealsContent.innerHTML.includes('تحديث: 2026-10-02'));
 });
 test('deal export distinguishes sale, recording and rejection evidence without losing original notes',()=>{
  const {c}=harness();let exported;c.downloadCSV=(name,headers,rows)=>{exported={headers,rows}};vm.runInContext(fn('exportDeals'),c);

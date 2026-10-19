@@ -45,6 +45,22 @@
   }
   const changeName=key=>({reservation_confirmed_at:'تاريخ الحجز',reservation_cancelled_at:'إلغاء الحجز',reservation_cancellation_reason:'سبب الإلغاء',reservation_evidence_note:'مصدر التسجيل',reservation_reference:'مرجع الإثبات',deposit_amount:'العربون',agent_id:'المسؤول',expected_company_commission_at_reservation:'العمولة المتوقعة',commission_entitled_at:'تاريخ استحقاق المكتب',commission_total:'العمولة الكاملة',broker_commission:'عمولة الوسيط',agent_share:'نصيب الموظفة',company_share:'صافي الشركة',commission_received_at:'تاريخ التحصيل',company_commission_received_amount:'المحصّل',commission_status:'حالة التحصيل'}[key]||'تعديل بيانات الصفقة');
   const changeValue=v=>v==null?'غير مسجل':/^\d{4}-\d{2}-\d{2}T/.test(String(v))?day(v):String(v);
+  function savedDates(d,viewings,owner){
+    const visit=(viewings||[]).find(v=>v.id===d.viewing_id);
+    const rows=[{key:'visit',label:'الزيارة',value:visit?day(visit.viewing_date)||'غير مسجل':d.viewing_id?(viewings?'تعذر تحميل الزيارة':'جارٍ تحميل الزيارة'):'غير مسجلة'},
+      {key:'booking',label:'الحجز · دفع العربون',value:day(d.reservation_confirmed_at)||'غير مسجل'},
+      {key:'sale',label:'إتمام البيع',value:day(d.closed_at)||'غير مسجل'}];
+    if(owner){
+      const dates=[...new Set((d.receipts||[]).map(r=>day(r.received_on)).filter(Boolean))].sort();
+      const received=dates.length?dates:day(d.commission_received_at)?[day(d.commission_received_at)]:[];
+      rows.push({key:'receipt',label:received.length>1?'دفعات التحصيل':'تحصيل المكتب',value:received.length?received.join('، '):d.commission_status==='received'||Number(d.company_commission_received_amount)>0?'تاريخ التحصيل غير مسجل':'لم يُسجل تحصيل'});
+    }
+    return rows;
+  }
+  function renderSavedDates(s){
+    if(!$('dwSavedDates')||!s.deal)return;
+    $('dwSavedDates').innerHTML=savedDates(s.deal,s.viewings,own()).map(x=>'<div data-deal-date="'+x.key+'"><span>'+esc(x.label)+'</span><strong dir="auto">'+esc(x.value)+'</strong></div>').join('');
+  }
   const allRows=make=>typeof crmReadAll==='function'?crmReadAll(make).then(data=>({data,error:null})):make();
   function active(s=state){return Boolean(s&&state===s&&s.sequence===sequence&&crmSessionCurrent(s.generation,s.user));}
   function error(message){const el=$('dwError');if(el){el.textContent=message;el.hidden=!message;}else if(message)showToast(message,'error');}
@@ -56,7 +72,8 @@
     const choose=(rows,empty,label,newLabel)=>option('',empty)+rows.map(x=>option(x.id,label(x))).join('')+(newLabel?option('__new__',newLabel):'');
     const typeOptions=typeof propertyTypeOptions==='function'?propertyTypeOptions():option('villa','فيلا')+option('apartment','شقة')+option('land','أرض')+option('other','أخرى');
     const modal=$('mDeal');
-    modal.innerHTML='<div class="modal-box lg dw-modal" dir="rtl"><form id="dealWorkflowForm" novalidate><div class="modal-title" id="mDealTitle">'+(editing?'تعديل الصفقة':'تسجيل صفقة')+'</div><p class="dw-intro">العميل والعقار والمالك وتواريخ البيع والعمولة في نفس الصفحة.</p><div id="dwError" class="dw-error" role="alert" hidden></div><div class="fgrid">'+
+    modal.innerHTML='<div class="modal-box lg dw-modal" dir="rtl"><form id="dealWorkflowForm" novalidate><div class="modal-title" id="mDealTitle">'+(editing?'تعديل الصفقة':'تسجيل صفقة')+'</div><p class="dw-intro">العميل والعقار والمالك وتواريخ الحجز والبيع والتحصيل في نفس الصفحة.</p><div id="dwError" class="dw-error" role="alert" hidden></div>'+
+      (editing?'<section class="dw-saved-dates" aria-label="التواريخ المسجلة"><h4>التواريخ المسجلة · توقيت سلطنة عمان</h4><div id="dwSavedDates"></div>'+(sold(d.stage)&&!d.reservation_confirmed_at?'<p id="dwMissingBooking" class="dw-missing-booking">البيع محفوظ، لكن تاريخ الحجز غير مسجل؛ لذلك لم يُنسب إلى هدف حجوزات أي شهر. أدخل تاريخ دفع العربون ومبلغه الفعليين في قسم الحجز أدناه عندما تتوفر المعلومة. تاريخ الزيارة أو تسجيل المرحلة لا يثبت تاريخ الدفع.</p><button class="btn-secondary" type="button" data-dw-booking>إكمال بيانات الحجز المعروفة</button>':'')+'</section>':'')+'<div class="fgrid">'+
       field('dwMode','نوع التسجيل',select('dwMode',(editing&&d.entry_mode==='legacy'?option('legacy','سجل موجود — احتفظ بالمعلومات المعروفة'):'')+option('current','صفقة جديدة')+option('historical','صفقة قديمة')))+
       field('dwStage','المرحلة',select('dwStage',stages.filter(x=>own()||x[0]!=='commission_collected'||d.stage==='commission_collected').map(x=>option(x[0],x[1])).join('')))+
       '<p class="dw-hint full" id="dwModeHint"></p>'+
@@ -105,6 +122,8 @@
       $('dwReceiptHistory').innerHTML=receipts.length?receipts.map(x=>'<p class="dw-hint">'+esc(x.received_on)+' · '+esc(x.amount)+' ر.ع · '+esc(x.source_note)+'</p>').join(''):(d.commission_status==='received'||Number(d.company_commission_received_amount)>0?'<p class="dw-hint">تحصيل سابق محفوظ؛ راجع السجل القديم قبل إضافة دفعة جديدة.</p>':'<p class="dw-hint">لا توجد دفعات مسجلة في سجل التحصيل الجديد.</p>');
     }
     s.financeBaseline=financialSnapshot();s.milestoneBaseline=[value('dwExpectedBookingCommission'),value('dwEntitledOn')].join('\u0000');
+    renderSavedDates(s);
+    modal.querySelector('[data-dw-booking]')?.addEventListener('click',()=>{$('dwPaidDeposit').scrollIntoView({block:'start',behavior:'smooth'});$('dwPaidDate').focus({preventScroll:true});});
     sync();
     modal.querySelector('[data-dw-cancel]').addEventListener('click',()=>closeModal('mDeal'));
   }
@@ -150,7 +169,7 @@
     if(!client||client==='__new__'||!property||property==='__new__'){sync();return;}
     try{const r=await supa.from('viewings').select('id,client_id,property_id,viewing_date,status,archived').eq('client_id',client).eq('property_id',property).eq('archived',false).order('viewing_date',{ascending:false});
       if(!active(s)||token!==s.viewingSequence)return;if(r.error)throw r.error;s.viewings=r.data||[];
-      $('dwViewingChoice').innerHTML=option('','لا توجد زيارة مختارة')+s.viewings.map(v=>option(v.id,(v.viewing_date||'بدون تاريخ')+' · '+(v.status==='done'?'تمت':v.status==='scheduled'?'مجدولة':v.status))).join('');
+      $('dwViewingChoice').innerHTML=option('','لا توجد زيارة مختارة')+s.viewings.map(v=>option(v.id,(v.viewing_date||'بدون تاريخ')+' · '+(v.status==='done'?'تمت':v.status==='scheduled'?'مجدولة':v.status))).join('');renderSavedDates(s);
       if(s.deal&&s.deal.viewing_id)set('dwViewingChoice',s.deal.viewing_id);sync();
     }catch(e){if(active(s)&&token===s.viewingSequence)error('تعذر تحميل الزيارات: '+e.message);}
   }
@@ -269,5 +288,5 @@
     const id=typeof draggedDealId!=='undefined'?draggedDealId:null,stage=event.currentTarget.dataset.stage;
     if(!id||!stage||!canEdit())return;await open(id,null,stage);
   };
-  window.crmDealWorkflow={day,validDate,amount,mergeNotes,commission,buildPayload,open};
+  window.crmDealWorkflow={day,validDate,amount,mergeNotes,commission,savedDates,buildPayload,open};
 })();

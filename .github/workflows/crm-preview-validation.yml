@@ -38,6 +38,9 @@ jobs:
       - run: node tests/audit-browser.cjs
       - run: node tests/audit-fault-browser.cjs
       - run: node tests/inventory-target-browser.cjs
+      - run: node tests/performance-coherence-browser.cjs
+      - run: node tests/deal-date-coherence-browser.cjs
+      - run: node tests/inquiry-followup-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -269,6 +272,39 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f db/changes/27-inventory-goal-source.forward.sql
           psql -v ON_ERROR_STOP=1 -f db/changes/27-inventory-goal-source.forward.sql
           psql -v ON_ERROR_STOP=1 -f tests/fixtures/inventory-goal-assert.sql
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/performance-coherence-before.sql
+          psql -v ON_ERROR_STOP=1 -f db/changes/28-performance-coherence.forward.sql
+          psql -v ON_ERROR_STOP=1 -f db/changes/28-performance-coherence.forward.sql
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/performance-coherence-assert.sql
+          # SQL29 acceptance intentionally keeps its synthetic follow-up events
+          # to prove rollback preserves them. Isolate that lifecycle so SQL28/27
+          # can still verify their own unchanged predecessor business snapshots.
+          pg_dump > /tmp/habib-followup-catalog.sql
+          createdb crm_inquiry_followup_test
+          psql -d crm_inquiry_followup_test -v ON_ERROR_STOP=1 -f /tmp/habib-followup-catalog.sql
+          psql -d crm_inquiry_followup_test -v ON_ERROR_STOP=1 -f db/changes/29-inquiry-followup-coherence.forward.sql
+          psql -d crm_inquiry_followup_test -v ON_ERROR_STOP=1 -f db/changes/29-inquiry-followup-coherence.forward.sql
+          psql -d crm_inquiry_followup_test -v ON_ERROR_STOP=1 -f tests/fixtures/inquiry-followup-assert.sql
+          HABIB_FOLLOWUP_TEST_DATABASE=crm_inquiry_followup_test node tests/inquiry-followup-concurrency.cjs
+          psql -d crm_inquiry_followup_test -v ON_ERROR_STOP=1 -f tests/fixtures/inquiry-followup-rollback-guard.sql
+          if psql -d crm_inquiry_followup_test -v ON_ERROR_STOP=1 -f db/changes/29-inquiry-followup-coherence.rollback.sql > /tmp/habib-inquiry-rollback-guard.log 2>&1; then
+            cat /tmp/habib-inquiry-rollback-guard.log
+            exit 1
+          fi
+          grep -F 'SQL29 rollback refused: function changed since release' /tmp/habib-inquiry-rollback-guard.log
+          psql -d crm_inquiry_followup_test -v ON_ERROR_STOP=1 -f tests/fixtures/inquiry-followup-rollback-restore.sql
+          psql -d crm_inquiry_followup_test -v ON_ERROR_STOP=1 -f db/changes/29-inquiry-followup-coherence.rollback.sql
+          psql -d crm_inquiry_followup_test -v ON_ERROR_STOP=1 -f tests/fixtures/inquiry-followup-rollback-assert.sql
+          dropdb crm_inquiry_followup_test
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/performance-coherence-rollback-guard-before.sql
+          if psql -v ON_ERROR_STOP=1 -f db/changes/28-performance-coherence.rollback.sql > /tmp/habib-performance-rollback-guard.log 2>&1; then
+            cat /tmp/habib-performance-rollback-guard.log
+            exit 1
+          fi
+          grep -F 'SQL28 rollback refused: object changed since release' /tmp/habib-performance-rollback-guard.log
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/performance-coherence-rollback-guard-assert.sql
+          psql -v ON_ERROR_STOP=1 -f db/changes/28-performance-coherence.rollback.sql
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/performance-coherence-rollback-assert.sql
           psql -v ON_ERROR_STOP=1 -f tests/fixtures/inventory-goal-rollback-guard-before.sql
           if psql -v ON_ERROR_STOP=1 -f db/changes/27-inventory-goal-source.rollback.sql > /tmp/habib-inventory-rollback-guard.log 2>&1; then
             cat /tmp/habib-inventory-rollback-guard.log

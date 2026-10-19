@@ -200,7 +200,7 @@ rpc:async(name,args={})=>{
  if(name==='crm_property_action_queue')return {data:[],error:null};
  // Distinct canned metric counts exercise frontend field mapping and role scope.
  // Their SQL calculation (unique clients, successful human messages) is tested separately.
- if(name==='crm_employee_performance')return {data:{from:args.p_from,to:args.p_to,employees:profiles.filter(p=>p.role==='agent'&&(profile.role!=='agent'||p.id===profile.id)).map(p=>({employee_id:p.id,name:p.full_name,active_inventory:properties.filter(x=>x.sourced_by===p.id&&!x.archived&&!['sold','not_available'].includes(x.status)).length,new_properties:0,inquiries:p.id===muscat?6:3,inquiry_clients:p.id===muscat?4:2,replied_inquiry_clients:p.id===muscat?3:1,successful_staff_messages:p.id===muscat?7:5,visits_booked:0,visits_done:0,sales:0,activities:0,outbound_messages:0,company_commission:20,targets:{inventory_target:10}}))},error:null};
+ if(name==='crm_employee_performance')return {data:{from:args.p_from,to:args.p_to,employees:profiles.filter(p=>p.role==='agent'&&(profile.role!=='agent'||p.id===profile.id)).map(p=>({employee_id:p.id,name:p.full_name,active_inventory:properties.filter(x=>x.sourced_by===p.id&&!x.archived&&!['sold','not_available'].includes(x.status)).length,new_properties:0,inquiries:p.id===muscat?6:3,inquiry_property_pairs:p.id===muscat?6:3,inquiry_pair_to_visit:0,inquiry_clients:p.id===muscat?4:2,replied_inquiry_clients:p.id===muscat?3:1,successful_staff_messages:p.id===muscat?7:5,visits_booked:0,visits_done:0,sales:0,activities:0,outbound_messages:0,company_commission:20,targets:{inventory_target:10}}))},error:null};
  if(name==='crm_commission_report'){
   if(profile.role!=='owner')return {data:null,error:{message:'TEST company receipts are owner-only',code:'42501'}};
   // Frontend-only ledger model: receipts carry their own date. Real accounting,
@@ -216,7 +216,13 @@ rpc:async(name,args={})=>{
   return {data:{expected_commission:expected/1000,collected_commission:collected/1000,outstanding_commission:outstanding/1000,undated_received_deals:undated},error:null};
  }
  if(name==='crm_property_acquisition_funnel')return {data:[],error:null};
- if(name==='crm_client_360')return {data:{requests:requests.filter(r=>r.client_id===args.p_client_id&&allowed(r,'client_requests')),property_journey:[],appointments:[],activities:[],tasks:[],deals:[],whatsapp:[]},error:null};
+ if(name==='crm_client_360'){
+  const client=db.clients.find(c=>c.id===args.p_client_id&&allowed(c,'clients'));
+  if(!client)return {data:null,error:{message:'TEST client is outside the permitted scope',code:'42501'}};
+  const rows=db.client_requests.filter(r=>r.client_id===client.id&&allowed(r,'client_requests'));
+  // Canned presentation data follows the RPC envelope; SQL suites establish its calculations.
+  return {data:{client,customer_kind:rows.length>1?'returning':'new',metrics:{requests_total:rows.length,active_requests:rows.filter(r=>r.status==='active').length,properties_inquired:0,properties_shown:0,properties_visited:0,rejected_properties:0,appointments_attended:0,appointments_no_show:0,negotiations:0,deposits:0,closed_deals:0,whatsapp_inbound:0,whatsapp_outbound:0,open_tasks:0,overdue_followups:0},requests:rows,property_journey:[],appointments:[],activities:[],open_tasks:[],deals:[],recent_whatsapp:[]},error:null};
+ }
  if(name==='crm_data_quality_summary')return {data:[],error:null};
  return {data:[],error:null};
 },

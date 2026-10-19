@@ -52,9 +52,10 @@ test('late owner request fetch cannot render a private form after account switch
 test('new client initializes phone synchronously and delayed form callbacks cannot erase entered phone',()=>{
  const h=harness(),timers=[];h.c.setTimeout=fn=>timers.push(fn);h.c.populateClientForm=()=>{};h.c.setupPhoneField=(_country,local)=>h.el(local).value='';h.load('openModal');h.c.openModal('mClient');h.el('cPhoneLocal').value='90000000';timers.forEach(fn=>fn());assert.equal(h.el('cPhoneLocal').value,'90000000');
 });
-test('late request-card budget patch cannot overwrite same client DOM under a different account',async()=>{
- const h=harness();h.c.viewingClient={id:'MIXED_CLIENT'};h.c.renderClientRequestsTab=async()=>{};h.el('cdTabRequests').children=[{}, {innerHTML:'💰 SAFE<br>'}];let resolve;h.c.respond=()=>new Promise(r=>resolve=r);
- vm.runInContext(fs.readFileSync(path.join(__dirname,'../crm-v18-request-integrity-patch.js'),'utf8'),h.c);const render=h.c.renderClientRequestsTab();await new Promise(r=>setImmediate(r));h.c.crmSessionGeneration++;h.c.currentUser={id:'STAFF'};resolve({data:[{id:'PRIVATE_REQUEST',budget_max:999999}],error:null});await render;assert.equal(h.el('cdTabRequests').children[1].innerHTML,'💰 SAFE<br>');
+test('budget patch leaves guarded request rendering intact and never performs a second private request read',async()=>{
+ const h=harness();h.c.viewingClient={id:'MIXED_CLIENT'};const original=h.c.renderClientRequestsTab;h.el('cdTabRequests').innerHTML='TEST CURRENT REQUESTS';h.c.respond=()=>assert.fail('request budgets must use the already authorized row');
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../crm-v18-request-integrity-patch.js'),'utf8'),h.c);assert.equal(h.c.renderClientRequestsTab,original);await h.c.renderClientRequestsTab();
+ assert.equal(h.calls.length,0);assert.equal(h.el('cdTabRequests').innerHTML,'TEST CURRENT REQUESTS');assert.equal(h.c.crmBudgetText(null,12000,false),'حتى 12,000 ر.ع');
 });
 test('late WhatsApp requirements cannot expose owner data in the same conversation after account switch',async()=>{
  const h=harness(),timers=[],inserted=[];h.c.document.readyState='loading';h.c.document.addEventListener=()=>{};h.c.setTimeout=(fn,delay)=>{if(delay===0)timers.push(fn);};h.c.renderWhatsAppChat=()=>{};h.c.waInboxActiveConversation={id:'SAME_CONVERSATION',client_id:'MIXED_CLIENT'};h.el('waClientStrip').insertBefore=node=>inserted.push(node);let resolve;h.c.respond=()=>new Promise(r=>resolve=r);

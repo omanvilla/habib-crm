@@ -5,8 +5,8 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const source=fs.readFileSync('crm-operations-v6.js','utf8');
 
-function fixture(){
-  const nodes=new Map(['employeePerformanceResults','opsDashboardPerformanceResults','opsPerformanceDetails','teamLeaderboard'].map(id=>[id,{id,innerHTML:'',textContent:'',querySelectorAll:()=>[]}]));
+function fixture(setup=()=>{}){
+  const nodes=new Map(['employeePerformanceResults','opsDashboardPerformanceResults','opsPerformanceDetails','teamLeaderboard'].map(id=>[id,{id,innerHTML:'',textContent:'',querySelectorAll:()=>[],querySelector:()=>null}]));
   const pending=[];
   let finishTeam;
   const context={document:{getElementById:id=>nodes.get(id)||null,querySelectorAll:()=>[],addEventListener(){}},
@@ -15,7 +15,7 @@ function fixture(){
     supa:{rpc:async(name,args)=>new Promise(resolve=>pending.push({name,args,resolve}))},
     loadTeam:()=>new Promise(resolve=>{finishTeam=resolve})};
   context.crmSessionCurrent=(generation,user)=>context.crmSessionGeneration===generation&&context.currentUser?.id===user;
-  context.window=context;vm.createContext(context);vm.runInContext(source,context);
+  context.window=context;setup(context,nodes);vm.createContext(context);vm.runInContext(source,context);
   return {context,nodes,pending,finishTeam:()=>finishTeam(),flush:()=>new Promise(resolve=>setImmediate(resolve))};
 }
 const result=name=>({data:{from:'2026-10-01',employees:[{name,active_inventory:10,targets:{}}]},error:null});
@@ -107,4 +107,51 @@ test('missing performance response is an error, never an empty or zero result',a
  f.pending[0].resolve({data:{},error:null});await f.flush();
  assert.match(f.nodes.get('employeePerformanceResults').innerHTML,/تعذر تحميل الأداء/);
  assert.doesNotMatch(f.nodes.get('employeePerformanceResults').innerHTML,/لا يوجد موظفون نشطون/);
+});
+
+test('refreshing dashboard work refreshes only open performance and retains its selected rolling period',async()=>{
+ const f=fixture(),panel=f.nodes.get('opsPerformanceDetails'),box=f.nodes.get('opsDashboardPerformanceResults');
+ const initial=f.context.crmDashboardPerformancePeriod('months3');f.pending[0].resolve(result('TEST BEFORE MUTATION'));await initial;
+ const span=JSON.parse(JSON.stringify(f.pending[0].args));panel.open=true;
+ const refreshing=f.context.loadDashboard();assert.match(box.innerHTML,/جاري تحميل الأداء/);await f.flush();
+ const reads=f.pending.slice(1);assert.deepEqual(reads.map(r=>r.name),['crm_dashboard_work','crm_dashboard_work','crm_employee_performance']);
+ const performance=reads.find(r=>r.name==='crm_employee_performance');assert.deepEqual(JSON.parse(JSON.stringify(performance.args)),span);
+ reads.forEach(r=>r.resolve(r.name==='crm_employee_performance'?result('TEST AFTER MUTATION'):{data:{scope:r.args.p_scope,counts:{}},error:null}));await refreshing;
+ assert.match(box.innerHTML,/TEST AFTER MUTATION/);assert.doesNotMatch(box.innerHTML,/TEST BEFORE MUTATION/);
+ assert.equal(f.nodes.get('employeePerformanceResults').innerHTML,'');assert.equal(f.nodes.get('teamLeaderboard').innerHTML,'');
+ panel.open=false;const next=f.pending.length,closed=f.context.loadDashboard();await f.flush();
+ assert.deepEqual(f.pending.slice(next).map(r=>r.name),['crm_dashboard_work','crm_dashboard_work']);f.pending.slice(next).forEach(r=>r.resolve({data:{scope:r.args.p_scope,counts:{}},error:null}));await closed;
+});
+
+test('a stale client-list completion cannot invalidate a fresh export snapshot',async()=>{
+ const completions=[],downloads=[],toasts=[];
+ const f=fixture((c,nodes)=>{
+  for(const id of ['clientsList','opsClientBranches'])nodes.set(id,{id,innerHTML:'',querySelectorAll:()=>[]});
+  c.isOwner=()=>true;c.canEdit=()=>false;c.allClients=[];c.clientWorkRequests=[];
+  c.loadClients=()=>new Promise(resolve=>completions.push(resolve));c.renderClients=()=>c.crmRenderClientWorkList(c.allClients);
+  c.exportClients=()=>downloads.push(c.allClients.map(x=>x.id));c.showToast=(...args)=>toasts.push(args);
+ });
+ const old=f.context.loadClients(),fresh=f.context.loadClients();f.context.allClients=[{id:'TEST_FRESH',name:'TEST Fresh'}];f.context.renderClients();completions[1](true);await fresh;
+ completions[0](false);await old;f.context.exportClients();assert.deepEqual(Array.from(downloads[0]),['TEST_FRESH']);assert.equal(toasts.length,0);
+});
+
+test('normal property filters use the same displayed count and exact exported records',async()=>{
+ const handlers={},downloads=[];
+ const f=fixture((c,nodes)=>{
+  for(const id of ['propertiesList','propertiesSub','opsPropertyStatus'])nodes.set(id,{id,innerHTML:'',textContent:'',value:'',querySelectorAll:()=>[]});
+  c.document.addEventListener=(name,handler)=>(handlers[name]||(handlers[name]=[])).push(handler);
+  c.isOwner=()=>true;c.canEdit=()=>false;c.allProperties=[{id:'TEST_1',title:'TEST One',status:'available',branch_key:'muscat'},{id:'TEST_2',title:'TEST Two',status:'reserved',branch_key:'muscat'},{id:'TEST_3',title:'TEST Three',status:'available',branch_key:'barka'}];
+  c.loadProperties=async()=>true;c.exportProperties=()=>downloads.push(c.allProperties.map(p=>p.id));c.showToast=()=>assert.fail('valid property export must succeed');
+ });
+ await f.context.loadProperties();assert.match(f.nodes.get('propertiesSub').textContent,/^3 عقار/);
+ const target=f.nodes.get('opsPropertyStatus');target.value='available';handlers.change.forEach(handler=>handler({target}));
+ assert.match(f.nodes.get('propertiesSub').textContent,/^2 عقار مطابق · من 3/);assert.doesNotMatch(f.nodes.get('propertiesList').innerHTML,/TEST Two/);
+ f.context.exportProperties();assert.deepEqual(Array.from(downloads[0]),['TEST_1','TEST_3']);assert.equal(f.context.allProperties.length,3);
+});
+
+test('session reset clears private client detail, property detail and period result caches',()=>{
+ const privateIds=['cdTabJourney','cdActivities','cdTabRequests','cdTabInterests','cdTabListings','cdTabTasks','cdTabDeals','cdTabInfo','cdSmartMatches','cdClientAI','propertyDetailContent','opsDashboardPerformanceResults','employeePerformanceResults','teamLeaderboard','conversionFunnel'];
+ const f=fixture((_c,nodes)=>privateIds.forEach(id=>{let html='TEST_PRIVATE_ACCOUNT_DATA';nodes.set(id,{id,get innerHTML(){return html;},set innerHTML(v){html=v;},set textContent(v){html=v;}});}));
+ f.context.client360Data={client:{id:'TEST_PRIVATE_CLIENT'}};f.context.crmResetOperations();
+ for(const id of privateIds)assert.equal(f.nodes.get(id).innerHTML,'',id);assert.equal(f.context.client360Data,null);
 });

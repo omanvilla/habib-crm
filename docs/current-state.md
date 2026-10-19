@@ -2,6 +2,14 @@
 
 Updated 2026-10-19. Read this with `AGENTS.md` before work. This file distinguishes deployed changes, direct verification and remaining work. Older dated reports remain evidence, not competing product rules.
 
+## 2026-10-19 coherence v10 — release candidate
+
+- Ahmed's latest request is shared authoritative records throughout the CRM and a simpler period-performance view. The candidate groups inquiries, actual appointment-date visits, bookings and sales; keeps current available inventory in goals/property browsing; preserves property additions and distinct human follow-up clients; and separates booking, closing and actual receipt periods.
+- SQL28 preserves legacy fields while correcting the new shared display contract, using actual inbound evidence for inquiry clients/pairs, one visit-date cohort and gross office commission before employee share. It appends only booking/cancellation dates to the existing protected deal view. SQL29 provides one authenticated, idempotent manual inquiry-follow-up transaction and prevents invented historical request milestones. Both are catalog changes without business-row DML; they are not yet applied at this candidate checkpoint.
+- The frontend shows actual saved dates in deal cards/table/client details/export and separates visit/booking/closing/receipt dates in the form. Missing historical payment date/amount stays unknown. Open performance refreshes after relevant saves. Client detail reads are guarded against late or cross-session responses, and request budgets come from their exact row rather than a second positional match.
+- Local combined verification: 330 Node tests passed with two PostgreSQL-context tests delegated to CI; 28 security checks passed. New synthetic browser suites passed 39 performance/read groups, 18 deal-date groups and 21 inquiry-follow-up groups. Isolated full-catalog SQL28/29 acceptance, repeated application and guarded rollback passed. True PostgreSQL concurrency and the final seven-job CI/deployment gates remain pending here. See [the focused report](coherence-20261019.md).
+- Production remains the v9 checkpoint below until the release evidence replaces this candidate status. Existing property/business counts are point-in-time observations; ordinary user work continued during this audit. No current count is a reason to restore an earlier snapshot.
+
 ## 2026-10-19 deployed inventory target follow-up
 
 - Ahmed clarified that each branch needs at least 10 currently available properties in total, independently of adding two properties each week. SQL27 removes the unused verification-timestamp gate and the standing-stock price/date gates. Counts and exact property-detail ID arrays use the same branch/company/private-investment scope. The other four target metrics and saved goal values are unchanged.

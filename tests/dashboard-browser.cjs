@@ -46,8 +46,8 @@ const server=require('../preview/serve.cjs'),out=path.resolve('preview-results/d
    await page.locator('#opsDashboardPerformanceResults .ops-metric-definitions > summary').click();
    assert.match(await page.locator('#opsDashboardPerformanceResults .ops-metric-definitions').innerText(),/تُستبعد الآلية والفاشلة والمعلقة/);
    const counts=await page.locator('#opsDashboardPerformanceResults .ops-person').evaluateAll(cards=>cards.map(card=>{
-    const value=label=>Number([...card.querySelectorAll('.ops-metric')].find(el=>el.querySelector('small')?.textContent===label)?.querySelector('strong')?.textContent);
-    return {name:card.querySelector('.ops-person-title strong').textContent,inquiries:value('عملاء استفسروا عن عقار'),replied:value('مستفسرون ردّت عليهم الموظفة'),messages:value('رسائل أرسلتها الموظفة')};
+    const value=key=>Number(card.querySelector('[data-performance-metric="'+key+'"] .ops-performance-value')?.textContent);
+    return {name:card.querySelector('.ops-person-title strong').textContent,inquiries:value('inquiry_clients'),replied:value('replied_inquiry_clients'),messages:value('successful_staff_messages')};
    }));
    const expected=[{name:'موظفة مسقط التجريبية',inquiries:4,replied:3,messages:7},{name:'موظفة بركاء التجريبية',inquiries:2,replied:1,messages:5}];
    assert.deepEqual(counts,role==='muscat'?[expected[0]]:role==='barka'?[expected[1]]:expected,role+' metric counts and employee scope');

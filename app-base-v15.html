@@ -318,7 +318,7 @@ window.fbAsyncInit = function(){
 <button class="report-tab active" onclick="switchReportTab('overview',this)">📊 نظرة عامة</button>
 <button class="report-tab" onclick="switchReportTab('revenue',this)">💰 العمولات</button>
 <button class="report-tab" onclick="switchReportTab('team',this)" id="repTeamTab" style="display:none">🏆 الفريق</button>
-<button class="report-tab" onclick="switchReportTab('funnel',this)">🔄 معدل التحويل</button>
+<button class="report-tab" onclick="switchReportTab('funnel',this)" id="repFunnelTab">رحلة العمل</button>
 <button class="report-tab" onclick="switchReportTab('thirtyday',this)">🎯 اختبار 30 يومًا</button>
 <button class="report-tab" onclick="switchReportTab('heatmap',this)">🗺 الخريطة الحرارية</button>
 </div>
@@ -370,7 +370,7 @@ window.fbAsyncInit = function(){
 
 <div id="reportFunnel" style="display:none">
 <div class="conv-funnel">
-<div class="chart-title" style="margin-bottom:18px">🔄 رحلة العميل من بداية للنهاية</div>
+<div class="chart-title" style="margin-bottom:18px">رحلة عمل الفرعين خلال الفترة</div>
 <div id="conversionFunnel"><div class="empty" style="padding:30px"><div class="loader-spinner"></div></div></div>
 </div>
 </div>
@@ -1245,7 +1245,9 @@ window.fbAsyncInit = function(){
 <select id="ifRejectReason" style="display:none"><option value=""></option></select>
 <div class="fg full" id="ifRejectWrap" style="display:none"><label class="fl">🎯 السبب الرئيسي لعدم المناسبة *</label><div id="ifStructuredReasons" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:7px;background:var(--cream);border:1px solid var(--cream-deeper);border-radius:12px;padding:10px"></div></div>
 <div class="fg" id="ifRejectPhaseWrap" style="display:none"><label class="fl">وقت ظهور السبب</label><select class="fs" id="ifRejectPhase"><option value="unknown">غير محدد</option><option value="pre_visit">قبل الزيارة</option><option value="post_visit">بعد الزيارة</option></select></div>
-<div class="fg full"><label class="fl">📝 نتيجة التواصل / ملاحظة المتابعة</label><textarea class="fta" id="ifNote" rows="3" placeholder="ماذا قال العميل؟ ما السبب الدقيق؟ وما الخطوة التالية؟"></textarea></div>
+<div class="fg full"><label class="fl">📝 نتيجة التواصل الجديدة</label><textarea class="fta" id="ifNote" rows="3" maxlength="10000" placeholder="دوّن نتيجة المحاولة الحالية، مثل: تم التواصل واتفقنا على زيارة، أو لم يرد. اتركها فارغة إذا كنت تعدّل الموعد أو الحالة فقط."></textarea><div style="font-size:11px;color:var(--umber);margin-top:5px">تُحتسب متابعة اليوم عند تسجيل نتيجة جديدة فقط؛ الملاحظة السابقة محفوظة أعلاه.</div></div>
+<div class="fg full"><label class="fl">الخطوة التالية</label><input class="fi" id="ifNextAction" maxlength="2000" placeholder="مثال: الاتصال غداً لتأكيد الموعد"></div>
+<div class="fg full" id="ifWorkflowHint" role="status" style="display:none;font-size:12px;color:var(--umber)"></div>
 </div>
 <div class="modal-foot"><button class="btn-secondary" onclick="closeModal('mInquiryFollowup')">إلغاء</button><button class="btn-primary" style="width:auto;padding:9px 22px" onclick="saveInquiryFollowup()">💾 حفظ وتحديث</button></div>
 </div></div>
@@ -2351,17 +2353,19 @@ function updateRoleCounts(){
   $('cntHot').textContent=hot;
   $('cntFollowup').textContent=followup;if($('cntUnassigned'))$('cntUnassigned').textContent=unassigned;if($('unassignedClientsTab'))$('unassignedClientsTab').style.display=canManage()?'':'none';if(followup>0){$('followupAlert').innerHTML='<div class="followup-alert"><div class="followup-text">⏰ <strong>'+followup+' عميل</strong> يحتاج متابعة (أكثر من أسبوع بدون تواصل)</div><button class="btn-primary" style="width:auto;padding:7px 14px;font-size:12px" onclick="filterClientRole(\'followup\',document.querySelector(\'#clientRoleTabs .role-tab:nth-child(6)\'))">عرضهم</button></div>'}else{$('followupAlert').innerHTML=''}}
 async function loadClients(){
- const list=$('clientsList'),generation=crmSessionGeneration,userId=currentUser&&currentUser.id;
+ const list=$('clientsList'),generation=crmSessionGeneration,userId=currentUser&&currentUser.id,archived=showArchivedClients,token={};
+ list.crmReadToken=token;
+ const current=()=>list.crmReadToken===token&&showArchivedClients===archived&&crmSessionCurrent(generation,userId);
  list.innerHTML='<div class="empty" role="status">جاري تحميل العملاء والطلبات…</div>';
  try{
   const [clients,requests]=await Promise.all([
    crmReadAll(()=>supa.from('clients').select('*, agent:profiles!clients_assigned_to_fkey(full_name)',{count:'exact'}).order('created_at',{ascending:false}).order('id')),
    crmReadAll(()=>supa.from('client_requests').select('id,client_id,request_type,status,pipeline_stage,qualified_at,preferred_area,property_type,subject_property_id,route_key,budget_min,budget_max,next_followup,next_action,branch_key',{count:'exact'}).in('status',['active','paused']).order('id'))
   ]);
-  if(!crmSessionCurrent(generation,userId))return;
-  clientWorkRequests=requests;allClients=clients.filter(c=>showArchivedClients?c.archived===true:c.archived!==true);
+  if(!current())return false;
+  clientWorkRequests=requests;allClients=clients.filter(c=>archived?c.archived===true:c.archived!==true);
   updateRoleCounts();renderClients();return true;
- }catch(err){if(!crmSessionCurrent(generation,userId))return false;allClients=[];clientWorkRequests=[];list.innerHTML='<div class="empty" role="alert"><p>تعذر تحميل العملاء وطلباتهم.</p><p>'+escapeHtml(err.message)+'</p><button class="btn-secondary" onclick="loadClients()">إعادة المحاولة</button></div>';return false;}
+ }catch(err){if(!current())return false;allClients=[];clientWorkRequests=[];console.error('[Clients]',err);list.innerHTML='<div class="empty" role="alert"><p>تعذر تحميل العملاء وطلباتهم. أعد المحاولة.</p><button class="btn-secondary" onclick="loadClients()">إعادة المحاولة</button></div>';return false;}
 }
 window.clientSmartFilter = {text:'',type:'',area:'',budget:null};
 
@@ -2501,7 +2505,26 @@ function deleteClient(id,n){
 
 async function restoreClient(id,n){confirmAction('استعادة العميل','هل تريد استعادة <strong>'+escapeHtml(n)+'</strong> من الأرشيف؟','♻️',async function(){let done=false;try{const r=await supa.from('clients').update({archived:false,archived_at:null,archived_by:null}).eq('id',id).select('id').single();if(r.error)throw r.error;if(!r.data)throw new Error('لم يؤكد الخادم استعادة العقار');done=true;showToast('♻️ تم استعادة العميل','success')}catch(err){console.error(err);showToast('خطأ: '+err.message,'error')}if(done){try{await logSystemActivity('edit','client',id,'استعادة العميل: '+n)}catch(e){}loadClients();loadDashboard()}})}
 function permanentDeleteClient(){if(!isOwner())return;showToast('الحذف النهائي غير متاح حالياً لحماية السجلات المرتبطة؛ يمكنك إبقاء العميل في الأرشيف أو استعادته','warning');}
-async function viewClient(id){const generation=crmSessionGeneration,userId=currentUser&&currentUser.id;try{const r=await supa.from('clients').select('*, agent:profiles!clients_assigned_to_fkey(full_name)').eq('id',id).single();if(!crmSessionCurrent(generation,userId))return;if(r.error)throw r.error;viewingClient=r.data;navigate('clientDetail',null);renderClientDetail()}catch(err){showToast('خطأ: '+err.message,'error')}}
+async function viewClient(id){
+ const generation=crmSessionGeneration,userId=currentUser&&currentUser.id,token={};viewClient.crmReadToken=token;
+ const current=()=>viewClient.crmReadToken===token&&crmSessionCurrent(generation,userId);
+ try{const r=await supa.from('clients').select('*, agent:profiles!clients_assigned_to_fkey(full_name)').eq('id',id).single();
+  if(!current())return;if(r.error)throw r.error;if(!r.data||r.data.id!==id)throw new Error('Client response is missing or mismatched');
+  viewingClient=r.data;navigate('clientDetail',null);renderClientDetail();
+ }catch(err){if(!current())return;console.error('[Client]',err);showToast('تعذر فتح ملف العميل. أعد المحاولة من قائمة العملاء.','error');}
+}
+// Every detail pane is tied to the selected client, session and latest request.
+// A late success or failure must not replace a different client's current work.
+function crmBeginClientDetailRead(paneId){
+ const el=$(paneId),client=viewingClient;if(!el||!client)return null;
+ const generation=crmSessionGeneration,userId=currentUser&&currentUser.id,clientId=client.id,token={};el.crmReadToken=token;
+ return {el,client,current:()=>el.crmReadToken===token&&crmSessionCurrent(generation,userId)&&viewingClient&&viewingClient.id===clientId};
+}
+function crmClientDetailReadError(read,label,retry,error){
+ if(!read.current())return;
+ console.error('[Client detail '+retry+']',error);
+ read.el.innerHTML='<div class="empty" role="alert"><div class="empty-desc">تعذر تحميل '+escapeHtml(label)+'. أعد المحاولة.</div><button class="btn-secondary" onclick="'+retry+'()">إعادة المحاولة</button></div>';
+}
 function renderClientDetail(){
   if(!viewingClient)return;
   const c=viewingClient;
@@ -2524,23 +2547,30 @@ function renderClientDetail(){
   renderClientInfo();loadClient360();loadClientActivities();renderClientRequestsTab();loadClientInterests();renderClientDealsTab();renderClientTasksTab();findSmartMatches();if(isSeller)loadClientListings();
 }
 function renderClientInfo(){const c=viewingClient;const b=(c.budget_min&&c.budget_max)?(fmtMoney(c.budget_min)+' — '+fmtMoney(c.budget_max)):'—';$('cdTabInfo').innerHTML='<div class="info-row"><span class="info-label">📞 الهاتف</span><span class="info-value" style="direction:ltr;text-align:left;display:inline-flex;align-items:center;justify-content:flex-start"><input type="text" readonly dir="ltr" aria-label="رقم هاتف العميل" style="direction:ltr!important;unicode-bidi:normal!important;text-align:left!important;width:20ch;max-width:100%;font-family:Arial,sans-serif;font-size:15px;font-weight:600;letter-spacing:.3px;color:#28231f;border:0;background:transparent;outline:0;padding:0;box-shadow:none" value="'+escapeHtml((crmNormalizePhone(c.phone,'968')||c.phone).replace(/^(\+968)(\d{4})(\d{4})$/,'$1 $2 $3'))+'"></span></div><div class="info-row"><span class="info-label">📧 البريد</span><span class="info-value" dir="ltr">'+(c.email||'—')+'</span></div><div class="info-row"><span class="info-label">👤 النوع</span><span class="info-value">'+(clientTypeAr(c.client_type)||'—')+'</span></div><div class="info-row"><span class="info-label">🏠 العقار المطلوب</span><span class="info-value">'+(propTypeAr(c.property_type)||'—')+'</span></div><div class="info-row"><span class="info-label">📍 المنطقة</span><span class="info-value">'+escapeHtml(c.preferred_area||'—')+'</span></div><div class="info-row"><span class="info-label">💰 الميزانية</span><span class="info-value">'+b+'</span></div><div class="info-row"><span class="info-label">📡 المصدر</span><span class="info-value">'+sourceAr(c.source)+'</span></div>'+(c.lead_route?'<div class="info-row"><span class="info-label">🔀 مسار الاستقبال</span><span class="info-value">'+escapeHtml(({muscat:'مسقط',barka:'بركاء',investment:'المشاريع الاستثمارية',general:'باقي عمان / غير محدد'}[c.lead_route]||c.lead_route))+'</span></div>':'')+'<div class="info-row"><span class="info-label">👨‍💼 الموظف المسؤول</span><span class="info-value">'+escapeHtml(c.agent&&c.agent.full_name||'—')+'</span></div><div class="info-row"><span class="info-label">📅 تاريخ التسجيل</span><span class="info-value">'+fmtDate(c.created_at)+'</span></div>'+(c.readiness?'<div class="info-row"><span class="info-label">📊 جاهزية الشراء</span><span class="info-value" style="flex:1;max-width:200px">'+readinessHTML(c.readiness)+'</span></div>':'')+(c.importance?'<div class="info-row"><span class="info-label">⭐ الأهمية</span><span class="info-value">'+starsHTML(c.importance)+'</span></div>':'')+(c.notes?'<div style="background:var(--cream);padding:14px;border-radius:10px;margin-top:14px;font-size:13px;line-height:1.6"><strong style="color:var(--umber)">📝 ملاحظات:</strong><br>'+escapeHtml(c.notes)+'</div>':'')}
-async function loadClientActivities(){if(!viewingClient)return;try{const r=await supa.from('activities').select('*, user:profiles(full_name)').eq('client_id',viewingClient.id).order('created_at',{ascending:false});const acts=r.data||[];if(!acts.length){$('cdActivities').innerHTML='<div class="empty" style="padding:30px"><div class="empty-ico" style="font-size:32px">📜</div><div class="empty-desc">لا توجد نشاطات. ابدأ بإضافة نشاط جديد!</div></div>';return}let h='';acts.forEach(function(a){h+='<div class="activity-item"><div class="activity-icon '+a.activity_type+'">'+activityIcon(a.activity_type)+'</div><div class="activity-content"><div style="font-size:11px;font-weight:700;color:var(--umber);margin-bottom:3px">'+activityLabel(a.activity_type)+'</div><div class="activity-text">'+escapeHtml(a.activity_text||'')+'</div><div class="activity-meta">'+(a.user?'<span>👤 '+escapeHtml(a.user.full_name)+'</span>':'')+'<span>· '+timeAgo(a.created_at)+'</span></div></div></div>'});$('cdActivities').innerHTML=h}catch(err){console.error(err)}}
+async function loadClientActivities(){
+ const read=crmBeginClientDetailRead('cdActivities');if(!read)return;const {el,client,current}=read;
+ el.innerHTML='<div class="empty" role="status">جاري تحميل النشاطات…</div>';
+ try{
+  const acts=await crmReadAll(()=>supa.from('activities').select('*, user:profiles(full_name)',{count:'exact'}).eq('client_id',client.id).order('created_at',{ascending:false}).order('id'));
+  if(!current())return;
+  if(!acts.length){el.innerHTML='<div class="empty" style="padding:30px"><div class="empty-ico" style="font-size:32px">📜</div><div class="empty-desc">لا توجد نشاطات. ابدأ بإضافة نشاط جديد!</div></div>';return;}
+  el.innerHTML=acts.map(a=>'<div class="activity-item"><div class="activity-icon '+escapeHtml(a.activity_type||'')+'">'+activityIcon(a.activity_type)+'</div><div class="activity-content"><div style="font-size:11px;font-weight:700;color:var(--umber);margin-bottom:3px">'+activityLabel(a.activity_type)+'</div><div class="activity-text">'+escapeHtml(a.activity_text||'')+'</div><div class="activity-meta">'+(a.user?'<span>👤 '+escapeHtml(a.user.full_name)+'</span>':'')+'<span>· '+timeAgo(a.created_at)+'</span></div></div></div>').join('');
+ }catch(err){crmClientDetailReadError(read,'النشاطات','loadClientActivities',err);}
+}
 function requestTypeAr(v){return({buyer:'شراء',seller:'بيع عقار',tenant:'إيجار',landlord:'تأجير',consultation:'استشارة',investor:'استثمار'}[v]||v||'—')}
 function requestStatusAr(v){return({active:'نشط',paused:'متوقف مؤقتًا',won:'تم بنجاح',lost:'خاسر',cancelled:'ملغي',archived:'مؤرشف'}[v]||v||'—')}
 function requestSearchAr(v){return({active:'يبحث بنشاط',active_no_match:'يبحث ولا يوجد مطابق',waiting_new_property:'ينتظر عقارًا جديدًا',financing_in_progress:'التمويل قيد التجهيز',not_ready:'غير جاهز حاليًا',deferred:'مؤجل',stopped:'توقف عن البحث',bought_with_us:'اشترى عن طريقنا',bought_elsewhere:'اشترى من جهة أخرى',no_response:'لا يرد',unknown:'غير معروف'}[v]||v||'—')}
 async function renderClientRequestsTab(){
-  const el=$('cdTabRequests');if(!el||!viewingClient)return;
-  const clientId=viewingClient.id,session=crmSessionGeneration,actor=currentUser&&currentUser.id;
-  const current=()=>crmSessionCurrent(session,actor)&&viewingClient&&viewingClient.id===clientId;
+  const read=crmBeginClientDetailRead('cdTabRequests');if(!read)return;const {el,client,current}=read,clientId=client.id;
   el.innerHTML='<div class="empty" style="padding:22px"><div class="loader-spinner"></div></div>';
   try{
-    const r=await supa.from('client_requests').select('*').eq('client_id',clientId).order('created_at',{ascending:false});
-    if(!current())return;if(r.error)throw r.error;const rows=r.data||[];
+    const rows=await crmReadAll(()=>supa.from('client_requests').select('*',{count:'exact'}).eq('client_id',clientId).order('created_at',{ascending:false}).order('id'));
+    if(!current())return;
     let h='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px"><strong>طلبات العميل ('+rows.length+')</strong><button class="btn-gold" style="width:auto;padding:7px 14px" onclick="openNewRequestForClient()">+ إنشاء طلب جديد لنفس العميل</button></div>';
     if(!rows.length){el.innerHTML=h+'<div class="empty" style="padding:24px"><div class="empty-desc">لا توجد طلبات مستقلة مسجلة لهذا العميل بعد.</div></div>';return}
-    rows.forEach(function(x){const areas=(x.preferred_areas&&x.preferred_areas.length?x.preferred_areas.join('، '):(x.preferred_area||'—'));const budget=(x.budget_min||x.budget_max)?fmtMoney(x.budget_min||0)+' — '+fmtMoney(x.budget_max||0):'—';h+='<div style="border:1px solid var(--cream-deeper);border-radius:12px;padding:13px;margin-bottom:10px;background:white"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><strong style="color:var(--espresso)">🎯 '+escapeHtml(requestTypeAr(x.request_type))+'</strong> <span class="badge b-em">'+escapeHtml(requestStatusAr(x.status))+'</span> '+(canEdit()?'<button class="btn-secondary" onclick="editClientRequest(\''+x.id+'\')">تعديل الطلب</button>':'')+'</div><div style="font-size:11px;color:var(--umber)">'+fmtDate(x.created_at)+'</div></div><div style="font-size:12px;margin-top:8px;line-height:1.8">📍 '+escapeHtml(areas)+' · 🏠 '+escapeHtml(propTypeAr(x.property_type)||x.property_type||'—')+' · 💰 '+budget+'<br>🔀 '+escapeHtml(({barka:'بركاء',muscat:'مسقط',investment:'استثمار',general:'عام'}[x.branch_key]||x.branch_key||'—'))+' · 🔎 '+escapeHtml(requestSearchAr(x.search_status))+(x.next_followup?' · 📅 متابعة '+fmtDate(x.next_followup):'')+(x.next_action?'<br>➡️ '+escapeHtml(x.next_action):'')+'</div></div>'});
+    rows.forEach(function(x){const areas=(x.preferred_areas&&x.preferred_areas.length?x.preferred_areas.join('، '):(x.preferred_area||'—'));const budget=typeof crmBudgetText==='function'?crmBudgetText(x.budget_min,x.budget_max,false):(x.budget_min||x.budget_max)?fmtMoney(x.budget_min||0)+' — '+fmtMoney(x.budget_max||0):'—';h+='<div data-client-request-id="'+escapeHtml(x.id)+'" style="border:1px solid var(--cream-deeper);border-radius:12px;padding:13px;margin-bottom:10px;background:white"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><strong style="color:var(--espresso)">🎯 '+escapeHtml(requestTypeAr(x.request_type))+'</strong> <span class="badge b-em">'+escapeHtml(requestStatusAr(x.status))+'</span> '+(canEdit()?'<button class="btn-secondary" onclick="editClientRequest(\''+x.id+'\')">تعديل الطلب</button>':'')+'</div><div style="font-size:11px;color:var(--umber)">'+fmtDate(x.created_at)+'</div></div><div style="font-size:12px;margin-top:8px;line-height:1.8">📍 '+escapeHtml(areas)+' · 🏠 '+escapeHtml(propTypeAr(x.property_type)||x.property_type||'—')+' · 💰 '+escapeHtml(budget)+'<br>🔀 '+escapeHtml(({barka:'بركاء',muscat:'مسقط',investment:'استثمار',general:'عام'}[x.branch_key]||x.branch_key||'—'))+' · 🔎 '+escapeHtml(requestSearchAr(x.search_status))+(x.next_followup?' · 📅 متابعة '+fmtDate(x.next_followup):'')+(x.next_action?'<br>➡️ '+escapeHtml(x.next_action):'')+'</div></div>'});
     el.innerHTML=h;
-  }catch(e){if(current())el.innerHTML='<div class="empty"><div class="empty-desc">'+escapeHtml(e.message)+'</div></div>'}
+  }catch(e){crmClientDetailReadError(read,'طلبات العميل','renderClientRequestsTab',e);}
 }
 
 let editingClientRequest=null,clientRequestFormClientId=null,clientRequestFormGeneration=0,clientRequestFormInvestment=false;
@@ -2644,15 +2674,44 @@ async function saveNewClientRequest(){
     if(!crmSessionCurrent(session,actor))return;if(r.error)throw r.error;crmFinishSave('mClientRequest');showToast('تم حفظ الطلب','success');await logSystemActivity(old?'edit':'create','request',r.data.id,'حفظ طلب مستقل للعميل');if(!crmSessionCurrent(session,actor))return;if(viewingClient&&viewingClient.id===clientId){await renderClientRequestsTab();await renderClientInfo();}loadDashboard();
   }catch(e){if(crmSessionCurrent(session,actor))showToast('تعذر حفظ الطلب: '+e.message,'error');}finally{crmEndSave('mClientRequest');}
 }
-async function renderClientDealsTab(){if(!viewingClient)return;const r=await crmDataFrom('deals').select('*, property:properties(title), loss_reason:rejection_reasons!deals_lost_reason_id_fkey(label_ar)').eq('client_id',viewingClient.id).order('created_at',{ascending:false});const deals=r.data||[];if(!deals.length){$('cdTabDeals').innerHTML='<div class="empty" style="padding:30px"><div class="empty-ico" style="font-size:32px">🤝</div><div class="empty-desc">لا توجد رحلات عقارية لهذا العميل</div></div>';return}let h='';deals.forEach(function(d){var lr=Array.isArray(d.loss_reason)?d.loss_reason[0]:d.loss_reason;h+='<div style="padding:12px;border:1px solid var(--cream-deeper);border-radius:10px;margin-bottom:10px;cursor:pointer" onclick="editDeal(\''+d.id+'\')"><div style="display:flex;justify-content:space-between;align-items:start;gap:10px"><div style="flex:1"><div style="font-weight:700;color:var(--espresso);font-size:13px">'+escapeHtml(d.property&&d.property.title||'بدون عقار')+'</div><div style="font-size:11px;color:var(--umber);margin-top:3px">'+dealStageAr(d.stage)+' · '+(['closed','commission_collected'].includes(d.stage)?'تاريخ البيع: '+(d.closed_at?fmtDate(d.closed_at):'غير مسجل'):'تاريخ التسجيل: '+fmtDate(d.created_at))+'</div>'+(d.stage==='lost'?'<div style="font-size:10px;color:var(--ruby);margin-top:5px">السبب: '+escapeHtml(lr&&lr.label_ar||'غير موثق')+(d.lost_reason_note?' — '+escapeHtml(d.lost_reason_note):'')+'</div>':'')+'</div><div style="font-weight:700;color:var(--gold);font-size:13px">'+fmtMoney(d.deal_value)+'</div></div></div>'});$('cdTabDeals').innerHTML=h}
+function crmDealCalendarDate(value){
+  if(!value)return '';
+  const date=new Date(value);if(!Number.isFinite(date.getTime()))return '';
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Muscat',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date);
+  return ['year','month','day'].map(type=>parts.find(p=>p.type===type).value).join('-');
+}
+function crmDealDatesHtml(d){
+  const date=crmDealCalendarDate(d.reservation_confirmed_at);
+  const booking=date||('reservation_confirmed_at' in d?'غير مسجل':'تعذر تحميله');
+  const closed=['closed','commission_collected'].includes(d.stage);
+  return '<div class="crm-deal-dates"><span'+(!date&&closed?' class="missing-booking"':'')+'>حجز: <bdi>'+escapeHtml(booking)+'</bdi></span>'+
+    (closed?'<span>بيع: <bdi>'+escapeHtml(crmDealCalendarDate(d.closed_at)||'غير مسجل')+'</bdi></span>':'')+
+    (d.reservation_cancelled_at?'<span>إلغاء الحجز: <bdi>'+escapeHtml(crmDealCalendarDate(d.reservation_cancelled_at))+'</bdi></span>':'')+'</div>';
+}
+let clientDealsLoadSequence=0;
+async function renderClientDealsTab(){
+  if(!viewingClient)return;const clientId=viewingClient.id,generation=crmSessionGeneration,userId=currentUser&&currentUser.id,seq=++clientDealsLoadSequence;
+  const current=()=>seq===clientDealsLoadSequence&&crmSessionCurrent(generation,userId)&&viewingClient&&viewingClient.id===clientId;
+  $('cdTabDeals').innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';
+  try{
+    const deals=await crmReadAll(()=>crmDataFrom('deals').select('*, property:properties(title), loss_reason:rejection_reasons!deals_lost_reason_id_fkey(label_ar)',{count:'exact'}).eq('client_id',clientId).order('created_at',{ascending:false}).order('id'));
+    if(!current())return;
+    if(!deals.length){$('cdTabDeals').innerHTML='<div class="empty" style="padding:30px"><div class="empty-ico" style="font-size:32px">🤝</div><div class="empty-desc">لا توجد رحلات عقارية لهذا العميل</div></div>';return;}
+    $('cdTabDeals').innerHTML=deals.map(function(d){
+      const lr=Array.isArray(d.loss_reason)?d.loss_reason[0]:d.loss_reason;
+      return '<div style="padding:12px;border:1px solid var(--cream-deeper);border-radius:10px;margin-bottom:10px;cursor:pointer" onclick="editDeal(\''+d.id+'\')"><div style="display:flex;justify-content:space-between;align-items:start;gap:10px"><div style="flex:1"><div style="font-weight:700;color:var(--espresso);font-size:13px">'+escapeHtml(d.property&&d.property.title||'بدون عقار')+'</div><div style="font-size:11px;color:var(--umber);margin-top:3px">'+dealStageAr(d.stage)+'</div>'+crmDealDatesHtml(d)+(d.stage==='lost'?'<div style="font-size:10px;color:var(--ruby);margin-top:5px">السبب: '+escapeHtml(lr&&lr.label_ar||'غير موثق')+(d.lost_reason_note?' — '+escapeHtml(d.lost_reason_note):'')+'</div>':'')+'</div><div style="font-weight:700;color:var(--gold);font-size:13px">'+fmtMoney(d.deal_value)+'</div></div></div>';
+    }).join('');
+  }catch(e){if(current())$('cdTabDeals').innerHTML='<div class="wa-inbox-error">تعذر تحميل صفقات العميل. <button class="btn-secondary" onclick="renderClientDealsTab()">إعادة المحاولة</button></div>';}
+}
 async function renderClientTasksTab(){
- if(!viewingClient)return;const clientId=viewingClient.id;
+ const read=crmBeginClientDetailRead('cdTabTasks');if(!read)return;const {el,client,current}=read,clientId=client.id;
+ el.innerHTML='<div class="empty" role="status">جاري تحميل المهام…</div>';
  try{const tasks=await crmReadAll(()=>supa.from('tasks').select('*, client:clients(name,phone)',{count:'exact'}).eq('client_id',clientId).order('id'));
- if(!viewingClient||viewingClient.id!==clientId)return;
+ if(!current())return;
  const ids=new Set(tasks.map(t=>t.id));allTasks=allTasks.filter(t=>!ids.has(t.id)).concat(tasks);
  const ordered=typeof sortTasksByActionPriority==='function'?sortTasksByActionPriority(tasks):tasks;
- $('cdTabTasks').innerHTML=ordered.length?ordered.map(t=>window.renderTaskCard(t,false)).join(''):'<div class="empty"><div class="empty-desc">لا توجد مهام لهذا العميل</div></div>';
- }catch(e){$('cdTabTasks').innerHTML='<div class="wa-inbox-error">تعذر تحميل المهام: '+escapeHtml(e.message||String(e))+'</div>'}
+ el.innerHTML=ordered.length?ordered.map(t=>window.renderTaskCard(t,false)).join(''):'<div class="empty"><div class="empty-desc">لا توجد مهام لهذا العميل</div></div>';
+ }catch(e){crmClientDetailReadError(read,'المهام','renderClientTasksTab',e);}
 }
 async function toggleTaskInDetail(id,done){await toggleTask(id,done);await renderClientTasksTab()}
 function switchClientTab(tab,el){document.querySelectorAll('.detail-tab').forEach(t=>t.classList.remove('active'));if(el)el.classList.add('active');['Info','Journey','Listings','Requests','Interests','Deals','Tasks'].forEach(function(t){const e=$('cdTab'+t);if(e)e.style.display=tab===t.toLowerCase()?'':'none'})}
@@ -2695,10 +2754,10 @@ function exportClients(){if(!allClients.length){showToast('لا توجد بيا�
 function exportProperties(){if(!allProperties.length){showToast('لا توجد بيانات','error');return}const headers=['العنوان','النوع','المنطقة','السعر','الحالة','الغرف','الحمامات','مساحة الأرض','مساحة البناء','الوصف'];const rows=allProperties.map(function(p){return[p.title||'',propTypeAr(p.type),p.area||'',p.price||'',p.status||'',p.bedrooms||'',p.bathrooms||'',p.land_size||'',p.built_size||'',p.description||'']});downloadCSV('عقارات',headers,rows)}
 function exportDeals(){
   if(!allDeals.length){showToast('لا توجد بيانات','error');return;}
-  const headers=['العميل','العقار','القيمة','المرحلة','سبب الرفض الرئيسي','كلام العميل','ملاحظات السجل الأصلية','تاريخ البيع','تاريخ التسجيل'];
+  const headers=['العميل','العقار','القيمة','المرحلة','سبب الرفض الرئيسي','كلام العميل','ملاحظات السجل الأصلية','تاريخ البيع','تاريخ التسجيل','تاريخ دفع العربون','تاريخ إلغاء الحجز'];
   const rows=allDeals.map(function(d){
     const reason=Array.isArray(d.loss_reason)?d.loss_reason[0]:d.loss_reason;
-    return[d.client&&d.client.name||'',d.property&&d.property.title||'',d.deal_value||'',dealStageAr(d.stage),d.stage==='lost'?(reason&&reason.label_ar||'غير مسجل'):'',d.lost_reason_note||'',d.notes||'',d.closed_at?fmtDate(d.closed_at):'',fmtDate(d.created_at)];
+    return[d.client&&d.client.name||'',d.property&&d.property.title||'',d.deal_value||'',dealStageAr(d.stage),d.stage==='lost'?(reason&&reason.label_ar||'غير مسجل'):'',d.lost_reason_note||'',d.notes||'',crmDealCalendarDate(d.closed_at),crmDealCalendarDate(d.created_at),crmDealCalendarDate(d.reservation_confirmed_at),crmDealCalendarDate(d.reservation_cancelled_at)];
   });
   downloadCSV('صفقات',headers,rows);
 }
@@ -3017,7 +3076,7 @@ async function savePropertyDecisionNote(propId){var note=($('pdDecisionNote')&&$
 async function runPropertyAIInsight(propId){var btn=$('pdAiBtn');if(btn){btn.disabled=true;btn.textContent='⏳ جاري تحليل بيانات العقار...'}try{var r=await supa.functions.invoke('property-ai-insights',{body:{property_id:propId}});if(r.error)throw r.error;if(!r.data||!r.data.ok)throw new Error(r.data&&r.data.error||'فشل التحليل');showToast('✅ تم تحليل العقار من البيانات الفعلية','success');if($('pdAiInsight'))$('pdAiInsight').innerHTML=aiInsightHtml(r.data.insight);loadPropertyDecisionPanel(propId);loadPropertyActionQueue('dashboard');loadPropertyActionQueue('properties')}catch(e){console.error('[Property AI]',e);showToast('⚠️ '+(e.message||String(e)),'error')}finally{if(btn){btn.disabled=false;btn.textContent='🤖 تحليل ذكي واتخاذ قرار'}}}
 
 window.client360Data=null;
-function client360Metric(label,value,ico,action){var cls=action?'c360-metric clickable':'c360-metric';return '<div class="'+cls+'" '+(action?'onclick="'+action+'"':'')+'><div class="c360-metric-num">'+(value==null?0:value)+'</div><div class="c360-metric-label">'+ico+' '+label+(action?' ←':'')+'</div></div>'}
+function client360Metric(label,value,ico,action){var cls=action?'c360-metric clickable':'c360-metric';return '<div class="'+cls+'" '+(action?'onclick="'+action+'"':'')+'><div class="c360-metric-num">'+(value==null||value===''||!Number.isFinite(Number(value))?'—':escapeHtml(value))+'</div><div class="c360-metric-label">'+ico+' '+label+(action?' ←':'')+'</div></div>'}
 function client360SwitchTab(tab){var btn=document.querySelector('.detail-tab[onclick*="\''+tab+'\'"]');switchClientTab(tab,btn)}
 function client360UniqueByProperty(rows){var seen=new Set();return (rows||[]).filter(x=>{var id=x.property_id||x.id;if(!id||seen.has(id))return false;seen.add(id);return true})}
 function client360PropertyListHtml(rows,emptyText){if(!rows.length)return '<div class="empty" style="padding:16px"><div class="empty-desc">'+escapeHtml(emptyText||'لا توجد سجلات')+'</div></div>';return rows.map(x=>'<div class="c360-sent-row" onclick="viewProperty(\''+x.property_id+'\')"><div style="font-size:20px">🏠</div><div class="c360-sent-main"><div class="c360-sent-title">'+escapeHtml(x.property_title||'عقار')+'</div><div class="c360-sent-meta">'+escapeHtml(x.property_area||'')+(x.property_price?' · '+fmtMoney(x.property_price):'')+(x.last_contact_at?' · آخر تواصل '+fmtDate(x.last_contact_at):x.last_inquiry_at?' · '+fmtDate(x.last_inquiry_at):'')+'</div></div><div style="font-size:11px;color:var(--gold);font-weight:800">فتح ←</div></div>').join('')}
@@ -3042,11 +3101,13 @@ async function openClientWhatsAppHistory(){
  }catch(e){showToast('تعذر فتح محادثة العميل: '+(e.message||e),'error')}
 }
 async function loadClient360(){
-  var el=$('cdTabJourney');if(!el||!viewingClient)return;el.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';
+  const read=crmBeginClientDetailRead('cdTabJourney');if(!read)return;const {el,client,current}=read;
+  window.client360Data=null;el.innerHTML='<div class="empty" role="status"><div class="loader-spinner"></div></div>';
   try{
-    var r=await supa.rpc('crm_client_360',{p_client_id:viewingClient.id});if(r.error)throw r.error;
-    var d=r.data||{},m=d.metrics||{},ar=d.active_request,journey=d.property_journey||[],apps=d.appointments||[],reasons=d.top_rejection_reasons||[],wa=d.recent_whatsapp||[],tasks=d.open_tasks||[];window.client360Data=d;
-    var h='<div style="background:linear-gradient(135deg,#FFF9EC,#F7F4FF);border:1px solid #E7D8AF;border-radius:12px;padding:13px;margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong style="color:var(--espresso)">🧭 ملف العميل 360</strong><span class="badge b-em">'+(d.customer_kind==='returning'?'عميل سابق / طلبات متعددة':'عميل بطلب واحد')+'</span></div><div style="font-size:11px;color:var(--umber);margin-top:6px">📞 '+escapeHtml(viewingClient.phone||'—')+' · الرقم الموحّد: '+escapeHtml(viewingClient.phone_normalized||'—')+(d.last_whatsapp_at?' · 💚 آخر واتساب: '+fmtDate(d.last_whatsapp_at):'')+'</div></div>';
+    var r=await supa.rpc('crm_client_360',{p_client_id:client.id});if(!current())return;if(r.error)throw r.error;
+    if(!r.data||r.data.client?.id!==client.id||!r.data.metrics||typeof r.data.metrics!=='object'||Array.isArray(r.data.metrics))throw new Error('Client360 response is missing or mismatched');
+    var d=r.data,m=d.metrics,ar=d.active_request,journey=d.property_journey||[],apps=d.appointments||[],reasons=d.top_rejection_reasons||[],wa=d.recent_whatsapp||[],tasks=d.open_tasks||[];
+    var h='<div style="background:linear-gradient(135deg,#FFF9EC,#F7F4FF);border:1px solid #E7D8AF;border-radius:12px;padding:13px;margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong style="color:var(--espresso)">🧭 ملف العميل 360</strong><span class="badge b-em">'+(d.customer_kind==='returning'?'عميل سابق / طلبات متعددة':'عميل بطلب واحد')+'</span></div><div style="font-size:11px;color:var(--umber);margin-top:6px">📞 '+escapeHtml(client.phone||'—')+' · الرقم الموحّد: '+escapeHtml(client.phone_normalized||'—')+(d.last_whatsapp_at?' · 💚 آخر واتساب: '+fmtDate(d.last_whatsapp_at):'')+'</div></div>';
     h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:7px;margin-bottom:10px">'+client360Metric('الطلبات',m.requests_total,'🎯',"client360Drill('requests')")+client360Metric('النشطة',m.active_requests,'🟢',"client360Drill('requests')")+client360Metric('استفسر عنها',m.properties_inquired,'💬',"client360Drill('inquired')")+client360Metric('أرسلناها له',m.properties_shown,'📨',"client360Drill('shown')")+client360Metric('زارها',m.properties_visited,'👁',"client360Drill('visited')")+client360Metric('رفضها',m.rejected_properties,'❌',"client360Drill('rejected')")+client360Metric('حضر مواعيد',m.appointments_attended,'✅',"client360Drill('attended')")+client360Metric('لم يحضر',m.appointments_no_show,'🚫',"client360Drill('noshow')")+client360Metric('تفاوض',m.negotiations,'🤝',"client360Drill('negotiations')")+client360Metric('عربون',m.deposits,'💰',"client360Drill('deposits')")+client360Metric('صفقات',m.closed_deals,'🏁',"client360Drill('deals')")+client360Metric('واتساب وارد',m.whatsapp_inbound,'⬅️',"client360Drill('whatsapp')")+client360Metric('واتساب صادر',m.whatsapp_outbound,'➡️',"client360Drill('whatsapp')")+client360Metric('مهام مفتوحة',m.open_tasks,'⏰',"client360Drill('tasks')")+client360Metric('متابعات متأخرة',m.overdue_followups,'⚠️',"client360Drill('overdue')")+'</div><div id="client360Drilldown"></div>';
     if(ar){var areas=ar.preferred_areas&&ar.preferred_areas.length?ar.preferred_areas.join('، '):(ar.preferred_area||'—');h+='<div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:12px;padding:12px;margin-bottom:12px;cursor:pointer" onclick="client360SwitchTab(\'requests\')"><strong>🎯 الطلب النشط الآن: '+escapeHtml(requestTypeAr(ar.request_type))+' ←</strong><div style="font-size:12px;line-height:1.8;margin-top:5px">📍 '+escapeHtml(areas)+' · 🏠 '+escapeHtml(propTypeAr(ar.property_type)||ar.property_type||'—')+'<br>💰 '+((ar.budget_min||ar.budget_max)?fmtMoney(ar.budget_min||0)+' — '+fmtMoney(ar.budget_max||0):'—')+' · 🔎 '+escapeHtml(requestSearchAr(ar.search_status))+(ar.first_human_response_at?'<br>👤 أول رد بشري: '+fmtDate(ar.first_human_response_at):'')+(ar.next_action?'<br>➡️ '+escapeHtml(ar.next_action):'')+(ar.next_followup?'<br>📅 المتابعة: '+fmtDate(ar.next_followup):'')+'</div></div>'}
     var sent=client360UniqueByProperty(journey.filter(x=>x.shown_by_agent===true));h+='<div class="c360-sent-card"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><strong>📨 العقارات المرسلة / المعروضة على العميل</strong><span class="badge b-em">'+sent.length+'</span></div><div style="font-size:10px;color:var(--umber);margin-top:3px">أي عقار ترسله من زر «📨 إرسال للعميل» يُسجل هنا تلقائياً بعد نجاح الإرسال.</div><div style="margin-top:6px">'+client360PropertyListHtml(sent,'لم نرسل له عقارًا مسجلًا بعد')+'</div></div>';
@@ -3054,11 +3115,11 @@ async function loadClient360(){
     h+='<div style="font-size:11px;color:var(--umber);margin-bottom:10px">🕐 آخر تواصل متبادل: '+(d.last_mutual_contact_at?fmtDate(d.last_mutual_contact_at):'—')+' · 📅 أقرب متابعة: '+(d.next_followup?fmtDate(d.next_followup):'—')+'</div>';
     if(wa.length){h+='<div id="client360WhatsappSection" style="font-weight:800;margin:12px 0 6px">💚 أحدث الوارد والصادر (حتى 12 من كل اتجاه) <button class="btn-secondary" style="font-size:10px" onclick="openClientWhatsAppHistory()">فتح المحادثة كاملة</button></div><div style="overflow-x:auto"><table class="tbl"><thead><tr><th>الاتجاه</th><th>الرسالة</th><th>التاريخ</th><th>الحالة</th></tr></thead><tbody>';wa.forEach(x=>{h+='<tr><td>'+(x.direction==='inbound'?'⬅️ من العميل':'➡️ من المكتب')+'</td><td style="max-width:320px;white-space:normal">'+escapeHtml(x.body||'['+(x.message_type||'رسالة')+']')+'</td><td>'+fmtDate(x.message_timestamp)+'</td><td>'+escapeHtml(x.delivery_status||'—')+'</td></tr>'});h+='</tbody></table></div>'}
     h+='<div style="font-weight:800;margin:14px 0 6px">🏠 رحلة العميل مع العقارات</div>';
-    if(journey.length){h+='<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>العقار</th><th>العلاقة</th><th>الحالة</th><th>آخر تواصل</th><th>بعد الزيارة</th><th>سبب/ملاحظة</th></tr></thead><tbody>';journey.forEach(x=>{var relation=x.shown_by_agent?'📨 أرسلناه له':x.has_inbound_inquiry!==false?'💬 استفسر':'🔗 مرتبط';h+='<tr onclick="viewProperty(\''+x.property_id+'\')" style="cursor:pointer"><td><strong>'+escapeHtml(x.property_title||'عقار')+'</strong><br><span style="font-size:10px">'+escapeHtml(x.property_area||'')+'</span></td><td>'+relation+'</td><td>'+escapeHtml(propertyInquiryStatusAr(x.status))+'</td><td>'+fmtDate(x.last_contact_at||x.last_inquiry_at)+'</td><td>'+escapeHtml(x.post_visit_interest||x.outcome||'—')+'</td><td>'+escapeHtml(x.rejection_notes||x.rejection_reason||x.match_notes||'—')+'</td></tr>'});h+='</tbody></table></div>'}else h+='<div class="empty" style="padding:16px"><div class="empty-desc">لا توجد رحلة عقارية مسجلة بعد</div></div>';
+    if(journey.length){h+='<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>العقار</th><th>العلاقة</th><th>الحالة</th><th>آخر تواصل</th><th>بعد الزيارة</th><th>سبب/ملاحظة</th></tr></thead><tbody>';journey.forEach(x=>{var relation=x.shown_by_agent?'📨 أرسلناه له':x.has_inbound_inquiry!==false?'💬 استفسر':'🔗 مرتبط';h+='<tr onclick="viewProperty(\''+x.property_id+'\')" style="cursor:pointer"><td><strong>'+escapeHtml(x.property_title||'عقار')+'</strong><br><span style="font-size:10px">'+escapeHtml(x.property_area||'')+'</span></td><td>'+relation+'</td><td>'+escapeHtml(propertyInquiryStatusAr(x.status))+'</td><td>'+(x.last_contact_at?fmtDate(x.last_contact_at):'—')+'</td><td>'+escapeHtml(x.post_visit_interest||x.outcome||'—')+'</td><td>'+escapeHtml(x.rejection_notes||x.rejection_reason||x.match_notes||'—')+'</td></tr>'});h+='</tbody></table></div>'}else h+='<div class="empty" style="padding:16px"><div class="empty-desc">لا توجد رحلة عقارية مسجلة بعد</div></div>';
     if(apps.length){h+='<div style="font-weight:800;margin:14px 0 6px">📅 المواعيد والحضور</div><div style="overflow-x:auto"><table class="tbl"><thead><tr><th>التاريخ</th><th>الحالة</th><th>النتيجة</th><th>الإجراء التالي</th></tr></thead><tbody>';apps.slice(0,20).forEach(x=>{h+='<tr><td>'+fmtDate(x.appointment_at)+'</td><td>'+escapeHtml(x.status||'—')+'</td><td>'+escapeHtml(x.result||x.no_show_reason||'—')+'</td><td>'+escapeHtml(x.next_action||'—')+'</td></tr>'});h+='</tbody></table></div>'}
     if(tasks.length){h+='<div style="font-weight:800;margin:14px 0 6px">⏰ المهام المفتوحة للعميل</div>';tasks.slice(0,10).forEach(x=>{h+='<div style="border:1px solid var(--cream-deeper);border-radius:10px;padding:9px 11px;margin-top:6px;font-size:11px;cursor:pointer" onclick="client360SwitchTab(\'tasks\')"><strong>'+escapeHtml(x.title||'مهمة')+'</strong> · '+(x.due_date?fmtDate(x.due_date):'بدون تاريخ')+(x.notes?'<br><span style="color:var(--umber)">'+escapeHtml(x.notes)+'</span>':'')+'</div>'})}
-    el.innerHTML=h;
-  }catch(e){console.error('[Client 360]',e);el.innerHTML='<div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(e.message||String(e))+'</div></div>'}
+    if(!current())return;window.client360Data=d;el.innerHTML=h;
+  }catch(e){crmClientDetailReadError(read,'ملف العميل المترابط','loadClient360',e);}
 }
 
 // ==================== END PROPERTY INTELLIGENCE + CLIENT 360 ====================
@@ -3078,11 +3139,12 @@ function toggleStructuredReason(control){
   set.clear();if(id)set.add(id);setStructuredPrimary(prefix,id||null);
 }
 function setStructuredPrimary(prefix,id){if(prefix==='pi')piStructuredPrimary=id;else ifStructuredPrimary=id;}
-async function loadStructuredReasons(prefix,inquiryId){
-  await ensureStructuredReasonCatalog();const set=prefix==='pi'?piStructuredSelected:ifStructuredSelected;set.clear();setStructuredPrimary(prefix,null);
+async function loadStructuredReasons(prefix,inquiryId,isCurrent){
+  await ensureStructuredReasonCatalog();if(isCurrent&&!isCurrent())return;
+  const set=prefix==='pi'?piStructuredSelected:ifStructuredSelected;set.clear();setStructuredPrimary(prefix,null);
   const phaseEl=$(prefix+'RejectPhase');if(phaseEl)phaseEl.value='unknown';
   if(inquiryId){
-    const r=await supa.from('property_rejection_reasons').select('reason_id,is_primary,phase').eq('property_inquiry_id',inquiryId).eq('is_primary',true);if(r.error)throw r.error;
+    const r=await supa.from('property_rejection_reasons').select('reason_id,is_primary,phase').eq('property_inquiry_id',inquiryId).eq('is_primary',true);if(isCurrent&&!isCurrent())return;if(r.error)throw r.error;
     const rows=r.data||[];
     // Ambiguous legacy primaries remain unselected until a human supplies the actual reason.
     if(rows.length===1){set.add(rows[0].reason_id);setStructuredPrimary(prefix,rows[0].reason_id);if(phaseEl)phaseEl.value=rows[0].phase||'unknown';}
@@ -3402,29 +3464,79 @@ document.addEventListener('click',function(e){
     if(pd)pd.style.display='none';
   }
 });
+let dealsLoadSequence=0;
 async function loadDeals(){
+  const seq=++dealsLoadSequence,generation=crmSessionGeneration,userId=currentUser&&currentUser.id;
+  const current=()=>seq===dealsLoadSequence&&crmSessionCurrent(generation,userId);
   try{
     const rs=await Promise.all([
-      crmDataFrom('deals').select('*, client:clients(id,name,phone), property:properties(id,title,area), agent:profiles!deals_agent_id_fkey(full_name), viewing:viewings!deals_viewing_id_fkey(id,viewing_date,viewing_time,status,client_feedback,pipeline_outcome,outcome_note,rejection_reason), loss_reason:rejection_reasons!deals_lost_reason_id_fkey(id,code,label_ar,category)').order('updated_at',{ascending:false}),
-      supa.from('property_inquiries').select('*, client:clients(id,name,phone,lead_temperature,lead_score,assigned_to), property:properties(id,title,area,price), agent:profiles!property_inquiries_assigned_to_fkey(full_name)').order('last_inquiry_at',{ascending:false}).limit(1000)
+      crmReadAll(()=>crmDataFrom('deals').select('*, client:clients(id,name,phone), property:properties(id,title,area), agent:profiles!deals_agent_id_fkey(full_name), viewing:viewings!deals_viewing_id_fkey(id,viewing_date,viewing_time,status,client_feedback,pipeline_outcome,outcome_note,rejection_reason), loss_reason:rejection_reasons!deals_lost_reason_id_fkey(id,code,label_ar,category)',{count:'exact'}).order('updated_at',{ascending:false}).order('id')),
+      crmReadAll(()=>supa.from('property_inquiries').select('*, client:clients(id,name,phone,lead_temperature,lead_score,assigned_to), property:properties(id,title,area,price), agent:profiles!property_inquiries_assigned_to_fkey(full_name)',{count:'exact'}).order('last_inquiry_at',{ascending:false}).order('id'))
     ]);
-    if(rs[0].error)throw rs[0].error;if(rs[1].error)throw rs[1].error;
-    allDeals=rs[0].data||[];allPropertyInquiries=rs[1].data||[];
+    if(!current())return;
+    allDeals=rs[0];allPropertyInquiries=rs[1];
     $('dealsSub').textContent=allDeals.length+' رحلة عقارية في الـPipeline · '+allPropertyInquiries.length+' اهتمام/استفسار';renderDeals();
-  }catch(err){$('dealsContent').innerHTML='<div class="card"><div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">'+escapeHtml(err.message)+'</div></div></div>'}
+  }catch(err){if(current())$('dealsContent').innerHTML='<div class="card"><div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">تعذر تحميل الصفقات والمتابعات.</div><button class="btn-secondary" onclick="loadDeals()">إعادة المحاولة</button></div></div>';}
 }
 function renderDeals(){if(dealView==='inquiries'){renderInquiryPipeline();return}if(!allDeals.length){$('dealsContent').innerHTML='<div class="card"><div class="empty"><div class="empty-ico">🤝</div><div class="empty-title">لا توجد صفقات بعد</div><div class="empty-desc">كل زيارة مجدولة تنشئ رحلة مستقلة للعميل مع ذلك العقار، وتتحرك حتى البيع أو الخروج من العقار.</div>'+(canEdit()?'<button class="btn-primary" style="margin-top:14px;width:auto;padding:10px 22px" onclick="openModal(\'mDeal\')">+ إضافة صفقة</button>':'')+'</div></div>';return}if(dealView==='pipeline')renderPipeline();else renderDealTable()}
-function renderDealTable(){let h='<div class="card"><table class="tbl"><thead><tr><th>العميل</th><th>العقار</th><th>القيمة</th><th>المرحلة</th>'+(canManage()?'<th>الموظف</th>':'')+'<th></th></tr></thead><tbody>';allDeals.forEach(function(d){h+='<tr class="row-clickable" onclick="editDeal(\''+d.id+'\')"><td><strong>'+escapeHtml(d.client&&d.client.name||'—')+'</strong></td><td>'+escapeHtml(d.property&&d.property.title||'—')+'</td><td style="color:var(--gold);font-weight:700">'+fmtMoney(d.deal_value)+'</td><td>'+dealStageAr(d.stage)+'</td>'+(canManage()?'<td>'+escapeHtml(d.agent&&d.agent.full_name||'—')+'</td>':'')+'<td onclick="event.stopPropagation()">'+'<span style="cursor:pointer" onclick="deleteDeal(\''+d.id+'\')">🗑</span>'+'</td></tr>'});$('dealsContent').innerHTML=h+'</tbody></table></div>'}
+function renderDealTable(){
+  let h='<div class="card"><div style="overflow-x:auto"><table class="tbl"><thead><tr><th>العميل</th><th>العقار</th><th>القيمة</th><th>المرحلة</th><th>الحجز والبيع · توقيت عمان</th>'+(canManage()?'<th>الموظف</th>':'')+'<th></th></tr></thead><tbody>';
+  allDeals.forEach(function(d){h+='<tr class="row-clickable" onclick="editDeal(\''+d.id+'\')"><td><strong>'+escapeHtml(d.client&&d.client.name||'—')+'</strong></td><td>'+escapeHtml(d.property&&d.property.title||'—')+'</td><td style="color:var(--gold);font-weight:700">'+fmtMoney(d.deal_value)+'</td><td>'+dealStageAr(d.stage)+'</td><td>'+crmDealDatesHtml(d)+'</td>'+(canManage()?'<td>'+escapeHtml(d.agent&&d.agent.full_name||'—')+'</td>':'')+'<td onclick="event.stopPropagation()">'+'<span style="cursor:pointer" onclick="deleteDeal(\''+d.id+'\')">🗑</span>'+'</td></tr>';});
+  $('dealsContent').innerHTML=h+'</tbody></table></div></div>';
+}
 
 // ==================== PHASE 6 — CUSTOMER / PROPERTY FOLLOW-UP PIPELINE ====================
-var editingFollowupInquiryId=null;
+var editingFollowupInquiryId=null,inquiryFollowupOpenSeq=0;
 function inquiryDueBadge(d){if(!d)return '<span style="color:var(--sand-dark)">—</span>';var today=toLocalDateStr(new Date());if(d<today)return '<span class="badge b-rb">⚠️ متأخرة '+escapeHtml(d)+'</span>';if(d===today)return '<span class="badge b-go">📅 اليوم</span>';return '<span class="badge b-sky">📅 '+escapeHtml(d)+'</span>'}
-function renderInquiryPipeline(){var groups=[{label:'💬 استفسار / متابعة',statuses:['inquiry','followup'],color:'#3B82F6'},{label:'📅 معاينة محددة',statuses:['viewing_scheduled'],color:'#F59E0B'},{label:'✅ تمت المعاينة',statuses:['viewed'],color:'#EAB308'},{label:'🤝 تفاوض',statuses:['negotiation'],color:'#F97316'},{label:'💰 حجز / عربون',statuses:['reserved','deal'],color:'#14B8A6'},{label:'📌 خرج من هذا العقار',statuses:['not_suitable','no_response','closed'],color:'#6B7280'}];if(!allPropertyInquiries.length){$('dealsContent').innerHTML='<div class="card"><div class="empty"><div class="empty-ico">🎯</div><div class="empty-title">لا توجد اهتمامات عقارية بعد</div><div class="empty-desc">عندما يُربط العميل بعقار سيظهر هنا تلقائياً للمتابعة.</div></div></div>';return}var h='<div style="margin-bottom:12px;background:white;border:1px solid var(--cream-deeper);border-radius:12px;padding:12px 16px;font-size:12px;color:var(--umber)">🎯 <strong>هذه لوحة العمل اليومية:</strong> كل بطاقة = عميل + عقار. نتيجة عقار واحد لا تجعل العميل كله خاسر.</div><div class="pipeline-wrap"><div class="pipeline" style="min-width:1280px">';groups.forEach(function(g){var items=allPropertyInquiries.filter(x=>g.statuses.indexOf(x.status)>=0).sort(function(a,b){var ad=a.next_followup||'9999-12-31',bd=b.next_followup||'9999-12-31';if(ad!==bd)return ad.localeCompare(bd);return String(b.last_inquiry_at||'').localeCompare(String(a.last_inquiry_at||''))});h+='<div class="p-col" style="border-top:3px solid '+g.color+';min-width:205px"><div class="p-head"><div class="p-head-title">'+g.label+'</div><div class="p-count">'+items.length+'</div></div>';items.forEach(function(x){var temp=x.client&&(x.client.lead_temperature||'warm');h+='<div class="deal-card" style="cursor:pointer" onclick="openInquiryFollowup(\''+x.id+'\')"><div style="display:flex;justify-content:space-between;gap:6px;align-items:flex-start"><div class="deal-name">'+escapeHtml(x.client&&x.client.name||'—')+'</div>'+statusBadge(temp,x.client&&x.client.lead_score)+'</div><div class="deal-prop">🏠 '+escapeHtml(x.property&&x.property.title||'—')+'</div><div style="font-size:10px;color:var(--umber);margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><span>📡 '+propertyInquirySourceAr(x.source)+'</span><span>💬 '+(x.inquiry_count||1)+'</span></div><div style="margin-top:7px">'+inquiryDueBadge(x.next_followup)+'</div>'+(x.rejection_reason?'<div style="font-size:10px;color:var(--ruby);margin-top:6px">'+escapeHtml(propertyRejectReasonAr(x.rejection_reason))+'</div>':'')+'<div class="deal-meta"><span>'+fmtDate(x.last_inquiry_at)+'</span><span>✏️</span></div></div>'});h+='</div>'});$('dealsContent').innerHTML=h+'</div></div>'}
-function updateInquiryFollowupFields(){var st=$('ifStatus').value,show=st==='not_suitable';if($('ifRejectWrap'))$('ifRejectWrap').style.display=show?'':'none';if($('ifRejectPhaseWrap'))$('ifRejectPhaseWrap').style.display=show?'':'none'}
-async function openInquiryFollowup(id){var x=allPropertyInquiries.find(a=>a.id===id);if(!x)return;editingFollowupInquiryId=id;$('ifSummary').innerHTML='<strong>'+escapeHtml(x.client&&x.client.name||'—')+'</strong> · 🏠 '+escapeHtml(x.property&&x.property.title||'—')+'<br><span style="font-size:11px;color:var(--umber)">الحالة الحالية: '+propertyInquiryStatusAr(x.status)+' · آخر تواصل: '+fmtDate(x.last_inquiry_at)+'</span>';$('ifStatus').value=x.status||'followup';$('ifNextFollowup').value=x.next_followup||'';$('ifRejectReason').value=x.rejection_reason||'';$('ifNote').value=x.status==='not_suitable'?(x.rejection_notes||''):(x.followup_note||'');await loadStructuredReasons('if',id);updateInquiryFollowupFields();$('mInquiryFollowup').classList.add('on')}
+function renderInquiryPipeline(){var groups=[{label:'💬 استفسار / متابعة',statuses:['inquiry','followup','no_response'],color:'#3B82F6'},{label:'📅 معاينة محددة',statuses:['viewing_scheduled'],color:'#F59E0B'},{label:'✅ تمت المعاينة',statuses:['viewed'],color:'#EAB308'},{label:'🤝 تفاوض',statuses:['negotiation'],color:'#F97316'},{label:'💰 حجز / عربون',statuses:['reserved','deal'],color:'#14B8A6'},{label:'📌 خرج من هذا العقار',statuses:['not_suitable','closed'],color:'#6B7280'}];if(!allPropertyInquiries.length){$('dealsContent').innerHTML='<div class="card"><div class="empty"><div class="empty-ico">🎯</div><div class="empty-title">لا توجد اهتمامات عقارية بعد</div><div class="empty-desc">عندما يُربط العميل بعقار سيظهر هنا تلقائياً للمتابعة.</div></div></div>';return}var h='<div style="margin-bottom:12px;background:white;border:1px solid var(--cream-deeper);border-radius:12px;padding:12px 16px;font-size:12px;color:var(--umber)">🎯 <strong>هذه لوحة العمل اليومية:</strong> كل بطاقة = عميل + عقار. نتيجة عقار واحد لا تجعل العميل كله خاسر.</div><div class="pipeline-wrap"><div class="pipeline" style="min-width:1280px">';groups.forEach(function(g){var items=allPropertyInquiries.filter(x=>g.statuses.indexOf(x.status)>=0).sort(function(a,b){var ad=a.next_followup||'9999-12-31',bd=b.next_followup||'9999-12-31';if(ad!==bd)return ad.localeCompare(bd);return String(b.last_inquiry_at||'').localeCompare(String(a.last_inquiry_at||''))});h+='<div class="p-col" style="border-top:3px solid '+g.color+';min-width:205px"><div class="p-head"><div class="p-head-title">'+g.label+'</div><div class="p-count">'+items.length+'</div></div>';items.forEach(function(x){var temp=x.client&&(x.client.lead_temperature||'warm');h+='<div class="deal-card" style="cursor:pointer" onclick="openInquiryFollowup(\''+x.id+'\')"><div style="display:flex;justify-content:space-between;gap:6px;align-items:flex-start"><div class="deal-name">'+escapeHtml(x.client&&x.client.name||'—')+'</div>'+statusBadge(temp,x.client&&x.client.lead_score)+'</div><div class="deal-prop">🏠 '+escapeHtml(x.property&&x.property.title||'—')+'</div><div style="font-size:10px;color:var(--umber);margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><span>📡 '+propertyInquirySourceAr(x.source)+'</span><span>💬 '+(x.inquiry_count||1)+'</span></div><div style="margin-top:7px">'+inquiryDueBadge(x.next_followup)+'</div>'+(x.rejection_reason?'<div style="font-size:10px;color:var(--ruby);margin-top:6px">'+escapeHtml(propertyRejectReasonAr(x.rejection_reason))+'</div>':'')+'<div class="deal-meta"><span>'+(x.last_contact_at?'آخر متابعة: '+fmtDate(x.last_contact_at):(x.has_inbound_inquiry===false?'تسجيل الاهتمام: ':'آخر استفسار: ')+fmtDate(x.last_inquiry_at))+'</span><span>✏️</span></div></div>'});h+='</div>'});$('dealsContent').innerHTML=h+'</div></div>'}
+function updateInquiryFollowupFields(){
+ var st=$('ifStatus').value,show=st==='not_suitable';
+ if($('ifRejectWrap'))$('ifRejectWrap').style.display=show?'':'none';
+ if($('ifRejectPhaseWrap'))$('ifRejectPhaseWrap').style.display=show?'':'none';
+ var hint=$('ifWorkflowHint'),text=st==='reserved'?'الحجز يتطلب صفقة سُجّل فيها دفع العربون الفعلي وتاريخه. استخدم نموذج الصفقة لتسجيله أولاً.':(['viewing_scheduled','viewed'].includes(st)?'حالة المعاينة تعتمد على زيارة فعلية مسجّلة لهذا العميل والعقار والطلب. سجّلها من نموذج الزيارة.':(['negotiation','deal'].includes(st)?'الصفقة والتفاوض يعتمدان على سجل الصفقة المرتبط. حدّث المرحلة من نموذج الصفقة أولاً.':''));
+ if(hint){hint.textContent=text;hint.style.display=text?'':'none';}
+}
+async function openInquiryFollowup(id){
+ if(!canEdit()||crmSavingForms.has('mInquiryFollowup'))return;
+ var x=allPropertyInquiries.find(a=>a.id===id);if(!x)return;
+ var seq=++inquiryFollowupOpenSeq,generation=crmSessionGeneration,user=currentUser.id;
+ var current=()=>seq===inquiryFollowupOpenSeq&&editingFollowupInquiryId===id&&crmSessionCurrent(generation,user);
+ editingFollowupInquiryId=id;crmSaveAttempts.delete('mInquiryFollowup');
+ var previous=x.status==='not_suitable'?(x.rejection_notes||x.followup_note||''):(x.followup_note||'');
+ $('ifSummary').innerHTML='<strong>'+escapeHtml(x.client&&x.client.name||'—')+'</strong> · 🏠 '+escapeHtml(x.property&&x.property.title||'—')+'<br><span style="font-size:11px;color:var(--umber)">الحالة الحالية: '+escapeHtml(propertyInquiryStatusAr(x.status))+' · آخر استفسار: '+fmtDate(x.last_inquiry_at)+' · آخر متابعة: '+fmtDate(x.last_contact_at)+'</span>'+(previous?'<div style="margin-top:8px;white-space:pre-wrap">الملاحظة السابقة: '+escapeHtml(previous)+'</div>':'');
+ $('ifStatus').value=x.status||'followup';$('ifNextFollowup').value=x.next_followup||'';
+ $('ifRejectReason').value=x.rejection_reason||'';$('ifNote').value='';$('ifNextAction').value='';
+ try{await loadStructuredReasons('if',id,current);if(!current())return;updateInquiryFollowupFields();$('mInquiryFollowup').classList.add('on');}
+ catch(e){if(current()){console.error('[inquiry follow-up open]',e);showToast('تعذر تحميل تفاصيل المتابعة. أعد فتحها للمحاولة.','error');}}
+}
 async function ensureDealFromInquiry(x,newStatus){if(['negotiation','reserved','deal'].indexOf(newStatus)<0)return;try{var ex=await crmDataFrom('deals').select('id,stage').eq('client_id',x.client_id).eq('property_id',x.property_id).order('created_at',{ascending:false}).limit(1);if(ex.error)throw ex.error;var target=newStatus==='reserved'?'deposit':'negotiation';if(ex.data&&ex.data.length){var d=ex.data[0];var ranks={new:0,viewing_scheduled:0,viewing_no_show:0,viewing_cancelled:0,viewing_postponed:0,visit:0,negotiation:1,deposit:2,awaiting_finance:3,finance_approved:3,awaiting_clearance:3,ownership_transfer:3,closed:4,commission_collected:5,lost:-1};if((ranks[d.stage]||0)<(ranks[target]||0))await crmDataFrom('deals').update({stage:target}).eq('id',d.id);return}var prop=await crmDataFrom('properties').select('price').eq('id',x.property_id).single();await crmDataFrom('deals').insert({company_id:x.company_id,client_id:x.client_id,property_id:x.property_id,agent_id:x.assigned_to||currentUser.id,deal_value:prop.data&&prop.data.price||null,stage:target,notes:'تم إنشاؤها تلقائياً من متابعة اهتمام العميل بالعقار'})}catch(e){console.warn('[Auto deal]',e)}}
-async function saveInquiryFollowup(){if(!editingFollowupInquiryId)return;var x=allPropertyInquiries.find(a=>a.id===editingFollowupInquiryId);if(!x)return;var st=$('ifStatus').value,note=$('ifNote').value.trim(),nf=$('ifNextFollowup').value||null;if(st==='not_suitable'&&!ifStructuredSelected.size){showToast('⚠️ اختر السبب الرئيسي لعدم مناسبة العقار','error');return}if(st==='followup'&&!nf){showToast('⚠️ حدّد موعد المتابعة القادمة','error');return}try{var primaryCode=primaryStructuredReasonCode('if'),legacy=structuredLegacyReason(primaryCode);var data={status:st,next_followup:nf,followup_note:note||null,last_contact_at:new Date().toISOString(),last_inquiry_at:new Date().toISOString(),rejection_reason:st==='not_suitable'?legacy:null,rejection_notes:st==='not_suitable'?(note||null):null};var r=await supa.from('property_inquiries').update(data).eq('id',editingFollowupInquiryId).select('id,request_id,client_id,property_id').single();if(r.error)throw r.error;if(st==='not_suitable')await syncStructuredReasons(r.data.id,r.data.client_id,r.data.property_id,r.data.request_id,'if',note);await ensureDealFromInquiry(x,st);try{await logActivity('note','تحديث متابعة '+(x.property&&x.property.title||'العقار')+': '+propertyInquiryStatusAr(st)+(note?' — '+note:''),x.client_id)}catch(e){}closeModal('mInquiryFollowup');editingFollowupInquiryId=null;showToast('✅ تم تحديث المتابعة وأسباب العميل','success');await loadDeals();loadDashboard();if(window.viewingProperty&&window.viewingProperty.id===x.property_id){loadPropertyPerformance(x.property_id);loadPropertyDecisionPanel(x.property_id)}}catch(err){showToast('خطأ: '+err.message,'error')}}
-async function loadClientInterests(){var el=$('cdTabInterests');if(!el||!viewingClient)return;el.innerHTML='<div class="empty" style="padding:22px"><div class="loader-spinner"></div></div>';try{var r=await supa.from('property_inquiries').select('*, property:properties(id,title,area,price)').eq('client_id',viewingClient.id).order('last_inquiry_at',{ascending:false});if(r.error)throw r.error;var a=r.data||[];if(!a.length){el.innerHTML='<div class="empty" style="padding:24px"><div class="empty-desc">لا توجد عقارات مرتبطة بهذا العميل بعد</div></div>';return}var h='<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>العقار</th><th>الحالة</th><th>آخر تواصل</th><th>المتابعة</th><th>النتيجة/السبب</th></tr></thead><tbody>';a.forEach(function(x){h+='<tr><td><strong style="cursor:pointer" onclick="viewProperty(\''+x.property_id+'\')">'+escapeHtml(x.property&&x.property.title||'—')+'</strong><div style="font-size:10px;color:var(--umber)">'+escapeHtml(x.property&&x.property.area||'')+'</div></td><td>'+propertyInquiryStatusAr(x.status)+'</td><td>'+fmtDate(x.last_inquiry_at)+'</td><td>'+inquiryDueBadge(x.next_followup)+'</td><td>'+escapeHtml(x.rejection_reason?propertyRejectReasonAr(x.rejection_reason)+(x.rejection_notes?' — '+x.rejection_notes:''):(x.followup_note||'—'))+'</td></tr>'});h+='</tbody></table></div>';el.innerHTML=h}catch(err){el.innerHTML='<div class="empty"><div class="empty-desc">'+escapeHtml(err.message)+'</div></div>'}}
+async function saveInquiryFollowup(){
+ if(!canEdit()||!editingFollowupInquiryId)return;
+ var id=editingFollowupInquiryId,x=allPropertyInquiries.find(a=>a.id===id);if(!x)return;
+ var st=$('ifStatus').value,note=$('ifNote').value.trim(),nf=$('ifNextFollowup').value||null;
+ if(st==='not_suitable'&&!ifStructuredSelected.size){showToast('اختر السبب الرئيسي لعدم مناسبة العقار','error');return;}
+ if(st==='followup'&&!nf){showToast('حدّد موعد المتابعة القادمة','error');return;}
+ var generation=crmSessionGeneration,user=currentUser.id;
+ var current=()=>editingFollowupInquiryId===id&&crmSessionCurrent(generation,user);
+ var payload={inquiry_id:id,expected_updated_at:x.updated_at||null,status:st,outcome:note||null,next_action:$('ifNextAction').value.trim()||null,next_followup:nf,
+  reason_id:st==='not_suitable'?(ifStructuredPrimary||[...ifStructuredSelected][0]||null):null,reason_phase:st==='not_suitable'?$('ifRejectPhase').value||'unknown':'unknown'};
+ if(!crmBeginSave('mInquiryFollowup'))return;
+ try{
+  var result=await supa.rpc('crm_save_inquiry_followup',{p_payload:payload,p_idempotency_key:crmSaveKey('mInquiryFollowup',payload)});
+  if(!current())return;if(result.error)throw result.error;
+  if(!result.data?.ok||result.data.inquiry_id!==id||!result.data.activity_id||result.data.inquiry?.id!==id)throw new Error('followup_confirmation_missing');
+  Object.assign(x,result.data.inquiry);crmFinishSave('mInquiryFollowup');editingFollowupInquiryId=null;
+  showToast(result.data.contact_recorded?'تم حفظ نتيجة المتابعة وربطها بالعميل والعقار والأهداف.':'تم تحديث الحالة أو الموعد؛ لم تُسجّل محاولة تواصل جديدة.','success');
+  loadDeals();loadDashboard();
+  if(typeof viewingClient!=='undefined'&&viewingClient?.id===x.client_id){loadClientActivities();loadClientInterests();loadClient360();renderClientRequestsTab();}
+  if(window.viewingProperty?.id===x.property_id){loadPropertyPerformance(x.property_id);loadPropertyDecisionPanel(x.property_id);}
+ }catch(e){
+  if(!current())return;console.error('[inquiry follow-up save]',e);
+  var messages={inquiry_requires_paid_reservation_workflow:'لم تُحفظ المتابعة: سجّل تاريخ دفع العربون ومبلغه في نموذج الصفقة أولاً. مدخلاتك ما زالت محفوظة هنا.',inquiry_requires_actual_viewing:'لم تُحفظ المتابعة: سجّل الزيارة الفعلية وحالتها من نموذج الزيارة أولاً. مدخلاتك ما زالت محفوظة هنا.',inquiry_requires_deal_workflow:'لم تُحفظ المتابعة: حدّث التفاوض أو الصفقة من نموذج الصفقة المرتبط أولاً. مدخلاتك ما زالت محفوظة هنا.',inquiry_changed_reload_before_saving:'تغيّر سجل المتابعة أثناء فتحه. احتفظ بنتيجتك المكتوبة وأعد فتح السجل قبل الحفظ.'};
+  showToast(messages[e.message]||'تعذر حفظ المتابعة. مدخلاتك محفوظة؛ أعد المحاولة.','error');
+ }finally{if(crmSessionCurrent(generation,user))crmEndSave('mInquiryFollowup');}
+}
+async function loadClientInterests(){const read=crmBeginClientDetailRead('cdTabInterests');if(!read)return;const {el,client,current}=read;el.innerHTML='<div class="empty" style="padding:22px"><div class="loader-spinner"></div></div>';try{const a=await crmReadAll(()=>supa.from('property_inquiries').select('*, property:properties(id,title,area,price)',{count:'exact'}).eq('client_id',client.id).order('last_inquiry_at',{ascending:false}).order('id'));if(!current())return;if(!a.length){el.innerHTML='<div class="empty" style="padding:24px"><div class="empty-desc">لا توجد عقارات مرتبطة بهذا العميل بعد</div></div>';return}var h='<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>العقار</th><th>الحالة</th><th>آخر تواصل</th><th>المتابعة</th><th>النتيجة/السبب</th></tr></thead><tbody>';a.forEach(function(x){h+='<tr><td><strong style="cursor:pointer" onclick="viewProperty(\''+x.property_id+'\')">'+escapeHtml(x.property&&x.property.title||'—')+'</strong><div style="font-size:10px;color:var(--umber)">'+escapeHtml(x.property&&x.property.area||'')+'</div></td><td>'+propertyInquiryStatusAr(x.status)+'</td><td>'+(x.last_contact_at?fmtDate(x.last_contact_at):'—')+'</td><td>'+inquiryDueBadge(x.next_followup)+'</td><td>'+escapeHtml(x.rejection_reason?propertyRejectReasonAr(x.rejection_reason)+(x.rejection_notes?' — '+x.rejection_notes:''):(x.followup_note||'—'))+'</td></tr>'});h+='</tbody></table></div>';el.innerHTML=h}catch(err){crmClientDetailReadError(read,'العقارات المرتبطة بالعميل','loadClientInterests',err);}}
 
 function crmDealCustomerNotes(value){
   return String(value||'').split(/\r?\n/).filter(function(line){
@@ -3480,7 +3592,8 @@ function renderPipeline(){
         }else h+='<div style="font-size:9px;color:var(--ruby);margin-top:5px;background:#FFF1F2;border-radius:6px;padding:5px"><strong>السبب:</strong> '+escapeHtml(lr&&lr.label_ar||'—')+(d.lost_reason_note?'<br>'+escapeHtml(String(d.lost_reason_note).slice(0,110)):'')+'</div>';
       }
       if(d.deal_value)h+='<div class="deal-val" style="font-size:10px;margin-top:5px">'+fmtMoney(d.deal_value)+'</div>';
-      h+='<div class="deal-meta" style="font-size:8.5px;gap:4px"><span>'+(['closed','commission_collected'].includes(d.stage)?'بيع: '+(d.closed_at?fmtDate(d.closed_at):'غير مسجل'):'تحديث: '+fmtDate(d.updated_at||d.created_at))+'</span><span style="cursor:pointer" onclick="event.stopPropagation();deleteDeal(\''+d.id+'\')">🗑</span></div></div>';
+      h+=crmDealDatesHtml(d);
+      h+='<div class="deal-meta" style="font-size:8.5px;gap:4px"><span>'+(d.reservation_confirmed_at?'يُحتسب في شهر الحجز':!['closed','commission_collected'].includes(d.stage)?'تحديث: '+fmtDate(d.updated_at||d.created_at):'أكمل بيانات الحجز الفعلية')+'</span><span style="cursor:pointer" onclick="event.stopPropagation();deleteDeal(\''+d.id+'\')">🗑</span></div></div>';
     });
     h+='</div>';
   });
@@ -3712,18 +3825,18 @@ async function findClientsForProperty(property){
   return requests.map(request=>{if(!request.client||request.client.archived)return null;const match=crmRequestMatchScore(request,property);return match?{...request.client,...match,request_id:request.id}:null;}).filter(Boolean).sort((a,b)=>b.score-a.score);
 }
 async function findSmartMatches(){
-  if(!viewingClient)return;const client=viewingClient,container=$('cdSmartMatches');if(!container)return;
-  try{const r=await supa.from('client_requests').select('*').eq('client_id',client.id).eq('status','active').order('updated_at',{ascending:false});if(r.error)throw r.error;
-    const active=r.data||[],requests=active.length?active.filter(x=>['buyer','tenant','investor'].includes(x.request_type)):[{...client,id:null,request_type:client.client_type}].filter(x=>['buyer','tenant','investor'].includes(x.request_type));
-    let html='';for(const request of requests){const matches=await findPropertiesForBuyer(request);if(viewingClient&&viewingClient.id!==client.id)return;
+  const read=crmBeginClientDetailRead('cdSmartMatches');if(!read)return;const {el:container,client,current}=read;container.innerHTML='<div class="empty" role="status">جاري تحميل العقارات المناسبة…</div>';
+  try{const active=await crmReadAll(()=>supa.from('client_requests').select('*',{count:'exact'}).eq('client_id',client.id).eq('status','active').order('updated_at',{ascending:false}).order('id'));if(!current())return;
+    const requests=active.length?active.filter(x=>['buyer','tenant','investor'].includes(x.request_type)):[{...client,id:null,request_type:client.client_type}].filter(x=>['buyer','tenant','investor'].includes(x.request_type));
+    let html='';for(const request of requests){const matches=await findPropertiesForBuyer(request);if(!current())return;
       if(!matches.length)continue;html+='<div class="match-card"><div class="match-header">عقارات مناسبة لطلب '+escapeHtml(requestTypeAr(request.request_type))+' — '+escapeHtml((request.preferred_areas||[]).join('، ')||request.preferred_area||'')+'</div><div class="match-list">';
       matches.slice(0,5).forEach(m=>{html+='<div class="match-item" onclick="viewProperty(\''+m.id+'\')"><div class="match-info"><div class="match-name">'+escapeHtml(m.title)+'</div><div class="match-detail">'+escapeHtml(propTypeAr(m.type))+' · '+escapeHtml(m.area)+' · '+fmtMoney(m.price)+'</div></div><div class="match-score">'+m.score+'%</div><button class="match-send-btn" onclick="event.stopPropagation();openPropertySendToClient(\''+m.id+'\',\''+client.id+'\','+(request.id?'\''+request.id+'\'':'null')+')">إرسال</button></div>';});html+='</div></div>';
     }
 
     const sellerRequests=active.length?active.filter(x=>['seller','landlord'].includes(x.request_type)):[{...client,request_type:client.client_type}].filter(x=>['seller','landlord'].includes(x.request_type));
-    for(const request of sellerRequests){const buyers=await findBuyersForSeller(request);if(viewingClient&&viewingClient.id!==client.id)return;if(buyers.length)html+='<div class="match-card"><div class="match-header">عملاء يبحثون في منطقة طلب البيع أو التأجير</div>'+buyers.slice(0,5).map(b=>'<div class="match-item" onclick="viewClient(\''+b.id+'\')"><div class="match-info"><div class="match-name">'+escapeHtml(b.name)+'</div><div class="match-detail">'+escapeHtml(b.preferred_area||'')+' · '+(b.budget_max?fmtMoney(b.budget_max):'ميزانية غير محددة')+'</div></div></div>').join('')+'</div>';}
-    if(viewingClient&&viewingClient.id===client.id)container.innerHTML=html;
-  }catch(e){if(viewingClient&&viewingClient.id===client.id)container.innerHTML='<div class="empty-desc">تعذر تحميل العقارات المناسبة: '+escapeHtml(e.message)+'</div>';}
+    for(const request of sellerRequests){const buyers=await findBuyersForSeller(request);if(!current())return;if(buyers.length)html+='<div class="match-card"><div class="match-header">عملاء يبحثون في منطقة طلب البيع أو التأجير</div>'+buyers.slice(0,5).map(b=>'<div class="match-item" onclick="viewClient(\''+b.id+'\')"><div class="match-info"><div class="match-name">'+escapeHtml(b.name)+'</div><div class="match-detail">'+escapeHtml(b.preferred_area||'')+' · '+(b.budget_max?fmtMoney(b.budget_max):'ميزانية غير محددة')+'</div></div></div>').join('')+'</div>';}
+    if(current())container.innerHTML=html;
+  }catch(e){crmClientDetailReadError(read,'العقارات المناسبة','findSmartMatches',e);}
 }
 async function findPropertiesForBuyer(request){const properties=await crmReadAllPages(()=>crmDataFrom('properties').select('id,title,type,area,price,bedrooms,land_size,built_size').eq('status','available').neq('archived',true).order('id'));return properties.map(p=>{const match=crmRequestMatchScore(request,p);return match?{...p,...match}:null;}).filter(Boolean).sort((a,b)=>b.score-a.score);}
 async function findSellersForBuyer(c){if(!c.preferred_area)return[];try{const r=await supa.from('clients').select('*').eq('is_seller',true).neq('id',c.id);return(r.data||[]).filter(s=>s.preferred_area&&c.preferred_area&&s.preferred_area.indexOf(c.preferred_area)>=0)}catch(e){return[]}}
@@ -3733,7 +3846,7 @@ async function findBuyersForSeller(request){
   const rows=await crmReadAllPages(()=>supa.from('client_requests').select('id,client_id,preferred_area,preferred_areas,property_type,budget_max,client:clients(id,name,archived)').eq('status','active').in('request_type',['buyer','investor','tenant']).order('id'));
   return rows.filter(r=>r.client&&!r.client.archived&&r.client_id!==(request.client_id||request.id)&&areas.some(a=>(r.preferred_areas&&r.preferred_areas.length?r.preferred_areas:[r.preferred_area].filter(Boolean)).some(b=>a.includes(b)||b.includes(a)))&&(!request.property_type||!r.property_type||request.property_type===r.property_type)).map(r=>({...r,...r.client,request_id:r.id}));
 }
-async function loadClientListings(){if(!viewingClient)return;try{const r=await crmDataFrom('properties').select('*').eq('owner_client_id',viewingClient.id);const props=r.data||[];if(!props.length){$('cdTabListings').innerHTML='<div class="empty" style="padding:30px"><div class="empty-ico" style="font-size:32px">🏠</div><div class="empty-desc">لا يوجد عقارات مسجّلة لهذا البائع.<br>يمكنك ربط عقاراته من صفحة العقارات.</div></div>';return}let h='';props.forEach(p=>{const sm={available:'✅ متوفر',reserved:'⏳ محجوز',deposit:'💰 عربون',negotiating:'💬 تفاوض',sold:'🔴 مباع',not_available:'⚪ غير متاح'};h+='<div class="listing-card"><div class="listing-icon">'+(p.type==='villa'?'🏡':p.type==='apartment'?'🏢':p.type==='land'?'🏞':'🏠')+'</div><div class="listing-info"><div class="listing-title">'+escapeHtml(p.title)+'</div><div class="listing-detail">'+propTypeAr(p.type)+' · '+escapeHtml(p.area)+' · '+(sm[p.status]||p.status)+'</div></div><div class="listing-price">'+fmtMoney(p.price)+'</div></div>'});$('cdTabListings').innerHTML=h}catch(e){console.error(e)}}
+async function loadClientListings(){const read=crmBeginClientDetailRead('cdTabListings');if(!read)return;const {el,client,current}=read;el.innerHTML='<div class="empty" role="status">جاري تحميل عقارات العميل…</div>';try{const props=await crmReadAll(()=>crmDataFrom('properties').select('*',{count:'exact'}).eq('owner_client_id',client.id).order('id'));if(!current())return;if(!props.length){el.innerHTML='<div class="empty" style="padding:30px"><div class="empty-ico" style="font-size:32px">🏠</div><div class="empty-desc">لا يوجد عقارات مسجّلة لهذا البائع.<br>يمكنك ربط عقاراته من صفحة العقارات.</div></div>';return}let h='';props.forEach(p=>{const sm={available:'✅ متوفر',reserved:'⏳ محجوز',deposit:'💰 عربون',negotiating:'💬 تفاوض',sold:'🔴 مباع',not_available:'⚪ غير متاح'};h+='<div class="listing-card"><div class="listing-icon">'+(p.type==='villa'?'🏡':p.type==='apartment'?'🏢':p.type==='land'?'🏞':'🏠')+'</div><div class="listing-info"><div class="listing-title">'+escapeHtml(p.title)+'</div><div class="listing-detail">'+propTypeAr(p.type)+' · '+escapeHtml(p.area)+' · '+(sm[p.status]||p.status)+'</div></div><div class="listing-price">'+fmtMoney(p.price)+'</div></div>'});el.innerHTML=h}catch(e){crmClientDetailReadError(read,'عقارات العميل','loadClientListings',e);}}
 const WA_TEMPLATES=[
 {id:'welcome',title:'👋 ترحيب أوّلي',template:'مرحباً {name}،\n\nأنا {agent} من {company}.\nشكراً على اهتمامك! 🌟\n\nبأي وقت يناسبك للتواصل معك أكثر عن متطلباتك؟'},
 {id:'followup',title:'📞 متابعة عميل',template:'مرحباً {name} 🌟\n\nأتمنى أن تكون بخير.\nأكتب لك للمتابعة بخصوص بحثك عن عقار.\n\nهل لازال الموضوع قائم؟ عندي عروض جديدة قد تناسبك.'},
@@ -4462,6 +4575,10 @@ async function loadReports(){
  if(!isOwner()){showPermissionDenied();return}
  const seq=++reportLoadSeq,generation=crmSessionGeneration,user=currentUser&&currentUser.id;
  if(reportTab==='thirtyday')return load30DayReport();
+ if(reportTab==='funnel'){
+  showReportNotice('رحلة عمل الفرعين خلال الفترة؛ كل مرحلة بتاريخها الفعلي، وبيانات المستثمرين الخاصة غير مشمولة.',false);
+  return renderFunnel();
+ }
  if(reportTab==='team'){
   if(!canManage()){showPermissionDenied();return}
   const range=getPeriodRange(),omanDay=d=>d.toLocaleDateString('en-CA',{timeZone:'Asia/Muscat',numberingSystem:'latn'});
@@ -4494,7 +4611,6 @@ async function loadReports(){
  showReportNotice(reportNote+(missing?' هناك '+missing+' صفقة مغلقة بلا تاريخ إغلاق مستبعدة من '+(reportTab==='overview'?'قيمة المبيعات وعدد الإغلاقات.':'أرقام الفترة.'):''),false);
  if(reportTab==='overview'){renderRevenueLineChart(deals);renderClientStatusChart(clients);renderPropTypesChart(properties);renderClientSourcesChart(periodClients)}
  else if(reportTab==='revenue'&&canViewFinancials()){renderRevenueDetails(periodDeals,properties,cash);showReportNotice(range.start.toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'})+' — '+new Date(range.end.getTime()-1).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'})+' · '+crmCommissionPeriodNote(cash),false);}
- else if(reportTab==='funnel')renderFunnel(clients,deals);
  else if(reportTab==='heatmap')renderHeatmap(deals);
  }catch(e){if(seq!==reportLoadSeq||!crmSessionCurrent(generation,user))return;if(reportTab==='revenue')['revReceived','revPending','revNet'].forEach(id=>$(id).textContent='—');console.error('report_load_failed',e);showReportNotice('تعذر تحميل التقرير. الأرقام المعروضة قد تكون من آخر تحميل ناجح. أعد المحاولة.',true);showToast('تعذر تحديث التقرير','error')}
 }
@@ -4532,7 +4648,14 @@ const byType={};closedDeals.forEach(d=>{const t=d.property?d.property.type:'unkn
 const byArea={};closedDeals.forEach(d=>{const a=d.property?d.property.area:'غير محدد';if(!byArea[a])byArea[a]=0;byArea[a]+=parseFloat(d.deal_value)||0});const maxA=Math.max.apply(null,Object.values(byArea).concat([1]));let hA='';Object.keys(byArea).sort((a,b)=>byArea[b]-byArea[a]).slice(0,10).forEach(a=>{const v=byArea[a];const w=Math.max((v/maxA)*100,3);hA+='<div class="bar-row"><div class="bar-label">'+escapeHtml(a)+'</div><div class="bar-track"><div class="bar-fill em" style="width:'+w+'%">'+fmtMoneyShort(v)+'</div></div><div class="bar-value">'+fmtMoneyShort(v)+'</div></div>'});$('chartRevByArea').innerHTML=hA||'<div class="empty-desc" style="text-align:center">لا توجد بيانات</div>'}
 function renderLeaderboard(deals,clients){const perf={};deals.forEach(d=>{const id=d.agent_id;if(!id)return;const name=(d.agent&&d.agent.full_name)||'غير محدد';if(!perf[id])perf[id]={name,deals:0,closed:0,revenue:0,role:''};perf[id].deals++;if(d.stage==='closed'||d.stage==='commission_collected'){perf[id].closed++;perf[id].revenue+=parseFloat(d.deal_value)||0}});clients.forEach(c=>{const id=c.assigned_to;if(!id||!perf[id])perf[id]&&(perf[id].clients=(perf[id].clients||0)+1)||(perf[id]={name:'غير محدد',deals:0,closed:0,revenue:0,clients:1})});
 (allMembers||[]).forEach(m=>{if(perf[m.id]){perf[m.id].role=roleAr(m.role)}});const arr=Object.entries(perf).map(([id,p])=>({id,...p,clients:p.clients||0})).sort((a,b)=>b.revenue-a.revenue);if(!arr.length){$('teamLeaderboard').innerHTML='<div class="empty" style="padding:30px"><div class="empty-desc">لا توجد بيانات أداء بعد</div></div>';return}let h='';arr.forEach((p,i)=>{const cls=i===0?'gold':i===1?'silver':i===2?'bronze':'';const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);h+='<div class="lb-row '+cls+'"><div class="lb-rank">'+medal+'</div><div><div class="lb-name">'+escapeHtml(p.name)+'</div><div class="lb-role">'+p.role+'</div></div><div class="lb-stat"><div class="lb-stat-num">'+p.clients+'</div><div class="lb-stat-lbl">عميل</div></div><div class="lb-stat"><div class="lb-stat-num">'+p.closed+'/'+p.deals+'</div><div class="lb-stat-lbl">صفقات</div></div><div class="lb-revenue">'+fmtMoney(p.revenue)+'</div></div>'});$('teamLeaderboard').innerHTML=h}
-function renderFunnel(clients,deals){const totalClients=clients.length;const withDeal=clients.filter(c=>deals.some(d=>d.client_id===c.id)).length;const withVisit=deals.filter(d=>['visit','negotiation','deposit','closed'].indexOf(d.stage)>=0).length;const negotiation=deals.filter(d=>['negotiation','deposit','closed'].indexOf(d.stage)>=0).length;const closed=deals.filter(d=>d.stage==='closed'||d.stage==='commission_collected').length;const stages=[{label:'👥 عملاء',count:totalClients,max:totalClients},{label:'🤝 صفقات',count:withDeal,max:totalClients},{label:'🏠 معاينات',count:withVisit,max:totalClients},{label:'💬 تفاوض',count:negotiation,max:totalClients},{label:'✅ مكتملة',count:closed,max:totalClients}];let h='';stages.forEach((s,i)=>{const pct=s.max?(s.count/s.max*100):0;const prevPct=i>0?(stages[i-1].count?stages[i].count/stages[i-1].count*100:0):100;h+='<div class="funnel-row"><div class="funnel-label">'+s.label+'</div><div class="funnel-bar"><div class="funnel-fill '+(i===stages.length-1?'em':'')+'" style="width:'+Math.max(pct,5)+'%">'+s.count+'</div></div><div class="funnel-rate">'+(i===0?'بداية':prevPct.toFixed(0)+'% من السابق')+'</div></div>'});$('conversionFunnel').innerHTML=h}
+function renderFunnel(){
+ if(!isOwner())return;
+ const range=getPeriodRange(),omanDay=d=>d.toLocaleDateString('en-CA',{timeZone:'Asia/Muscat',numberingSystem:'latn'});
+ const kind=window.specificMonth?'month':reportPeriod;
+ // The shared period RPC counts actual inquiries, visits and paid reservations.
+ // Keep employees separate instead of summing potentially overlapping clients.
+ return crmReportPerformance(kind,{from:kind==='all'?null:omanDay(range.start),to:omanDay(range.end)},'conversionFunnel');
+}
 function renderHeatmap(deals){
 const omanDay=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat',numberingSystem:'latn'});
 const [year,month]=omanDay(new Date()).slice(0,7).split('-').map(Number),months=[];

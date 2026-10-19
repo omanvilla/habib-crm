@@ -61,19 +61,9 @@
   var oldRenderInfo=window.renderClientInfo;
   if(typeof oldRenderInfo==='function')window.renderClientInfo=function(){var r=oldRenderInfo.apply(this,arguments);fixClientInfoBudget();return r};
 
-  async function fixRequestCards(){
-    try{
-      if(typeof viewingClient==='undefined'||!viewingClient)return;
-      var root=el('cdTabRequests');if(!root)return;
-      var session=crmSessionGeneration,actor=currentUser&&currentUser.id,clientId=viewingClient.id;
-      var q=await supa.from('client_requests').select('id,budget_min,budget_max').eq('client_id',clientId).order('created_at',{ascending:false});
-      if(!crmSessionCurrent(session,actor)||!viewingClient||viewingClient.id!==clientId||q.error)return;
-      var cards=Array.from(root.children).slice(1);
-      (q.data||[]).forEach(function(r,i){var card=cards[i];if(!card)return;var txt=budgetText(r.budget_min,r.budget_max,false);card.innerHTML=card.innerHTML.replace(/💰\s*[^<]*<br>/,'💰 '+(typeof escapeHtml==='function'?escapeHtml(txt):txt)+'<br>');});
-    }catch(e){console.warn('[budget display requests]',e)}
-  }
-  var oldRenderRequests=window.renderClientRequestsTab;
-  if(typeof oldRenderRequests==='function')window.renderClientRequestsTab=async function(){var session=crmSessionGeneration,actor=currentUser&&currentUser.id,clientId=typeof viewingClient!=='undefined'&&viewingClient&&viewingClient.id;var r=await oldRenderRequests.apply(this,arguments);if(crmSessionCurrent(session,actor)&&viewingClient&&viewingClient.id===clientId)await fixRequestCards();return r};
+  // Client request cards format crmBudgetText directly from their own row.
+  // Do not refetch and align budgets by card position: equal dates or pagination
+  // can change that order and display another request's budget.
 
   function fixDashHot(clients){
     try{

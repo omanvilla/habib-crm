@@ -26,7 +26,6 @@
     if(kind==='all')from=null;
     return {from,to};
   }
-  const metric=(label,value,hint='')=>'<span class="ops-metric"><strong>'+n(value)+'</strong><small>'+label+'</small>'+(hint?'<span class="ops-metric-help">'+hint+'</span>':'')+'</span>';
   function targetScore(row,kind){
     if(kind!=='month')return 'نتائج الفترة المختارة؛ لا تُقارن بهدف شهر واحد';
     const bookings=Number(row.reservations||0),expected=Number(row.expected_commission||0),goals=row.targets||{};
@@ -56,7 +55,7 @@
       (employees.map(x=>'<article class="ops-person"><div class="ops-person-title"><strong>'+safe(x.name)+' · '+(x.branch==='muscat'?'مسقط':'بركاء')+'</strong><span>'+(x.sales_goal_met?'هدف الحجوزات الشهري متحقق':'هدف الحجوزات الشهري لم يتحقق بعد')+'</span></div><div class="ops-metrics">'+
       targetMetric('المخزون المتاح حاليًا',x.inventory,x.goals?x.goals.inventory:10,'properties',{kind:'inventory',employee:x.id})+targetMetric('عقارات أُضيفت هذا الأسبوع',x.new_properties,x.goals?x.goals.new_properties:2,'properties',{kind:'weekly',employee:x.id})+targetMetric('عملاء تمت متابعتهم بنتيجة اليوم',x.followups,x.goals?x.goals.followups:10,'daily')+targetMetric('المعاينات المكتملة أسبوعيًا',x.viewings,x.goals?x.goals.viewings:5,'viewings')+
       targetMetric('الحجوزات المؤكدة هذا الشهر',x.bookings,x.goals?x.goals.bookings:2,'deals')+
-      (x.expected_commission==null?'<span class="ops-metric"><small>عمولات المكتب المتوقعة محجوبة لهذا الدور</small></span>':targetMetric('عمولات المكتب المتوقعة من الحجوزات (ر.ع)',x.expected_commission,x.goals?x.goals.expected_commission:4000,'deals'))+'</div><p class="ops-note">المخزون هو كل المتاح الآن في الفرع، مهما كان تاريخ إضافته؛ هدفه مستقل عن إضافات الأسبوع.</p><p class="ops-note">الحجوزات السارية: '+n(x.live_bookings)+' · الملغاة لاحقًا: '+n(x.cancelled_bookings)+' · لا يُحتسب التفاوض أو العربون غير المدفوع حجزًا.</p></article>').join('')||'<p class="ops-state">لا توجد بيانات موظفات متاحة لهذا الحساب.</p>');
+      (x.expected_commission==null?'<span class="ops-metric"><small>عمولات المكتب المتوقعة محجوبة لهذا الدور</small></span>':targetMetric('عمولات حجوزات هذا الشهر (ر.ع)',x.expected_commission,x.goals?x.goals.expected_commission:4000,'deals'))+'</div><p class="ops-note">المخزون هو كل المتاح الآن في الفرع، مهما كان تاريخ إضافته؛ هدفه مستقل عن إضافات الأسبوع.</p><p class="ops-note">عمولات الهدف هي القيمة المسجلة للحجوزات، وتشمل ما تم بيعه أو تحصيله لاحقًا. يبقى الحجز وعمولته في شهر دفع العربون ولا يتكرران عند البيع أو التحصيل.</p><p class="ops-note">الحجوزات السارية: '+n(x.live_bookings)+' · الملغاة لاحقًا: '+n(x.cancelled_bookings)+' · لا يُحتسب التفاوض أو العربون غير المدفوع حجزًا.</p></article>').join('')||'<p class="ops-state">لا توجد بيانات موظفات متاحة لهذا الحساب.</p>');
     }catch(e){if(seq===targetLoadSeq&&crmSessionCurrent(generation,user))host.innerHTML='<div class="ops-error" role="alert">تعذر تحميل الأهداف: '+safe(e.message)+' <button type="button" class="ops-action" data-target-retry>إعادة المحاولة</button></div>';}
   }
   document.addEventListener('click',e=>{const b=e.target.closest('[data-target-go]');if(b){if(b.dataset.targetProperty){openPropertyTarget(b.dataset.targetEmployee,b.dataset.targetProperty);return;}const page=b.dataset.targetGo;if(typeof navigate==='function')navigate(page,null);}if(e.target.closest('[data-target-retry]'))loadTargetDashboard()});
@@ -69,7 +68,29 @@
   const previousDashboardTargets=window.loadDashboard;
   if(typeof previousDashboardTargets==='function')window.loadDashboard=function(){const result=previousDashboardTargets.apply(this,arguments);mountTargetDashboard();return result;};
   const performanceLoads=new WeakMap();
-  let teamPerformancePeriod='month';
+  let teamPerformancePeriod='month',dashboardPerformancePeriod='month';
+  // Keep the three shared performance surfaces on the same response contract.
+  // An absent field is unavailable, not a zero or a count inferred from another cohort.
+  const performanceValue=value=>value==null||value===''||!Number.isFinite(Number(value))?'—':n(value);
+  function performanceCount(key,label,value,hint='',primary=false){
+    return '<div class="ops-performance-stat'+(primary?' ops-performance-primary':'')+'" data-performance-metric="'+key+'"><dt>'+label+(hint?'<small>'+hint+'</small>':'')+'</dt><dd class="ops-performance-value">'+performanceValue(value)+'</dd></div>';
+  }
+  function performanceBreakdown(items){
+    return '<div class="ops-performance-breakdown">'+items.map(([key,label,value])=>'<span data-performance-metric="'+key+'"><b class="ops-performance-value">'+performanceValue(value)+'</b> '+label+'</span>').join('')+'</div>';
+  }
+  function performanceFinance(row){
+    const fields=[['expected_commission','عمولات حجوزات الفترة','القيمة المسجلة عند الحجز، وتشمل الحجوزات التي تم بيعها أو تحصيلها لاحقًا'],['company_commission','عمولات المكتب من المبيعات المكتملة في الفترة','بتاريخ إتمام البيع، قبل خصم نصيب الموظفة'],['commission_collected','عمولات المكتب المحصلة فعليًا في الفترة','بتاريخ التحصيل الفعلي، ويشمل الدفعات الجزئية']];
+    const visible=fields.filter(([key])=>row[key]!=null);
+    return visible.length?'<section class="ops-performance-finance" aria-label="العمولات"><dl>'+visible.map(([key,label,hint])=>performanceCount(key,label,row[key],hint)).join('')+'</dl><p class="ops-note">المبالغ بالريال العُماني. لكل صف تاريخه؛ لا تُجمع هذه القيم بوصفها إيرادًا واحدًا.</p></section>':'';
+  }
+  function performancePerson(x,kind,journeyOnly=false){
+    const visitsAvailable=['visit_cohort_total','visit_cohort_done','visit_cohort_pending','visit_cohort_cancelled'].every(key=>x[key]!=null);
+    return '<article class="ops-person ops-performance-person"><div class="ops-person-title"><strong>'+safe(x.name)+'</strong>'+(journeyOnly?'':'<span>'+safe(targetScore(x,kind))+'</span>')+'</div><div class="ops-performance-stages">'+
+      '<section class="ops-performance-stage" data-performance-stage="inquiries"><h4>استفسارات العملاء</h4><dl>'+performanceCount('inquiry_clients','عملاء استفسروا عن عقار',x.inquiry_clients,'كل عميل مرة واحدة خلال الفترة',true)+performanceCount('inquiry_property_pairs','استفسارات عن عقار محدد',x.inquiry_property_pairs,'قد يستفسر العميل نفسه عن أكثر من عقار')+performanceCount('replied_inquiry_clients','مستفسرون ردّت عليهم الموظفة',x.replied_inquiry_clients,'رد بشري بعد الاستفسار وفي الفترة نفسها')+performanceCount('inquiry_pair_to_visit','استفسارات الفترة التي وصلت لزيارة',x.inquiry_pair_to_visit,'قد تكون الزيارة في فترة لاحقة')+'</dl></section>'+
+      '<section class="ops-performance-stage" data-performance-stage="visits"><h4>الزيارات</h4><dl>'+performanceCount('visit_cohort_total','زيارات موعدها خلال الفترة',x.visit_cohort_total,'بتاريخ الزيارة المسجل، مهما كان وقت إدخالها',true)+performanceCount('visit_cohort_done','زيارات تمت',x.visit_cohort_done)+performanceCount('visit_cohort_pending','زيارات لم تكتمل بعد',x.visit_cohort_pending,'تشمل المواعيد القادمة والمؤجلة وعدم الحضور')+performanceCount('visit_cohort_cancelled','زيارات أُلغيت',x.visit_cohort_cancelled)+'</dl>'+(!visitsAvailable?'<p class="ops-note" role="status">تفاصيل حالات زيارات الفترة غير متاحة حاليًا؛ لا يُستنتج المتبقي من أرقام ذات تواريخ مختلفة.</p>':'')+'</section>'+
+      '<section class="ops-performance-stage" data-performance-stage="deals"><h4>الحجوزات والمبيعات</h4><dl>'+performanceCount('reservations','حجوزات مؤكدة في الفترة',x.reservations,'بتاريخ دفع العربون، مرة واحدة',true)+'</dl>'+performanceBreakdown([['active_reservations','سارية',x.active_reservations],['cancelled_reservations','أُلغيت لاحقًا',x.cancelled_reservations]])+'<dl class="ops-performance-sale">'+performanceCount('sales','مبيعات أُغلقت',x.sales,'بتاريخ إتمام البيع',true)+performanceCount('visit_to_sale','منها مبيعات مرتبطة بزيارة',x.visit_to_sale,'يشمل الزيارات السابقة للفترة')+'</dl>'+(Number(x.sales_without_reservation)>0?'<p class="ops-performance-diagnostic">'+n(x.sales_without_reservation)+' من مبيعات الفترة تفتقد تاريخ حجز مؤكدًا. يلزم تسجيل تاريخ الحجز الصحيح لتحديد شهر الهدف.</p>':'')+'</section></div>'+
+      (journeyOnly?'':'<dl class="ops-performance-work">'+performanceCount('successful_staff_messages','رسائل أرسلتها الموظفة',x.successful_staff_messages,'رسائل أُرسلت بنجاح؛ بدون الآلية أو الفاشلة')+performanceCount('new_properties','عقارات أُضيفت خلال الفترة',x.new_properties,'عقارات غير مؤرشفة بسعر مسجل؛ تبقى الإضافة محسوبة بعد البيع')+performanceCount('followup_clients','عملاء تمت متابعتهم بنتيجة خلال الفترة',x.followup_clients,'كل عميل مرة واحدة؛ من تواصل بشري موثق بنتيجة')+'</dl>'+performanceFinance(x)+(Number(x.unknown_expected_commission)>0?'<p class="ops-note">حجوزات لم تُحدد عمولتها المتوقعة: '+n(x.unknown_expected_commission)+'</p>':'')+(Number(x.unknown_company_commission)>0?'<p class="ops-note">مبيعات مكتملة لم تُحدد عمولة المكتب فيها: '+n(x.unknown_company_commission)+'. الإجمالي يشمل القيم المعروفة فقط.</p>':''))+'</article>';
+  }
   async function renderPerformance(kind,boxId='employeePerformanceResults',explicitSpan){
     kind=validPerformancePeriod(kind);
     const generation=crmSessionGeneration,user=currentUser&&currentUser.id;
@@ -83,16 +104,14 @@
       if(r.error)throw r.error;
       if(!r.data||!Array.isArray(r.data.employees))throw new Error('لم تصل بيانات الأداء. أعد المحاولة');
       const employees=r.data.employees;
-      box.innerHTML='<div class="ops-performance-caption"><span>'+safe(r.data.from||span.from||'بداية الشركة')+' — '+safe(new Date(Date.parse(span.to+'T00:00:00Z')-86400000).toISOString().slice(0,10))+'</span><small>العقارات النشطة رصيد حالي؛ بقية الأرقام للفترة المختارة.</small></div>'+
-      (employees.map(x=>'<article class="ops-person"><div class="ops-person-title"><strong>'+safe(x.name)+'</strong><span>'+safe(targetScore(x,kind))+'</span></div><div class="ops-metrics">'+
-        metric('عملاء استفسروا عن عقار',x.inquiry_clients,'كل عميل مرة واحدة خلال الفترة')+metric('مستفسرون ردّت عليهم الموظفة',x.replied_inquiry_clients,'رد بشري بعد الاستفسار وفي الفترة نفسها')+metric('رسائل أرسلتها الموظفة',x.successful_staff_messages,'رسائل أُرسلت بنجاح؛ بدون الآلية أو الفاشلة')+metric('عقارات نشطة الآن',x.active_inventory,'مسندة للموظفة')+metric('عقارات أُضيفت خلال الفترة',x.new_properties,'إضافة عقار جديد إلى CRM')+metric('استفسارات عن عقار محدد',x.inquiries,'رسائل واردة رُبطت بعقار')+metric('استفسارات الفترة التي وصلت لزيارة',x.inquiry_to_visit,'قد تكون الزيارة في فترة لاحقة')+metric('زيارات حُجزت',x.visits_booked)+metric('زيارات تمت',x.visits_done)+metric('مبيعات الفترة المرتبطة بزيارة',x.visit_to_sale,'يشمل الزيارات السابقة للفترة')+metric('حجوزات مؤكدة في الفترة',x.reservations,'بتاريخ دفع العربون، مرة واحدة')+metric('حجوزات الفترة التي لا تزال سارية',x.active_reservations)+metric('حجوزات الفترة الملغاة لاحقًا',x.cancelled_reservations)+metric('مبيعات أُغلقت',x.sales,'بتاريخ إتمام البيع؛ مستقلة عن هدف الحجوزات')+metric('أنشطة متابعة موثقة',x.activities,'مكالمات واجتماعات ومتابعات مسجلة')+'</div>'+
-        (x.expected_commission==null?'':'<div class="ops-commission"><span>عمولات متوقعة من حجوزات الفترة</span><strong>'+n(x.expected_commission)+' <small>ر.ع</small></strong></div>')+(x.unknown_expected_commission?'<p class="ops-note">حجوزات لم تُحدد عمولتها المتوقعة: '+n(x.unknown_expected_commission)+'</p>':'')+(x.company_commission==null?'':'<div class="ops-commission"><span>عمولة الشركة من المبيعات المكتملة في الفترة</span><strong>'+n(x.company_commission)+' <small>ر.ع</small></strong></div>')+(x.commission_collected==null?'':'<div class="ops-commission"><span>عمولات المكتب المحصلة فعليًا في الفترة</span><strong>'+n(x.commission_collected)+' <small>ر.ع</small></strong></div>')+'</article>').join('')||'<p class="ops-empty">لا يوجد موظفون نشطون.</p>')+
-        '<details class="ops-metric-definitions"><summary>كيف تُحسب هذه الأرقام؟</summary><p>عملاء الاستفسارات يُحسبون مرة واحدة لكل عميل خلال الفترة، والردود هي ردود الموظفة البشرية بعد الاستفسار. رسائل الموظفة هي الرسائل البشرية التي أُرسلت بنجاح، وقد تتعدد للعميل الواحد؛ تُستبعد الآلية والفاشلة والمعلقة. الحجز يُحسب مرة واحدة بتاريخ دفع العربون، وتبقى عمولته متوقعة إلى أن تُسجل دفعة فعلية بتاريخ تحصيلها. الانتقال للبيع أو التحصيل لا يكرر الحجز. الإلغاء يبقي التاريخ ظاهرًا ويُخرج الحجز من السارية. الاستفسار يُحسب عند وجود رسالة واردة مرتبطة بعقار محدد. الزيارة اليدوية تُحسب زيارة، ولا تتحول وحدها إلى استفسار وارد. مبيعات الفترة المرتبطة بزيارة تشمل البيع الذي أُغلق خلالها وكانت له زيارة مكتملة، حتى لو تمت الزيارة في شهر سابق. أنشطة المتابعة هي السجلات البشرية الفعلية؛ رسائل واتساب الآلية مستبعدة.</p><p>الإسناد المعتمد للعمل منذ 1 أغسطس 2026: مسقط لهديل وبركاء لمرام. رصيد العقارات المستهدف 10، وبقية الأهداف حسب اعتماد المالك.</p></details>';
+      box.innerHTML='<div class="ops-performance-caption"><span>'+safe(r.data.from||span.from||'بداية الشركة')+' — '+safe(new Date(Date.parse(span.to+'T00:00:00Z')-86400000).toISOString().slice(0,10))+' · بتوقيت مسقط</span><small>كل مرحلة بتاريخها الفعلي؛ قد تبدأ الرحلة في فترة سابقة.</small></div>'+
+      (employees.map(x=>performancePerson(x,kind,boxId==='conversionFunnel')).join('')||'<p class="ops-empty">لا يوجد موظفون نشطون.</p>')+
+        '<details class="ops-metric-definitions"><summary>كيف تُحسب هذه الأرقام؟</summary><p>عملاء الاستفسارات يُحسبون مرة واحدة لكل عميل خلال الفترة. الاستفسارات عن عقارات محددة هي روابط العميل والعقار؛ قد يكون للعميل أكثر من رابط، ولذلك لا تُجمع مع عدد العملاء. الردود هي ردود الموظفة البشرية بعد الاستفسار. رسائل الموظفة هي الرسائل البشرية التي أُرسلت بنجاح، وقد تتعدد للعميل الواحد؛ تُستبعد الآلية والفاشلة والمعلقة. الاستفسار يحتاج رسالة واردة مرتبطة بعقار؛ الزيارة اليدوية تُحسب زيارة ولا تُنشئ استفسارًا واردًا.</p><p>حالات الزيارات تخص المواعيد المسجلة داخل الفترة نفسها؛ المكتملة وغير المكتملة والملغاة أجزاء من هذا العدد. أما تحول استفسار الفترة إلى زيارة فقد يحدث لاحقًا. مبيعات الفترة المرتبطة بزيارة تشمل البيع الذي أُغلق خلالها وكانت له زيارة مكتملة، حتى لو تمت الزيارة في شهر سابق.</p><p>الحجز وعمولته يُحسبان مرة واحدة في شهر دفع العربون. إتمام البيع أو التحصيل لاحقًا لا يُزيلهما من ذلك الشهر ولا يُعيد احتسابهما في شهر آخر. عمولات الحجوزات هي قيمتها المسجلة، وعمولات المبيعات تُعرض بتاريخ البيع، والتحصيل الفعلي بتاريخ كل دفعة. الإلغاء يبقي الحجز وتاريخه ظاهرين ويُخرجه من السارية. تاريخ الحجز غير المعروف يحتاج إدخالًا صحيحًا ولا يُستنتج من الزيارة أو البيع.</p><p>المتابعات تُحسب للعملاء الذين سُجل لهم تواصل بشري بنتيجة فعلية؛ لا يُحسب حفظ بيانات العميل أو رسالة آلية متابعةً. الإسناد المعتمد للعمل منذ 1 أغسطس 2026: مسقط لهديل وبركاء لمرام. المخزون المتاح وهدفه موجودان في أهداف العمل المعتمدة.</p></details>';
     }catch(e){if(!isCurrent())return;box.innerHTML='<div class="ops-error" role="alert"><strong>تعذر تحميل الأداء</strong><span>'+safe(e.message)+'</span><button class="ops-action" data-performance-retry="'+safe(kind)+'" data-performance-box="'+safe(boxId)+'">إعادة المحاولة</button></div>'}
   }
-  window.crmDashboardPerformancePeriod=function(kind){const panel=$id('opsPerformanceDetails');if(!currentProfile||!['owner','manager','agent'].includes(currentProfile.role))return;if(panel)panel.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('active',b.dataset.period===kind));renderPerformance(kind,'opsDashboardPerformanceResults')};
+  window.crmDashboardPerformancePeriod=function(kind){const panel=$id('opsPerformanceDetails');if(!currentProfile||!['owner','manager','agent'].includes(currentProfile.role))return;dashboardPerformancePeriod=validPerformancePeriod(kind);if(panel)panel.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('active',b.dataset.period===dashboardPerformancePeriod));return renderPerformance(dashboardPerformancePeriod,'opsDashboardPerformanceResults')};
   window.crmPerformancePeriod=function(kind){teamPerformancePeriod=kind;document.querySelectorAll('.ops-period').forEach(b=>b.classList.toggle('active',b.dataset.period===kind));return renderPerformance(kind)};
-  window.crmReportPerformance=function(kind,span){if(currentProfile?.role!=='owner')return;return renderPerformance(kind,'teamLeaderboard',span)};
+  window.crmReportPerformance=function(kind,span,boxId='teamLeaderboard'){if(currentProfile?.role!=='owner')return;return renderPerformance(kind,boxId==='conversionFunnel'?'conversionFunnel':'teamLeaderboard',span)};
   function addPerformance(){
     const target=$id('employeeTargetsPanel'),team=$id('page-team');if(!team||$id('employeePerformancePanel'))return;
     const card=document.createElement('div');card.className='card';card.id='employeePerformancePanel';
@@ -213,7 +232,11 @@
     const panel=$id('opsPerformanceDetails');if(panel){panel.hidden=!['owner','manager','agent'].includes(currentProfile.role);const heading=panel.querySelector('summary>span');if(heading)heading.textContent=owner||currentProfile.role==='manager'?'أداء الفريق خلال الفترة':'أدائي خلال الفترة';}
     if(typeof loadEmployeeTargetReminder==='function')loadEmployeeTargetReminder();
     const scopes=owner?['branches','investment']:['branches'];scopes.forEach(scope=>dashboardScopes.set(scope,{status:'loading'}));renderDashboard();
-    await Promise.allSettled(scopes.map(loadDashboardScope));
+    const reads=scopes.map(loadDashboardScope);
+    // Successful mutations already refresh this workspace. Refresh a visible
+    // performance panel with its selected period too; hidden reports reload on entry.
+    if(panel?.open&&!panel.hidden)reads.push(window.crmDashboardPerformancePeriod(dashboardPerformancePeriod));
+    await Promise.allSettled(reads);
   };
   window.loadDashboard=function(){const result=window.crmLoadDashboardWork.apply(this,arguments);mountTargetDashboard();return result;};
   const propertyActionQueue=window.loadPropertyActionQueue;
@@ -284,7 +307,7 @@
       if(propertyArea&&!areas.includes(propertyArea))propertyArea='';
       areaSelect.innerHTML='<option value="">كل المناطق</option>'+areas.map(a=>'<option value="'+safe(a)+'">'+safe(a)+'</option>').join('');areaSelect.value=propertyArea;}
     const items=allProperties.filter(p=>(!propertyBranch||(p.branch_key||'unknown')===propertyBranch)&&(!propertyArea||(p.area||'غير محددة')===propertyArea)&&(!propertyStatus||p.status===propertyStatus)&&(!propertySearch||[p.title,p.property_code,p.area,p.wilayat].join(' ').toLowerCase().includes(propertySearch)));
-    if(propertyTargetScope&&$id('propertiesSub'))$id('propertiesSub').textContent=n(items.length)+' عقار مطابق · من '+n(allProperties.length)+' في نطاق الهدف';
+    if($id('propertiesSub'))$id('propertiesSub').textContent=propertyTargetScope?n(items.length)+' عقار مطابق · من '+n(allProperties.length)+' في نطاق الهدف':(propertySearch||propertyArea||propertyBranch||propertyStatus)?n(items.length)+' عقار مطابق · من '+n(allProperties.length)+' في العرض الحالي':n(items.length)+' عقار في العرض الحالي';
     if(!items.length){captureListExport('properties',[]);list.innerHTML='<div class="ops-state">لا توجد عقارات تطابق العرض الحالي.'+((propertySearch||propertyArea||propertyBranch||propertyStatus)?workButton('clear-properties','مسح الفلاتر'):'')+'</div>';return;}
     const groups=new Map();items.slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).forEach(p=>{
       const branch=p.branch_key==='barka'?'بركاء':p.branch_key==='muscat'?'مسقط':'غير محدد',area=p.area||'منطقة غير محددة',key=branch+'|'+area;
@@ -342,11 +365,13 @@
   const oldSetPropView=window.setPropView;
   if(typeof oldSetPropView==='function')window.setPropView=function(){if(propertyTargetScope)clearPropertyTarget();return oldSetPropView.apply(this,arguments);};
   const oldLoadClients=window.loadClients;
+  let clientLoadSeq=0;
   if(typeof oldLoadClients==='function')window.loadClients=async function(){
-    const user=currentUser&&currentUser.id,generation=crmSessionGeneration;
+    const user=currentUser&&currentUser.id,generation=crmSessionGeneration,seq=++clientLoadSeq;
     listExports.clients.ready=false;listExports.clients.snapshot=null;
     const loaded=await oldLoadClients.apply(this,arguments);
-    if(loaded===false||!crmSessionCurrent(generation,user)){listExports.clients.snapshot=null;return loaded;}
+    if(seq!==clientLoadSeq||!crmSessionCurrent(generation,user))return false;
+    if(loaded===false){listExports.clients.snapshot=null;return false;}
     listExports.clients.ready=true;return loaded;
   };
   const oldClients=window.renderClients;
@@ -388,7 +413,9 @@
     if(typeof crmEndSave==='function')crmEndSave('employeeTargetsPanel');
     if(typeof crmSaveAttempts!=='undefined')crmSaveAttempts.delete('employeeTargetsPanel');
     ['opsEmployeeTargets','employeeTargetsPanel'].forEach(id=>{if($id(id))$id(id).textContent='';});
-    teamPerformancePeriod='month';dashboardScopes.clear();dashboardSession='';dashboardScope='branches';dashboardCategory='all';
+    teamPerformancePeriod='month';dashboardPerformancePeriod='month';clientLoadSeq++;dashboardScopes.clear();dashboardSession='';dashboardScope='branches';dashboardCategory='all';
+    window.client360Data=null;
+    ['cdTabJourney','cdActivities','cdTabRequests','cdTabInterests','cdTabListings','cdTabTasks','cdTabDeals','cdTabInfo','cdSmartMatches','cdClientAI','propertyDetailContent','opsDashboardPerformanceResults','employeePerformanceResults','teamLeaderboard','conversionFunnel'].forEach(id=>{if($id(id))$id(id).textContent='';});
     clientBranch='all';clientWorkFilter='all';propertySearch='';propertyBranch='';propertyArea='';propertyStatus='';
     ['opsPropertySearch','opsPropertyBranch','opsPropertyArea','opsPropertyStatus'].forEach(id=>{if($id(id))$id(id).value='';});
   };
