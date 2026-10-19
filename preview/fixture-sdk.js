@@ -189,7 +189,9 @@ rpc:async(name,args={})=>{
  }
  if(name==='crm_client_contact_queue')return {data:clients.filter(c=>allowed(c,'clients')&&!c.human_contact_at).map(c=>({client_id:c.id})),error:null};
  if(name==='crm_property_action_queue')return {data:[],error:null};
- if(name==='crm_employee_performance')return {data:{from:args.p_from,to:args.p_to,employees:profiles.filter(p=>p.role==='agent'&&(profile.role!=='agent'||p.id===profile.id)).map(p=>({employee_id:p.id,name:p.full_name,active_inventory:properties.filter(x=>x.sourced_by===p.id&&!x.archived&&!['sold','not_available'].includes(x.status)).length,new_properties:0,inquiries:0,visits_booked:0,visits_done:0,sales:0,activities:0,outbound_messages:0,company_commission:20,targets:{inventory_target:10}}))},error:null};
+ // Distinct canned metric counts exercise frontend field mapping and role scope.
+ // Their SQL calculation (unique clients, successful human messages) is tested separately.
+ if(name==='crm_employee_performance')return {data:{from:args.p_from,to:args.p_to,employees:profiles.filter(p=>p.role==='agent'&&(profile.role!=='agent'||p.id===profile.id)).map(p=>({employee_id:p.id,name:p.full_name,active_inventory:properties.filter(x=>x.sourced_by===p.id&&!x.archived&&!['sold','not_available'].includes(x.status)).length,new_properties:0,inquiries:p.id===muscat?6:3,inquiry_clients:p.id===muscat?4:2,replied_inquiry_clients:p.id===muscat?3:1,successful_staff_messages:p.id===muscat?7:5,visits_booked:0,visits_done:0,sales:0,activities:0,outbound_messages:0,company_commission:20,targets:{inventory_target:10}}))},error:null};
  if(name==='crm_commission_report'){
   if(profile.role!=='owner')return {data:null,error:{message:'TEST company receipts are owner-only',code:'42501'}};
   // Frontend-only ledger model: receipts carry their own date. Real accounting,

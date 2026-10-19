@@ -41,7 +41,16 @@ const server=require('../preview/serve.cjs'),out=path.resolve('preview-results/d
   }
   if(role!=='viewer'){
    await page.locator('#opsPerformanceDetails > summary').click();await page.waitForFunction(()=>document.querySelector('#opsDashboardPerformanceResults .ops-person'));
-   const text=await page.locator('#opsDashboardPerformanceResults').innerText();assert.match(text,/عقارات أُضيفت خلال الفترة/);assert.match(text,/يشمل الزيارات السابقة للفترة/);assert.match(text,/رسائل واتساب صادرة من الفريق/);assert(!text.includes('تواصل بشري منسوب للشغل'));
+   const text=await page.locator('#opsDashboardPerformanceResults').innerText();assert.match(text,/عقارات أُضيفت خلال الفترة/);assert.match(text,/يشمل الزيارات السابقة للفترة/);assert.match(text,/رسائل أرسلتها الموظفة/);assert.doesNotMatch(text,/رسائل واتساب صادرة من الفريق/);assert(!text.includes('تواصل بشري منسوب للشغل'));
+   for(const explanation of ['كل عميل مرة واحدة خلال الفترة','رد بشري بعد الاستفسار وفي الفترة نفسها','رسائل أُرسلت بنجاح؛ بدون الآلية أو الفاشلة'])assert(text.includes(explanation),explanation);
+   await page.locator('#opsDashboardPerformanceResults .ops-metric-definitions > summary').click();
+   assert.match(await page.locator('#opsDashboardPerformanceResults .ops-metric-definitions').innerText(),/تُستبعد الآلية والفاشلة والمعلقة/);
+   const counts=await page.locator('#opsDashboardPerformanceResults .ops-person').evaluateAll(cards=>cards.map(card=>{
+    const value=label=>Number([...card.querySelectorAll('.ops-metric')].find(el=>el.querySelector('small')?.textContent===label)?.querySelector('strong')?.textContent);
+    return {name:card.querySelector('.ops-person-title strong').textContent,inquiries:value('عملاء استفسروا عن عقار'),replied:value('مستفسرون ردّت عليهم الموظفة'),messages:value('رسائل أرسلتها الموظفة')};
+   }));
+   const expected=[{name:'موظفة مسقط التجريبية',inquiries:4,replied:3,messages:7},{name:'موظفة بركاء التجريبية',inquiries:2,replied:1,messages:5}];
+   assert.deepEqual(counts,role==='muscat'?[expected[0]]:role==='barka'?[expected[1]]:expected,role+' metric counts and employee scope');
    if(role==='owner')await page.screenshot({path:path.join(out,'owner-performance.png'),fullPage:true,animations:'disabled'});
    await page.locator('#opsPerformanceDetails > summary').click();
   }

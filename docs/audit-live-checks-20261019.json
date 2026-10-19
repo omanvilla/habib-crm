@@ -1,0 +1,555 @@
+{
+  "verified_at_utc": "2026-10-19T04:41:07Z",
+  "type": "Read-only database role claims; not browser authentication",
+  "migrations": [
+    {
+      "version": "20261019042543",
+      "name": "comprehensive_audit_repairs_20261018"
+    },
+    {
+      "version": "20261019042648",
+      "name": "audit_financial_reporting_20261019"
+    }
+  ],
+  "preservation": {
+    "snapshotted_deals": 55,
+    "snapshotted_deposits": 2,
+    "changed_original_fields": 0,
+    "new_receipts": 0,
+    "new_milestone_events": 0,
+    "expense_precision": "numeric(13,3)"
+  },
+  "roles": [
+    {
+      "query": "01-trigger-acl.sql",
+      "data": [
+        {
+          "trigger_acl": [
+            {
+              "exists": true,
+              "function": "crm_set_request_geography",
+              "anon_execute": false,
+              "returns_trigger": true,
+              "authenticated_execute": false
+            },
+            {
+              "exists": true,
+              "function": "crm_sync_request_assignees",
+              "anon_execute": false,
+              "returns_trigger": true,
+              "authenticated_execute": false
+            },
+            {
+              "exists": true,
+              "function": "exclude_internal_numbers_from_followups",
+              "anon_execute": false,
+              "returns_trigger": true,
+              "authenticated_execute": false
+            },
+            {
+              "exists": true,
+              "function": "process_followup_reply_from_whatsapp",
+              "anon_execute": false,
+              "returns_trigger": true,
+              "authenticated_execute": false
+            },
+            {
+              "exists": true,
+              "function": "sync_followup_delivery_status",
+              "anon_execute": false,
+              "returns_trigger": true,
+              "authenticated_execute": false
+            },
+            {
+              "exists": true,
+              "function": "sync_property_monitoring_from_marketing_event",
+              "anon_execute": false,
+              "returns_trigger": true,
+              "authenticated_execute": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "query": "owner-targets.sql",
+      "data": [
+        {
+          "scope": "owner",
+          "audit": "targets",
+          "result": {
+            "goals": [
+              {
+                "goals": {
+                  "bookings": 2,
+                  "viewings": 5,
+                  "followups": 10,
+                  "inventory": 10,
+                  "new_properties": 2,
+                  "expected_commission": 4000
+                },
+                "branch": "barka"
+              },
+              {
+                "goals": {
+                  "bookings": 2,
+                  "viewings": 5,
+                  "followups": 10,
+                  "inventory": 10,
+                  "new_properties": 2,
+                  "expected_commission": 4000
+                },
+                "branch": "muscat"
+              }
+            ],
+            "period": {
+              "today": "2026-10-19",
+              "week_end": "2026-10-24",
+              "month_end": "2026-10-31",
+              "week_start": "2026-10-18",
+              "month_start": "2026-10-01"
+            },
+            "status": "ok",
+            "employee_rows": 2,
+            "effective_role": "owner",
+            "rows_outside_self": 2
+          }
+        }
+      ]
+    },
+    {
+      "query": "muscat-targets.sql",
+      "data": [
+        {
+          "scope": "muscat",
+          "audit": "targets",
+          "result": {
+            "goals": [
+              {
+                "goals": {
+                  "bookings": 2,
+                  "viewings": 5,
+                  "followups": 10,
+                  "inventory": 10,
+                  "new_properties": 2,
+                  "expected_commission": 4000
+                },
+                "branch": "muscat"
+              }
+            ],
+            "period": {
+              "today": "2026-10-19",
+              "week_end": "2026-10-24",
+              "month_end": "2026-10-31",
+              "week_start": "2026-10-18",
+              "month_start": "2026-10-01"
+            },
+            "status": "ok",
+            "employee_rows": 1,
+            "effective_role": "agent",
+            "rows_outside_self": 0
+          }
+        }
+      ]
+    },
+    {
+      "query": "barka-targets.sql",
+      "data": [
+        {
+          "scope": "barka",
+          "audit": "targets",
+          "result": {
+            "goals": [
+              {
+                "goals": {
+                  "bookings": 2,
+                  "viewings": 5,
+                  "followups": 10,
+                  "inventory": 10,
+                  "new_properties": 2,
+                  "expected_commission": 4000
+                },
+                "branch": "barka"
+              }
+            ],
+            "period": {
+              "today": "2026-10-19",
+              "week_end": "2026-10-24",
+              "month_end": "2026-10-31",
+              "week_start": "2026-10-18",
+              "month_start": "2026-10-01"
+            },
+            "status": "ok",
+            "employee_rows": 1,
+            "effective_role": "agent",
+            "rows_outside_self": 0
+          }
+        }
+      ]
+    },
+    {
+      "query": "disabled-targets.sql",
+      "data": [
+        {
+          "scope": "disabled",
+          "audit": "targets",
+          "result": {
+            "status": "error",
+            "sqlstate": "42501"
+          }
+        }
+      ]
+    },
+    {
+      "query": "owner-performance.sql",
+      "data": [
+        {
+          "scope": "owner",
+          "audit": "performance",
+          "result": {
+            "status": "timeout",
+            "sqlstate": "57014"
+          }
+        }
+      ]
+    },
+    {
+      "query": "muscat-performance.sql",
+      "data": [
+        {
+          "scope": "muscat",
+          "audit": "performance",
+          "result": {
+            "status": "timeout",
+            "sqlstate": "57014"
+          }
+        }
+      ]
+    },
+    {
+      "query": "barka-performance.sql",
+      "data": [
+        {
+          "scope": "barka",
+          "audit": "performance",
+          "result": {
+            "status": "timeout",
+            "sqlstate": "57014"
+          }
+        }
+      ]
+    },
+    {
+      "query": "disabled-performance.sql",
+      "data": [
+        {
+          "scope": "disabled",
+          "audit": "performance",
+          "result": {
+            "status": "error",
+            "sqlstate": "42501"
+          }
+        }
+      ]
+    },
+    {
+      "query": "owner-boundaries.sql",
+      "data": [
+        {
+          "scope": "owner",
+          "audit": "boundaries",
+          "result": {
+            "status": "ok",
+            "deals_visible": true,
+            "effective_role": "owner",
+            "clients_visible": true,
+            "company_visible": true,
+            "properties_visible": true,
+            "deal_finance_exposed": true,
+            "private_clients_visible": false,
+            "private_requests_visible": false,
+            "property_finance_exposed": true,
+            "private_conversations_visible": false
+          }
+        }
+      ]
+    },
+    {
+      "query": "muscat-boundaries.sql",
+      "data": [
+        {
+          "scope": "muscat",
+          "audit": "boundaries",
+          "result": {
+            "status": "ok",
+            "deals_visible": true,
+            "effective_role": "agent",
+            "clients_visible": true,
+            "company_visible": true,
+            "properties_visible": true,
+            "deal_finance_exposed": false,
+            "investment_rpc_denied": true,
+            "private_clients_visible": false,
+            "opposite_clients_visible": false,
+            "private_requests_visible": false,
+            "property_finance_exposed": false,
+            "direct_deal_finance_denied": true,
+            "opposite_properties_visible": false,
+            "private_conversations_visible": false,
+            "direct_property_finance_denied": true,
+            "opposite_conversations_visible": false
+          }
+        }
+      ]
+    },
+    {
+      "query": "barka-boundaries.sql",
+      "data": [
+        {
+          "scope": "barka",
+          "audit": "boundaries",
+          "result": {
+            "status": "ok",
+            "deals_visible": true,
+            "effective_role": "agent",
+            "clients_visible": true,
+            "company_visible": true,
+            "properties_visible": true,
+            "deal_finance_exposed": false,
+            "investment_rpc_denied": true,
+            "private_clients_visible": false,
+            "opposite_clients_visible": false,
+            "private_requests_visible": false,
+            "property_finance_exposed": false,
+            "direct_deal_finance_denied": true,
+            "opposite_properties_visible": false,
+            "private_conversations_visible": false,
+            "direct_property_finance_denied": true,
+            "opposite_conversations_visible": false
+          }
+        }
+      ]
+    },
+    {
+      "query": "disabled-boundaries.sql",
+      "data": [
+        {
+          "scope": "disabled",
+          "audit": "boundaries",
+          "result": {
+            "status": "ok",
+            "deals_visible": false,
+            "effective_role": null,
+            "clients_visible": false,
+            "company_visible": false,
+            "properties_visible": false,
+            "deal_finance_exposed": false,
+            "investment_rpc_denied": true,
+            "private_clients_visible": false,
+            "private_requests_visible": false,
+            "property_finance_exposed": false,
+            "direct_deal_finance_denied": true,
+            "private_conversations_visible": false,
+            "direct_property_finance_denied": true
+          }
+        }
+      ]
+    }
+  ],
+  "performance_at_8s_statement_budget": [
+    {
+      "query": "owner-performance-8s.sql",
+      "elapsed_ms": 4904,
+      "data": [
+        {
+          "scope": "owner",
+          "audit": "performance",
+          "result": {
+            "period": {
+              "to": "2026-11-01",
+              "from": "2026-10-01"
+            },
+            "status": "ok",
+            "employee_rows": 2,
+            "effective_role": "owner",
+            "rows_outside_self": 2,
+            "reservation_metric_present": true
+          }
+        }
+      ]
+    },
+    {
+      "query": "muscat-performance-8s.sql",
+      "elapsed_ms": 5751,
+      "data": [
+        {
+          "scope": "muscat",
+          "audit": "performance",
+          "result": {
+            "period": {
+              "to": "2026-11-01",
+              "from": "2026-10-01"
+            },
+            "status": "ok",
+            "employee_rows": 1,
+            "effective_role": "agent",
+            "rows_outside_self": 0,
+            "reservation_metric_present": true
+          }
+        }
+      ]
+    },
+    {
+      "query": "barka-performance-8s.sql",
+      "elapsed_ms": 7655,
+      "data": [
+        {
+          "scope": "barka",
+          "audit": "performance",
+          "result": {
+            "period": {
+              "to": "2026-11-01",
+              "from": "2026-10-01"
+            },
+            "status": "ok",
+            "employee_rows": 1,
+            "effective_role": "agent",
+            "rows_outside_self": 0,
+            "reservation_metric_present": true
+          }
+        }
+      ]
+    }
+  ],
+  "cash_authorization": [
+    {
+      "query": "owner-cash.sql",
+      "data": [
+        {
+          "scope": "owner",
+          "audit": "cash_report",
+          "result": {
+            "report": {
+              "from": "2026-10-01",
+              "to": "2026-11-01",
+              "monetary_fields_present_and_finite": true,
+              "undated_received_deals": 10,
+              "unknown_received_amount_deals": 2
+            },
+            "status": "ok"
+          }
+        }
+      ]
+    },
+    {
+      "query": "muscat-cash.sql",
+      "data": [
+        {
+          "scope": "muscat",
+          "audit": "cash_report",
+          "result": {
+            "status": "error",
+            "sqlstate": "42501"
+          }
+        }
+      ]
+    },
+    {
+      "query": "barka-cash.sql",
+      "data": [
+        {
+          "scope": "barka",
+          "audit": "cash_report",
+          "result": {
+            "status": "error",
+            "sqlstate": "42501"
+          }
+        }
+      ]
+    },
+    {
+      "query": "disabled-cash.sql",
+      "data": [
+        {
+          "scope": "disabled",
+          "audit": "cash_report",
+          "result": {
+            "status": "error",
+            "sqlstate": "42501"
+          }
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "bucket": "property-images",
+    "public": true,
+    "objects": 0,
+    "operations": "insert/select/delete through company/property scoped helper; direct image delivery is public",
+    "upload_not_tested": true
+  },
+  "cron": [
+    {
+      "jobname": "habib_whatsapp_followups_hourly",
+      "schedule": "35 5-14 * * *",
+      "active": false
+    }
+  ],
+  "advisory_categories": {
+    "security": [
+      {
+        "name": "rls_enabled_no_policy",
+        "level": "INFO",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy"
+      },
+      {
+        "name": "security_definer_view",
+        "level": "ERROR",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view"
+      },
+      {
+        "name": "authenticated_security_definer_function_executable",
+        "level": "WARN",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable"
+      },
+      {
+        "name": "auth_leaked_password_protection",
+        "level": "WARN",
+        "remediation": "https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection"
+      }
+    ],
+    "performance": [
+      {
+        "name": "unindexed_foreign_keys",
+        "level": "INFO",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys"
+      },
+      {
+        "name": "auth_rls_initplan",
+        "level": "WARN",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0003_auth_rls_initplan"
+      },
+      {
+        "name": "no_primary_key",
+        "level": "INFO",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0004_no_primary_key"
+      },
+      {
+        "name": "unused_index",
+        "level": "INFO",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index"
+      },
+      {
+        "name": "multiple_permissive_policies",
+        "level": "WARN",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0006_multiple_permissive_policies"
+      }
+    ]
+  },
+  "limits": [
+    "No real authentication, recovery or refresh-token expiry test; no production login tokens minted.",
+    "No live uploads, provider message delivery, Meta connection mutation or physical backup restore.",
+    "No canonical private investment rows exist in live reads; positive investment access and manager/viewer denial covered by isolated PostgreSQL fixtures.",
+    "The 4s performance probe timed out; owner/Muscat/Barka passed the 8s bounded probe. Report observed connection-inclusive times; do not claim instant load."
+  ]
+}
