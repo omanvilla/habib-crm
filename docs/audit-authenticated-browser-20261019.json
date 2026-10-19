@@ -1,0 +1,201 @@
+{
+  "scope": "Read-only production UI, desktop Chromium; secure browserAuth. No customer record writes or test messages.",
+  "accounts": {
+    "barka": {
+      "identity_verified": true,
+      "targets_verified": true,
+      "targets": {
+        "inventory": 10,
+        "weekly_new": 2,
+        "daily_followups": 10,
+        "weekly_viewings": 5,
+        "monthly_bookings": 2,
+        "monthly_expected_omr": 4000
+      },
+      "refreshed_session_restored": true,
+      "performance_this_month": {
+        "from": "2026-10-01",
+        "through": "2026-10-31",
+        "self_only": true,
+        "loaded": true
+      },
+      "performance_last_three_months": {
+        "from": "2026-07-19",
+        "through": "2026-10-19",
+        "loaded": true
+      },
+      "clients_loaded": true,
+      "search_no_results": true,
+      "clear_search_restores_list": true,
+      "blank_client_form_opened_and_cancelled": true,
+      "properties_loaded": true,
+      "staff_branch_filter_hidden": true,
+      "viewings_loaded": true,
+      "investor_classification": "Historical branch investor classification is distinct from canonical owner-only investment routing; no bulk reclassification.",
+      "issues_found": [
+        "Raw viewing_cancelled dashboard stage",
+        "Misleading unfiltered-empty wording for filtered zero results"
+      ],
+      "inbox_loaded": true,
+      "inbox_visible_rows_own_branch_only": true,
+      "local_logout_verified": true,
+      "reload_from_inbox_restores_dashboard": true,
+      "logout_survived_reload": true
+    },
+    "muscat": {
+      "identity_verified": true,
+      "targets_verified": true,
+      "targets": {
+        "inventory": 10,
+        "weekly_new": 2,
+        "daily_followups": 10,
+        "weekly_viewings": 5,
+        "monthly_bookings": 2,
+        "monthly_expected_omr": 4000
+      },
+      "prior_account_targets_absent": true,
+      "performance_this_month": {
+        "from": "2026-10-01",
+        "through": "2026-10-31",
+        "self_only": true,
+        "loaded": true
+      },
+      "clients_loaded": true,
+      "client_detail_read": true,
+      "client_360_read": true,
+      "inbox_loaded": true,
+      "inbox_visible_rows_own_branch_only": true,
+      "refreshed_session_restored": true,
+      "reload_from_inbox_restores_dashboard": true,
+      "v7_runtime_seen": true,
+      "targets_after_v7_reload": true,
+      "local_logout_verified": true
+    },
+    "owner": {
+      "identity_verified": true,
+      "both_employee_dashboard_targets_verified": true,
+      "private_investment_workspace_visible": true,
+      "current_month_team_performance_both_employees_loaded": true,
+      "team_monthly_saved_forms_verified": true,
+      "target_values": {
+        "inventory": 10,
+        "weekly_new": 2,
+        "daily_followups": 10,
+        "weekly_viewings": 5,
+        "monthly_bookings": 2,
+        "monthly_expected_omr": 4000
+      },
+      "targets_saved_during_audit": false,
+      "commissions_report_loaded": true,
+      "commission_report_matches_live_sql": true,
+      "commission_report_oman_bounds": {
+        "from": "2026-10-01",
+        "through": "2026-10-31"
+      },
+      "legacy_diagnostics": {
+        "undated_received_deals": 10,
+        "unknown_received_amount_deals": 2
+      },
+      "actual_company_financial_totals_omitted": true,
+      "expenses_and_cash_summary_loaded": true,
+      "blank_expense_form": {
+        "type": "number",
+        "min": "0.001",
+        "step": "0.001",
+        "cancelled_unsaved": true
+      },
+      "settings_routing": {
+        "muscat": "muscat_employee",
+        "barka": "barka_employee",
+        "investment": "owner",
+        "general": "unassigned_disabled"
+      },
+      "meta_status": {
+        "muscat": "ID_saved_not_proof_of_webhook_or_coexistence",
+        "barka": "ID_saved_not_proof_of_webhook_or_coexistence",
+        "investment": "not_linked",
+        "general": "unbound",
+        "oauth_sync_or_save_clicked": false
+      },
+      "manual_private_investor_form": {
+        "from_private_dashboard_queue": true,
+        "investor_role_prechecked": true,
+        "owner_assignee_selected_and_disabled": true,
+        "explicit_private_route_notice": true,
+        "fields_entered": false,
+        "saved": false,
+        "cancelled": true,
+        "queue_remained_empty": true
+      },
+      "raw_stage_repair_v7_seen": true,
+      "v8": {
+        "reload_kept_identity": true,
+        "dashboard_loaded": true,
+        "both_six_target_card_groups_loaded": true,
+        "overview": {
+          "bounds": "2026-10-01 — 2026-10-31",
+          "timezone": "Asia/Muscat",
+          "six_period_controls": true,
+          "correct_sales_clients_conversion_explanations": true,
+          "obsolete_commission_sentence_absent": true
+        },
+        "filtered_zero_clients": {
+          "appropriate_empty_message": true,
+          "incorrect_no_clients_message_absent": true,
+          "clear_restored_rows": true
+        }
+      }
+    }
+  },
+  "production_assets_v7": {
+    "all_http_200": true,
+    "all_source_bytes_match": true,
+    "count": 18,
+    "ci_run": 39203499962,
+    "pages_run": 39203860804,
+    "commit": "b25bb6922722f99e4a8c26ab4779a87574cae7a9"
+  },
+  "observed_at_utc": "2026-10-19 05:56:01 UTC",
+  "observed_url": "https://omanvilla.github.io/habib-crm/",
+  "runtime_checkpoints": {
+    "initial_employee_journeys": "20261019-audit-v6",
+    "muscat_reload_and_owner_read_journeys": "20261019-audit-v7",
+    "final_owner_deployment_checks": "20261019-audit-v8"
+  },
+  "final_release": {
+    "frontend_version": "20261019-audit-v8",
+    "runtime_commit": "6021a2416939075531b065e7c90e154ce3efb7f6",
+    "ci_run": 39206341645,
+    "ci_jobs_passed": 7,
+    "pages_run": 39206681056,
+    "pages_success": true,
+    "public_assets_checked": 18,
+    "all_assets_http_200_and_byte_identical": true,
+    "node_passed": 270,
+    "node_sql_context_skips": 2
+  },
+  "limits": {
+    "journeys": "Read-only real production journeys, not real production business-write acceptance. Write/fault/race/permission acceptance uses isolated synthetic SQL/browser fixtures.",
+    "credentials": "Handled by secure browserAuth; not read by the model or included in evidence.",
+    "production_test_records_created": 0,
+    "customer_messages_sent": 0,
+    "conversations_opened": 0,
+    "inbox_scope": "Only the first 100 loaded conversation rows per employee; not all inbox pages or message delivery.",
+    "authentication_not_tested": [
+      "password recovery",
+      "forced expiry",
+      "refresh-token lifecycle",
+      "actual inactive-account credential login"
+    ],
+    "mobile": "Desktop production UI only; mobile viewport checks were isolated synthetic browser tests, not a physical phone.",
+    "internal_urls": "No supported deep-link router; reload returns the dashboard and does not restore the prior inner page.",
+    "not_verified": [
+      "live Meta inbound/outbound delivery and webhook end-to-end",
+      "new Meta OAuth linking",
+      "private Realtime subscriptions",
+      "Storage sensitive attachment upload/download",
+      "physical backup restoration"
+    ],
+    "post_auth_browser_console": "A final console-log read was blocked by the browser's retained-data restriction after secure credential delivery. The preceding DOM target-card observation succeeded; no claim of zero production console errors is made."
+  }
+}

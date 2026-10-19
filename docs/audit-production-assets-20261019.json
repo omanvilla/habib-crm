@@ -1,20 +1,20 @@
 {
-  "verified_at_utc": "2026-10-19T04:49:48.518347+00:00",
-  "frontend_version": "20261019-audit-v6",
+  "verified_at_utc": "2026-10-19T05:52:44.743914+00:00",
+  "frontend_version": "20261019-audit-v8",
   "url": "https://omanvilla.github.io/habib-crm/",
   "assets": [
     {
       "file": "index.html",
       "url": "https://omanvilla.github.io/habib-crm/",
       "status": 200,
-      "sha256": "99a220d5236204aa0e27dfc4207b7d3c4a0400603fabb093efd0d1ed05921160",
+      "sha256": "1972d19e90c9d6ce81eda4064009df2b45806092cf8b47e6ccd088f84e405e53",
       "matches_validated_source": true
     },
     {
       "file": "app-base-v15.html",
-      "url": "https://omanvilla.github.io/habib-crm/app-base-v15.html?v=20261019-audit-v6",
+      "url": "https://omanvilla.github.io/habib-crm/app-base-v15.html?v=20261019-audit-v8",
       "status": 200,
-      "sha256": "4827e7617711b62daf1f50c89df0a9581cf8ca58a86e29744cc90d5b8bc7e2dc",
+      "sha256": "86f1198be1a37f4d7c2ebd42ece5ad8e9c3bf56f00270a2164422762f88ed607",
       "matches_validated_source": true
     },
     {
@@ -75,7 +75,7 @@
     },
     {
       "file": "crm-v18-client-info-patch.js",
-      "url": "https://omanvilla.github.io/habib-crm/crm-v18-client-info-patch.js?v=20261019-audit-v6",
+      "url": "https://omanvilla.github.io/habib-crm/crm-v18-client-info-patch.js?v=20261019-audit-v8",
       "status": 200,
       "sha256": "ba4d96147c782f23a5b5014828130d31b791afd9b5907f02817bae95e41418ea",
       "matches_validated_source": true
@@ -110,14 +110,14 @@
     },
     {
       "file": "crm-operations-v6.js",
-      "url": "https://omanvilla.github.io/habib-crm/crm-operations-v6.js?v=20261019-audit-v6",
+      "url": "https://omanvilla.github.io/habib-crm/crm-operations-v6.js?v=20261019-audit-v8",
       "status": 200,
-      "sha256": "34c5872a3b5b18511b18c7f315920a374a7e87eed5accd54a5fa89f881fa09b6",
+      "sha256": "0c84755e9c0c4144e802c51a32bf7466446a1812247b97d27585d2f1be0d484e",
       "matches_validated_source": true
     },
     {
       "file": "crm-deal-workflow.js",
-      "url": "https://omanvilla.github.io/habib-crm/crm-deal-workflow.js?v=20261019-audit-v6",
+      "url": "https://omanvilla.github.io/habib-crm/crm-deal-workflow.js?v=20261019-audit-v8",
       "status": 200,
       "sha256": "d65332181e298a348e9359c214ced1434a443c21a4be6cbceb8750d29c531e57",
       "matches_validated_source": true
