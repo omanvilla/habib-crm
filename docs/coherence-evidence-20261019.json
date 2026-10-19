@@ -1,0 +1,381 @@
+{
+  "release_date": "2026-10-19",
+  "frontend_version": "20261019-coherence-v10",
+  "production_url": "https://omanvilla.github.io/habib-crm/",
+  "validated_commit": "c3e78b14646180481e1eebc5e2cdc27cc9402de6",
+  "frontend_origin_commit": "258a4c1af93d58fa074a724b33352c14cffa9bda",
+  "ci": {
+    "id": 39230257811,
+    "url": "https://github.com/omanvilla/habib-crm/actions/runs/39230257811",
+    "jobs": [
+      {
+        "id": 117986234098,
+        "name": "investment-sql",
+        "conclusion": "success"
+      },
+      {
+        "id": 117986234390,
+        "name": "synthetic-browser",
+        "conclusion": "success"
+      },
+      {
+        "id": 117986234396,
+        "name": "workflows-sql",
+        "conclusion": "success"
+      },
+      {
+        "id": 117986234526,
+        "name": "attribution-sql",
+        "conclusion": "success"
+      },
+      {
+        "id": 117986234532,
+        "name": "comprehensive-audit-sql",
+        "conclusion": "success"
+      },
+      {
+        "id": 117986234597,
+        "name": "reservations-sql",
+        "conclusion": "success"
+      },
+      {
+        "id": 117986234631,
+        "name": "node-tests",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "pages": {
+    "id": 39230879858,
+    "url": "https://github.com/omanvilla/habib-crm/actions/runs/39230879858",
+    "head_sha": "c3e78b14646180481e1eebc5e2cdc27cc9402de6",
+    "conclusion": "success",
+    "earlier_frontend_release": {
+      "id": 39228956835,
+      "conclusion": "success"
+    }
+  },
+  "migrations": [
+    {
+      "sql": 28,
+      "version": "20261019090437",
+      "name": "performance_coherence_20261019"
+    },
+    {
+      "sql": 29,
+      "version": "20261019090534",
+      "name": "inquiry_followup_coherence_20261019"
+    },
+    {
+      "sql": 30,
+      "version": "20261019093011",
+      "name": "staff_message_volume_scope_20261019"
+    }
+  ],
+  "business_preservation": {
+    "sql28_29": {
+      "before_at": "2026-10-19T09:04:32.998004+00:00",
+      "after_at": "2026-10-19T09:06:23.242224+00:00",
+      "tables": [
+        {
+          "table": "public.deals",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "public.clients",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "public.deposits",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "public.viewings",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "public.activities",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "public.properties",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "public.client_requests",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "public.property_inquiries",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "public.employee_monthly_targets",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "crm_repair_private.deal_milestone_events",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "crm_repair_private.deal_commission_receipts",
+          "all_rows_unchanged": true
+        }
+      ]
+    },
+    "sql30": {
+      "before_at": "2026-10-19T09:30:03.904539+00:00",
+      "after_at": "2026-10-19T09:30:23.0808+00:00",
+      "tables": [
+        {
+          "table": "public.deals",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "public.clients",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "public.deposits",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "public.viewings",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "public.activities",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "public.properties",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "public.client_requests",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "public.property_inquiries",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "public.employee_monthly_targets",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "crm_repair_private.deal_milestone_events",
+          "all_rows_unchanged": true
+        },
+        {
+          "table": "crm_repair_private.deal_commission_receipts",
+          "all_rows_unchanged": true
+        }
+      ]
+    },
+    "business_row_dml_in_migrations": false,
+    "production_test_rows_created": false
+  },
+  "live_read_only_roles": {
+    "evidence_type": "transaction-local authenticated PostgreSQL roles; distinct from actual browser sessions",
+    "same_snapshot_period": [
+      "2026-10-01",
+      "2026-11-01"
+    ],
+    "employees": [
+      {
+        "branch": "barka",
+        "employee_result_rows": 1,
+        "message_volume_matches_owner": true,
+        "inquiry_clients_match_owner": true,
+        "visit_partition_agrees": true,
+        "available_inventory_matches_target": true,
+        "opposite_branch_property_rows": 0,
+        "private_investment_request_rows": 0,
+        "nonnull_protected_financial_rows": 0
+      },
+      {
+        "branch": "muscat",
+        "employee_result_rows": 1,
+        "message_volume_matches_owner": true,
+        "inquiry_clients_match_owner": true,
+        "visit_partition_agrees": true,
+        "available_inventory_matches_target": true,
+        "opposite_branch_property_rows": 0,
+        "private_investment_request_rows": 0,
+        "nonnull_protected_financial_rows": 0
+      }
+    ],
+    "owner_financial_positive_control_present": true
+  },
+  "current_inventory_point_in_time": {
+    "barka": 13,
+    "muscat": 4,
+    "goal_each": 10,
+    "weekly_addition_goal_each": 2,
+    "goal_ids_match_count": true,
+    "weekly_addition_ids_match_count": true
+  },
+  "owner_browser_v10": {
+    "owner_session_verified": true,
+    "credential_observation_recovery": "explicit canonical navigation permitted by browserAuth, successful",
+    "dashboard_goals": {
+      "barka_inventory": 13,
+      "muscat_inventory": 4,
+      "inventory_goal_each": 10,
+      "weekly_addition_goal_each": 2,
+      "weekly_additions_each": 0
+    },
+    "performance": {
+      "three_groups": true,
+      "current_inventory_removed": true,
+      "period_additions_retained": true,
+      "human_followup_clients": true,
+      "dates_explicit_muscat": true,
+      "six_approved_periods": true,
+      "closing_and_receipt_office_basis_match": true,
+      "missing_booking_diagnostic": true
+    },
+    "reports": {
+      "journey_same_october_metrics_as_dashboard": true,
+      "real_visit_dates": true
+    },
+    "deals": {
+      "pipeline_actual_booking_and_sale_dates": true,
+      "table_actual_booking_and_sale_dates": true,
+      "table_rows": 57,
+      "legacy_summary_dates_and_missing_booking": true,
+      "completion_button_focuses_date": true,
+      "known_payment_fields_left_blank": true,
+      "cancel_without_save": true
+    },
+    "new_actual_employee_logins": false,
+    "production_business_write_tests": false,
+    "external_sends": false,
+    "property_target": {
+      "barka_goal_count": 13,
+      "barka_detail_caption_count": 13,
+      "available_badges": 13,
+      "private_customer_writes": false,
+      "clearing_scope_restored_ordinary_list": true
+    }
+  },
+  "tests": {
+    "node": {
+      "passed": 330,
+      "postgres_context_skips": 2,
+      "covered_by_dedicated_ci_sql": true
+    },
+    "security": {
+      "passed": 28
+    },
+    "focused_synthetic_browsers": [
+      {
+        "suite": "performance-coherence",
+        "groups": 39
+      },
+      {
+        "suite": "deal-date-coherence",
+        "groups": 18
+      },
+      {
+        "suite": "inquiry-followup",
+        "groups": 21
+      }
+    ],
+    "viewports": [
+      1440,
+      390
+    ],
+    "postgresql": {
+      "sql24_through_30_acceptance": true,
+      "repeat_application": true,
+      "guarded_rollback": true,
+      "exact_preservation": true,
+      "sql29_real_concurrency": [
+        "same operation key commits one activity and replays once",
+        "same expected version permits one write and rejects the stale write",
+        "two inquiries for one client keep independent request details and latest contact timestamp"
+      ],
+      "sql30": {
+        "reproduced_undercount": true,
+        "owner_self_volume_agrees": true,
+        "all_other_metrics_identical": true,
+        "visible_row_sets_unchanged": true,
+        "private_and_automated_messages_excluded": true
+      }
+    }
+  },
+  "security_advisors": {
+    "before": [
+      {
+        "name": "rls_enabled_no_policy",
+        "level": "INFO",
+        "count": 26
+      },
+      {
+        "name": "security_definer_view",
+        "level": "ERROR",
+        "count": 2
+      },
+      {
+        "name": "authenticated_security_definer_function_executable",
+        "level": "WARN",
+        "count": 12
+      },
+      {
+        "name": "auth_leaked_password_protection",
+        "level": "WARN",
+        "count": 1
+      }
+    ],
+    "after": [
+      {
+        "name": "rls_enabled_no_policy",
+        "level": "INFO",
+        "count": 29,
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy"
+      },
+      {
+        "name": "security_definer_view",
+        "level": "ERROR",
+        "count": 2,
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view"
+      },
+      {
+        "name": "authenticated_security_definer_function_executable",
+        "level": "WARN",
+        "count": 12,
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable"
+      },
+      {
+        "name": "auth_leaked_password_protection",
+        "level": "WARN",
+        "count": 1,
+        "remediation": "https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection"
+      }
+    ],
+    "info_delta": "Three private, deny-all RLS catalog backups; no application grants or permissive policies were added.",
+    "leaked_password_protection": "Still disabled; connected tools cannot change Auth configuration."
+  },
+  "integration_scope": {
+    "read_only_relationship_diagnostics": true,
+    "provider_end_to_end_retested": false,
+    "customer_messages_sent": false,
+    "real_customer_threads_opened": false,
+    "edge_functions_changed": false,
+    "route_settings_changed": false,
+    "scheduled_followups_reenabled": false
+  },
+  "limits": [
+    "Earlier v7/v8 actual employee read-only login/reload/logout evidence is retained; no new actual staff login or live business-write journey in v10.",
+    "Password recovery, forced expiry and refresh-token lifecycle remain unverified.",
+    "Fresh Meta delivery/retry/OCR/onboarding, Storage upload/download and network Realtime behavior remain unverified.",
+    "390px synthetic browser verification is not physical-phone verification.",
+    "Catalog rollback was tested; physical backup/PITR restoration was not.",
+    "Missing historical paid-booking dates/amounts and legacy receipts require real evidence; no guessed backfill.",
+    "Historical notes without a new human outcome do not become follow-up credit automatically.",
+    "Legacy test-looking labels were preserved; this release created no production test records."
+  ],
+  "assets_report": "coherence-assets-20261019.json"
+}
