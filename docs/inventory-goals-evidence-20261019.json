@@ -3,10 +3,58 @@
   "scope": "Current inventory and independent weekly additions",
   "release": {
     "frontend": "20261019-audit-v9",
-    "phase": "database_applied_frontend_candidate",
+    "phase": "deployed_and_verified",
+    "runtime_commit": "238a875456e9ef0f23a75afba606c6098bc3b1e0",
+    "runtime_tree": "1d2b7515b7aee29831ca84f91979c358e9a80d9b",
     "migration": {
       "version": "20261019063515",
       "name": "inventory_goal_source_20261019"
+    },
+    "ci": {
+      "id": 39212446426,
+      "url": "https://github.com/omanvilla/habib-crm/actions/runs/39212446426",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "workflows-sql",
+          "conclusion": "success"
+        },
+        {
+          "name": "node-tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "reservations-sql",
+          "conclusion": "success"
+        },
+        {
+          "name": "synthetic-browser",
+          "conclusion": "success"
+        },
+        {
+          "name": "attribution-sql",
+          "conclusion": "success"
+        },
+        {
+          "name": "investment-sql",
+          "conclusion": "success"
+        },
+        {
+          "name": "comprehensive-audit-sql",
+          "conclusion": "success"
+        }
+      ]
+    },
+    "pages": {
+      "id": 39212871699,
+      "url": "https://github.com/omanvilla/habib-crm/actions/runs/39212871699",
+      "conclusion": "success"
+    },
+    "assets": {
+      "file": "inventory-goals-assets-20261019.json",
+      "count": 18,
+      "all_http_200": true,
+      "all_match_validated_source": true
     }
   },
   "baseline": {
@@ -160,7 +208,7 @@
     }
   },
   "isolated_sql": {
-    "engine": "full-catalog PGlite, pending real PostgreSQL CI",
+    "engine": "Full-catalog PGlite plus PostgreSQL 16 in GitHub CI",
     "acceptance": true,
     "repeat_application": true,
     "changed_function_rollback_rejected": true,
@@ -169,5 +217,62 @@
   },
   "production_business_writes": 0,
   "production_test_rows": 0,
-  "external_messages": 0
+  "external_messages": 0,
+  "actual_owner_browser": {
+    "recorded_at_utc": "2026-10-19 07:10:59 UTC",
+    "url": "https://omanvilla.github.io/habib-crm/",
+    "frontend": "20261019-audit-v9",
+    "authenticated_owner_identity": true,
+    "inventory_cards": [
+      {
+        "branch": "barka",
+        "actual": 15,
+        "goal": 10,
+        "percent": 150,
+        "remaining": 0
+      },
+      {
+        "branch": "muscat",
+        "actual": 4,
+        "goal": 10,
+        "percent": 40,
+        "remaining": 6
+      }
+    ],
+    "weekly_cards": [
+      {
+        "branch": "barka",
+        "actual": 0,
+        "goal": 2
+      },
+      {
+        "branch": "muscat",
+        "actual": 0,
+        "goal": 2
+      }
+    ],
+    "read_only_drilldowns": {
+      "barka_inventory_rows": 15,
+      "muscat_inventory_rows": 4,
+      "barka_weekly_rows": 0,
+      "weekly_from": "2026-10-18",
+      "weekly_to": "2026-10-24",
+      "weekly_counted_through": "2026-10-19",
+      "timezone": "Asia/Muscat",
+      "old_search_branch_and_status_filters_cleared": true,
+      "branch_locked_during_scope": true,
+      "broad_counters_hidden_during_scope": true,
+      "clear_scope_restores_controls": true,
+      "normal_available_rows_after_exit": 19,
+      "final_page": "dashboard"
+    },
+    "limits": "New actual employee logins, production business writes, physical mobile devices and production console logs were not tested in this focused follow-up. Employee SQL roles and 390px synthetic browser tests are separate evidence.",
+    "fresh_document_recovery_used": true
+  },
+  "ci_initial_attempt": {
+    "id": 39212124243,
+    "sql_acceptance_passed": true,
+    "stopped_because": "rg was not installed on the CI runner; the same rollback-log assertion was changed to grep -F.",
+    "sql_migration_changed": false
+  }
 }

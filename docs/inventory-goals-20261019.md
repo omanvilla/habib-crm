@@ -46,4 +46,20 @@ The full-catalog isolated SQL27 acceptance, repeat application, changed-function
 
 Local frontend validation passed: **276 Node tests**, two PostgreSQL-context skips assigned to their CI jobs, **28 security checks**, and **39 grouped synthetic browser checks** (owner 17, Barka 11, Muscat 11). The focused browser suite uses no external requests or production data; it verifies old/null-timestamp inventory, separate weekly additions, two-row API pagination, filters, exact private/branch scope, CSV parity, saved goals, 390px layout, save/status/archive/restore refresh, empty cohorts, failed/incomplete reads and retry, concurrent archive rejection, delayed broader reads and session reset. The six new shortage-reminder tests cover late success/error results and session changes.
 
-Production browser verification, CI/deployment commit identifiers and final asset evidence will be recorded here after publication. The live SQL role checks above are database authorization evidence; they do not claim new employee browser login or production write journeys. Sanitized checkpoint evidence is in [inventory-goals-evidence-20261019.json](inventory-goals-evidence-20261019.json).
+Final [CI run 39212446426](https://github.com/omanvilla/habib-crm/actions/runs/39212446426) passed **all seven jobs** for `238a875456e9ef0f23a75afba606c6098bc3b1e0`, including real PostgreSQL 16 SQL27 acceptance, repeat application, guarded rollback rejection, actual rollback and predecessor preservation. The first run passed SQL acceptance but stopped at a missing `rg` command in the test runner; the unchanged log assertion was switched to `grep -F`. No SQL migration or product change was required for that test-environment repair.
+
+[Pages run 39212871699](https://github.com/omanvilla/habib-crm/actions/runs/39212871699) successfully deployed that commit. The public site serves **`20261019-audit-v9`**. Every one of the 18 runtime HTML/CSS/JS files returned HTTP200 and matched the validated source bytes; see [asset evidence](inventory-goals-assets-20261019.json).
+
+### Actual authenticated owner browser after publication
+
+The owner session on the actual production URL displayed v9, both employee target groups, Barka 15/10 and 150%, Muscat 4/10 and 40% with six remaining, and weekly 0/2 for each. A fresh document was used after the browser's credential-protection guidance restricted observation of the older document; no credentials or protected logs were read.
+
+| Read-only interaction | Observed result |
+|---|---|
+| Set an old nonmatching property search, Muscat branch and reserved status; return to dashboard and open Barka inventory | Search cleared, branch Barka, status available, branch locked, broad counters hidden,15 property rows. |
+| Open Muscat inventory from its settled dashboard card | Muscat/available scope and 4 property rows. |
+| Open Barka weekly additions | Zero rows with the explicit empty state; October18–24, counted through October19, Asia/Muscat. |
+| Leave the target scope | Scope removed, branch selector unlocked and cleared, normal controls restored;19 ordinary active available property rows. |
+| Finish on dashboard | v9,15/10 and 4/10 inventory,0/2 weekly for both. |
+
+These observations verify the owner production UI and its real reads. They do not claim new employee browser logins, production property save/archive/restore tests, physical mobile-device use, or fresh production-console verification. Employee authorization was verified by the separate live SQL roles; write/failure/concurrency/mobile behavior was tested with isolated fixtures and the synthetic browser. No customer messages, real business writes or production test rows were created. Sanitized evidence is in [inventory-goals-evidence-20261019.json](inventory-goals-evidence-20261019.json).
