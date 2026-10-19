@@ -69,10 +69,16 @@ const signedOutKey='crm-preview-signedout:'+location.pathname;
 let signedOut=sessionStorage.getItem(signedOutKey)==='true',listeners=[],next=1000;
 const state={actor,mode,profile,db,calls:[],failNext:null,externalRequests:0,synthetic:true};
 window.CRMPREVIEW=state;
+// Minimal synthetic model for the SQL target/private-property contract.
+// It is not an implementation or test of production RLS.
+function privateProperty(id){
+ return (db.client_requests||[]).some(r=>r.subject_property_id===id&&(r.route_key==='investment'||r.branch_key==='investment'||db.clients.some(c=>c.id===r.client_id&&c.lead_route==='investment')));
+}
 function allowed(row,table){
  if(!row)return false;
  // Model owner-only investment reads for UI tests; real RLS is tested separately in SQL.
  if(profile.role!=='owner'){
+  if(table==='properties'&&privateProperty(row.id))return false;
   const privateClient=id=>clients.some(c=>c.id===id&&c.lead_route==='investment');
   const request=requests.find(r=>r.id===row.request_id);
   if(row.lead_route==='investment'||row.route_key==='investment'||row.branch_key==='investment'||privateClient(row.client_id)||request&&(request.route_key==='investment'||request.branch_key==='investment'||privateClient(request.client_id)))return false;
@@ -148,6 +154,7 @@ function query(name){
   for(const [key,asc] of orders.slice().reverse())rows.sort((a,b)=>String(a[key]||'').localeCompare(String(b[key]||''))*(asc?1:-1));
   const count=rows.length;
   if(range)rows=rows.slice(range[0],range[1]+1);
+  if(range&&table==='properties'&&Number(state.propertyPageSize)>0)rows=rows.slice(0,Number(state.propertyPageSize));
   if(limit!==null)rows=rows.slice(0,limit);
   const data=rows.map(decorate);
   return {data:head?null:single?(data[0]||null):data,count,error:single&&!data.length?{message:'TEST record not found'}:null};
@@ -162,10 +169,12 @@ rpc:async(name,args={})=>{
  if(state.failNext===name){state.failNext=null;return {data:null,error:{message:'TEST simulated RPC failure'}};}
  if(name==='crm_employee_target_snapshot'){
   if(profile.role==='viewer')return {data:null,error:{message:'TEST target access denied'}};
-  const month=today.slice(0,7)+'-01',week=new Date(today+'T12:00:00Z');week.setUTCDate(week.getUTCDate()-week.getUTCDay());
+  const month=today.slice(0,7)+'-01',week=new Date(today+'T12:00:00Z');week.setUTCDate(week.getUTCDate()-week.getUTCDay());const weekStart=week.toISOString().slice(0,10);
   return {data:{today,week_start:week.toISOString().slice(0,10),week_end:new Date(week.getTime()+6*86400000).toISOString().slice(0,10),month_start:month,month_end:new Date(Date.UTC(Number(today.slice(0,4)),Number(today.slice(5,7)),0)).toISOString().slice(0,10),employees:profiles.filter(p=>p.role==='agent'&&(profile.role!=='agent'||p.id===profile.id)).map(p=>{
    const row=(db.employee_monthly_targets||[]).find(t=>t.employee_id===p.id&&t.month_start===month),branch=p.id===muscat?'muscat':'barka';
-   return {id:p.id,name:p.full_name,branch,inventory:properties.filter(x=>x.branch_key===branch&&x.status==='available'&&!x.archived).length,new_properties:0,followups:new Set((db.activities||[]).filter(a=>a.user_id===p.id&&a.actor_type==='human'&&a.outcome&&a.type!=='note').map(a=>a.client_id)).size,viewings:0,bookings:0,live_bookings:0,cancelled_bookings:0,expected_commission:0,collected_commission:0,sales_goal_met:false,goals:row?{inventory:row.inventory_target,new_properties:row.weekly_new_properties_target,followups:row.daily_followups_target,viewings:row.weekly_viewings_target,bookings:row.reservations_target,expected_commission:row.booking_commission_target}:{inventory:10,new_properties:2,followups:10,viewings:5,bookings:2,expected_commission:4000}};
+   const eligible=db.properties.filter(x=>x.branch_key===branch&&!x.archived&&!privateProperty(x.id));
+   const inventoryIds=eligible.filter(x=>x.status==='available').map(x=>x.id).sort(),newIds=eligible.filter(x=>{const date=new Date(x.created_at).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'});return Number(x.price)>0&&date>=weekStart&&date<=today;}).map(x=>x.id).sort();
+   return {id:p.id,name:p.full_name,branch,inventory:inventoryIds.length,inventory_property_ids:inventoryIds,new_properties:newIds.length,new_property_ids:newIds,followups:new Set((db.activities||[]).filter(a=>a.user_id===p.id&&a.actor_type==='human'&&a.outcome&&a.type!=='note').map(a=>a.client_id)).size,viewings:0,bookings:0,live_bookings:0,cancelled_bookings:0,expected_commission:0,collected_commission:0,sales_goal_met:false,goals:row?{inventory:row.inventory_target,new_properties:row.weekly_new_properties_target,followups:row.daily_followups_target,viewings:row.weekly_viewings_target,bookings:row.reservations_target,expected_commission:row.booking_commission_target}:{inventory:10,new_properties:2,followups:10,viewings:5,bookings:2,expected_commission:4000}};
   })},error:null};
  }
  if(name==='crm_log_human_activity'){

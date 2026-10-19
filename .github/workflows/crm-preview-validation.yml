@@ -37,6 +37,7 @@ jobs:
       - run: node tests/reservation-browser.cjs
       - run: node tests/audit-browser.cjs
       - run: node tests/audit-fault-browser.cjs
+      - run: node tests/inventory-target-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -264,6 +265,19 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f db/changes/26-financial-reporting-preservation.forward.sql
           psql -v ON_ERROR_STOP=1 -f db/changes/26-financial-reporting-preservation.forward.sql
           psql -v ON_ERROR_STOP=1 -f tests/fixtures/financial-reporting-preservation-assert.sql
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/inventory-goal-before.sql
+          psql -v ON_ERROR_STOP=1 -f db/changes/27-inventory-goal-source.forward.sql
+          psql -v ON_ERROR_STOP=1 -f db/changes/27-inventory-goal-source.forward.sql
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/inventory-goal-assert.sql
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/inventory-goal-rollback-guard-before.sql
+          if psql -v ON_ERROR_STOP=1 -f db/changes/27-inventory-goal-source.rollback.sql > /tmp/habib-inventory-rollback-guard.log 2>&1; then
+            cat /tmp/habib-inventory-rollback-guard.log
+            exit 1
+          fi
+          rg --fixed-strings 'SQL27 rollback refused: function changed since release' /tmp/habib-inventory-rollback-guard.log
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/inventory-goal-rollback-guard-assert.sql
+          psql -v ON_ERROR_STOP=1 -f db/changes/27-inventory-goal-source.rollback.sql
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/inventory-goal-rollback-assert.sql
           psql -v ON_ERROR_STOP=1 -f db/changes/26-financial-reporting-preservation.rollback.sql
           psql -v ON_ERROR_STOP=1 -f tests/fixtures/financial-reporting-preservation-rollback-assert.sql
           psql -v ON_ERROR_STOP=1 -f db/changes/25-comprehensive-audit-repairs.rollback.sql

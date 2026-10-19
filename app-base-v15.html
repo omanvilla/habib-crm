@@ -2706,7 +2706,7 @@ function downloadCSV(name,headers,rows){
  const csv='\ufeff'+[headers,...rows].map(row=>row.map(crmSafeCsvCell).join(',')).join('\n');
  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name+'-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);showToast('تم التصدير','success');
 }
-async function loadProperties(){const generation=crmSessionGeneration,userId=currentUser&&currentUser.id;loadPropertyActionQueue('properties');const list=$('propertiesList');list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';try{const r=await crmDataFrom('properties').select('*').order('created_at',{ascending:false});if(!crmSessionCurrent(generation,userId))return false;if(r.error)throw r.error;var allData=(r.data||[]);
+async function loadProperties(isCurrentRequest){const generation=crmSessionGeneration,userId=currentUser&&currentUser.id;loadPropertyActionQueue('properties');const list=$('propertiesList');list.innerHTML='<div class="empty"><div class="loader-spinner"></div></div>';try{const r=await crmDataFrom('properties').select('*').order('created_at',{ascending:false});if(!crmSessionCurrent(generation,userId)||(typeof isCurrentRequest==='function'&&!isCurrentRequest()))return false;if(r.error)throw r.error;var allData=(r.data||[]);
 // حساب العدادات
 var activeCount=allData.filter(p=>p.archived!==true&&p.status!=='sold').length;
 var soldCount=allData.filter(p=>p.archived!==true&&p.status==='sold').length;
@@ -2741,7 +2741,7 @@ if(typeof isMobileCRM==='function'&&isMobileCRM()){
   });
   list.innerHTML=mh+'</div>';return;
 }
-let h='<table class="tbl"><thead><tr><th>العنوان</th><th>النوع</th><th>المنطقة</th><th>السعر</th><th>الحالة</th><th></th></tr></thead><tbody>';allProperties.forEach(function(p){const sm={available:'✅ متوفر',reserved:'⏳ محجوز',deposit:'💰 عربون',negotiating:'💬 تفاوض',sold:'🔴 مباع',not_available:'⚪ غير متاح'};h+='<tr'+(p.archived?' style="opacity:0.6;font-style:italic"':'')+' data-id="'+p.id+'"><td>'+(p.archived?'📦 ':'')+'<strong style="color:var(--espresso);cursor:pointer" onclick="viewProperty(\''+p.id+'\')">'+escapeHtml(p.title)+'</strong></td><td>'+propTypeAr(p.type)+'</td><td>'+escapeHtml(p.area)+'</td><td style="color:var(--gold);font-weight:700">'+fmtMoney(p.price)+'</td><td>'+(sm[p.status]||p.status)+'</td><td style="font-size:12px;color:var(--umber)" dir="ltr">'+fmtDate(p.created_at)+'</td><td style="display:flex;gap:6px;justify-content:flex-end">'+(canEdit()&&!p.archived?'<span style="cursor:pointer" onclick="editProperty(\''+p.id+'\')" title="تعديل">✏️</span>':'')+(p.archived?'<span style="cursor:pointer" onclick="restorePropertyById(\''+p.id+'\')" title="استعادة">♻️</span>'+(isOwner()?'<span style="cursor:pointer" onclick="permanentDeletePropertyById(\''+p.id+'\')" title="حذف نهائي">🗑</span>':''):'<span style="cursor:pointer" onclick="archivePropertyById(\''+p.id+'\')" title="أرشفة">📦</span>')+'</td></tr>'});list.innerHTML=h+'</tbody></table>'}catch(err){if(!crmSessionCurrent(generation,userId))return false;allProperties=[];list.innerHTML='<div class="empty" role="alert"><p>تعذر تحميل العقارات.</p><p>'+escapeHtml(err.message)+'</p><button class="btn-secondary" onclick="loadProperties()">إعادة المحاولة</button></div>';return false;}}
+let h='<table class="tbl"><thead><tr><th>العنوان</th><th>النوع</th><th>المنطقة</th><th>السعر</th><th>الحالة</th><th></th></tr></thead><tbody>';allProperties.forEach(function(p){const sm={available:'✅ متوفر',reserved:'⏳ محجوز',deposit:'💰 عربون',negotiating:'💬 تفاوض',sold:'🔴 مباع',not_available:'⚪ غير متاح'};h+='<tr'+(p.archived?' style="opacity:0.6;font-style:italic"':'')+' data-id="'+p.id+'"><td>'+(p.archived?'📦 ':'')+'<strong style="color:var(--espresso);cursor:pointer" onclick="viewProperty(\''+p.id+'\')">'+escapeHtml(p.title)+'</strong></td><td>'+propTypeAr(p.type)+'</td><td>'+escapeHtml(p.area)+'</td><td style="color:var(--gold);font-weight:700">'+fmtMoney(p.price)+'</td><td>'+(sm[p.status]||p.status)+'</td><td style="font-size:12px;color:var(--umber)" dir="ltr">'+fmtDate(p.created_at)+'</td><td style="display:flex;gap:6px;justify-content:flex-end">'+(canEdit()&&!p.archived?'<span style="cursor:pointer" onclick="editProperty(\''+p.id+'\')" title="تعديل">✏️</span>':'')+(p.archived?'<span style="cursor:pointer" onclick="restorePropertyById(\''+p.id+'\')" title="استعادة">♻️</span>'+(isOwner()?'<span style="cursor:pointer" onclick="permanentDeletePropertyById(\''+p.id+'\')" title="حذف نهائي">🗑</span>':''):'<span style="cursor:pointer" onclick="archivePropertyById(\''+p.id+'\')" title="أرشفة">📦</span>')+'</td></tr>'});list.innerHTML=h+'</tbody></table>'}catch(err){if(!crmSessionCurrent(generation,userId)||(typeof isCurrentRequest==='function'&&!isCurrentRequest()))return false;allProperties=[];list.innerHTML='<div class="empty" role="alert"><p>تعذر تحميل العقارات.</p><p>'+escapeHtml(err.message)+'</p><button class="btn-secondary" onclick="loadProperties()">إعادة المحاولة</button></div>';return false;}}
 
 
 function populatePropertyOwnerSelect(selectedId){
@@ -5771,22 +5771,24 @@ function employeeTargetMonth(){return new Date().toLocaleDateString('en-CA',{tim
 function employeeTargetMonthEnd(month){return new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),1)).toISOString().slice(0,10)}
 function employeeActiveProperty(p){return p.archived!==true&&!['sold','not_available'].includes(p.status)&&!String(p.title||'').startsWith('TEST')}
 function employeeInventoryDeficit(active){return Math.max(0,10-Number(active||0))}
+let employeeTargetReminderLoadSeq=0;
 async function loadEmployeeTargetReminder(){
+ const seq=++employeeTargetReminderLoadSeq;
  const card=$('employeeInventoryReminder'),box=$('employeeInventoryReminderText');
  if(!card||!box||!currentProfile||currentProfile.role!=='agent'){if(card)card.style.display='none';return}
  const generation=crmSessionGeneration,user=currentUser.id,company=currentProfile.company_id;
  card.style.display='none';
  try{
   const result=await supa.rpc('crm_employee_target_snapshot');if(result.error)throw result.error;
-  if(!crmSessionCurrent(generation,user))return;
+  if(seq!==employeeTargetReminderLoadSeq||!crmSessionCurrent(generation,user))return;
   const metric=result.data?.employees?.find(x=>x.id===user);if(!metric)throw new Error('لم تصل بيانات مخزون الموظفة');
   const required=metric.goals?.inventory??10,available=Number(metric.inventory||0),shortfall=Math.max(0,required-available);
   window.employeeInventoryState={active:available,required,needed:shortfall};
   if(!shortfall){box.textContent='';card.style.display='none';return}
-  box.innerHTML='<strong>المطلوب إكمال '+shortfall+' عقارات مؤكدة ومتاحة</strong><div style="margin-top:6px">لديك الآن '+available+' من '+required+'. هدف الإضافات الأسبوعية مستقل عن هذا المخزون، وتفصيله في بطاقة الأهداف.</div><button class="btn-secondary" onclick="navigate(\'properties\',null)">فتح العقارات</button>';
+  box.innerHTML='<strong>المطلوب إكمال '+shortfall+' عقارات متاحة</strong><div style="margin-top:6px">رصيد الفرع المتاح حاليًا '+available+' من '+required+'. هدف الإضافات الأسبوعية مستقل، وتفصيله في بطاقة الأهداف.</div><button class="btn-secondary" onclick="navigate(\'properties\',null)">فتح العقارات</button>';
   card.style.display='';
  }catch(e){
-  if(!crmSessionCurrent(generation,user))return;
+  if(seq!==employeeTargetReminderLoadSeq||!crmSessionCurrent(generation,user))return;
   window.employeeInventoryState=null;
   box.innerHTML='<strong>تعذر التحقق من رصيد العقارات</strong><div>لا يمكن تحديد النقص حتى يكتمل تحميل البيانات.</div><button class="btn-secondary" onclick="loadEmployeeTargetReminder()">إعادة المحاولة</button>';
   card.style.display='';

@@ -1,0 +1,173 @@
+{
+  "date": "2026-10-19",
+  "scope": "Current inventory and independent weekly additions",
+  "release": {
+    "frontend": "20261019-audit-v9",
+    "phase": "database_applied_frontend_candidate",
+    "migration": {
+      "version": "20261019063515",
+      "name": "inventory_goal_source_20261019"
+    }
+  },
+  "baseline": {
+    "main": "ab4974e2cd54bf62d37c373524943e49330f4e94",
+    "runtime": "6021a2416939075531b065e7c90e154ce3efb7f6",
+    "frontend": "20261019-audit-v8",
+    "actual_owner_browser_inventory": {
+      "barka": 0,
+      "muscat": 0
+    }
+  },
+  "preservation": {
+    "properties_unchanged": true,
+    "saved_targets_unchanged": true,
+    "other_target_metrics_unchanged": true,
+    "properties": {
+      "hash": "c13fd40bce48c4333ca959958cf81f10",
+      "count": 34
+    },
+    "saved_targets": {
+      "hash": "93f739e325cf2d81ea2e7180be7b665e",
+      "count": 2
+    },
+    "backup_definition_md5": "f149afe492ec2d5539890bd7bd46644c"
+  },
+  "live_sql": {
+    "method": "Read-only transaction-local authenticated role claims; not employee browser logins",
+    "roles": [
+      {
+        "role": "owner",
+        "today": "2026-10-19",
+        "week_start": "2026-10-18",
+        "week_end": "2026-10-24",
+        "targets": [
+          {
+            "branch": "barka",
+            "inventory": 15,
+            "weekly_additions": 0,
+            "inventory_id_count": 15,
+            "weekly_id_count": 0,
+            "inventory_goal": 10,
+            "weekly_goal": 2
+          },
+          {
+            "branch": "muscat",
+            "inventory": 4,
+            "weekly_additions": 0,
+            "inventory_id_count": 4,
+            "weekly_id_count": 0,
+            "inventory_goal": 10,
+            "weekly_goal": 2
+          }
+        ],
+        "protected_view": [
+          {
+            "branch": "barka",
+            "weekly_view_rows": 0,
+            "wrong_branch_ids": 0,
+            "inventory_view_rows": 15
+          },
+          {
+            "branch": "muscat",
+            "weekly_view_rows": 0,
+            "wrong_branch_ids": 0,
+            "inventory_view_rows": 4
+          }
+        ]
+      },
+      {
+        "role": "barka",
+        "today": "2026-10-19",
+        "week_start": "2026-10-18",
+        "week_end": "2026-10-24",
+        "targets": [
+          {
+            "branch": "barka",
+            "inventory": 15,
+            "weekly_additions": 0,
+            "inventory_id_count": 15,
+            "weekly_id_count": 0,
+            "inventory_goal": 10,
+            "weekly_goal": 2
+          }
+        ],
+        "protected_view": [
+          {
+            "branch": "barka",
+            "weekly_view_rows": 0,
+            "wrong_branch_ids": 0,
+            "inventory_view_rows": 15
+          }
+        ]
+      },
+      {
+        "role": "muscat",
+        "today": "2026-10-19",
+        "week_start": "2026-10-18",
+        "week_end": "2026-10-24",
+        "targets": [
+          {
+            "branch": "muscat",
+            "inventory": 4,
+            "weekly_additions": 0,
+            "inventory_id_count": 4,
+            "weekly_id_count": 0,
+            "inventory_goal": 10,
+            "weekly_goal": 2
+          }
+        ],
+        "protected_view": [
+          {
+            "branch": "muscat",
+            "weekly_view_rows": 0,
+            "wrong_branch_ids": 0,
+            "inventory_view_rows": 4
+          }
+        ]
+      }
+    ],
+    "anonymous_execute": false,
+    "authenticated_execute": true
+  },
+  "local_validation": {
+    "node": {
+      "passed": 276,
+      "skipped": 2,
+      "failed": 0,
+      "sql_context_skips_covered_by_ci": true
+    },
+    "security": {
+      "passed": 28,
+      "networkRequests": 0,
+      "productionWrites": 0
+    },
+    "synthetic_browser": {
+      "suite": "tests/inventory-target-browser.cjs",
+      "passed": true,
+      "grouped_checks": 39,
+      "roles": {
+        "owner": 17,
+        "barka": 11,
+        "muscat": 11
+      },
+      "page_errors": 0,
+      "external_requests": 0,
+      "production_writes": 0,
+      "viewport_widths": [
+        1440,
+        390
+      ]
+    }
+  },
+  "isolated_sql": {
+    "engine": "full-catalog PGlite, pending real PostgreSQL CI",
+    "acceptance": true,
+    "repeat_application": true,
+    "changed_function_rollback_rejected": true,
+    "actual_rollback_restores_exact_predecessor": true,
+    "sql26_and_sql25_rollback_after_sql27": true
+  },
+  "production_business_writes": 0,
+  "production_test_rows": 0,
+  "external_messages": 0
+}

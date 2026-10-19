@@ -34,30 +34,32 @@
     return bg>0&&bookings>=bg||cg>0&&expected>=cg?'هدف الحجوزات الشهري متحقق':'هدف الحجوزات: '+n(bookings)+' / '+(bg>0?n(bg):'غير مفعّل')+' أو '+(row.expected_commission==null?'عمولة متوقعة محجوبة':n(expected)+' / '+(cg>0?n(cg):'غير مفعّل')+' ر.ع');
   }
 
-  function targetMetric(label,value,goal,action){
+  function targetMetric(label,value,goal,action,propertyTarget){
     if(goal==null||Number(goal)<=0)return '<span class="ops-metric"><strong>'+n(value)+'</strong><small>'+label+'</small><span class="ops-metric-help">'+(goal==null?'الهدف غير محدد':'الهدف موقوف')+'</span></span>';
     const v=Number(value||0),missing=Math.max(0,goal-v);
     const percent=Math.round(v/goal*100);
-    return '<button type="button" class="ops-metric ops-target-action" data-target-go="'+action+'" title="فتح السجلات المرتبطة"><strong>'+n(v)+' / '+n(goal)+'</strong><small>'+label+'</small><span class="ops-metric-help">'+(missing?'المتبقي '+n(missing):'تم تحقيق الهدف')+' · '+n(percent)+'%</span></button>';
+    return '<button type="button" class="ops-metric ops-target-action" data-target-go="'+action+'"'+(propertyTarget?' data-target-property="'+safe(propertyTarget.kind)+'" data-target-employee="'+safe(propertyTarget.employee)+'"':'')+' title="فتح السجلات المرتبطة"><strong>'+n(v)+' / '+n(goal)+'</strong><small>'+label+'</small><span class="ops-metric-help">'+(missing?'المتبقي '+n(missing):'تم تحقيق الهدف')+' · '+n(percent)+'%</span></button>';
   }
   let targetLoadSeq=0;
+  const targetPropertyScopes=new Map();
   async function loadTargetDashboard(){
     const host=$id('opsEmployeeTargets');if(!host||!currentUser)return;
     const seq=++targetLoadSeq,user=currentUser.id,generation=crmSessionGeneration;
-    host.innerHTML='<p class="ops-state">جاري تحميل أهداف الموظفات…</p>';
+    targetPropertyScopes.clear();host.innerHTML='<p class="ops-state">جاري تحميل أهداف الموظفات…</p>';
     try{
       const result=await bounded(supa.rpc('crm_employee_target_snapshot'));
       if(seq!==targetLoadSeq||!crmSessionCurrent(generation,user))return;
       if(result.error)throw result.error;
       const data=result.data;if(!data||!Array.isArray(data.employees))throw new Error('لم تصل بيانات الأهداف. أعد المحاولة');const employees=data.employees;
+      employees.forEach(x=>{if(['muscat','barka'].includes(x.branch))targetPropertyScopes.set(x.id,{employee:x.id,branch:x.branch,user,generation,week_start:data.week_start,week_end:data.week_end,today:data.today});});
       host.innerHTML='<div class="ops-performance-caption"><strong>أهداف العمل المعتمدة</strong><small>اليوم '+safe(data.today||'')+' · الأسبوع من '+safe(data.week_start||'')+' إلى '+safe(data.week_end||'')+' · الشهر من '+safe(data.month_start||'')+' إلى '+safe(data.month_end||'')+'</small></div>'+
       (employees.map(x=>'<article class="ops-person"><div class="ops-person-title"><strong>'+safe(x.name)+' · '+(x.branch==='muscat'?'مسقط':'بركاء')+'</strong><span>'+(x.sales_goal_met?'هدف الحجوزات الشهري متحقق':'هدف الحجوزات الشهري لم يتحقق بعد')+'</span></div><div class="ops-metrics">'+
-      targetMetric('المخزون المؤكد المتاح',x.inventory,x.goals?x.goals.inventory:10,'properties')+targetMetric('إضافات الأسبوع المؤكدة',x.new_properties,x.goals?x.goals.new_properties:2,'properties')+targetMetric('عملاء تمت متابعتهم بنتيجة اليوم',x.followups,x.goals?x.goals.followups:10,'daily')+targetMetric('المعاينات المكتملة أسبوعيًا',x.viewings,x.goals?x.goals.viewings:5,'viewings')+
+      targetMetric('المخزون المتاح حاليًا',x.inventory,x.goals?x.goals.inventory:10,'properties',{kind:'inventory',employee:x.id})+targetMetric('عقارات أُضيفت هذا الأسبوع',x.new_properties,x.goals?x.goals.new_properties:2,'properties',{kind:'weekly',employee:x.id})+targetMetric('عملاء تمت متابعتهم بنتيجة اليوم',x.followups,x.goals?x.goals.followups:10,'daily')+targetMetric('المعاينات المكتملة أسبوعيًا',x.viewings,x.goals?x.goals.viewings:5,'viewings')+
       targetMetric('الحجوزات المؤكدة هذا الشهر',x.bookings,x.goals?x.goals.bookings:2,'deals')+
-      (x.expected_commission==null?'<span class="ops-metric"><small>عمولات المكتب المتوقعة محجوبة لهذا الدور</small></span>':targetMetric('عمولات المكتب المتوقعة من الحجوزات (ر.ع)',x.expected_commission,x.goals?x.goals.expected_commission:4000,'deals'))+'</div><p class="ops-note">الحجوزات السارية: '+n(x.live_bookings)+' · الملغاة لاحقًا: '+n(x.cancelled_bookings)+' · لا يُحتسب التفاوض أو العربون غير المدفوع حجزًا.</p></article>').join('')||'<p class="ops-state">لا توجد بيانات موظفات متاحة لهذا الحساب.</p>');
+      (x.expected_commission==null?'<span class="ops-metric"><small>عمولات المكتب المتوقعة محجوبة لهذا الدور</small></span>':targetMetric('عمولات المكتب المتوقعة من الحجوزات (ر.ع)',x.expected_commission,x.goals?x.goals.expected_commission:4000,'deals'))+'</div><p class="ops-note">المخزون هو كل المتاح الآن في الفرع، مهما كان تاريخ إضافته؛ هدفه مستقل عن إضافات الأسبوع.</p><p class="ops-note">الحجوزات السارية: '+n(x.live_bookings)+' · الملغاة لاحقًا: '+n(x.cancelled_bookings)+' · لا يُحتسب التفاوض أو العربون غير المدفوع حجزًا.</p></article>').join('')||'<p class="ops-state">لا توجد بيانات موظفات متاحة لهذا الحساب.</p>');
     }catch(e){if(seq===targetLoadSeq&&crmSessionCurrent(generation,user))host.innerHTML='<div class="ops-error" role="alert">تعذر تحميل الأهداف: '+safe(e.message)+' <button type="button" class="ops-action" data-target-retry>إعادة المحاولة</button></div>';}
   }
-  document.addEventListener('click',e=>{const b=e.target.closest('[data-target-go]');if(b){const page=b.dataset.targetGo;if(typeof navigate==='function')navigate(page,null);}if(e.target.closest('[data-target-retry]'))loadTargetDashboard()});
+  document.addEventListener('click',e=>{const b=e.target.closest('[data-target-go]');if(b){if(b.dataset.targetProperty){openPropertyTarget(b.dataset.targetEmployee,b.dataset.targetProperty);return;}const page=b.dataset.targetGo;if(typeof navigate==='function')navigate(page,null);}if(e.target.closest('[data-target-retry]'))loadTargetDashboard()});
   function mountTargetDashboard(){
     const page=$id('page-dash');if(!page)return;
     let host=$id('opsEmployeeTargets');
@@ -243,6 +245,32 @@
   if(typeof oldExportClients==='function')window.exportClients=function(){return exportDisplayed('clients',()=>oldExportClients.apply(this,arguments));};
   if(typeof oldExportProperties==='function')window.exportProperties=function(){return exportDisplayed('properties',()=>oldExportProperties.apply(this,arguments));};
   let propertySearch='',propertyBranch='',propertyArea='',propertyStatus='';
+  let propertyTargetScope=null,propertyLoadSeq=0;
+  function setPropertyFilters(branch='',status=''){
+    propertySearch=propertyArea='';propertyBranch=branch;propertyStatus=status;
+    for(const [id,value] of [['opsPropertySearch',''],['opsPropertyArea',''],['opsPropertyBranch',branch],['opsPropertyStatus',status]])if($id(id))$id(id).value=value;
+  }
+  function showPropertyTargetScope(){
+    const page=$id('page-properties');if(!page)return;
+    const tabs=page.querySelector('.archive-toggle'),actions=$id('propertyActionQueuePanel');
+    [tabs,actions?.closest('details')||actions].forEach(node=>{if(!node)return;if(propertyTargetScope)node.style.setProperty('display','none','important');else node.style.removeProperty('display');});
+    if($id('opsPropertyBranch'))$id('opsPropertyBranch').disabled=!!propertyTargetScope;
+    if($id('opsPropertyStatus'))$id('opsPropertyStatus').disabled=propertyTargetScope?.kind==='inventory';
+    let caption=$id('opsPropertyTargetScope');
+    if(!propertyTargetScope){if(caption)caption.remove();return;}
+    if(!caption){caption=document.createElement('div');caption.id='opsPropertyTargetScope';caption.className='ops-state';const filters=$id('opsPropertyFilters');if(filters)filters.before(caption);else page.prepend(caption);}
+    const scope=propertyTargetScope,branch=scope.branch==='muscat'?'مسقط':'بركاء';
+    caption.innerHTML='<strong>'+branch+' · '+(scope.kind==='inventory'?'المخزون المتاح حاليًا':'عقارات أُضيفت هذا الأسبوع')+'</strong><p class="ops-note">'+(scope.kind==='inventory'?'كل العقارات المتاحة حاليًا في الفرع، بغض النظر عن تاريخ إضافتها.':'من '+safe(scope.week_start||'')+' إلى '+safe(scope.week_end||'')+' · بتوقيت مسقط؛ المحتسب حتى '+safe(scope.today||'')+'، مع بقاء إضافة العقار المباع محسوبة.')+'</p>'+workButton('clear-property-target','العودة إلى عرض العقارات');
+  }
+  function clearPropertyTarget(){
+    propertyTargetScope=null;propertyLoadSeq++;setPropertyFilters();showPropertyTargetScope();
+  }
+  function openPropertyTarget(employee,kind){
+    const scope=targetPropertyScopes.get(employee);
+    if(!scope||!['inventory','weekly'].includes(kind)||!crmSessionCurrent(scope.generation,scope.user)){showToast('حدّث الأهداف ثم افتح تفاصيل العقارات.','error');return;}
+    propertyTargetScope={...scope,kind};setPropertyFilters(scope.branch,kind==='inventory'?'available':'');
+    if(typeof navigate==='function')navigate('properties',null);
+  }
   const propertyStatusLabel=s=>({available:'متوفر',reserved:'محجوز',deposit:'عربون',negotiating:'تفاوض',sold:'مباع',not_available:'غير متاح'}[s]||s||'غير محدد');
   function propertyActions(p){
     const button=(action,label)=>'<button type="button" class="ops-action" data-work-action="'+action+'" data-work-id="'+safe(p.id)+'">'+label+'</button>';
@@ -256,6 +284,7 @@
       if(propertyArea&&!areas.includes(propertyArea))propertyArea='';
       areaSelect.innerHTML='<option value="">كل المناطق</option>'+areas.map(a=>'<option value="'+safe(a)+'">'+safe(a)+'</option>').join('');areaSelect.value=propertyArea;}
     const items=allProperties.filter(p=>(!propertyBranch||(p.branch_key||'unknown')===propertyBranch)&&(!propertyArea||(p.area||'غير محددة')===propertyArea)&&(!propertyStatus||p.status===propertyStatus)&&(!propertySearch||[p.title,p.property_code,p.area,p.wilayat].join(' ').toLowerCase().includes(propertySearch)));
+    if(propertyTargetScope&&$id('propertiesSub'))$id('propertiesSub').textContent=n(items.length)+' عقار مطابق · من '+n(allProperties.length)+' في نطاق الهدف';
     if(!items.length){captureListExport('properties',[]);list.innerHTML='<div class="ops-state">لا توجد عقارات تطابق العرض الحالي.'+((propertySearch||propertyArea||propertyBranch||propertyStatus)?workButton('clear-properties','مسح الفلاتر'):'')+'</div>';return;}
     const groups=new Map();items.slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).forEach(p=>{
       const branch=p.branch_key==='barka'?'بركاء':p.branch_key==='muscat'?'مسقط':'غير محدد',area=p.area||'منطقة غير محددة',key=branch+'|'+area;
@@ -269,12 +298,49 @@
   }
   const oldProperties=window.loadProperties;
   if(typeof oldProperties==='function')window.loadProperties=async function(){
-    const user=currentUser&&currentUser.id,generation=crmSessionGeneration;
+    const user=currentUser&&currentUser.id,generation=crmSessionGeneration,seq=++propertyLoadSeq,scope=propertyTargetScope;
+    const isCurrent=()=>seq===propertyLoadSeq&&scope===propertyTargetScope&&crmSessionCurrent(generation,user);
     listExports.properties.ready=false;listExports.properties.snapshot=null;
-    const loaded=await oldProperties.apply(this,arguments);
-    if(loaded===false||!crmSessionCurrent(generation,user))return loaded;
+    showPropertyTargetScope();
+    if(scope){
+      const list=$id('propertiesList');allProperties=[];
+      if(list)list.innerHTML='<p class="ops-state" role="status">جاري تحميل عقارات الهدف…</p>';
+      if($id('propertiesSub'))$id('propertiesSub').textContent='جاري تحميل تفاصيل الهدف…';
+      try{
+        // The server returns the exact counted IDs, including its private-investment exclusion.
+        // A branch/date query alone would be broader for an owner. Never fall back to it.
+        const result=await bounded(supa.rpc('crm_employee_target_snapshot'));if(!isCurrent())return false;
+        if(result.error)throw result.error;
+        const employee=result.data?.employees?.find(x=>x.id===scope.employee),field=scope.kind==='inventory'?'inventory_property_ids':'new_property_ids';
+        if(!employee||!['muscat','barka'].includes(employee.branch)||!Array.isArray(employee[field]))throw new Error('تفاصيل الهدف غير متاحة. حدّث الصفحة ثم أعد المحاولة.');
+        const ids=[...new Set(employee[field])],expected=Number(employee[scope.kind==='inventory'?'inventory':'new_properties']);
+        if(ids.some(id=>typeof id!=='string'||!id)||!Number.isInteger(expected)||ids.length!==expected)throw new Error('لم تصل تفاصيل الهدف كاملة. أعد المحاولة.');
+        Object.assign(scope,{branch:employee.branch,week_start:result.data.week_start,week_end:result.data.week_end,today:result.data.today});
+        propertyBranch=scope.branch;if($id('opsPropertyBranch'))$id('opsPropertyBranch').value=propertyBranch;showPropertyTargetScope();
+        const rows=[];
+        // Keep query URLs bounded and paginate through the protected property view.
+        for(let offset=0;offset<ids.length;offset+=100){
+          const selected=ids.slice(offset,offset+100);
+          rows.push(...await bounded(crmReadAll(()=>crmDataFrom('properties').select('*',{count:'exact'}).in('id',selected).order('created_at',{ascending:false}).order('id'))));
+          if(!isCurrent())return false;
+        }
+        const permitted=new Set(ids);
+        const stillEligible=p=>!p.archived&&(scope.kind==='inventory'?p.status==='available':Number(p.price)>0&&omanDate(p.created_at)>=scope.week_start&&omanDate(p.created_at)<=scope.today);
+        if(rows.length!==ids.length||new Set(rows.map(p=>p.id)).size!==ids.length||rows.some(p=>!permitted.has(p.id)||p.branch_key!==scope.branch||!stillEligible(p)))throw new Error('تغيّرت تفاصيل الهدف أثناء التحميل. أعد المحاولة.');
+        allProperties=rows;renderOrganizedProperties();listExports.properties.ready=true;return true;
+      }catch(error){
+        if(!isCurrent())return false;allProperties=[];
+        if($id('propertiesSub'))$id('propertiesSub').textContent='تعذر تحميل تفاصيل الهدف';
+        if(list)list.innerHTML='<div class="ops-error" role="alert">تعذر تحميل عقارات الهدف. '+workButton('retry-properties','إعادة المحاولة')+'</div>';
+        console.warn('Property target details failed',error);return false;
+      }
+    }
+    const loaded=await oldProperties.call(this,isCurrent);
+    if(loaded===false||!isCurrent())return loaded;
     renderOrganizedProperties();listExports.properties.ready=true;return loaded;
   };
+  const oldSetPropView=window.setPropView;
+  if(typeof oldSetPropView==='function')window.setPropView=function(){if(propertyTargetScope)clearPropertyTarget();return oldSetPropView.apply(this,arguments);};
   const oldLoadClients=window.loadClients;
   if(typeof oldLoadClients==='function')window.loadClients=async function(){
     const user=currentUser&&currentUser.id,generation=crmSessionGeneration;
@@ -317,7 +383,7 @@
     }).join('');
   };
   window.crmResetOperations=function(){
-    targetLoadSeq++;
+    targetLoadSeq++;targetPropertyScopes.clear();propertyTargetScope=null;propertyLoadSeq++;showPropertyTargetScope();
     Object.values(listExports).forEach(state=>{state.ready=false;state.snapshot=null;});
     if(typeof crmEndSave==='function')crmEndSave('employeeTargetsPanel');
     if(typeof crmSaveAttempts!=='undefined')crmSaveAttempts.delete('employeeTargetsPanel');
@@ -326,12 +392,12 @@
     clientBranch='all';clientWorkFilter='all';propertySearch='';propertyBranch='';propertyArea='';propertyStatus='';
     ['opsPropertySearch','opsPropertyBranch','opsPropertyArea','opsPropertyStatus'].forEach(id=>{if($id(id))$id(id).value='';});
   };
-  document.addEventListener('input',e=>{if(e.target.id==='opsPropertySearch'){propertySearch=e.target.value.trim().toLowerCase();renderOrganizedProperties();}});
+  document.addEventListener('input',e=>{if(e.target.id==='opsPropertySearch'){propertySearch=e.target.value.trim().toLowerCase();if(!propertyTargetScope||listExports.properties.ready)renderOrganizedProperties();}});
   document.addEventListener('change',e=>{
-    if(e.target.id==='opsPropertyBranch'){propertyBranch=e.target.value;propertyArea='';}
+    if(e.target.id==='opsPropertyBranch'){if(propertyTargetScope)return;propertyBranch=e.target.value;propertyArea='';}
     else if(e.target.id==='opsPropertyArea')propertyArea=e.target.value;
     else if(e.target.id==='opsPropertyStatus')propertyStatus=e.target.value;
-    else return;renderOrganizedProperties();
+    else return;if(!propertyTargetScope||listExports.properties.ready)renderOrganizedProperties();
   });
   document.addEventListener('click',async e=>{
     const filter=e.target.closest('[data-work-filter]');if(filter){clientWorkFilter=filter.dataset.workFilter;renderClients();return;}
@@ -360,7 +426,9 @@
         else if(action==='archive-property'&&!property.archived)archivePropertyById(id);
         else if(action==='restore-property'&&property.archived)restorePropertyById(id);
       }
-      else if(action==='clear-properties'){propertySearch=propertyBranch=propertyArea=propertyStatus='';['opsPropertySearch','opsPropertyBranch','opsPropertyStatus'].forEach(id=>{if($id(id))$id(id).value='';});renderOrganizedProperties();}
+      else if(action==='clear-properties'){setPropertyFilters(propertyTargetScope?.branch||'',propertyTargetScope?.kind==='inventory'?'available':'');renderOrganizedProperties();}
+      else if(action==='clear-property-target'){clearPropertyTarget();const button=$id('page-properties')?.querySelector('.archive-toggle button');if(button&&typeof setPropView==='function')setPropView('active',button);else await loadProperties();}
+      else if(action==='retry-properties')await loadProperties();
       else if(action==='clear-clients'){clientWorkFilter='all';renderClients();}
     }catch(err){showToast('تعذر فتح الإجراء: '+err.message,'error');}
   });

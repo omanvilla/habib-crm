@@ -2,6 +2,12 @@
 
 Updated 2026-10-19. Read this with `AGENTS.md` before work. This file distinguishes deployed changes, direct verification and remaining work. Older dated reports remain evidence, not competing product rules.
 
+## 2026-10-19 inventory target follow-up
+
+- Ahmed clarified that each branch needs at least 10 currently available properties in total, independently of adding two properties each week. SQL27 removes the unused verification-timestamp gate and the standing-stock price/date gates. Counts and exact property-detail ID arrays use the same branch/company/private-investment scope. Other four target metrics and saved goal values are unchanged.
+- SQL27 is applied as migration `20261019063515` (`inventory_goal_source_20261019`). Actual owner/Barka/Muscat SQL-role reads now agree: Barka 15 available, Muscat 4; weekly additions 0 for each in the Oman-local October 18–24 week through October19. All 34 property rows and both saved goal rows retain identical full-row fingerprints. No business data, verification dates or test rows were created or edited.
+- Frontend candidate `20261019-audit-v9` distinguishes current inventory from weekly additions, opens the exact counted property IDs, clears old filters and rejects partial/changed/late results. Local validation: 276 Node tests passed, two PostgreSQL-context skips reserved for their CI jobs, and 28 security checks passed. Publication and actual owner-browser details are pending at this checkpoint. See [the focused report](inventory-goals-20261019.md); the v8 release below remains a separate historical audit checkpoint.
+
 ## 2026-10-19 deployed comprehensive audit release
 
 - SQL25 and SQL26 are applied to production as migrations `20261019042543` (`comprehensive_audit_repairs_20261018`) and `20261019042648` (`audit_financial_reporting_20261019`). Current frontend **`20261019-audit-v8`** is deployed from validated runtime commit `6021a2416939075531b065e7c90e154ce3efb7f6`. All seven jobs passed in [CI run 39206341645](https://github.com/omanvilla/habib-crm/actions/runs/39206341645); [Pages run 39206681056](https://github.com/omanvilla/habib-crm/actions/runs/39206681056) succeeded for the same commit. SQL25/26 are unchanged by v8. Earlier October19 checkpoints remain historical: v7 `b25bb6922722f99e4a8c26ab4779a87574cae7a9` (CI `39203499962`, Pages `39203860804`) and v6 `265fe01e91e521d52a1e368fcbc0a9c789ac92d7`. The pre-audit source `0df90ba902af5eaca2e73dd6fedeab421dd69406` remains preserved as `backup/pre-audit-20261019`.
