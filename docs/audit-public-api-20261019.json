@@ -1,0 +1,55 @@
+{
+  "verified_at_utc": "2026-10-19T04:49:51.116597+00:00",
+  "authentication": "public anon key only; no user session",
+  "operations": "read-only table requests and STABLE report RPCs; no business writes",
+  "checks": [
+    {
+      "path": "clients?select=id&limit=1",
+      "method": "GET",
+      "http_status": 200,
+      "error_code": null,
+      "returned_rows": 0,
+      "anonymous_data_access_denied": true
+    },
+    {
+      "path": "deals?select=id&limit=1",
+      "method": "GET",
+      "http_status": 401,
+      "error_code": "42501",
+      "returned_rows": null,
+      "anonymous_data_access_denied": true
+    },
+    {
+      "path": "whatsapp_messages?select=id&limit=1",
+      "method": "GET",
+      "http_status": 200,
+      "error_code": null,
+      "returned_rows": 0,
+      "anonymous_data_access_denied": true
+    },
+    {
+      "path": "properties?select=id&limit=1",
+      "method": "GET",
+      "http_status": 401,
+      "error_code": "42501",
+      "returned_rows": null,
+      "anonymous_data_access_denied": true
+    },
+    {
+      "path": "rpc/crm_commission_report",
+      "method": "POST read-only RPC",
+      "http_status": 401,
+      "error_code": "42501",
+      "returned_rows": null,
+      "anonymous_data_access_denied": true
+    },
+    {
+      "path": "rpc/crm_employee_target_snapshot",
+      "method": "POST read-only RPC",
+      "http_status": 401,
+      "error_code": "42501",
+      "returned_rows": null,
+      "anonymous_data_access_denied": true
+    }
+  ]
+}
