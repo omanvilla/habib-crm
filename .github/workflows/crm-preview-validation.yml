@@ -296,6 +296,31 @@ jobs:
           psql -d crm_inquiry_followup_test -v ON_ERROR_STOP=1 -f db/changes/29-inquiry-followup-coherence.rollback.sql
           psql -d crm_inquiry_followup_test -v ON_ERROR_STOP=1 -f tests/fixtures/inquiry-followup-rollback-assert.sql
           dropdb crm_inquiry_followup_test
+          # SQL30 reproduces authorized inboxes attached to another branch's
+          # primary client. Keep those fixtures outside predecessor fingerprints.
+          createdb crm_staff_volume_test
+          psql -d crm_staff_volume_test -v ON_ERROR_STOP=1 -f /tmp/habib-followup-catalog.sql
+          psql -d crm_staff_volume_test -v ON_ERROR_STOP=1 -f db/changes/29-inquiry-followup-coherence.forward.sql
+          psql -d crm_staff_volume_test -v ON_ERROR_STOP=1 -f tests/fixtures/staff-message-volume-before.sql
+          cmp db/changes/30-staff-message-volume-scope.forward.sql supabase/migrations/*_staff_message_volume_scope_20261019.sql
+          psql -d crm_staff_volume_test -v ON_ERROR_STOP=1 -f db/changes/30-staff-message-volume-scope.forward.sql
+          psql -d crm_staff_volume_test -v ON_ERROR_STOP=1 -f db/changes/30-staff-message-volume-scope.forward.sql
+          psql -d crm_staff_volume_test -v ON_ERROR_STOP=1 -f tests/fixtures/staff-message-volume-assert.sql
+          psql -d crm_staff_volume_test -v ON_ERROR_STOP=1 -f tests/fixtures/staff-message-volume-rollback-guard-before.sql
+          if psql -d crm_staff_volume_test -v ON_ERROR_STOP=1 -f db/changes/30-staff-message-volume-scope.forward.sql > /tmp/habib-staff-volume-apply-guard.log 2>&1; then
+            cat /tmp/habib-staff-volume-apply-guard.log
+            exit 1
+          fi
+          grep -F 'SQL30 apply refused: function or permissions changed since release' /tmp/habib-staff-volume-apply-guard.log
+          if psql -d crm_staff_volume_test -v ON_ERROR_STOP=1 -f db/changes/30-staff-message-volume-scope.rollback.sql > /tmp/habib-staff-volume-rollback-guard.log 2>&1; then
+            cat /tmp/habib-staff-volume-rollback-guard.log
+            exit 1
+          fi
+          grep -F 'SQL30 rollback refused: function or permissions changed since release' /tmp/habib-staff-volume-rollback-guard.log
+          psql -d crm_staff_volume_test -v ON_ERROR_STOP=1 -f tests/fixtures/staff-message-volume-rollback-guard-assert.sql
+          psql -d crm_staff_volume_test -v ON_ERROR_STOP=1 -f db/changes/30-staff-message-volume-scope.rollback.sql
+          psql -d crm_staff_volume_test -v ON_ERROR_STOP=1 -f tests/fixtures/staff-message-volume-rollback-assert.sql
+          dropdb crm_staff_volume_test
           psql -v ON_ERROR_STOP=1 -f tests/fixtures/performance-coherence-rollback-guard-before.sql
           if psql -v ON_ERROR_STOP=1 -f db/changes/28-performance-coherence.rollback.sql > /tmp/habib-performance-rollback-guard.log 2>&1; then
             cat /tmp/habib-performance-rollback-guard.log
