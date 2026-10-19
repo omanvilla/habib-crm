@@ -4488,7 +4488,10 @@ async function loadReports(){
  ['kpiRevenueChange','kpiClientsChange','kpiClosedChange','kpiConvChange'].forEach(id=>{if($(id))$(id).textContent=''});
  if(previousValue)$('kpiRevenueChange').textContent=((salesValue-previousValue)/previousValue*100).toFixed(0)+'% مقارنة بالفترة السابقة';
  const missing=deals.filter(d=>closedDeal(d)&&!d.closed_at).length;
- showReportNotice('قيمة المبيعات حسب تاريخ الإغلاق. معدل التحويل لفرص أُنشئت في الفترة. العمولات بحسب حالة التحصيل الحالية لصفقات الفترة وليست تدفقات نقدية بتاريخ التحصيل.'+(missing?' هناك '+missing+' صفقة مغلقة بلا تاريخ إغلاق مستبعدة من أرقام الفترة.':''),false);
+ const reportNote=reportTab==='overview'
+  ?range.start.toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'})+' — '+new Date(range.end.getTime()-1).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'})+' · بتوقيت مسقط. قيمة المبيعات وعدد الصفقات المغلقة بحسب تاريخ الإغلاق. العملاء الجدد بحسب تاريخ إضافتهم. معدل التحويل هو نسبة الصفقات المكتملة حاليًا من الفرص التي أُنشئت خلال الفترة.'
+  :'قيمة المبيعات حسب تاريخ الإغلاق. معدل التحويل لفرص أُنشئت في الفترة. العمولات بحسب حالة التحصيل الحالية لصفقات الفترة وليست تدفقات نقدية بتاريخ التحصيل.';
+ showReportNotice(reportNote+(missing?' هناك '+missing+' صفقة مغلقة بلا تاريخ إغلاق مستبعدة من '+(reportTab==='overview'?'قيمة المبيعات وعدد الإغلاقات.':'أرقام الفترة.'):''),false);
  if(reportTab==='overview'){renderRevenueLineChart(deals);renderClientStatusChart(clients);renderPropTypesChart(properties);renderClientSourcesChart(periodClients)}
  else if(reportTab==='revenue'&&canViewFinancials()){renderRevenueDetails(periodDeals,properties,cash);showReportNotice(range.start.toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'})+' — '+new Date(range.end.getTime()-1).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'})+' · '+crmCommissionPeriodNote(cash),false);}
  else if(reportTab==='funnel')renderFunnel(clients,deals);

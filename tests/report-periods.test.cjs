@@ -54,3 +54,29 @@ test('Preset click clears a specific month and report controls contain all six a
   const controls=source.slice(source.indexOf('<div class="page" id="page-reports">'),source.indexOf('<div class="report-tabs">'));
   assert.deepEqual([...controls.matchAll(/data-report-period="([^"]+)"/g)].map(x=>x[1]),['month','quarter','halfyear','nine_months','year','all']);
 });
+test('Overview displays its Oman bounds and explains the actual sales, client and conversion bases',async()=>{
+  const start=source.indexOf('async function loadReports('),end=source.indexOf('\nfunction renderRevenueLineChart(',start);
+  const clients=[{created_at:'2024-02-29T19:59:59Z'},{created_at:'2024-02-29T20:00:00Z'}],deals=[
+    {stage:'closed',created_at:'2024-01-15T08:00:00Z',closed_at:'2024-02-29T19:59:59Z',deal_value:100},
+    {stage:'commission_collected',created_at:'2024-02-10T08:00:00Z',closed_at:'2024-02-29T20:00:00Z',deal_value:200},
+    {stage:'negotiation',created_at:'2024-02-15T08:00:00Z',deal_value:300},
+    {stage:'closed',created_at:'2024-01-01T08:00:00Z',closed_at:null,deal_value:999}
+  ];
+  for(const [options,expected] of [
+    [{now:'2024-02-29T20:01:00Z'},'2024-03-01 — 2024-03-31'],
+    [{month:'2024-02'},'2024-02-01 — 2024-02-29'],
+    [{now:'2026-05-31T12:00:00Z',kind:'quarter'},'2026-02-28 — 2026-05-31']
+  ]){
+    const nodes={},notices=[],data=[clients,deals,[]],errors=[],noRender=()=>{};
+    const env={...reports(options),reportTab:'overview',reportLoadSeq:0,currentUser:{id:'SYNTHETIC-OWNER'},crmSessionGeneration:1,isOwner:()=>true,crmSessionCurrent:()=>true,
+      $:id=>nodes[id]||(nodes[id]={textContent:''}),crmReadAll:async()=>data.shift(),closedDeal:d=>['closed','commission_collected'].includes(d.stage),
+      dealInClosingPeriod:(d,r)=>['closed','commission_collected'].includes(d.stage)&&!!d.closed_at&&new Date(d.closed_at)>=r.start&&new Date(d.closed_at)<r.end,
+      fmtMoneyShort:String,showReportNotice:(message,error)=>notices.push({message,error}),showToast:message=>errors.push(message),console:{error:(...args)=>errors.push(args)},
+      renderRevenueLineChart:noRender,renderClientStatusChart:noRender,renderPropTypesChart:noRender,renderClientSourcesChart:noRender};
+    await new Function(...Object.keys(env),source.slice(start,end)+';return loadReports();')(...Object.values(env));
+    assert.deepEqual(errors,[]);const notice=notices.at(-1);assert.equal(notice.error,false);assert(notice.message.startsWith(expected),notice.message);
+    for(const explanation of ['بتوقيت مسقط','بحسب تاريخ الإغلاق','العملاء الجدد بحسب تاريخ إضافتهم','الصفقات المكتملة حاليًا من الفرص التي أُنشئت خلال الفترة'])assert(notice.message.includes(explanation),explanation);
+    assert.doesNotMatch(notice.message,/العمولات بحسب حالة التحصيل|تدفقات نقدية/);
+    if(options.month==='2024-02'){assert.equal(nodes.kpiRevenue.textContent,'100');assert.equal(nodes.kpiClosed.textContent,1);assert.equal(nodes.kpiNewClients.textContent,1);assert.equal(nodes.kpiConversion.textContent,'50%');}
+  }
+});
