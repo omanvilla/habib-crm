@@ -274,7 +274,7 @@ jobs:
             cat /tmp/habib-inventory-rollback-guard.log
             exit 1
           fi
-          rg --fixed-strings 'SQL27 rollback refused: function changed since release' /tmp/habib-inventory-rollback-guard.log
+          grep -F 'SQL27 rollback refused: function changed since release' /tmp/habib-inventory-rollback-guard.log
           psql -v ON_ERROR_STOP=1 -f tests/fixtures/inventory-goal-rollback-guard-assert.sql
           psql -v ON_ERROR_STOP=1 -f db/changes/27-inventory-goal-source.rollback.sql
           psql -v ON_ERROR_STOP=1 -f tests/fixtures/inventory-goal-rollback-assert.sql
