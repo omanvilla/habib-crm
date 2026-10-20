@@ -1,0 +1,28 @@
+name: Verify published design v14
+on:
+  push:
+    branches: ['codex/design-public-verification-20261020']
+permissions:
+  contents: read
+jobs:
+  public-read-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compare actual served files with validated source
+        run: python3 tests/design-public-verification.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Observe unauthenticated production startup without API calls
+        run: node tests/design-public-startup.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: design-v14-public-verification
+          path: public-verification/
