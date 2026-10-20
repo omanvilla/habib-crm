@@ -1,0 +1,431 @@
+{
+  "assembled_at_utc": "2026-10-20T03:46:52Z",
+  "retirement_state_verified_at_utc": "2026-10-20T03:28:50.735293+00:00",
+  "release": {
+    "frontend_version": "20261020-branch-v11",
+    "url": "https://omanvilla.github.io/habib-crm/",
+    "runtime_source_commit": "89eb774b347a72a67ee98f9f5feb5a202f551405",
+    "validated_commit": "a0ef434bf0d473b8eb226ad79beeb380fc269467",
+    "ci": {
+      "run_id": 39362717083,
+      "conclusion": "success",
+      "successful_jobs": 7
+    },
+    "pages": {
+      "run_id": 39364258345,
+      "conclusion": "success"
+    },
+    "runtime_assets": {
+      "count": 18,
+      "http200": true,
+      "all_match": true
+    }
+  },
+  "migrations": [
+    {
+      "version": "20261020031442",
+      "name": "branch_operations_20261020"
+    },
+    {
+      "version": "20261020032501",
+      "name": "shared_muscat_reception_20261020"
+    }
+  ],
+  "edge_functions": [
+    {
+      "name": "whatsapp-webhook",
+      "version": 38,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "source_matches": true,
+      "gateway_matches": true
+    },
+    {
+      "name": "whatsapp-send",
+      "version": 16,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "source_matches": true,
+      "gateway_matches": true
+    },
+    {
+      "name": "whatsapp-inbox",
+      "version": 13,
+      "status": "ACTIVE",
+      "verify_jwt": true,
+      "source_matches": true,
+      "gateway_matches": true
+    },
+    {
+      "name": "whatsapp-direct-bind",
+      "version": 12,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "source_matches": true,
+      "gateway_matches": true
+    },
+    {
+      "name": "whatsapp-embedded-signup",
+      "version": 7,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "source_matches": true,
+      "gateway_matches": true
+    }
+  ],
+  "tests": {
+    "node_cases": 377,
+    "node_passed": 375,
+    "node_failed": 0,
+    "database_context_cases_covered_in_dedicated_ci": 2,
+    "security_checks_passed": 28,
+    "synthetic_browser_suites_passed": 11,
+    "focused_browser_groups": {
+      "branch_operations": 7,
+      "performance": 39,
+      "inventory": 39,
+      "audit_faults": 56,
+      "dashboard": 5
+    },
+    "native_postgres": {
+      "branch_target_concurrency_cases": 2,
+      "shared_reception_commit_order_races": 4,
+      "retirement_expected_guard_failures": 19,
+      "actual_admin_script_and_replay": true,
+      "old_historical_viewing_failure_reproduced": true,
+      "historical_viewing_author_preservation": true,
+      "guarded_exact_rollback_reapply": true
+    },
+    "real_customer_test_messages_sent": 0,
+    "production_test_rows_created": 0
+  },
+  "retirement": {
+    "retired_profile_active": false,
+    "auth_banned": true,
+    "unexpired_sessions": 0,
+    "unrevoked_refresh_tokens": 0,
+    "administrative_audit_entries": 1,
+    "retained_barka_active": true,
+    "owner_active": true,
+    "verified_in_fresh_query": true,
+    "retired_sessions_expired_at": "2026-10-20T03:27:53.896467+00:00",
+    "auth_http_login_refresh_tested": false
+  },
+  "production_sql_roles": {
+    "owner": {
+      "branch_keys": [
+        "barka",
+        "muscat"
+      ],
+      "inventory_detail_counts_match": true
+    },
+    "barka": {
+      "branch_keys": [
+        "barka"
+      ],
+      "opposite_branch_clients": 0,
+      "opposite_branch_properties": 0,
+      "opposite_branch_conversations": 0,
+      "previously_assigned_general_clients_retained": true,
+      "goal_write_denied": true,
+      "service_resolver_denied": true
+    },
+    "retired": {
+      "role": null,
+      "company": null,
+      "visible_deals": 0,
+      "visible_clients": 0,
+      "visible_messages": 0,
+      "visible_requests": 0,
+      "visible_properties": 0,
+      "visible_conversations": 0,
+      "property_projection_rows": 0,
+      "deal_projection_rows": 0,
+      "goal_read_denied": true,
+      "goal_write_denied": true,
+      "service_resolver_denied": true
+    },
+    "evidence_type": "transaction-local authenticated claims against live PostgreSQL; not a real password/browser session"
+  },
+  "branch_goals": [
+    {
+      "branch": "barka",
+      "inventory": 13,
+      "qualified_weekly_additions": 0,
+      "goals": {
+        "bookings": 2,
+        "viewings": 5,
+        "followups": 10,
+        "inventory": 10,
+        "new_properties": 2,
+        "expected_commission": 4000
+      }
+    },
+    {
+      "branch": "muscat",
+      "inventory": 4,
+      "qualified_weekly_additions": 0,
+      "goals": {
+        "bookings": 2,
+        "viewings": 5,
+        "followups": 10,
+        "inventory": 10,
+        "new_properties": 2,
+        "expected_commission": 4000
+      }
+    }
+  ],
+  "preservation": {
+    "retirement": [
+      {
+        "table": "public.deals",
+        "unchanged": true
+      },
+      {
+        "table": "public.tasks",
+        "unchanged": true
+      },
+      {
+        "table": "public.events",
+        "unchanged": true
+      },
+      {
+        "table": "public.clients",
+        "unchanged": true
+      },
+      {
+        "table": "public.deposits",
+        "unchanged": true
+      },
+      {
+        "table": "public.viewings",
+        "unchanged": true
+      },
+      {
+        "table": "public.activities",
+        "unchanged": true
+      },
+      {
+        "table": "public.properties",
+        "unchanged": true
+      },
+      {
+        "table": "public.client_requests",
+        "unchanged": true
+      },
+      {
+        "table": "public.whatsapp_messages",
+        "unchanged": true
+      },
+      {
+        "table": "public.property_inquiries",
+        "unchanged": true
+      },
+      {
+        "table": "public.whatsapp_conversations",
+        "unchanged": true
+      },
+      {
+        "table": "public.whatsapp_message_requests",
+        "unchanged": true
+      },
+      {
+        "table": "crm_repair_private.deal_milestone_events",
+        "unchanged": true
+      },
+      {
+        "table": "crm_repair_private.deal_commission_receipts",
+        "unchanged": true
+      }
+    ],
+    "migration_window": [
+      {
+        "table": "public.deals",
+        "unchanged": true
+      },
+      {
+        "table": "public.tasks",
+        "unchanged": true
+      },
+      {
+        "table": "public.events",
+        "unchanged": true
+      },
+      {
+        "table": "public.clients",
+        "unchanged": false
+      },
+      {
+        "table": "public.deposits",
+        "unchanged": true
+      },
+      {
+        "table": "public.viewings",
+        "unchanged": true
+      },
+      {
+        "table": "public.activities",
+        "unchanged": false
+      },
+      {
+        "table": "public.properties",
+        "unchanged": true
+      },
+      {
+        "table": "public.client_requests",
+        "unchanged": true
+      },
+      {
+        "table": "public.whatsapp_messages",
+        "unchanged": false
+      },
+      {
+        "table": "public.property_inquiries",
+        "unchanged": true
+      },
+      {
+        "table": "public.whatsapp_conversations",
+        "unchanged": false
+      },
+      {
+        "table": "public.whatsapp_message_requests",
+        "unchanged": true
+      },
+      {
+        "table": "crm_repair_private.deal_milestone_events",
+        "unchanged": true
+      },
+      {
+        "table": "crm_repair_private.deal_commission_receipts",
+        "unchanged": true
+      }
+    ],
+    "migration_window_explanation": "Five ordinary messages and two activities were created before SQL32 during the connector delay; no migration business-row backfill.",
+    "route_original_field_changes": [
+      {
+        "route": "barka",
+        "changed_original_fields": [],
+        "transport": null
+      },
+      {
+        "route": "general",
+        "changed_original_fields": [],
+        "transport": null
+      },
+      {
+        "route": "investment",
+        "changed_original_fields": [
+          "label",
+          "updated_at",
+          "whatsapp_number"
+        ],
+        "transport": "muscat"
+      },
+      {
+        "route": "muscat",
+        "changed_original_fields": [
+          "updated_at",
+          "assigned_to"
+        ],
+        "transport": null
+      }
+    ],
+    "historic_financial_amounts_and_dates_unmodified": true,
+    "credentials_decrypted_or_changed": false
+  },
+  "controls": {
+    "sql31_catalog_drift": 0,
+    "retired_property_attribution_trigger_disabled": true,
+    "resolver_execute": {
+      "anon": false,
+      "authenticated": false,
+      "service_role": true
+    },
+    "application_private_audit_select": false,
+    "cron_followups_active": false
+  },
+  "browser": {
+    "production_startup_version": "20261020-branch-v11",
+    "sign_in_form_loaded": true,
+    "authenticated_v11_session_available": false,
+    "application_error_seen_in_observed_startup_logs": false,
+    "browser_extension_metadata_errors_observed": true
+  },
+  "logs": {
+    "window_start_utc": "2026-10-20T03:25:00Z",
+    "window_end_utc": "2026-10-20T03:32:00Z",
+    "postgres_log_records": 5,
+    "postgres_error_fatal_panic_records": 0,
+    "postgrest_records": 14,
+    "postgrest_statuses_not_classified": true,
+    "function_ingress_evidence_in_window": false,
+    "new_whatsapp_messages_after_new_webhook_observed": 0
+  },
+  "advisors": {
+    "security": [
+      {
+        "name": "rls_enabled_no_policy",
+        "level": "INFO",
+        "count": 35,
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy"
+      },
+      {
+        "name": "security_definer_view",
+        "level": "ERROR",
+        "count": 2,
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view"
+      },
+      {
+        "name": "authenticated_security_definer_function_executable",
+        "level": "WARN",
+        "count": 16,
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable"
+      },
+      {
+        "name": "auth_leaked_password_protection",
+        "level": "WARN",
+        "count": 1,
+        "remediation": "https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection"
+      }
+    ],
+    "performance": [
+      {
+        "name": "unindexed_foreign_keys",
+        "level": "INFO",
+        "count": 103,
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys"
+      },
+      {
+        "name": "auth_rls_initplan",
+        "level": "WARN",
+        "count": 37,
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0003_auth_rls_initplan"
+      },
+      {
+        "name": "no_primary_key",
+        "level": "INFO",
+        "count": 15,
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0004_no_primary_key"
+      },
+      {
+        "name": "unused_index",
+        "level": "INFO",
+        "count": 25,
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index"
+      },
+      {
+        "name": "multiple_permissive_policies",
+        "level": "WARN",
+        "count": 16,
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0006_multiple_permissive_policies"
+      }
+    ]
+  },
+  "limitations": [
+    "New Muscat branch-owned email pending from owner; no placeholder account created.",
+    "Fresh actual password sign-in/GoTrue refresh and authenticated v11 browser journey not exercised.",
+    "No fresh live Meta ingress or provider send was tested on new Edge versions; simulations used isolated data.",
+    "Existing leaked-password protection disabled; connected tools expose no Auth configuration mutation.",
+    "Earlier physical mobile, Storage/Realtime and physical backup-restore coverage limits remain."
+  ]
+}

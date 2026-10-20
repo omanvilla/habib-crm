@@ -1,0 +1,134 @@
+{
+  "verified_at_utc": "2026-10-20T03:27:31.773175+00:00",
+  "frontend_version": "20261020-branch-v11",
+  "runtime_commit": "a0ef434bf0d473b8eb226ad79beeb380fc269467",
+  "url": "https://omanvilla.github.io/habib-crm/",
+  "assets": [
+    {
+      "file": "index.html",
+      "url": "https://omanvilla.github.io/habib-crm/",
+      "status": 200,
+      "sha256": "f63e11fd0f731c824c40c0cba4ac19f6cfeef2717ca4a7134c95e55b939e6587",
+      "matches_validated_source": true
+    },
+    {
+      "file": "app-base-v15.html",
+      "url": "https://omanvilla.github.io/habib-crm/app-base-v15.html?v=20261020-branch-v11",
+      "status": 200,
+      "sha256": "5eed1c106cbe0bb3cf642aac4ad2277a3e1d0d4caf0294faea70042df7cb2f1d",
+      "matches_validated_source": true
+    },
+    {
+      "file": "modern-v17.css",
+      "url": "https://omanvilla.github.io/habib-crm/modern-v17.css?v=20260923repair2",
+      "status": 200,
+      "sha256": "7e82320e76b414c9391d3c8bc73c902ffb4ca0dd4be545f4a8f95c2f21ae9ec0",
+      "matches_validated_source": true
+    },
+    {
+      "file": "crm-operations-v6.css",
+      "url": "https://omanvilla.github.io/habib-crm/crm-operations-v6.css?v=20261020-branch-v11",
+      "status": 200,
+      "sha256": "3ca8a683151dc271e8dd8178833963e3083aa477049ea1405dc8a590beb90af9",
+      "matches_validated_source": true
+    },
+    {
+      "file": "crm-deal-workflow.css",
+      "url": "https://omanvilla.github.io/habib-crm/crm-deal-workflow.css?v=20261020-branch-v11",
+      "status": 200,
+      "sha256": "c34843bc9c72e172c461982d2f69fa0033ee238c07ed010ee21bda7bb7db2cb8",
+      "matches_validated_source": true
+    },
+    {
+      "file": "crm-v17-patch.js",
+      "url": "https://omanvilla.github.io/habib-crm/crm-v17-patch.js?v=20260923repair2",
+      "status": 200,
+      "sha256": "596b6f6ed4243d34eaa93ee886ff4800d60c2ef46c60f02063d9ca87435b4483",
+      "matches_validated_source": true
+    },
+    {
+      "file": "modern-v17.js",
+      "url": "https://omanvilla.github.io/habib-crm/modern-v17.js?v=20260923repair2",
+      "status": 200,
+      "sha256": "e62672b5436de419f1a1cd2bb524194286e1ff636a8238e332c4b32ca7b93a35",
+      "matches_validated_source": true
+    },
+    {
+      "file": "whatsapp-direct-bind-ui.js",
+      "url": "https://omanvilla.github.io/habib-crm/whatsapp-direct-bind-ui.js?v=20261020-branch-v11",
+      "status": 200,
+      "sha256": "2d7b2e0e03e0ad5fbbb99601524cc18aaa89b7556dfb01424caa1e6e1743d39f",
+      "matches_validated_source": true
+    },
+    {
+      "file": "crm-v18-routing-patch.js",
+      "url": "https://omanvilla.github.io/habib-crm/crm-v18-routing-patch.js?v=20261015dashboard16",
+      "status": 200,
+      "sha256": "2768d824d2a33716f22833a035e7d89c109049fbd6e63bbc24ad48a710df509e",
+      "matches_validated_source": true
+    },
+    {
+      "file": "crm-v18-request-integrity-patch.js",
+      "url": "https://omanvilla.github.io/habib-crm/crm-v18-request-integrity-patch.js?v=20261020-branch-v11",
+      "status": 200,
+      "sha256": "f4d1c5b08928a92960f3627b363cd14e6a03ae1646fd1273f23811b066a2c61a",
+      "matches_validated_source": true
+    },
+    {
+      "file": "crm-v18-client-info-patch.js",
+      "url": "https://omanvilla.github.io/habib-crm/crm-v18-client-info-patch.js?v=20261020-branch-v11",
+      "status": 200,
+      "sha256": "6ad69006db0b2a90720ed85581d68e5a0fc8379bb04218db81ee0871e2033dd2",
+      "matches_validated_source": true
+    },
+    {
+      "file": "crm-v18-property-monitoring-patch.js",
+      "url": "https://omanvilla.github.io/habib-crm/crm-v18-property-monitoring-patch.js?v=20260923repair2",
+      "status": 200,
+      "sha256": "74bfccf96fa06321fd5df3a3b1455672081542f4e007109f5d62049843605bec",
+      "matches_validated_source": true
+    },
+    {
+      "file": "crm-v18-task-priority-patch.js",
+      "url": "https://omanvilla.github.io/habib-crm/crm-v18-task-priority-patch.js?v=20261020-branch-v11",
+      "status": 200,
+      "sha256": "b12485954f6aa6e9cd28e20551431fe097fad067a2fa8f7b93d4dc627ad91767",
+      "matches_validated_source": true
+    },
+    {
+      "file": "instagram-crm.js",
+      "url": "https://omanvilla.github.io/habib-crm/instagram-crm.js?v=20261015dashboard16",
+      "status": 200,
+      "sha256": "e36cbaf92572263a615b954fc0c38406c9146f7018ef952894603a697a058663",
+      "matches_validated_source": true
+    },
+    {
+      "file": "crm-funnel.js",
+      "url": "https://omanvilla.github.io/habib-crm/crm-funnel.js?v=20261015dashboard16",
+      "status": 200,
+      "sha256": "6ab4ee4f00a3f0353738aa97b918d3cf211c7a0b91cfe4a4294b791526111901",
+      "matches_validated_source": true
+    },
+    {
+      "file": "crm-operations-v6.js",
+      "url": "https://omanvilla.github.io/habib-crm/crm-operations-v6.js?v=20261020-branch-v11",
+      "status": 200,
+      "sha256": "0b16b2456d53cc7c1932e1ae39cde62d160ef3d38bc8bbaae85c1f1b3145dba0",
+      "matches_validated_source": true
+    },
+    {
+      "file": "crm-deal-workflow.js",
+      "url": "https://omanvilla.github.io/habib-crm/crm-deal-workflow.js?v=20261020-branch-v11",
+      "status": 200,
+      "sha256": "1982592e20c38cc361d1434f52856bc2c38178f0b7b40f770fb5930333e56cce",
+      "matches_validated_source": true
+    },
+    {
+      "file": "crm-visit-client.js",
+      "url": "https://omanvilla.github.io/habib-crm/crm-visit-client.js?v=20261015dashboard16",
+      "status": 200,
+      "sha256": "cd686954d311e09757c1fb12b53f92236aa11dba27453807b989bbb03a4c8900",
+      "matches_validated_source": true
+    }
+  ]
+}

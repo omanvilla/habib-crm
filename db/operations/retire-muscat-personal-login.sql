@@ -96,8 +96,8 @@ BEGIN
  VALUES(op_,company_,target_,before_,after_,owner_,'Owner requested retirement of the personal Muscat login; owner handles the branch until a new branch-owned email is supplied.',at_);
 END $action$;
 COMMIT;
-SELECT p.is_active AS retired_profile_active,u.banned_until>now() AS auth_banned,
- (SELECT count(*) FROM auth.sessions s WHERE s.user_id=p.id AND (s.not_after IS NULL OR s.not_after>now())) AS unexpired_sessions,
+SELECT p.is_active AS retired_profile_active,u.banned_until>clock_timestamp() AS auth_banned,
+ (SELECT count(*) FROM auth.sessions s WHERE s.user_id=p.id AND (s.not_after IS NULL OR s.not_after>clock_timestamp())) AS unexpired_sessions,
  (SELECT count(*) FROM auth.refresh_tokens t WHERE t.user_id=p.id::text AND t.revoked IS DISTINCT FROM true) AS unrevoked_refresh_tokens,
  (SELECT count(*) FROM crm_repair_private.audit32_access_changes WHERE operation_key=nullif(btrim(current_setting('crm.retirement.operation_key',true)),'')) AS audit_entries
 FROM public.profiles p JOIN auth.users u ON u.id=p.id WHERE p.id=nullif(current_setting('crm.retirement.target_user_id',true),'')::uuid;
