@@ -1,0 +1,16 @@
+{
+  "version": "20261020-design-v14",
+  "runtime_commit": "d49357224002fff16d0c194013256d15e9cc8c57",
+  "baseline_main": "70f413f9e5e95824f8237ffc99a52a5418d78c33",
+  "ci": {"run_id": 39467518482, "successful_jobs": 7, "node_pass": 382, "node_postgres_context_skips": 2, "security_pass": 28, "native_sql_suites_pass": 5, "original_sql_steps_unchanged": true, "base_deal_backend_byte_guard": true},
+  "browser": {"artifact_id": 12284854046, "synthetic": true, "design_groups": 10, "workspace_groups": 11, "compact_groups": 10, "deal_date_groups": 18, "inquiry_groups": 21, "total_groups": 70, "page_errors": [], "external_requests": [], "production_writes": 0, "desktop_page_surfaces": 18, "narrow_page_surfaces": 17, "narrow_width": 390, "physical_device": false, "settled_mutation_callbacks": 0},
+  "pages": {"run_id": 39467959784, "conclusion": "success"},
+  "public": {"run_id": 39468123768, "conclusion": "success", "artifact_id": 12284798932, "checked_at_utc": "2026-10-20T17:40:33.846418+00:00", "assets": 24, "all_http200": true, "all_hashes_equal": true, "version": "20261020-design-v14", "login_form_visible": true, "authenticated": false, "design_class": true, "icon_renderer": true, "ibm_arabic_font_faces_loaded": [400,600], "page_errors": [], "failed_requests": [], "blocked_business_api_attempts": []},
+  "live_sql": {"read_only": true, "public_tables_without_rls": 0, "anon_checked_tables_returned_zero": 6, "barka_checked_opposite_or_private_paths_returned_zero": 6, "retired_role_and_company_null": true, "retired_checked_tables_or_views_returned_zero": 6, "owner_nonempty_positive_controls": true, "both_branch_target_rows_loaded": true, "evidence_type": "transaction-local role claims, not browser/password sessions", "cron_remains_disabled": true},
+  "security_advisors": {"private_deny_all_rls_info": 35, "protected_definer_views": 2, "authenticated_privileged_rpcs": 16, "leaked_password_protection_disabled": true, "claimed_resolved": false},
+  "production_migrations_applied": [],
+  "edge_deployments": [],
+  "production_customer_messages": 0,
+  "production_business_test_writes": 0,
+  "limitations": ["No fresh authenticated production role/write journey", "No forced recovery/refresh lifecycle test", "No physical phone", "No new live provider OAuth/metrics/send test", "No sensitive Storage/Realtime network journey", "No physical backup restore", "No claim that every control/filter combination was exercised"]
+}
