@@ -1,0 +1,28 @@
+name: Verify published workspace v13
+on:
+  push:
+    branches: ['codex/workspace-public-verification-20261020']
+permissions:
+  contents: read
+jobs:
+  public-read-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compare every served runtime asset against validated source
+        run: python3 tests/workspace-public-verification.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Observe public unauthenticated startup without writes
+        run: node tests/workspace-public-startup.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: workspace-v13-public-verification
+          path: public-verification/
