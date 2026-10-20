@@ -49,8 +49,9 @@ const server=require('../preview/serve.cjs'),out=path.resolve('preview-results/d
     const value=key=>Number(card.querySelector('[data-performance-metric="'+key+'"] .ops-performance-value')?.textContent);
     return {name:card.querySelector('.ops-person-title strong').textContent,inquiries:value('inquiry_clients'),replied:value('replied_inquiry_clients'),messages:value('successful_staff_messages')};
    }));
-   const expected=[{name:'مسقط',inquiries:4,replied:3,messages:7},{name:'بركاء',inquiries:2,replied:1,messages:5}];
-   assert.deepEqual(counts,role==='muscat'?[expected[0]]:role==='barka'?[expected[1]]:expected,role+' metric counts and employee scope');
+   // The branch RPC orders by branch key (barka, muscat), independently of account creation order.
+   const expected=[{name:'بركاء',inquiries:2,replied:1,messages:5},{name:'مسقط',inquiries:4,replied:3,messages:7}];
+   assert.deepEqual(counts,role==='muscat'?[expected[1]]:role==='barka'?[expected[0]]:expected,role+' metric counts and branch scope');
    if(role==='owner')await page.screenshot({path:path.join(out,'owner-performance.png'),fullPage:true,animations:'disabled'});
    await page.locator('#opsPerformanceDetails > summary').click();
   }

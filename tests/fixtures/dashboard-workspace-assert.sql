@@ -31,6 +31,13 @@ UPDATE viewings SET viewing_date=(now() AT TIME ZONE 'Asia/Muscat')::date,status
  WHERE id IN(test_id(600),test_id(601),test_id(602),test_id(603));
 UPDATE deals SET stage='negotiation' WHERE id IN(test_id(800),test_id(801),test_id(802),test_id(803));
 UPDATE client_requests SET next_followup=(now() AT TIME ZONE 'Asia/Muscat')::date,lead_temperature='hot' WHERE id IN(test_id(200),test_id(201),test_id(202),test_id(206));
+-- The preceding owner-creation suite commits request2501 with a fixed follow-up
+-- date (2026-10-20). Once that day arrives it correctly becomes a third due
+-- private client. Give this known inherited synthetic request a deterministic
+-- future date for this transaction, then explicitly test its transition to due
+-- below. The final ROLLBACK restores the preceding suite's original record.
+UPDATE client_requests SET next_followup=(now() AT TIME ZONE 'Asia/Muscat')::date+1
+ WHERE id=test_id(2501) AND client_id=test_id(2500) AND company_id=test_id(1);
 -- Other suites may have committed their own owner follow-up fixture. Change only
 -- the six records this suite owns; never turn unrelated synthetic tasks urgent.
 UPDATE tasks SET due_date=(now() AT TIME ZONE 'Asia/Muscat')::date,priority='high'
@@ -67,6 +74,8 @@ DO $$DECLARE b jsonb:=crm_dashboard_work('branches');i jsonb:=crm_dashboard_work
  PERFORM test_assert(jsonb_array_length(p->'tasks')=7 AND p->'counts'=b->'counts','pagination lost data or changed count');
  PERFORM test_assert(NOT EXISTS(SELECT 1 FROM jsonb_array_elements(p->'tasks') a JOIN jsonb_array_elements(b->'tasks') z ON a->>'id'=z->>'id'),'pagination duplicate tasks');
  PERFORM test_assert((i#>>'{counts,followups_due}')::int=2,'owner private due count');
+ PERFORM test_assert((SELECT jsonb_agg(r->>'client_id' ORDER BY r->>'client_id') FROM jsonb_array_elements(i->'followups')r)
+   =to_jsonb(ARRAY[test_id(102)::text,test_id(106)::text]),'owner private due clients must match the two current-day fixtures exactly');
  PERFORM test_assert((i#>>'{counts,hot_requests}')::int=2,'owner private hot count');
  PERFORM test_assert((i#>>'{counts,viewings_today}')::int=2,'owner private visits count');
  PERFORM test_assert((i#>>'{counts,open_deals}')::int=2,'owner private deals count');
@@ -74,6 +83,20 @@ DO $$DECLARE b jsonb:=crm_dashboard_work('branches');i jsonb:=crm_dashboard_work
  PERFORM test_assert(i::text LIKE '%'||test_id(206)::text||'%','private request on ordinary identity missing');
  PERFORM test_assert(i::text LIKE '%'||test_id(905)::text||'%','private indirect viewing-only task missing');
  PERFORM test_assert(i::text NOT LIKE '%'||test_id(200)::text||'%','ordinary request entered private dashboard');
+ IF EXISTS(SELECT 1 FROM client_requests WHERE id=test_id(2501) AND client_id=test_id(2500)) THEN
+  PERFORM test_assert(NOT EXISTS(SELECT 1 FROM jsonb_array_elements(i->'followups')r WHERE r->>'id'=test_id(2501)::text),
+   'tomorrow private follow-up must not be counted today');
+  UPDATE client_requests SET next_followup=(now() AT TIME ZONE 'Asia/Muscat')::date WHERE id=test_id(2501);
+  p:=crm_dashboard_work('investment');
+  PERFORM test_assert((p#>>'{counts,followups_due}')::int=3
+   AND EXISTS(SELECT 1 FROM jsonb_array_elements(p->'followups')r WHERE r->>'id'=test_id(2501)::text AND r->>'client_id'=test_id(2500)::text),
+   'private follow-up scheduled for today must add its exact third client');
+  PERFORM test_assert((crm_dashboard_work('branches')#>>'{counts,followups_due}')::int=2,
+   'newly due private follow-up must not change the branch count');
+  UPDATE client_requests SET next_followup=(now() AT TIME ZONE 'Asia/Muscat')::date+1 WHERE id=test_id(2501);
+  PERFORM test_assert((crm_dashboard_work('investment')#>>'{counts,followups_due}')::int=2,
+   'rescheduling the private follow-up to tomorrow restores the exact due count');
+ END IF;
  BEGIN PERFORM crm_dashboard_work('all');RAISE EXCEPTION 'invalid scope accepted';EXCEPTION WHEN invalid_parameter_value THEN NULL;END;
 END $$;
 SELECT set_config('test.actor',test_id(11)::text,false);
