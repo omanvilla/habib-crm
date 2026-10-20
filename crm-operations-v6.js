@@ -5,6 +5,19 @@
   const n=v=>Number(v||0).toLocaleString('en-US');
   const omanDate=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'});
   const dateText=d=>d?new Date(d).toLocaleDateString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat'}):'—';
+  const branchLabel=branch=>({muscat:'مسقط',barka:'بركاء'}[branch]||'الفرع');
+  function branchRows(data){
+    const rows=data?.branches??data?.employees;
+    if(!Array.isArray(rows))throw new Error('لم تصل بيانات الفروع. أعد المحاولة.');
+    const seen=new Set();
+    return rows.map(row=>{
+      const branch=row?.branch||row?.branch_key;
+      // The backend aggregates actual records once per branch. An old employee
+      // response must not become duplicate branch totals through relabelling.
+      if(!['muscat','barka'].includes(branch)||seen.has(branch)||(row.id??row.employee_id)!==branch)throw new Error('بيانات الفروع غير مكتملة. حدّث الصفحة ثم أعد المحاولة.');
+      seen.add(branch);return {...row,id:branch,branch,name:branchLabel(branch)};
+    });
+  }
   // Calendar arithmetic uses UTC components of the Oman-local date.
   // Browser/device timezone must not move the period boundary.
   function validPerformancePeriod(kind){
@@ -37,28 +50,29 @@
     if(goal==null||Number(goal)<=0)return '<span class="ops-metric"><strong>'+n(value)+'</strong><small>'+label+'</small><span class="ops-metric-help">'+(goal==null?'الهدف غير محدد':'الهدف موقوف')+'</span></span>';
     const v=Number(value||0),missing=Math.max(0,goal-v);
     const percent=Math.round(v/goal*100);
-    return '<button type="button" class="ops-metric ops-target-action" data-target-go="'+action+'"'+(propertyTarget?' data-target-property="'+safe(propertyTarget.kind)+'" data-target-employee="'+safe(propertyTarget.employee)+'"':'')+' title="فتح السجلات المرتبطة"><strong>'+n(v)+' / '+n(goal)+'</strong><small>'+label+'</small><span class="ops-metric-help">'+(missing?'المتبقي '+n(missing):'تم تحقيق الهدف')+' · '+n(percent)+'%</span></button>';
+    return '<button type="button" class="ops-metric ops-target-action" data-target-go="'+action+'"'+(propertyTarget?' data-target-property="'+safe(propertyTarget.kind)+'" data-target-branch="'+safe(propertyTarget.branch)+'"':'')+' title="فتح السجلات المرتبطة"><strong>'+n(v)+' / '+n(goal)+'</strong><small>'+label+'</small><span class="ops-metric-help">'+(missing?'المتبقي '+n(missing):'تم تحقيق الهدف')+' · '+n(percent)+'%</span></button>';
   }
   let targetLoadSeq=0;
   const targetPropertyScopes=new Map();
   async function loadTargetDashboard(){
     const host=$id('opsEmployeeTargets');if(!host||!currentUser)return;
     const seq=++targetLoadSeq,user=currentUser.id,generation=crmSessionGeneration;
-    targetPropertyScopes.clear();host.innerHTML='<p class="ops-state">جاري تحميل أهداف الموظفات…</p>';
+    targetPropertyScopes.clear();host.innerHTML='<p class="ops-state">جاري تحميل أهداف الفروع…</p>';
     try{
-      const result=await bounded(supa.rpc('crm_employee_target_snapshot'));
+      const result=await bounded(supa.rpc('crm_branch_target_snapshot'));
       if(seq!==targetLoadSeq||!crmSessionCurrent(generation,user))return;
       if(result.error)throw result.error;
-      const data=result.data;if(!data||!Array.isArray(data.employees))throw new Error('لم تصل بيانات الأهداف. أعد المحاولة');const employees=data.employees;
-      employees.forEach(x=>{if(['muscat','barka'].includes(x.branch))targetPropertyScopes.set(x.id,{employee:x.id,branch:x.branch,user,generation,week_start:data.week_start,week_end:data.week_end,today:data.today});});
+      const data=result.data,branches=branchRows(data);
+      if(typeof crmRememberBranchIdentity==='function')crmRememberBranchIdentity(data);
+      branches.forEach(x=>targetPropertyScopes.set(x.branch,{branch:x.branch,user,generation,week_start:data.week_start,week_end:data.week_end,today:data.today}));
       host.innerHTML='<div class="ops-performance-caption"><strong>أهداف العمل المعتمدة</strong><small>اليوم '+safe(data.today||'')+' · الأسبوع من '+safe(data.week_start||'')+' إلى '+safe(data.week_end||'')+' · الشهر من '+safe(data.month_start||'')+' إلى '+safe(data.month_end||'')+'</small></div>'+
-      (employees.map(x=>'<article class="ops-person"><div class="ops-person-title"><strong>'+safe(x.name)+' · '+(x.branch==='muscat'?'مسقط':'بركاء')+'</strong><span>'+(x.sales_goal_met?'هدف الحجوزات الشهري متحقق':'هدف الحجوزات الشهري لم يتحقق بعد')+'</span></div><div class="ops-metrics">'+
-      targetMetric('المخزون المتاح حاليًا',x.inventory,x.goals?x.goals.inventory:10,'properties',{kind:'inventory',employee:x.id})+targetMetric('عقارات أُضيفت هذا الأسبوع',x.new_properties,x.goals?x.goals.new_properties:2,'properties',{kind:'weekly',employee:x.id})+targetMetric('عملاء تمت متابعتهم بنتيجة اليوم',x.followups,x.goals?x.goals.followups:10,'daily')+targetMetric('المعاينات المكتملة أسبوعيًا',x.viewings,x.goals?x.goals.viewings:5,'viewings')+
+      (branches.map(x=>'<article class="ops-person" data-target-branch-card="'+x.branch+'"><div class="ops-person-title"><strong>'+branchLabel(x.branch)+'</strong><span>'+(x.sales_goal_met?'هدف الحجوزات الشهري متحقق':'هدف الحجوزات الشهري لم يتحقق بعد')+'</span></div><div class="ops-metrics">'+
+      targetMetric('المخزون المتاح حاليًا',x.inventory,x.goals?x.goals.inventory:10,'properties',{kind:'inventory',branch:x.branch})+targetMetric('عقارات أُضيفت هذا الأسبوع',x.new_properties,x.goals?x.goals.new_properties:2,'properties',{kind:'weekly',branch:x.branch})+targetMetric('عملاء تمت متابعتهم بنتيجة اليوم',x.followups,x.goals?x.goals.followups:10,'daily')+targetMetric('المعاينات المكتملة أسبوعيًا',x.viewings,x.goals?x.goals.viewings:5,'viewings')+
       targetMetric('الحجوزات المؤكدة هذا الشهر',x.bookings,x.goals?x.goals.bookings:2,'deals')+
-      (x.expected_commission==null?'<span class="ops-metric"><small>عمولات المكتب المتوقعة محجوبة لهذا الدور</small></span>':targetMetric('عمولات حجوزات هذا الشهر (ر.ع)',x.expected_commission,x.goals?x.goals.expected_commission:4000,'deals'))+'</div><p class="ops-note">المخزون هو كل المتاح الآن في الفرع، مهما كان تاريخ إضافته؛ هدفه مستقل عن إضافات الأسبوع.</p><p class="ops-note">عمولات الهدف هي القيمة المسجلة للحجوزات، وتشمل ما تم بيعه أو تحصيله لاحقًا. يبقى الحجز وعمولته في شهر دفع العربون ولا يتكرران عند البيع أو التحصيل.</p><p class="ops-note">الحجوزات السارية: '+n(x.live_bookings)+' · الملغاة لاحقًا: '+n(x.cancelled_bookings)+' · لا يُحتسب التفاوض أو العربون غير المدفوع حجزًا.</p></article>').join('')||'<p class="ops-state">لا توجد بيانات موظفات متاحة لهذا الحساب.</p>');
+      (x.expected_commission==null?'<span class="ops-metric"><small>عمولات المكتب المتوقعة محجوبة لهذا الدور</small></span>':targetMetric('عمولات حجوزات هذا الشهر (ر.ع)',x.expected_commission,x.goals?x.goals.expected_commission:4000,'deals'))+'</div><p class="ops-note">المخزون هو كل المتاح الآن في الفرع، مهما كان تاريخ إضافته؛ هدفه مستقل عن إضافات الأسبوع.</p><p class="ops-note">عمولات الهدف هي القيمة المسجلة للحجوزات، وتشمل ما تم بيعه أو تحصيله لاحقًا. يبقى الحجز وعمولته في شهر دفع العربون ولا يتكرران عند البيع أو التحصيل.</p><p class="ops-note">الحجوزات السارية: '+n(x.live_bookings)+' · الملغاة لاحقًا: '+n(x.cancelled_bookings)+' · لا يُحتسب التفاوض أو العربون غير المدفوع حجزًا.</p></article>').join('')||'<p class="ops-state">لا توجد فروع متاحة لهذا الحساب.</p>');
     }catch(e){if(seq===targetLoadSeq&&crmSessionCurrent(generation,user))host.innerHTML='<div class="ops-error" role="alert">تعذر تحميل الأهداف: '+safe(e.message)+' <button type="button" class="ops-action" data-target-retry>إعادة المحاولة</button></div>';}
   }
-  document.addEventListener('click',e=>{const b=e.target.closest('[data-target-go]');if(b){if(b.dataset.targetProperty){openPropertyTarget(b.dataset.targetEmployee,b.dataset.targetProperty);return;}const page=b.dataset.targetGo;if(typeof navigate==='function')navigate(page,null);}if(e.target.closest('[data-target-retry]'))loadTargetDashboard()});
+  document.addEventListener('click',e=>{const b=e.target.closest('[data-target-go]');if(b){if(b.dataset.targetProperty){openPropertyTarget(b.dataset.targetBranch,b.dataset.targetProperty);return;}const page=b.dataset.targetGo;if(typeof navigate==='function')navigate(page,null);}if(e.target.closest('[data-target-retry]'))loadTargetDashboard()});
   function mountTargetDashboard(){
     const page=$id('page-dash');if(!page)return;
     let host=$id('opsEmployeeTargets');
@@ -79,17 +93,17 @@
     return '<div class="ops-performance-breakdown">'+items.map(([key,label,value])=>'<span data-performance-metric="'+key+'"><b class="ops-performance-value">'+performanceValue(value)+'</b> '+label+'</span>').join('')+'</div>';
   }
   function performanceFinance(row){
-    const fields=[['expected_commission','عمولات حجوزات الفترة','القيمة المسجلة عند الحجز، وتشمل الحجوزات التي تم بيعها أو تحصيلها لاحقًا'],['company_commission','عمولات المكتب من المبيعات المكتملة في الفترة','بتاريخ إتمام البيع، قبل خصم نصيب الموظفة'],['commission_collected','عمولات المكتب المحصلة فعليًا في الفترة','بتاريخ التحصيل الفعلي، ويشمل الدفعات الجزئية']];
+    const fields=[['expected_commission','عمولات حجوزات الفترة','القيمة المسجلة عند الحجز، وتشمل الحجوزات التي تم بيعها أو تحصيلها لاحقًا'],['company_commission','عمولات المكتب من المبيعات المكتملة في الفترة','بتاريخ إتمام البيع، قبل خصم نصيب الموظف'],['commission_collected','عمولات المكتب المحصلة فعليًا في الفترة','بتاريخ التحصيل الفعلي، ويشمل الدفعات الجزئية']];
     const visible=fields.filter(([key])=>row[key]!=null);
     return visible.length?'<section class="ops-performance-finance" aria-label="العمولات"><dl>'+visible.map(([key,label,hint])=>performanceCount(key,label,row[key],hint)).join('')+'</dl><p class="ops-note">المبالغ بالريال العُماني. لكل صف تاريخه؛ لا تُجمع هذه القيم بوصفها إيرادًا واحدًا.</p></section>':'';
   }
   function performancePerson(x,kind,journeyOnly=false){
     const visitsAvailable=['visit_cohort_total','visit_cohort_done','visit_cohort_pending','visit_cohort_cancelled'].every(key=>x[key]!=null);
-    return '<article class="ops-person ops-performance-person"><div class="ops-person-title"><strong>'+safe(x.name)+'</strong>'+(journeyOnly?'':'<span>'+safe(targetScore(x,kind))+'</span>')+'</div><div class="ops-performance-stages">'+
-      '<section class="ops-performance-stage" data-performance-stage="inquiries"><h4>استفسارات العملاء</h4><dl>'+performanceCount('inquiry_clients','عملاء استفسروا عن عقار',x.inquiry_clients,'كل عميل مرة واحدة خلال الفترة',true)+performanceCount('inquiry_property_pairs','استفسارات عن عقار محدد',x.inquiry_property_pairs,'قد يستفسر العميل نفسه عن أكثر من عقار')+performanceCount('replied_inquiry_clients','مستفسرون ردّت عليهم الموظفة',x.replied_inquiry_clients,'رد بشري بعد الاستفسار وفي الفترة نفسها')+performanceCount('inquiry_pair_to_visit','استفسارات الفترة التي وصلت لزيارة',x.inquiry_pair_to_visit,'قد تكون الزيارة في فترة لاحقة')+'</dl></section>'+
+    return '<article class="ops-person ops-performance-person" data-performance-branch="'+x.branch+'"><div class="ops-person-title"><strong>'+branchLabel(x.branch)+'</strong>'+(journeyOnly?'':'<span>'+safe(targetScore(x,kind))+'</span>')+'</div><div class="ops-performance-stages">'+
+      '<section class="ops-performance-stage" data-performance-stage="inquiries"><h4>استفسارات العملاء</h4><dl>'+performanceCount('inquiry_clients','عملاء استفسروا عن عقار',x.inquiry_clients,'كل عميل مرة واحدة خلال الفترة',true)+performanceCount('inquiry_property_pairs','استفسارات عن عقار محدد',x.inquiry_property_pairs,'قد يستفسر العميل نفسه عن أكثر من عقار')+performanceCount('replied_inquiry_clients','مستفسرون ردّ عليهم الفريق',x.replied_inquiry_clients,'رد بشري بعد الاستفسار وفي الفترة نفسها')+performanceCount('inquiry_pair_to_visit','استفسارات الفترة التي وصلت لزيارة',x.inquiry_pair_to_visit,'قد تكون الزيارة في فترة لاحقة')+'</dl></section>'+
       '<section class="ops-performance-stage" data-performance-stage="visits"><h4>الزيارات</h4><dl>'+performanceCount('visit_cohort_total','زيارات موعدها خلال الفترة',x.visit_cohort_total,'بتاريخ الزيارة المسجل، مهما كان وقت إدخالها',true)+performanceCount('visit_cohort_done','زيارات تمت',x.visit_cohort_done)+performanceCount('visit_cohort_pending','زيارات لم تكتمل بعد',x.visit_cohort_pending,'تشمل المواعيد القادمة والمؤجلة وعدم الحضور')+performanceCount('visit_cohort_cancelled','زيارات أُلغيت',x.visit_cohort_cancelled)+'</dl>'+(!visitsAvailable?'<p class="ops-note" role="status">تفاصيل حالات زيارات الفترة غير متاحة حاليًا؛ لا يُستنتج المتبقي من أرقام ذات تواريخ مختلفة.</p>':'')+'</section>'+
       '<section class="ops-performance-stage" data-performance-stage="deals"><h4>الحجوزات والمبيعات</h4><dl>'+performanceCount('reservations','حجوزات مؤكدة في الفترة',x.reservations,'بتاريخ دفع العربون، مرة واحدة',true)+'</dl>'+performanceBreakdown([['active_reservations','سارية',x.active_reservations],['cancelled_reservations','أُلغيت لاحقًا',x.cancelled_reservations]])+'<dl class="ops-performance-sale">'+performanceCount('sales','مبيعات أُغلقت',x.sales,'بتاريخ إتمام البيع',true)+performanceCount('visit_to_sale','منها مبيعات مرتبطة بزيارة',x.visit_to_sale,'يشمل الزيارات السابقة للفترة')+'</dl>'+(Number(x.sales_without_reservation)>0?'<p class="ops-performance-diagnostic">'+n(x.sales_without_reservation)+' من مبيعات الفترة تفتقد تاريخ حجز مؤكدًا. يلزم تسجيل تاريخ الحجز الصحيح لتحديد شهر الهدف.</p>':'')+'</section></div>'+
-      (journeyOnly?'':'<dl class="ops-performance-work">'+performanceCount('successful_staff_messages','رسائل أرسلتها الموظفة',x.successful_staff_messages,'رسائل أُرسلت بنجاح؛ بدون الآلية أو الفاشلة')+performanceCount('new_properties','عقارات أُضيفت خلال الفترة',x.new_properties,'عقارات غير مؤرشفة بسعر مسجل؛ تبقى الإضافة محسوبة بعد البيع')+performanceCount('followup_clients','عملاء تمت متابعتهم بنتيجة خلال الفترة',x.followup_clients,'كل عميل مرة واحدة؛ من تواصل بشري موثق بنتيجة')+'</dl>'+performanceFinance(x)+(Number(x.unknown_expected_commission)>0?'<p class="ops-note">حجوزات لم تُحدد عمولتها المتوقعة: '+n(x.unknown_expected_commission)+'</p>':'')+(Number(x.unknown_company_commission)>0?'<p class="ops-note">مبيعات مكتملة لم تُحدد عمولة المكتب فيها: '+n(x.unknown_company_commission)+'. الإجمالي يشمل القيم المعروفة فقط.</p>':''))+'</article>';
+      (journeyOnly?'':'<dl class="ops-performance-work">'+performanceCount('successful_staff_messages','رسائل أرسلها الفريق',x.successful_staff_messages,'رسائل أُرسلت بنجاح؛ بدون الآلية أو الفاشلة')+performanceCount('new_properties','عقارات أُضيفت خلال الفترة',x.new_properties,'عقارات غير مؤرشفة بسعر مسجل؛ تبقى الإضافة محسوبة بعد البيع')+performanceCount('followup_clients','عملاء تمت متابعتهم بنتيجة خلال الفترة',x.followup_clients,'كل عميل مرة واحدة؛ من تواصل بشري موثق بنتيجة')+'</dl>'+performanceFinance(x)+(Number(x.unknown_expected_commission)>0?'<p class="ops-note">حجوزات لم تُحدد عمولتها المتوقعة: '+n(x.unknown_expected_commission)+'</p>':'')+(Number(x.unknown_company_commission)>0?'<p class="ops-note">مبيعات مكتملة لم تُحدد عمولة المكتب فيها: '+n(x.unknown_company_commission)+'. الإجمالي يشمل القيم المعروفة فقط.</p>':''))+'</article>';
   }
   async function renderPerformance(kind,boxId='employeePerformanceResults',explicitSpan){
     kind=validPerformancePeriod(kind);
@@ -99,14 +113,13 @@
     const isCurrent=()=>performanceLoads.get(box)===request&&crmSessionCurrent(generation,user);
     box.innerHTML='<p class="ops-state" role="status">جاري تحميل الأداء…</p>';
     try{
-      const span=request.span,r=await bounded(supa.rpc('crm_employee_performance',{p_from:span.from,p_to:span.to}));
+      const span=request.span,r=await bounded(supa.rpc('crm_branch_performance',{p_from:span.from,p_to:span.to}));
       if(!isCurrent())return;
       if(r.error)throw r.error;
-      if(!r.data||!Array.isArray(r.data.employees))throw new Error('لم تصل بيانات الأداء. أعد المحاولة');
-      const employees=r.data.employees;
+      const branches=branchRows(r.data);
       box.innerHTML='<div class="ops-performance-caption"><span>'+safe(r.data.from||span.from||'بداية الشركة')+' — '+safe(new Date(Date.parse(span.to+'T00:00:00Z')-86400000).toISOString().slice(0,10))+' · بتوقيت مسقط</span><small>كل مرحلة بتاريخها الفعلي؛ قد تبدأ الرحلة في فترة سابقة.</small></div>'+
-      (employees.map(x=>performancePerson(x,kind,boxId==='conversionFunnel')).join('')||'<p class="ops-empty">لا يوجد موظفون نشطون.</p>')+
-        '<details class="ops-metric-definitions"><summary>كيف تُحسب هذه الأرقام؟</summary><p>عملاء الاستفسارات يُحسبون مرة واحدة لكل عميل خلال الفترة. الاستفسارات عن عقارات محددة هي روابط العميل والعقار؛ قد يكون للعميل أكثر من رابط، ولذلك لا تُجمع مع عدد العملاء. الردود هي ردود الموظفة البشرية بعد الاستفسار. رسائل الموظفة هي الرسائل البشرية التي أُرسلت بنجاح، وقد تتعدد للعميل الواحد؛ تُستبعد الآلية والفاشلة والمعلقة. الاستفسار يحتاج رسالة واردة مرتبطة بعقار؛ الزيارة اليدوية تُحسب زيارة ولا تُنشئ استفسارًا واردًا.</p><p>حالات الزيارات تخص المواعيد المسجلة داخل الفترة نفسها؛ المكتملة وغير المكتملة والملغاة أجزاء من هذا العدد. أما تحول استفسار الفترة إلى زيارة فقد يحدث لاحقًا. مبيعات الفترة المرتبطة بزيارة تشمل البيع الذي أُغلق خلالها وكانت له زيارة مكتملة، حتى لو تمت الزيارة في شهر سابق.</p><p>الحجز وعمولته يُحسبان مرة واحدة في شهر دفع العربون. إتمام البيع أو التحصيل لاحقًا لا يُزيلهما من ذلك الشهر ولا يُعيد احتسابهما في شهر آخر. عمولات الحجوزات هي قيمتها المسجلة، وعمولات المبيعات تُعرض بتاريخ البيع، والتحصيل الفعلي بتاريخ كل دفعة. الإلغاء يبقي الحجز وتاريخه ظاهرين ويُخرجه من السارية. تاريخ الحجز غير المعروف يحتاج إدخالًا صحيحًا ولا يُستنتج من الزيارة أو البيع.</p><p>المتابعات تُحسب للعملاء الذين سُجل لهم تواصل بشري بنتيجة فعلية؛ لا يُحسب حفظ بيانات العميل أو رسالة آلية متابعةً. الإسناد المعتمد للعمل منذ 1 أغسطس 2026: مسقط لهديل وبركاء لمرام. المخزون المتاح وهدفه موجودان في أهداف العمل المعتمدة.</p></details>';
+      (branches.map(x=>performancePerson(x,kind,boxId==='conversionFunnel')).join('')||'<p class="ops-empty">لا توجد فروع متاحة لهذا الحساب.</p>')+
+        '<details class="ops-metric-definitions"><summary>كيف تُحسب هذه الأرقام؟</summary><p>عملاء الاستفسارات يُحسبون مرة واحدة لكل عميل خلال الفترة. الاستفسارات عن عقارات محددة هي روابط العميل والعقار؛ قد يكون للعميل أكثر من رابط، ولذلك لا تُجمع مع عدد العملاء. الردود هي ردود الفريق البشرية بعد الاستفسار. رسائل الفريق هي الرسائل البشرية التي أُرسلت بنجاح، وقد تتعدد للعميل الواحد؛ تُستبعد الآلية والفاشلة والمعلقة. الاستفسار يحتاج رسالة واردة مرتبطة بعقار؛ الزيارة اليدوية تُحسب زيارة ولا تُنشئ استفسارًا واردًا.</p><p>حالات الزيارات تخص المواعيد المسجلة داخل الفترة نفسها؛ المكتملة وغير المكتملة والملغاة أجزاء من هذا العدد. أما تحول استفسار الفترة إلى زيارة فقد يحدث لاحقًا. مبيعات الفترة المرتبطة بزيارة تشمل البيع الذي أُغلق خلالها وكانت له زيارة مكتملة، حتى لو تمت الزيارة في شهر سابق.</p><p>الحجز وعمولته يُحسبان مرة واحدة في شهر دفع العربون. إتمام البيع أو التحصيل لاحقًا لا يُزيلهما من ذلك الشهر ولا يُعيد احتسابهما في شهر آخر. عمولات الحجوزات هي قيمتها المسجلة، وعمولات المبيعات تُعرض بتاريخ البيع، والتحصيل الفعلي بتاريخ كل دفعة. الإلغاء يبقي الحجز وتاريخه ظاهرين ويُخرجه من السارية. تاريخ الحجز غير المعروف يحتاج إدخالًا صحيحًا ولا يُستنتج من الزيارة أو البيع.</p><p>المتابعات تُحسب للعملاء الذين سُجل لهم تواصل بشري بنتيجة فعلية؛ لا يُحسب حفظ بيانات العميل أو رسالة آلية متابعةً. تُجمع السجلات الفعلية لكل فرع مرة واحدة، ويستمر تاريخه عند تغيير حسابات الفريق. المخزون المتاح وهدفه موجودان في أهداف العمل المعتمدة.</p></details>';
     }catch(e){if(!isCurrent())return;box.innerHTML='<div class="ops-error" role="alert"><strong>تعذر تحميل الأداء</strong><span>'+safe(e.message)+'</span><button class="ops-action" data-performance-retry="'+safe(kind)+'" data-performance-box="'+safe(boxId)+'">إعادة المحاولة</button></div>'}
   }
   window.crmDashboardPerformancePeriod=function(kind){const panel=$id('opsPerformanceDetails');if(!currentProfile||!['owner','manager','agent'].includes(currentProfile.role))return;dashboardPerformancePeriod=validPerformancePeriod(kind);if(panel)panel.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('active',b.dataset.period===dashboardPerformancePeriod));return renderPerformance(dashboardPerformancePeriod,'opsDashboardPerformanceResults')};
@@ -115,7 +128,7 @@
   function addPerformance(){
     const target=$id('employeeTargetsPanel'),team=$id('page-team');if(!team||$id('employeePerformancePanel'))return;
     const card=document.createElement('div');card.className='card';card.id='employeePerformancePanel';
-    card.innerHTML='<div class="card-body"><h3>أداء الفريق</h3><div class="ops-periods"><button class="btn-secondary ops-period active" data-period="month" onclick="crmPerformancePeriod(\'month\')">هذا الشهر</button><button class="btn-secondary ops-period" data-period="months3" onclick="crmPerformancePeriod(\'months3\')">آخر 3 أشهر</button><button class="btn-secondary ops-period" data-period="months6" onclick="crmPerformancePeriod(\'months6\')">آخر 6 أشهر</button><button class="btn-secondary ops-period" data-period="months9" onclick="crmPerformancePeriod(\'months9\')">آخر 9 أشهر</button><button class="btn-secondary ops-period" data-period="year" onclick="crmPerformancePeriod(\'year\')">آخر سنة</button><button class="btn-secondary ops-period" data-period="all" onclick="crmPerformancePeriod(\'all\')">من بداية الشركة</button></div><div id="employeePerformanceResults"></div></div>';
+    card.innerHTML='<div class="card-body"><h3>أداء الفروع</h3><div class="ops-periods"><button class="btn-secondary ops-period active" data-period="month" onclick="crmPerformancePeriod(\'month\')">هذا الشهر</button><button class="btn-secondary ops-period" data-period="months3" onclick="crmPerformancePeriod(\'months3\')">آخر 3 أشهر</button><button class="btn-secondary ops-period" data-period="months6" onclick="crmPerformancePeriod(\'months6\')">آخر 6 أشهر</button><button class="btn-secondary ops-period" data-period="months9" onclick="crmPerformancePeriod(\'months9\')">آخر 9 أشهر</button><button class="btn-secondary ops-period" data-period="year" onclick="crmPerformancePeriod(\'year\')">آخر سنة</button><button class="btn-secondary ops-period" data-period="all" onclick="crmPerformancePeriod(\'all\')">من بداية الشركة</button></div><div id="employeePerformanceResults"></div></div>';
     if(target)target.closest('.card').after(card);else team.append(card);
   }
   const oldTeam=window.loadTeam;
@@ -288,8 +301,8 @@
   function clearPropertyTarget(){
     propertyTargetScope=null;propertyLoadSeq++;setPropertyFilters();showPropertyTargetScope();
   }
-  function openPropertyTarget(employee,kind){
-    const scope=targetPropertyScopes.get(employee);
+  function openPropertyTarget(branch,kind){
+    const scope=targetPropertyScopes.get(branch);
     if(!scope||!['inventory','weekly'].includes(kind)||!crmSessionCurrent(scope.generation,scope.user)){showToast('حدّث الأهداف ثم افتح تفاصيل العقارات.','error');return;}
     propertyTargetScope={...scope,kind};setPropertyFilters(scope.branch,kind==='inventory'?'available':'');
     if(typeof navigate==='function')navigate('properties',null);
@@ -332,13 +345,13 @@
       try{
         // The server returns the exact counted IDs, including its private-investment exclusion.
         // A branch/date query alone would be broader for an owner. Never fall back to it.
-        const result=await bounded(supa.rpc('crm_employee_target_snapshot'));if(!isCurrent())return false;
+        const result=await bounded(supa.rpc('crm_branch_target_snapshot'));if(!isCurrent())return false;
         if(result.error)throw result.error;
-        const employee=result.data?.employees?.find(x=>x.id===scope.employee),field=scope.kind==='inventory'?'inventory_property_ids':'new_property_ids';
-        if(!employee||!['muscat','barka'].includes(employee.branch)||!Array.isArray(employee[field]))throw new Error('تفاصيل الهدف غير متاحة. حدّث الصفحة ثم أعد المحاولة.');
-        const ids=[...new Set(employee[field])],expected=Number(employee[scope.kind==='inventory'?'inventory':'new_properties']);
+        const target=branchRows(result.data).find(x=>x.branch===scope.branch),field=scope.kind==='inventory'?'inventory_property_ids':'new_property_ids';
+        if(!target||!Array.isArray(target[field]))throw new Error('تفاصيل الهدف غير متاحة. حدّث الصفحة ثم أعد المحاولة.');
+        const ids=[...new Set(target[field])],expected=Number(target[scope.kind==='inventory'?'inventory':'new_properties']);
         if(ids.some(id=>typeof id!=='string'||!id)||!Number.isInteger(expected)||ids.length!==expected)throw new Error('لم تصل تفاصيل الهدف كاملة. أعد المحاولة.');
-        Object.assign(scope,{branch:employee.branch,week_start:result.data.week_start,week_end:result.data.week_end,today:result.data.today});
+        Object.assign(scope,{branch:target.branch,week_start:result.data.week_start,week_end:result.data.week_end,today:result.data.today});
         propertyBranch=scope.branch;if($id('opsPropertyBranch'))$id('opsPropertyBranch').value=propertyBranch;showPropertyTargetScope();
         const rows=[];
         // Keep query URLs bounded and paginate through the protected property view.

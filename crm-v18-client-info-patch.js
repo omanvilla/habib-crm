@@ -38,7 +38,7 @@
   function areaText(r){return r.preferred_areas&&r.preferred_areas.length?r.preferred_areas.join('، '):(r.preferred_area||'—')}
   function propText(r){return r.property_types&&r.property_types.length?r.property_types.map(prop).join('، '):prop(r.property_type)}
   function teamText(list,r){
-    if(list&&list.length)return list.map(function(x){return branchName(x.branch_key)+(x.name?' — '+x.name:'')}).join('، ');
+    if(list&&list.length)return [...new Set(list.map(function(x){return branchName(x.branch_key)}))].join('، ');
     if(r&&r.branch_key)return branchName(r.branch_key);
     return '—';
   }
@@ -85,9 +85,7 @@
     var out={},ids=(requests||[]).map(function(r){return r.id}).filter(Boolean);if(!ids.length)return out;
     var ar=await supa.from('client_request_assignees').select('request_id,user_id,branch_key').in('request_id',ids);
     if(ar.error)return out;
-    var uids=[...new Set((ar.data||[]).map(function(a){return a.user_id}).filter(Boolean))],names={};
-    if(uids.length){var pr=await supa.from('profiles').select('id,full_name').in('id',uids);if(!pr.error)(pr.data||[]).forEach(function(p){names[p.id]=p.full_name})}
-    (ar.data||[]).forEach(function(a){(out[a.request_id]||(out[a.request_id]=[])).push({branch_key:a.branch_key,name:names[a.user_id]||''})});
+    (ar.data||[]).forEach(function(a){(out[a.request_id]||(out[a.request_id]=[])).push({branch_key:a.branch_key})});
     return out;
   }
   function repairVisibleFormattingArtifacts(root){

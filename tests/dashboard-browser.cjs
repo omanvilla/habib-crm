@@ -41,7 +41,7 @@ const server=require('../preview/serve.cjs'),out=path.resolve('preview-results/d
   }
   if(role!=='viewer'){
    await page.locator('#opsPerformanceDetails > summary').click();await page.waitForFunction(()=>document.querySelector('#opsDashboardPerformanceResults .ops-person'));
-   const text=await page.locator('#opsDashboardPerformanceResults').innerText();assert.match(text,/عقارات أُضيفت خلال الفترة/);assert.match(text,/يشمل الزيارات السابقة للفترة/);assert.match(text,/رسائل أرسلتها الموظفة/);assert.doesNotMatch(text,/رسائل واتساب صادرة من الفريق/);assert(!text.includes('تواصل بشري منسوب للشغل'));
+   const text=await page.locator('#opsDashboardPerformanceResults').innerText();assert.match(text,/عقارات أُضيفت خلال الفترة/);assert.match(text,/يشمل الزيارات السابقة للفترة/);assert.match(text,/رسائل أرسلها الفريق/);assert.doesNotMatch(text,/رسائل واتساب صادرة من الفريق/);assert(!text.includes('تواصل بشري منسوب للشغل'));
    for(const explanation of ['كل عميل مرة واحدة خلال الفترة','رد بشري بعد الاستفسار وفي الفترة نفسها','رسائل أُرسلت بنجاح؛ بدون الآلية أو الفاشلة'])assert(text.includes(explanation),explanation);
    await page.locator('#opsDashboardPerformanceResults .ops-metric-definitions > summary').click();
    assert.match(await page.locator('#opsDashboardPerformanceResults .ops-metric-definitions').innerText(),/تُستبعد الآلية والفاشلة والمعلقة/);
@@ -49,7 +49,7 @@ const server=require('../preview/serve.cjs'),out=path.resolve('preview-results/d
     const value=key=>Number(card.querySelector('[data-performance-metric="'+key+'"] .ops-performance-value')?.textContent);
     return {name:card.querySelector('.ops-person-title strong').textContent,inquiries:value('inquiry_clients'),replied:value('replied_inquiry_clients'),messages:value('successful_staff_messages')};
    }));
-   const expected=[{name:'موظفة مسقط التجريبية',inquiries:4,replied:3,messages:7},{name:'موظفة بركاء التجريبية',inquiries:2,replied:1,messages:5}];
+   const expected=[{name:'مسقط',inquiries:4,replied:3,messages:7},{name:'بركاء',inquiries:2,replied:1,messages:5}];
    assert.deepEqual(counts,role==='muscat'?[expected[0]]:role==='barka'?[expected[1]]:expected,role+' metric counts and employee scope');
    if(role==='owner')await page.screenshot({path:path.join(out,'owner-performance.png'),fullPage:true,animations:'disabled'});
    await page.locator('#opsPerformanceDetails > summary').click();

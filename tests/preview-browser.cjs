@@ -251,7 +251,7 @@ async function verifyDealWorkflow(page,role,report){
    await page.evaluate(()=>{const row=CRMPREVIEW.db.properties.find(p=>p.sourced_by===CRMPREVIEW.profile.id&&!p.archived&&p.status==='available');row.status='sold'});
    await page.evaluate(()=>loadEmployeeTargetReminder());assert(await page.locator('#employeeInventoryReminder').isVisible());
    assert.equal(await page.evaluate(()=>employeeInventoryState.needed),1);
-   await page.evaluate(()=>{CRMPREVIEW.failNext='crm_employee_target_snapshot';return loadEmployeeTargetReminder()});assert((await page.locator('#employeeInventoryReminder').innerText()).includes('تعذر'));
+   await page.evaluate(()=>{CRMPREVIEW.failNext='crm_branch_target_snapshot';return loadEmployeeTargetReminder()});assert((await page.locator('#employeeInventoryReminder').innerText()).includes('تعذر'));
    await page.evaluate(rows=>{CRMPREVIEW.db.properties.splice(0,CRMPREVIEW.db.properties.length,...rows)},original);
    await page.evaluate(()=>loadEmployeeTargetReminder());
    report.checks.push(role+': shortage reminder visible outside details, hidden at 10, restored at 9, load failure does not invent a shortage');

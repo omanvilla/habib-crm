@@ -82,7 +82,7 @@
       '<div id="dwNewClient" class="dw-subform full" hidden><h4>العميل الجديد</h4><div class="fgrid">'+field('dwClientName','اسم العميل *',input('dwClientName'))+field('dwClientPhone','الهاتف *',input('dwClientPhone','tel','dir="ltr" placeholder="+968..."'))+'</div></div>'+
       '<div id="dwNewProperty" class="dw-subform full" hidden><h4>العقار الجديد</h4><div class="fgrid">'+field('dwPropertyTitle','عنوان العقار *',input('dwPropertyTitle'))+field('dwPropertyArea','المنطقة *',input('dwPropertyArea'))+field('dwPropertyType','نوع العقار *',select('dwPropertyType',typeOptions))+field('dwPropertyPrice','سعر العقار (ر.ع) *',input('dwPropertyPrice','text','inputmode="decimal" dir="ltr" required'))+field('dwPropertyBranch','الفرع *',select('dwPropertyBranch',option('','اختر الفرع')+s.branches.map(x=>option(x,x==='muscat'?'مسقط':x==='barka'?'بركاء':x)).join('')) )+'</div></div>'+
       field('dwOwnerChoice','المالك',select('dwOwnerChoice',choose(owners,'بدون إضافة مالك',x=>x.name,'＋ إضافة مالك هنا')))+
-      (manager?field('dwAgent','الموظفة المسؤولة',select('dwAgent',option('','حسب الموظفة المسجلة')+s.members.map(x=>option(x.id,x.full_name)).join(''))):'')+
+      (manager?field('dwAgent','الحساب المسؤول',select('dwAgent',option('','حسب المسؤول المسجل')+s.members.map(x=>option(x.id,typeof crmMemberChoiceLabel==='function'?crmMemberChoiceLabel(x):x.full_name)).join(''))):'')+
       '<div id="dwNewOwner" class="dw-subform full" hidden><h4>المالك الجديد</h4><div class="fgrid">'+field('dwOwnerName','اسم المالك *',input('dwOwnerName'))+field('dwOwnerPhone','هاتف المالك *',input('dwOwnerPhone','tel','dir="ltr" placeholder="+968..." required'))+'</div></div>'+
       '<p class="dw-hint full" id="dwOwnerHint" hidden>المالك مرتبط بهذا العقار مسبقاً.</p>'+
       '<div id="dwSaleSection" class="full"><div class="fgrid">'+field('dwDealValue','قيمة البيع (ر.ع)',input('dwDealValue','text','inputmode="decimal" dir="ltr"'))+field('dwClosedOn','تاريخ البيع',input('dwClosedOn','date','dir="ltr"'))+'</div></div>'+
@@ -182,13 +182,15 @@
     try{
     const queries=[allRows(()=>supa.from('clients').select('id,name,phone').order('name').order('id')),allRows(()=>crmDataFrom('properties').select('id,title,area,type,price,owner_id,branch_key,archived').order('title').order('id')),supa.from('rejection_reasons').select('id,label_ar,is_active').order('sort_order'),supa.from('company_lead_routes').select('route_key,assigned_to,is_active').eq('is_active',true)];
       if(dealId)queries.push(supa.rpc('crm_get_deal_workflow',{p_deal_id:dealId}));
-      if(manage())queries.push(supa.from('profiles').select('id,full_name,role,is_active').eq('company_id',currentProfile.company_id).eq('is_active',true).order('full_name'));
+      if(manage())queries.push(supa.from('profiles').select('id,full_name,email,role,is_active').eq('company_id',currentProfile.company_id).eq('is_active',true).order('full_name'));
       const results=await Promise.all(queries);if(!active(s))return;results.forEach(r=>{if(r.error)throw r.error;});
       s.clients=results[0].data||[];s.properties=results[1].data||[];s.reasons=results[2].data||[];
       const routes=(results[3].data||[]).filter(r=>manage()||r.assigned_to===s.user);
       s.branches=[...new Set(routes.map(r=>r.route_key).filter(x=>['muscat','barka'].includes(x)))];if(manage())s.branches=['muscat','barka'];
       if(dealId){s.deal=results[4].data&&results[4].data.deal;if(!s.deal)throw new Error('الصفقة غير متاحة');}
       s.members=manage()?(results[dealId?5:4].data||[]):[];
+      if(manage()&&s.deal?.agent_id&&!s.members.some(m=>m.id===s.deal.agent_id)){const prior=await supa.from('profiles').select('id,full_name,email,role,is_active').eq('company_id',currentProfile.company_id).eq('id',s.deal.agent_id).maybeSingle();if(!active(s))return;if(prior.error)throw prior.error;if(prior.data)s.members.push(prior.data);}
+
       const ownerIds=[...new Set(s.properties.map(p=>p.owner_id).filter(Boolean))];
       let ownerResult={data:[]};if(manage())ownerResult=await allRows(()=>supa.from('owners').select('id,name,phone,owner_type').order('name').order('id'));else if(ownerIds.length)ownerResult=await allRows(()=>supa.from('owners').select('id,name,phone,owner_type').in('id',ownerIds).order('name').order('id'));
       if(!active(s))return;if(ownerResult.error)throw ownerResult.error;s.owners=ownerResult.data||[];

@@ -34,8 +34,8 @@ const report={synthetic:true,productionWrites:0,realEmployeeSessions:false,exter
       const result={ok:true,inquiry_id:q.id,activity_id:args.p_idempotency_key,contact_recorded:!!p.outcome,inquiry:structuredClone(q),replayed:false};t.saved.set(args.p_idempotency_key,result);return {data:result,error:null};
      }
      const result=await followupOriginalRpc.call(this,name,args);
-     if(name==='crm_employee_target_snapshot'&&!result.error)for(const e of result.data.employees)e.followups=countFor(e);
-     if(name==='crm_employee_performance'&&!result.error)for(const e of result.data.employees)e.followup_clients=countFor(e);
+     if(name==='crm_branch_target_snapshot'&&!result.error)for(const e of result.data.branches)e.followups=countFor(e);
+     if(name==='crm_branch_performance'&&!result.error)for(const e of result.data.branches)e.followup_clients=countFor(e);
      return result;
     };
     return {id:inquiry.id,employee:client.assigned_to,branch};
@@ -56,7 +56,7 @@ const report={synthetic:true,productionWrites:0,realEmployeeSessions:false,exter
    assert(await page.evaluate(()=>JSON.stringify(followupTest.calls[0])===JSON.stringify(followupTest.calls[1])));assert.equal(await page.evaluate(()=>CRMPREVIEW.db.activities.filter(a=>a.type==='followup').length),1);
    assert.deepEqual(await page.evaluate(id=>{const q=CRMPREVIEW.db.property_inquiries.find(q=>q.id===id);return [q.first_inquiry_at,q.last_inquiry_at];},seed.id),['2026-08-25T08:00:00Z','2026-09-01T08:00:00Z']);
    checks.push('failed save retains inputs, retry retains operation key, double click sends one in-flight request','acknowledged outcome preserves original inbound dates and records one synthetic contact event');
-   await page.evaluate(()=>navigate('dash',null));await page.waitForFunction(id=>document.querySelector('[data-target-employee="'+id+'"]')?.closest('.ops-person')?.querySelector('[data-target-go="daily"] strong')?.textContent==='1 / 10',seed.employee);
+   await page.evaluate(()=>navigate('dash',null));await page.waitForFunction(id=>document.querySelector('[data-target-branch="'+id+'"]')?.closest('.ops-person')?.querySelector('[data-target-go="daily"] strong')?.textContent==='1 / 10',seed.branch);
    checks.push('the refreshed target card displays the linked synthetic unique-client result');
    await page.evaluate(()=>navigate('deals',null));await page.locator('#viewInquiryPipeline').click();await card.click();await page.locator('#mInquiryFollowup.on').waitFor();assert.equal(await page.locator('#ifNote').inputValue(),'');
    await page.locator('#ifNextFollowup').fill('2026-10-21');await page.locator('#mInquiryFollowup button.btn-primary').click();await page.locator('#mInquiryFollowup.on').waitFor({state:'hidden'});

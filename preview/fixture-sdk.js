@@ -161,12 +161,51 @@ function query(name){
  }).then(resolve,reject);}
  };return q;
 }
+// Branch API contracts are modeled separately from historical employee APIs.
+// SQL acceptance tests prove their accounting and real authorization predicates.
+const fixtureGoalFields={inventory_target:10,weekly_new_properties_target:2,daily_followups_target:10,weekly_viewings_target:5,reservations_target:2,booking_commission_target:4000};
+const fixtureGoalKeys={inventory:'inventory_target',new_properties:'weekly_new_properties_target',followups:'daily_followups_target',viewings:'weekly_viewings_target',bookings:'reservations_target',expected_commission:'booking_commission_target'};
+function fixtureBranchKeys(){return ['barka','muscat'].filter(branch=>profile.role!=='agent'||db.company_lead_routes.some(r=>r.route_key===branch&&r.is_active&&r.assigned_to===profile.id));}
+function fixtureBranchGoal(branch,month){
+ const stored=(db.branch_monthly_targets||[]).find(row=>row.branch_key===branch&&row.month_start===month),targets={...fixtureGoalFields};
+ if(stored)for(const key of Object.keys(targets))targets[key]=stored[key];
+ return {id:branch,branch,branch_key:branch,name:branch==='muscat'?'مسقط':'بركاء',month_start:month,goals:Object.fromEntries(Object.entries(fixtureGoalKeys).map(([key,column])=>[key,targets[column]])),targets,updated_at:stored?.updated_at||null,configured:!!stored};
+}
 const client={
 from:query,
 rpc:async(name,args={})=>{
  state.calls.push({rpc:name,args:structuredClone(args)});
  if(signedOut)return {data:null,error:{message:'TEST signed out'}};
  if(state.failNext===name){state.failNext=null;return {data:null,error:{message:'TEST simulated RPC failure'}};}
+ if(['crm_branch_target_snapshot','crm_branch_performance','crm_branch_monthly_targets','crm_save_branch_monthly_targets'].includes(name)){
+  if(profile.is_active===false||!['owner','manager','agent'].includes(profile.role))return {data:null,error:{message:'TEST branch access denied',code:'42501'}};
+  const month=args.p_month||today.slice(0,7)+'-01';
+  if(name==='crm_save_branch_monthly_targets'){
+   if(profile.role!=='owner')return {data:null,error:{message:'TEST branch target save owner-only',code:'42501'}};
+   const branch=args.p_branch,targets=args.p_targets;
+   if(!['muscat','barka'].includes(branch)||!/^\d{4}-\d{2}-01$/.test(month)||!targets||Object.keys(targets).sort().join('|')!==Object.keys(fixtureGoalFields).sort().join('|')||Object.entries(targets).some(([key,value])=>!Number.isFinite(value)||value<0||(key!=='booking_commission_target'&&(!Number.isInteger(value)||value>1000))||(key==='booking_commission_target'&&Math.abs(value*1000-Math.round(value*1000))>0.000001)))return {data:null,error:{message:'TEST invalid branch targets',code:'22023'}};
+   db.branch_monthly_targets=db.branch_monthly_targets||[];
+   let row=db.branch_monthly_targets.find(r=>r.branch_key===branch&&r.month_start===month);
+   const unchanged=row&&Object.keys(fixtureGoalFields).every(key=>row[key]===targets[key]);
+   if(!unchanged&&(row?.updated_at||null)!==(args.p_expected_updated_at||null))return {data:null,error:{message:'TEST branch targets changed; reload before editing',code:'40001'}};
+   if(!row){row={company_id:company,branch_key:branch,month_start:month};db.branch_monthly_targets.push(row);}
+   if(!unchanged)Object.assign(row,targets,{updated_at:new Date().toISOString()});
+   return {data:{scope:'branch',...fixtureBranchGoal(branch,month),replayed:!!unchanged},error:null};
+  }
+  if(name==='crm_branch_monthly_targets')return {data:{scope:'branch',month_start:month,branches:fixtureBranchKeys().map(branch=>fixtureBranchGoal(branch,month))},error:null};
+  if(name==='crm_branch_target_snapshot'){
+   const week=new Date(today+'T12:00:00Z');week.setUTCDate(week.getUTCDate()-week.getUTCDay());const weekStart=week.toISOString().slice(0,10);
+   const branches=fixtureBranchKeys().map(branch=>{
+    const eligible=db.properties.filter(p=>p.branch_key===branch&&!p.archived&&!privateProperty(p.id));
+    const inventoryIds=eligible.filter(p=>p.status==='available').map(p=>p.id).sort(),newIds=eligible.filter(p=>{const day=new Date(p.created_at).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'});return Number(p.price)>0&&day>=weekStart&&day<=today;}).map(p=>p.id).sort();
+    const followups=new Set((db.activities||[]).filter(a=>a.actor_type==='human'&&a.outcome&&a.type!=='note'&&(requests.find(r=>r.id===a.request_id)?.route_key||clients.find(c=>c.id===a.client_id)?.lead_route)===branch).map(a=>a.client_id)).size;
+    return {...fixtureBranchGoal(branch,month),inventory:inventoryIds.length,inventory_property_ids:inventoryIds,new_properties:newIds.length,new_property_ids:newIds,followups,viewings:0,bookings:0,live_bookings:0,cancelled_bookings:0,expected_commission:0,collected_commission:0,sales_goal_met:false};
+   });
+   return {data:{scope:'branch',today,week_start:weekStart,week_end:new Date(week.getTime()+6*86400000).toISOString().slice(0,10),month_start:month,month_end:new Date(Date.UTC(Number(today.slice(0,4)),Number(today.slice(5,7)),0)).toISOString().slice(0,10),branches,employees:branches},error:null};
+  }
+  const branches=fixtureBranchKeys().map(branch=>({...fixtureBranchGoal(branch,month),employee_id:branch,active_inventory:properties.filter(p=>p.branch_key===branch&&!p.archived&&p.status==='available').length,new_properties:0,inquiries:branch==='muscat'?6:3,inquiry_property_pairs:branch==='muscat'?6:3,inquiry_pair_to_visit:0,inquiry_clients:branch==='muscat'?4:2,replied_inquiry_clients:branch==='muscat'?3:1,successful_staff_messages:branch==='muscat'?7:5,visits_booked:0,visits_done:0,sales:0,activities:0,outbound_messages:0,company_commission:20}));
+  return {data:{scope:'branch',from:args.p_from,to:args.p_to,branches,employees:branches},error:null};
+ }
  if(name==='crm_employee_target_snapshot'){
   if(profile.role==='viewer')return {data:null,error:{message:'TEST target access denied'}};
   const month=today.slice(0,7)+'-01',week=new Date(today+'T12:00:00Z');week.setUTCDate(week.getUTCDate()-week.getUTCDay());const weekStart=week.toISOString().slice(0,10);

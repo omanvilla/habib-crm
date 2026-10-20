@@ -359,8 +359,9 @@ async function processTestKrookiImage(args: {
   messageId: string;
   mediaId: string;
   physicalRoute: string;
+  transportRoute: string;
 }) {
-  const analyzed = await analyzeKrookiImage(args.mediaId, args.physicalRoute);
+  const analyzed = await analyzeKrookiImage(args.mediaId, args.transportRoute);
   const lastHuman = await supabase.from("whatsapp_messages")
     .select("id,body,message_timestamp")
     .eq("company_id", CRM_COMPANY_ID)
@@ -531,6 +532,23 @@ async function resolveRoute(metaPhoneNumberId: string) {
   if (error) throw new Error(`route: ${error.message}`);
   const row = Array.isArray(data) ? data[0] : data;
   return { route_key: row?.route_key || "general", assigned_to: row?.assigned_to || null, whatsapp_number: row?.whatsapp_number || null, mapped: Boolean(row?.whatsapp_number) };
+}
+async function resolveBusinessRoute(physicalRoute: any, customerPhone: string, existingConversationId: string | null) {
+  const { data, error } = await supabase.rpc("crm_resolve_whatsapp_business_route", {
+    p_company_id: CRM_COMPANY_ID, p_physical_route_key: physicalRoute.route_key,
+    p_customer_phone: customerPhone, p_existing_conversation_id: existingConversationId,
+  });
+  if (error) throw new Error(`business route: ${error.message}`);
+  const row = Array.isArray(data) ? data[0] : data;
+  // The phone and credential identity stay physical. Only a database-verified
+  // canonical investment relationship may make this conversation owner-only.
+  if (!row || ![physicalRoute.route_key, "investment"].includes(row.route_key)
+    || row.transport_route_key !== physicalRoute.route_key
+    || (row.route_key === "investment" && (!row.assigned_to || row.owner_only_inbox !== true))) {
+    throw new Error("invalid_business_route");
+  }
+  return { ...physicalRoute, route_key: row.route_key, assigned_to: row.assigned_to || null,
+    owner_only_inbox: row.owner_only_inbox === true, transport_route_key: physicalRoute.route_key };
 }
 async function upsertClientIdentity(args: { phone: string; customerName: string | null; route: any; messageAt: string }) {
   const { data, error } = await supabase.rpc("upsert_whatsapp_client_identity", {
@@ -775,16 +793,25 @@ async function applyTestValuationBeforeSaleState(args: {
   return { applied: true, requestIds: sellerIds };
 }
 
-async function getOrCreateConversation(args: { metaPhoneNumberId: string; customerWaId: string; customerPhone: string; customerName: string | null; route: any }) {
-  const { metaPhoneNumberId, customerWaId, customerPhone, customerName, route } = args;
+async function getOrCreateConversation(args: { metaPhoneNumberId: string; customerWaId: string; customerPhone: string; customerName: string | null; route: any }, collisionRetry = false) {
+  const { metaPhoneNumberId, customerWaId, customerPhone, customerName, route: physicalRoute } = args;
   const existing = await supabase.from("whatsapp_conversations").select("id,client_id,assigned_to,unread_count,route_key,last_inbound_at").eq("company_id", CRM_COMPANY_ID).eq("meta_phone_number_id", metaPhoneNumberId).eq("customer_wa_id", customerWaId).maybeSingle();
   if (existing.error) throw new Error(`conversation select: ${existing.error.message}`);
+  const route = await resolveBusinessRoute(physicalRoute, customerPhone, existing.data?.id || null);
+  async function resolvedConversation(data: any) {
+    // A concurrent canonical classification can strengthen privacy in the SQL
+    // trigger after our lookup. Use the persisted route in downstream parsing.
+    const persistedRoute = data.route_key === route.route_key ? route : await resolveBusinessRoute(physicalRoute, customerPhone, data.id);
+    if (persistedRoute.route_key !== data.route_key) throw new Error("conversation_route_changed");
+    return { conversation: data, route: persistedRoute };
+  }
   if (existing.data) {
-    const { data, error } = await supabase.from("whatsapp_conversations").update({ route_key: route.route_key, assigned_to: route.route_key === "general" ? existing.data.assigned_to : (route.assigned_to || existing.data.assigned_to), inbound_number: route.whatsapp_number, customer_phone: customerPhone, customer_name: customerName || undefined, status: "open", updated_at: new Date().toISOString() }).eq("id", existing.data.id).select("id,client_id,assigned_to,unread_count,route_key,last_inbound_at").single();
-    if (error) throw new Error(`conversation update: ${error.message}`); return data;
+    const { data, error } = await supabase.from("whatsapp_conversations").update({ route_key: route.route_key, assigned_to: route.route_key === "general" ? existing.data.assigned_to : (route.assigned_to || existing.data.assigned_to), inbound_number: route.whatsapp_number, customer_phone: customerPhone, customer_name: customerName || undefined, status: "open", updated_at: new Date().toISOString() }).eq("id", existing.data.id).eq("company_id", CRM_COMPANY_ID).select("id,client_id,assigned_to,unread_count,route_key,last_inbound_at").single();
+    if (error) throw new Error(`conversation update: ${error.message}`); return resolvedConversation(data);
   }
   const { data, error } = await supabase.from("whatsapp_conversations").insert({ company_id: CRM_COMPANY_ID, route_key: route.route_key, assigned_to: route.route_key === "general" ? null : route.assigned_to, meta_phone_number_id: metaPhoneNumberId, inbound_number: route.whatsapp_number, customer_wa_id: customerWaId, customer_phone: customerPhone, customer_name: customerName, status: "open", unread_count: 0 }).select("id,client_id,assigned_to,unread_count,route_key,last_inbound_at").single();
-  if (error) throw new Error(`conversation insert: ${error.message}`); return data;
+  if (error?.code === "23505" && !collisionRetry) return getOrCreateConversation(args, true);
+  if (error) throw new Error(`conversation insert: ${error.message}`); return resolvedConversation(data);
 }
 // Conversation timestamps/unread counters are updated atomically by trg_crm_touch_whatsapp_atomic.
 async function applyRequestBatch(args: { clientId: string; route: any; messageId: string; requests: any[]; messageAt: string }) {
@@ -1216,25 +1243,38 @@ async function postProcessLinkedRequests(args: { clientId: string; conversationI
   }
 }
 
-async function logInboundActivity(clientId: string, assignedTo: string | null, body: string, messageType: string, appliedCount: number, reviewNeeded: boolean) {
+async function logInboundActivity(clientId: string, assignedTo: string | null, body: string, messageType: string, appliedCount: number, reviewNeeded: boolean, evidence: { conversationId: string; messageId: string; routeKey: string; messageAt: string }) {
   let userId = assignedTo;
   if (!userId) { const owner = await supabase.from("profiles").select("id").eq("company_id", CRM_COMPANY_ID).eq("role", "owner").eq("is_active", true).limit(1).maybeSingle(); userId = owner.data?.id || null; }
   if (!userId) return;
   const suffix = appliedCount > 0 ? ` · ${appliedCount} طلب` : (reviewNeeded ? " · يحتاج مراجعة" : "");
   const text = body ? `رسالة واتساب واردة: ${shortText(body, 900)}${suffix}` : `رسالة واتساب واردة (${messageType})${suffix}`;
-  await supabase.from("activities").insert({ company_id: CRM_COMPANY_ID, user_id: userId, activity_type: "note", activity_text: text, client_id: clientId, deal_id: null });
+  // A private investment conversation may share an ordinary contact identity.
+  // Preserve the explicit message/conversation provenance so the existing
+  // recursive investment policy protects this activity as well as the message.
+  const saved = await supabase.from("activities").insert({ id: evidence.messageId, company_id: CRM_COMPANY_ID, user_id: userId, activity_type: "note", activity_text: text, client_id: clientId, deal_id: null,
+    channel: "whatsapp", direction: "inbound", actor_type: "system", occurred_at: evidence.messageAt,
+    after_data: { conversation_id: evidence.conversationId, message_id: evidence.messageId, route_key: evidence.routeKey, source_actor_type: "customer" } });
+  if (saved.error?.code === "23505") {
+    const previous = await supabase.from("activities").select("id,client_id,after_data").eq("company_id", CRM_COMPANY_ID).eq("id", evidence.messageId).maybeSingle();
+    if (!previous.error && previous.data?.client_id === clientId
+      && previous.data?.after_data?.message_id === evidence.messageId
+      && previous.data?.after_data?.conversation_id === evidence.conversationId) return;
+    throw new Error("inbound_activity_identity_conflict");
+  }
+  if (saved.error) throw new Error(`inbound activity: ${saved.error.message}`);
 }
 
 async function processInboundMessage(value: any, m: any) {
   const metaPhoneNumberId = String(value?.metadata?.phone_number_id || ""), customerWaId = String(m?.from || ""), customerPhone = cleanPhone(customerWaId);
   if (!metaPhoneNumberId || !customerWaId || !customerPhone || !m?.id) return;
-  const route = await resolveRoute(metaPhoneNumberId); if (!route.mapped) throw new Error(`unmapped_phone_number_id:${metaPhoneNumberId}`);
+  const physicalRoute = await resolveRoute(metaPhoneNumberId); if (!physicalRoute.mapped) throw new Error(`unmapped_phone_number_id:${metaPhoneNumberId}`);
   const contact = (value?.contacts || []).find((c: any) => String(c?.wa_id) === customerWaId) || value?.contacts?.[0];
   const customerName = shortText(contact?.profile?.name, 120) || null, messageAt = messageTime(m.timestamp);
   let body = bodyFromMessage(m);
-  const conversation = await getOrCreateConversation({ metaPhoneNumberId, customerWaId, customerPhone, customerName, route });
+  let { conversation, route } = await getOrCreateConversation({ metaPhoneNumberId, customerWaId, customerPhone, customerName, route: physicalRoute });
   const identity = await upsertClientIdentity({ phone: customerPhone, customerName, route, messageAt }); const clientId = identity?.client_id; if (!clientId) throw new Error("client identity returned no client_id");
-  const effectiveAssignedTo = route.route_key === "general" ? (identity?.assigned_to || conversation.assigned_to || null) : (route.assigned_to || identity?.assigned_to || conversation.assigned_to || null);
+  let effectiveAssignedTo = route.route_key === "general" ? (identity?.assigned_to || conversation.assigned_to || null) : (route.assigned_to || identity?.assigned_to || conversation.assigned_to || null);
   await supabase.from("whatsapp_conversations").update({ client_id: clientId, assigned_to: effectiveAssignedTo, updated_at: new Date().toISOString() }).eq("id", conversation.id);
   if (/^\s*موظف[ة]?\s*$/i.test(body)) await supabase.from("whatsapp_conversations").update({ human_handoff_required: true, handoff_reason: "العميل طلب التواصل مع موظف", handoff_updated_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", conversation.id);
   const inserted = await supabase.from("whatsapp_messages").insert({ company_id: CRM_COMPANY_ID, conversation_id: conversation.id, client_id: clientId, whatsapp_message_id: m.id, direction: "inbound", message_type: m.type || "unknown", sender_wa_id: customerWaId, recipient_wa_id: metaPhoneNumberId, body: body || null, media_id: m?.[m.type]?.id || null, reply_to_message_id: m?.context?.id || null, message_timestamp: messageAt, raw_payload: m }).select("id,ai_extracted,ai_processed_at,processing_error").single();
@@ -1242,6 +1282,10 @@ async function processInboundMessage(value: any, m: any) {
   if (inserted.error?.code === "23505") { const existing = await supabase.from("whatsapp_messages").select("id,ai_extracted,ai_processed_at,processing_error").eq("whatsapp_message_id", m.id).single(); if (existing.error) throw new Error(`message reload: ${existing.error.message}`); messageRow = existing.data; }
   else if (inserted.error) throw new Error(`message insert: ${inserted.error.message}`);
   else { messageRow = inserted.data; isNewMessage = true; }
+  // Owner classification may commit while the webhook is persisting the
+  // message. Use the database's current compartment for every derived write.
+  route = await resolveBusinessRoute(physicalRoute, customerPhone, conversation.id);
+  effectiveAssignedTo = route.assigned_to || effectiveAssignedTo;
   // Link, code and photo evidence is captured in the same transaction as the
   // inbound message. Even a media-only message remains in the staff review queue.
   const propertyEvidence = await supabase.from("whatsapp_messages")
@@ -1254,7 +1298,7 @@ async function processInboundMessage(value: any, m: any) {
       // Reading inbound media and recording interest sends no customer reply and
       // does not change any outbound automation/test recipient allowlist.
       const cached = propertyEvidence.data?.property_image_analysis;
-      const evidence = cached?.vision_version === 2 ? cached : await readListingImageReference(String(m.image.id), route.route_key, body);
+      const evidence = cached?.vision_version === 2 ? cached : await readListingImageReference(String(m.image.id), route.transport_route_key, body);
       imageEvidence = evidence;
       propertyImageDocument = evidence.is_property_document === true;
       const stored = await supabase.from("whatsapp_messages").update({property_image_analysis:evidence}).eq("id",messageRow.id).eq("company_id",CRM_COMPANY_ID);
@@ -1285,7 +1329,7 @@ async function processInboundMessage(value: any, m: any) {
       channel_source: "whatsapp"
     }).eq("id", messageRow.id);
     try {
-      const transcribed = await transcribeWhatsAppAudio(String(m.audio.id), route.route_key);
+      const transcribed = await transcribeWhatsAppAudio(String(m.audio.id), route.transport_route_key);
       body = transcribed.text;
       const saved = await supabase.from("whatsapp_messages").update({
         body,
@@ -1321,7 +1365,7 @@ async function processInboundMessage(value: any, m: any) {
         handoff_updated_at: now,
         updated_at: now
       }).eq("id", conversation.id);
-      await logInboundActivity(clientId, effectiveAssignedTo, "رسالة صوتية لم يتم تحويلها إلى نص", m.type || "audio", 0, true);
+      await logInboundActivity(clientId, effectiveAssignedTo, "رسالة صوتية لم يتم تحويلها إلى نص", m.type || "audio", 0, true, { conversationId: conversation.id, messageId: messageRow.id, routeKey: route.route_key, messageAt });
       return;
     }
   }
@@ -1339,9 +1383,10 @@ async function processInboundMessage(value: any, m: any) {
         conversationId: conversation.id,
         messageId: messageRow.id,
         mediaId: String(m.image.id),
-        physicalRoute: route.route_key
+        physicalRoute: route.route_key,
+        transportRoute: route.transport_route_key
       });
-      await logInboundActivity(clientId, effectiveAssignedTo, "صورة كروكي/مستند عقاري تم تحليلها", m.type || "image", 0, true);
+      await logInboundActivity(clientId, effectiveAssignedTo, "صورة كروكي/مستند عقاري تم تحليلها", m.type || "image", 0, true, { conversationId: conversation.id, messageId: messageRow.id, routeKey: route.route_key, messageAt });
       return;
     } catch (imageError) {
       const errorText = String((imageError as any)?.message || imageError).slice(0, 1000);
@@ -1359,7 +1404,7 @@ async function processInboundMessage(value: any, m: any) {
         handoff_updated_at: now,
         updated_at: now
       }).eq("id", conversation.id);
-      await logInboundActivity(clientId, effectiveAssignedTo, "صورة كروكي تعذر تحليلها آلياً", m.type || "image", 0, true);
+      await logInboundActivity(clientId, effectiveAssignedTo, "صورة كروكي تعذر تحليلها آلياً", m.type || "image", 0, true, { conversationId: conversation.id, messageId: messageRow.id, routeKey: route.route_key, messageAt });
       return;
     }
   }
@@ -1373,11 +1418,24 @@ async function processInboundMessage(value: any, m: any) {
   }
   let extracted: any = null;
   try {
-    const existingRequests = await getExistingRequests(clientId, route.route_key);
-    if (messageRow?.ai_extracted && Array.isArray(messageRow.ai_extracted?.requests)) extracted = messageRow.ai_extracted;
+    let existingRequests = await getExistingRequests(clientId, route.route_key);
+    if (messageRow?.ai_extracted?.crm_route_key === route.route_key && Array.isArray(messageRow.ai_extracted?.requests)) extracted = messageRow.ai_extracted;
     else extracted = await extractRequestsWithOpenAI(body, customerName, existingRequests, route.route_key);
+    const extractionRouteKey = route.route_key;
+    route = await resolveBusinessRoute(physicalRoute, customerPhone, conversation.id);
+    if (route.route_key !== extractionRouteKey) {
+      // Never apply ordinary request IDs or fields inferred before a private
+      // classification. Re-extract once with the newly authorized context.
+      existingRequests = await getExistingRequests(clientId, route.route_key);
+      extracted = await extractRequestsWithOpenAI(body, customerName, existingRequests, route.route_key);
+      const checkedRoute = await resolveBusinessRoute(physicalRoute, customerPhone, conversation.id);
+      if (checkedRoute.route_key !== route.route_key) throw new Error("business_route_changed_during_extraction");
+      route = checkedRoute;
+    }
+    effectiveAssignedTo = route.assigned_to || effectiveAssignedTo;
     extracted = enforceCrossBranchRequestSeparation(extracted, existingRequests, route.route_key, body);
     extracted = enforceInvestmentRequestBoundary(extracted, existingRequests, route.route_key);
+    extracted = { ...extracted, crm_route_key: route.route_key };
     if (await isAllowedTestCustomer(customerPhone)) {
       extracted = bindAmbiguousFieldsToSingleRouteRequest(extracted, existingRequests, route.route_key);
     }
@@ -1419,7 +1477,7 @@ async function processInboundMessage(value: any, m: any) {
       }
     }
     const currentConv = await supabase.from("whatsapp_conversations").select("assigned_to").eq("id", conversation.id).maybeSingle();
-    if (isNewMessage || !batchResult?.already_processed) await logInboundActivity(clientId, currentConv.data?.assigned_to || effectiveAssignedTo, body, m.type || "unknown", appliedCount, reviewNeeded);
+    await logInboundActivity(clientId, currentConv.data?.assigned_to || effectiveAssignedTo, body, m.type || "unknown", appliedCount, reviewNeeded, { conversationId: conversation.id, messageId: messageRow.id, routeKey: route.route_key, messageAt });
   } catch (err) {
     const errorText = String((err as any)?.message || err).slice(0, 2000); await supabase.from("whatsapp_messages").update({ ai_extracted: extracted, ai_processed_at: null, processing_error: errorText }).eq("id", messageRow.id); throw new Error(`inbound:${m.id}:${errorText}`);
   }
@@ -1428,13 +1486,13 @@ async function processInboundMessage(value: any, m: any) {
 async function processOutboundEcho(value: any, echo: any) {
   const metaPhoneNumberId = String(value?.metadata?.phone_number_id || ""), customerWaId = String(echo?.to || ""), customerPhone = cleanPhone(customerWaId);
   if (!metaPhoneNumberId || !customerWaId || !customerPhone || !echo?.id) return;
-  const route = await resolveRoute(metaPhoneNumberId); if (!route.mapped) throw new Error(`unmapped_phone_number_id:${metaPhoneNumberId}`);
+  const physicalRoute = await resolveRoute(metaPhoneNumberId); if (!physicalRoute.mapped) throw new Error(`unmapped_phone_number_id:${metaPhoneNumberId}`);
   const messageAt = messageTime(echo.timestamp), body = bodyFromMessage(echo);
   const normalizedBody = body.replace(/\s+/g, " ").trim();
   const isLegacyBusinessGreeting = normalizedBody === "مرحبًا بك في Oman Villa 👋 كيف ممكن نساعدك؟";
   const echoActorType = isLegacyBusinessGreeting ? "automated" : "human";
   const echoChannelSource = isLegacyBusinessGreeting ? "whatsapp_business_greeting" : "whatsapp_business_app";
-  const conversation = await getOrCreateConversation({ metaPhoneNumberId, customerWaId, customerPhone, customerName: null, route });
+  const { conversation, route } = await getOrCreateConversation({ metaPhoneNumberId, customerWaId, customerPhone, customerName: null, route: physicalRoute });
   const identity = await upsertClientIdentity({ phone: customerPhone, customerName: null, route, messageAt }); const clientId = identity?.client_id || conversation.client_id || null;
   const effectiveAssignedTo = route.route_key === "general" ? (identity?.assigned_to || conversation.assigned_to || null) : (route.assigned_to || identity?.assigned_to || conversation.assigned_to || null);
   if (clientId) await supabase.from("whatsapp_conversations").update({ client_id: clientId, assigned_to: effectiveAssignedTo, updated_at: new Date().toISOString() }).eq("id", conversation.id);

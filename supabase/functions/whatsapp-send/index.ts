@@ -69,25 +69,36 @@ Deno.serve(async(req)=>{
     if(rows.length===1){resolvedRequest=rows[0];requestLinkState="unique_active_request";}else if(rows.length>1)requestLinkState="ambiguous_multiple_requests";
   }
 
-  let desiredRouteKey=String(resolvedRequest?.branch_key||resolvedRequest?.route_key||"");
+  let desiredRouteKey=String([resolvedRequest?.route_key,resolvedRequest?.branch_key].includes("investment")?"investment":resolvedRequest?.branch_key||resolvedRequest?.route_key||(client.lead_route==="investment"?"investment":""));
   if(!["muscat","barka","investment"].includes(desiredRouteKey))desiredRouteKey="";
+  let desiredTransportRouteKey=desiredRouteKey;
+  let desiredPhoneNumberId="";
 
   const convSelect="id,client_id,route_key,assigned_to,meta_phone_number_id,last_inbound_at,last_message_at,unread_count";
   let conversation:any=null;
   if(desiredRouteKey){
-    const {data:routeRow,error:routeErr}=await admin.from("company_lead_routes").select("route_key,meta_phone_number_id,whatsapp_number,owner_only_inbox,assigned_to,is_active").eq("company_id",profile.company_id).eq("route_key",desiredRouteKey).eq("is_active",true).maybeSingle();
+    const {data:logicalRoute,error:routeErr}=await admin.from("company_lead_routes").select("route_key,transport_route_key,meta_phone_number_id,whatsapp_number,owner_only_inbox,assigned_to,is_active").eq("company_id",profile.company_id).eq("route_key",desiredRouteKey).eq("is_active",true).maybeSingle();
     if(routeErr)return json({ok:false,error:`desired_route_lookup_failed: ${routeErr.message}`},500);
-    if(routeRow?.meta_phone_number_id){
-      const r=await admin.from("whatsapp_conversations").select(convSelect).eq("company_id",profile.company_id).eq("client_id",clientId).eq("meta_phone_number_id",String(routeRow.meta_phone_number_id)).not("last_inbound_at","is",null).order("last_inbound_at",{ascending:false}).limit(1).maybeSingle();
+    desiredTransportRouteKey=String(logicalRoute?.transport_route_key||desiredRouteKey);
+    if(desiredRouteKey==="investment"&&desiredTransportRouteKey!=="muscat")return json({ok:false,error:"investment_transport_not_configured",message:"تعذر التحقق من إعداد استقبال المستثمرين عبر مسقط."},409);
+    let physicalRoute=logicalRoute;
+    if(desiredTransportRouteKey!==desiredRouteKey){
+      const physical=await admin.from("company_lead_routes").select("route_key,meta_phone_number_id,whatsapp_number,is_active").eq("company_id",profile.company_id).eq("route_key",desiredTransportRouteKey).eq("is_active",true).maybeSingle();
+      if(physical.error)return json({ok:false,error:`transport_route_lookup_failed: ${physical.error.message}`},500);
+      physicalRoute=physical.data;
+    }
+    desiredPhoneNumberId=cleanDigits(physicalRoute?.meta_phone_number_id);
+    if(desiredPhoneNumberId){
+      const r=await admin.from("whatsapp_conversations").select(convSelect).eq("company_id",profile.company_id).eq("client_id",clientId).eq("meta_phone_number_id",desiredPhoneNumberId).not("last_inbound_at","is",null).order("last_inbound_at",{ascending:false}).limit(1).maybeSingle();
       if(r.error)return json({ok:false,error:`route_conversation_lookup_failed: ${r.error.message}`},500);conversation=r.data||null;
     }
     if(!conversation && requestedConversationId){
       const r=await admin.from("whatsapp_conversations").select(convSelect).eq("id",requestedConversationId).eq("company_id",profile.company_id).eq("client_id",clientId).maybeSingle();
       if(r.error)return json({ok:false,error:`conversation_lookup_failed: ${r.error.message}`},500);
-      if(r.data && String(r.data.route_key||"")===desiredRouteKey)conversation=r.data;
+      if(r.data && String(r.data.route_key||"")===desiredRouteKey && desiredPhoneNumberId && cleanDigits(r.data.meta_phone_number_id)===desiredPhoneNumberId)conversation=r.data;
     }
     if(!conversation){
-      return json({ok:false,error:"route_handoff_required",desired_route:desiredRouteKey,message:`هذا الطلب تابع لمسار ${desiredRouteKey==='barka'?'بركاء':desiredRouteKey==='muscat'?'مسقط':'المشاريع الاستثمارية'}، لكن لا توجد محادثة واردة مفتوحة على رقم هذا المسار. تابع العميل من WhatsApp Business الخاص بالمسار الصحيح يدوياً، أو انتظر حتى يرسل على ذلك الرقم.`},409);
+      return json({ok:false,error:"route_handoff_required",desired_route:desiredRouteKey,transport_route_key:desiredTransportRouteKey,message:desiredRouteKey==='investment'?"لم تصل محادثة لهذا المستثمر على رقم مسقط بعد. انتظر رسالته على رقم مسقط؛ لم تُرسل أي رسالة من النظام.":`هذا الطلب تابع لمسار ${desiredRouteKey==='barka'?'بركاء':'مسقط'}، لكن لا توجد محادثة واردة مفتوحة على رقم هذا المسار. تابع العميل من WhatsApp Business الخاص بالمسار الصحيح يدوياً، أو انتظر حتى يرسل على ذلك الرقم.`},409);
     }
   } else if(requestedConversationId){
     const r=await admin.from("whatsapp_conversations").select(convSelect).eq("id",requestedConversationId).eq("company_id",profile.company_id).eq("client_id",clientId).maybeSingle();if(r.error)return json({ok:false,error:`conversation_lookup_failed: ${r.error.message}`},500);conversation=r.data;
@@ -98,23 +109,41 @@ Deno.serve(async(req)=>{
   }
   if(!conversation)return json({ok:false,error:"no_whatsapp_conversation",message:"لا توجد محادثة واتساب واردة لهذا العميل حتى نحدد رقم الإرسال الصحيح."},409);
   if(conversation.route_key==="investment"&&(profile.role!=="owner"||profile.is_active!==true))return json({ok:false,error:"conversation_not_authorized"},403);
+  const visibleConversation=await userClient.from("whatsapp_conversations").select("id").eq("id",conversation.id).eq("company_id",profile.company_id).maybeSingle();
+  if(visibleConversation.error)return json({ok:false,error:"conversation_access_unavailable"},503);
+  if(!visibleConversation.data)return json({ok:false,error:"conversation_not_authorized"},403);
 
   const senderPhoneNumberId=cleanDigits(conversation.meta_phone_number_id);if(!senderPhoneNumberId)return json({ok:false,error:"conversation_sender_missing",message:"المحادثة لا تحتوي على Meta Phone Number ID صالح."},409);
   const {data:routeData,error:routeError}=await admin.rpc("resolve_whatsapp_route",{p_company_id:profile.company_id,p_meta_phone_number_id:senderPhoneNumberId});if(routeError)return json({ok:false,error:`sender_route_lookup_failed: ${routeError.message}`},500);
   const routeRow=Array.isArray(routeData)?routeData[0]:routeData;if(!routeRow?.whatsapp_number)return json({ok:false,error:"sender_not_configured",message:"رقم واتساب الخاص بهذه المحادثة غير مربوط بمسار نشط."},409);
-  const routeKey=String(routeRow?.route_key||conversation.route_key||"").trim();
-  const {data:routePolicy,error:routePolicyError}=await admin.from("company_lead_routes").select("route_key,owner_only_inbox,assigned_to,is_active").eq("company_id",profile.company_id).eq("route_key",routeKey).maybeSingle();if(routePolicyError)return json({ok:false,error:`route_policy_lookup_failed: ${routePolicyError.message}`},500);
-  const ownerOnly=routePolicy?.owner_only_inbox===true;
+  const transportRouteKey=String(routeRow?.route_key||"").trim();
+  if(desiredTransportRouteKey&&transportRouteKey!==desiredTransportRouteKey)return json({ok:false,error:"route_handoff_required",desired_route:desiredRouteKey,transport_route_key:desiredTransportRouteKey,message:"هذه المحادثة على رقم مختلف عن رقم استقبال الطلب. لم تُرسل الرسالة."},409);
+  const business=await admin.rpc("crm_resolve_whatsapp_business_route",{p_company_id:profile.company_id,p_physical_route_key:transportRouteKey,p_customer_phone:client.phone,p_existing_conversation_id:conversation.id});
+  const businessRoute=Array.isArray(business.data)?business.data[0]:business.data;
+  if(business.error||!businessRoute||![transportRouteKey,"investment"].includes(businessRoute.route_key)||businessRoute.transport_route_key!==transportRouteKey)return json({ok:false,error:"business_route_unavailable"},503);
+  const routeKey=String(businessRoute.route_key);
+  if(routeKey==="investment"&&(profile.role!=="owner"||profile.is_active!==true))return json({ok:false,error:"conversation_not_authorized"},403);
+  if(resolvedRequest&&[resolvedRequest.route_key,resolvedRequest.branch_key].includes("investment")!==(routeKey==="investment"))return json({ok:false,error:"request_conversation_scope_changed",message:"تغيّر تصنيف المحادثة ولا يطابق الطلب المحدد. حدّث المحادثة واختر طلباً من المسار نفسه قبل الإرسال."},409);
+  if(desiredRouteKey==="investment"&&routeKey!=="investment")return json({ok:false,error:"investment_context_unavailable"},409);
+  if(conversation.route_key==="investment"&&routeKey!=="investment")return json({ok:false,error:"conversation_route_changed"},409);
+  const {data:routePolicy,error:routePolicyError}=await admin.from("company_lead_routes").select("route_key,owner_only_inbox,assigned_to,is_active").eq("company_id",profile.company_id).eq("route_key",transportRouteKey).maybeSingle();if(routePolicyError)return json({ok:false,error:`route_policy_lookup_failed: ${routePolicyError.message}`},500);
+  const ownerOnly=routePolicy?.owner_only_inbox===true||businessRoute.owner_only_inbox===true||routeKey==="investment";
   let allowed=profile.role==="owner" || (profile.role==="manager"&&!ownerOnly);
-  if(profile.role==="agent"&&!ownerOnly){allowed=conversation.assigned_to===user.id||client.assigned_to===user.id||Boolean(resolvedRequest&&await requestTeamAllowed(resolvedRequest.id));}
+  if(profile.role==="agent"&&!ownerOnly)allowed=true; // Caller RLS above is authoritative, including branch membership.
   if(!allowed)return json({ok:false,error:"conversation_not_authorized"},403);
 
   const lastInboundMs=conversation.last_inbound_at?new Date(conversation.last_inbound_at).getTime():0;const within24h=lastInboundMs>0&&(Date.now()-lastInboundMs)<24*60*60*1000;
   if(!within24h)return json({ok:false,error:"outside_customer_service_window",message:"آخر رسالة واردة من العميل على رقم هذا المسار أقدم من 24 ساعة. تابع العميل من WhatsApp Business يدوياً، أو استخدم Template معتمد إذا فُعّل لاحقاً."},409);
+  if(routeKey==="investment"&&conversation.route_key!=="investment"){
+    if(!businessRoute.assigned_to)return json({ok:false,error:"investment_owner_unavailable"},409);
+    const privateThread=await admin.from("whatsapp_conversations").update({route_key:"investment",assigned_to:businessRoute.assigned_to,updated_at:new Date().toISOString()}).eq("company_id",profile.company_id).eq("id",conversation.id).select("id,route_key").single();
+    if(privateThread.error||privateThread.data?.route_key!=="investment")return json({ok:false,error:"investment_conversation_protection_failed"},503);
+    conversation.route_key="investment";
+  }
 
   const resolvedRequestId=resolvedRequest?.id||null;
   let routeToken:string|null=null;let routeCredentialType:string|null=null;
-  try{const cr=await admin.from("whatsapp_route_credentials").select("token_ciphertext,token_iv,token_type,expires_at").eq("company_id",profile.company_id).eq("route_key",routeKey).maybeSingle();if(!cr.error&&cr.data){const exp=cr.data.expires_at?new Date(cr.data.expires_at).getTime():0;if(!exp||exp>Date.now()+60000){routeToken=await decryptToken(cr.data.token_ciphertext,cr.data.token_iv,String(profile.company_id),routeKey);routeCredentialType=cr.data.token_type||"route";}}}catch(e){console.error("[whatsapp-send] route credential decrypt",String((e as any)?.message||e));}
+  try{const cr=await admin.from("whatsapp_route_credentials").select("token_ciphertext,token_iv,token_type,expires_at").eq("company_id",profile.company_id).eq("route_key",transportRouteKey).maybeSingle();if(!cr.error&&cr.data){const exp=cr.data.expires_at?new Date(cr.data.expires_at).getTime():0;if(!exp||exp>Date.now()+60000){routeToken=await decryptToken(cr.data.token_ciphertext,cr.data.token_iv,String(profile.company_id),transportRouteKey);routeCredentialType=cr.data.token_type||"route";}}}catch(e){console.error("[whatsapp-send] route credential decrypt",String((e as any)?.message||e));}
   const candidates:Array<{token:string,source:string}>=[];if(routeToken)candidates.push({token:routeToken,source:`route_${routeCredentialType||'credential'}`});if(WHATSAPP_ACCESS_TOKEN&&WHATSAPP_ACCESS_TOKEN!==routeToken)candidates.push({token:WHATSAPP_ACCESS_TOKEN,source:"server_system_user"});if(!candidates.length)return json({ok:false,error:"no_send_credential",message:"لا يوجد رمز Meta صالح للإرسال لهذا المسار."},409);
   const fingerprint=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(JSON.stringify({clientId,conversationId:conversation.id,requestId:resolvedRequestId,messageBody,senderPhoneNumberId})))))
     .map(x=>x.toString(16).padStart(2,"0")).join("");
@@ -167,11 +196,11 @@ Deno.serve(async(req)=>{
     const unknown={ok:false,error:"send_status_unknown",sent:null,recorded:false,retry_safe:false,operation_id:operationId,message:"لم يُرجع مزود واتساب معرّف الرسالة. تحقق من المحادثة ولا تعِد إرسالها تلقائياً."};
     await finishOperation("unknown",unknown);return json(unknown);
   }
-  const responseBase={ok:true,sent:true,recorded:true,retry_safe:false,operation_id:operationId,message_id:wamid||null,to,sent_at:now,conversation_id:conversation.id,request_id:resolvedRequestId,request_link_state:requestLinkState,sender_phone_number_id:senderPhoneNumberId,route_key:routeKey,sender_whatsapp_number:routeRow?.whatsapp_number||null,credential_source:sendSource};
+  const responseBase={ok:true,sent:true,recorded:true,retry_safe:false,operation_id:operationId,message_id:wamid||null,to,sent_at:now,conversation_id:conversation.id,request_id:resolvedRequestId,request_link_state:requestLinkState,sender_phone_number_id:senderPhoneNumberId,route_key:routeKey,transport_route_key:transportRouteKey,sender_whatsapp_number:routeRow?.whatsapp_number||null,credential_source:sendSource};
   acceptedSend=responseBase;
   const failures:string[]=[];
   if(wamid){
-    const ins=await admin.from("whatsapp_messages").insert({company_id:profile.company_id,conversation_id:conversation.id,client_id:clientId,request_id:resolvedRequestId,sent_by_user_id:user.id,actor_type:"human",channel_source:"crm",whatsapp_message_id:wamid,direction:"outbound",message_type:"text",sender_wa_id:senderPhoneNumberId,recipient_wa_id:to,body:messageBody,message_timestamp:now,delivery_status:"sent",raw_payload:{source:"crm_direct_send_idempotent",credential_source:sendSource,sent_by:user.id,request_link_state:requestLinkState,request_id:resolvedRequestId,route_key:routeKey,sender_phone_number_id:senderPhoneNumberId,operation_id:operationId,graph_response:graphPayload}});
+    const ins=await admin.from("whatsapp_messages").insert({company_id:profile.company_id,conversation_id:conversation.id,client_id:clientId,request_id:resolvedRequestId,sent_by_user_id:user.id,actor_type:"human",channel_source:"crm",whatsapp_message_id:wamid,direction:"outbound",message_type:"text",sender_wa_id:senderPhoneNumberId,recipient_wa_id:to,body:messageBody,message_timestamp:now,delivery_status:"sent",raw_payload:{source:"crm_direct_send_idempotent",credential_source:sendSource,sent_by:user.id,request_link_state:requestLinkState,request_id:resolvedRequestId,route_key:routeKey,transport_route_key:transportRouteKey,sender_phone_number_id:senderPhoneNumberId,operation_id:operationId,graph_response:graphPayload}});
     if(ins.error&&ins.error.code!=="23505")failures.push("message_history");
     if(!ins.error || ins.error.code==="23505") {
       // Attribution must never turn an accepted send into a retryable send.
@@ -185,8 +214,10 @@ Deno.serve(async(req)=>{
     }
   }else failures.push("provider_message_id");
   // Conversation timestamps are maintained atomically by the message-insert trigger.
-  const clientUpdate=await admin.from("clients").update({last_contact_at:now}).eq("id",clientId).eq("company_id",profile.company_id);
-  if(clientUpdate.error)failures.push("client_contact_time");
+  if(routeKey!=="investment"||client.lead_route==="investment"){
+    const clientUpdate=await admin.from("clients").update({last_contact_at:now}).eq("id",clientId).eq("company_id",profile.company_id);
+    if(clientUpdate.error)failures.push("client_contact_time");
+  }
   const activity=await admin.from("activities").insert({company_id:profile.company_id,user_id:user.id,client_id:clientId,request_id:resolvedRequestId,type:"whatsapp",description:`رسالة واتساب مرسلة من CRM عبر ${routeKey||"whatsapp"}: ${shortText(messageBody,900)}`,activity_type:"whatsapp",activity_text:`رسالة واتساب مرسلة من CRM عبر ${routeKey||"whatsapp"}: ${shortText(messageBody,900)}`,channel:"whatsapp",direction:"outbound",actor_type:"human",occurred_at:now,outcome:"sent",after_data:{conversation_id:conversation.id,whatsapp_message_id:wamid||null,request_link_state:requestLinkState,credential_source:sendSource,operation_id:operationId}});
   if(activity.error)failures.push("activity_history");
   const result={...responseBase,recorded:failures.length===0,recording_failures:failures,

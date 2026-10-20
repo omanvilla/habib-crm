@@ -21,11 +21,11 @@ function runtime(name, { role = 'agent', active = true, clientRoute = 'muscat', 
     clients: [{ id: 'TEST-client', company_id: COMPANY, lead_route: clientRoute, assigned_to: clientRoute === 'investment' ? OWNER : AGENT, phone: '+96800000000' }],
     client_requests: requestRoute ? [{ id: 'TEST-request', company_id: COMPANY, client_id: 'TEST-client', branch_key: requestRoute, route_key: requestRoute, request_type: requestRoute === 'investment' ? 'investor' : 'buyer', assigned_to: requestRoute === 'investment' ? OWNER : AGENT, status: 'active', updated_at: '2026-01-01' }, ...extraRequests] : extraRequests,
     client_request_assignees: [],
-    whatsapp_conversations: conversationRoute ? [{ id: 'TEST-conversation', company_id: COMPANY, client_id: 'TEST-client', route_key: conversationRoute, assigned_to: conversationRoute === 'investment' ? OWNER : AGENT, meta_phone_number_id: '12345', last_inbound_at: '2020-01-01T00:00:00Z' }] : [],
+    whatsapp_conversations: conversationRoute ? [{ id: 'TEST-conversation', company_id: COMPANY, client_id: 'TEST-client', route_key: conversationRoute, assigned_to: conversationRoute === 'investment' ? OWNER : AGENT, meta_phone_number_id: conversationRoute === 'barka' ? '23456' : '12345', last_inbound_at: '2020-01-01T00:00:00Z' }] : [],
     company_lead_routes: name === 'whatsapp-webhook' || name === 'whatsapp-send' ? [
       { route_key: 'muscat', company_id: COMPANY, assigned_to: AGENT, is_active: true, meta_phone_number_id: '12345', whatsapp_number: '+96800000001', owner_only_inbox: false },
-      { route_key: 'barka', company_id: COMPANY, assigned_to: AGENT, is_active: true, meta_phone_number_id: '12345', whatsapp_number: '+96800000002', owner_only_inbox: false },
-      { route_key: 'investment', company_id: COMPANY, assigned_to: ownerAssignment, is_active: true, meta_phone_number_id: '12345', whatsapp_number: '+96800000003', owner_only_inbox: true },
+      { route_key: 'barka', company_id: COMPANY, assigned_to: AGENT, is_active: true, meta_phone_number_id: '23456', whatsapp_number: '+96800000002', owner_only_inbox: false },
+      { route_key: 'investment', company_id: COMPANY, assigned_to: ownerAssignment, is_active: true, meta_phone_number_id: null, whatsapp_number: null, transport_route_key: 'muscat', owner_only_inbox: true },
     ] : [],
     whatsapp_message_requests: [{ company_id: COMPANY, message_id: 'TEST-message', request_id: 'TEST-request' }],
   };
@@ -51,7 +51,12 @@ function runtime(name, { role = 'agent', active = true, clientRoute = 'muscat', 
     auth: { getUser: async () => ({ data: { user: { id: profile.id } }, error: null }) },
     rpc: async (fn, args) => {
       calls.push({ rpc: fn, args });
-      if (fn === 'resolve_whatsapp_route') return { data: [{ route_key: conversationRoute, assigned_to: profile.id, whatsapp_number: '+96800000000' }], error: null };
+      if (fn === 'resolve_whatsapp_route') return { data: rows.company_lead_routes.filter(row => row.meta_phone_number_id === args.p_meta_phone_number_id && row.is_active), error: null };
+      if (fn === 'crm_resolve_whatsapp_business_route') {
+        const conversation = rows.whatsapp_conversations.find(row => row.id === args.p_existing_conversation_id);
+        const isPrivate = clientRoute === 'investment' || conversation?.route_key === 'investment' || (args.p_physical_route_key === 'muscat' && requestRoute === 'investment');
+        return { data: { route_key: isPrivate ? 'investment' : args.p_physical_route_key, transport_route_key: args.p_physical_route_key, assigned_to: isPrivate ? ownerAssignment : AGENT, owner_only_inbox: isPrivate }, error: null };
+      }
       if (fn === 'my_role') return { data: active === true ? role : null, error: null };
       if (fn === 'crm_shared_ai_evidence_mask') {
         assert.equal(role, 'owner'); assert(args.p_rows.length <= 1000);
@@ -134,7 +139,7 @@ for (const role of ['agent', 'manager']) {
 test('private requests do not enter staff auto-selection or ambiguity counts', async () => {
   const f = runtime('whatsapp-send', { role: 'manager', requestRoute: 'investment', conversationRoute: 'muscat' });
   const r = await f.invoke(sendBody);
-  assert.equal(r.status, 409); assert.equal(r.body.error, 'outside_customer_service_window');
+  assert.equal(r.status, 403); assert.equal(r.body.error, 'conversation_not_authorized');
   const call = f.calls.find(call => call.table === 'client_requests');
   assert.deepEqual(call.filters.filter(filter => filter[0] === 'or'), [['or', 'and(or(route_key.is.null,route_key.neq.investment),or(branch_key.is.null,branch_key.neq.investment))']]);
   assert.equal(f.writes.length, 0); assert.equal(f.fetches.length, 0);
@@ -175,14 +180,38 @@ for (const name of ['whatsapp-direct-bind', 'whatsapp-embedded-signup']) {
     assert.equal(r.status, 403); assert.equal(r.body.error, 'owner_required');
     assert(f.calls.every(call => call.table === 'profiles')); assert.equal(f.fetches.length, 0);
   });
-  test(`${name} owner and existing branch manager retain route-lookup access`, async () => {
-    for (const [role, route] of [['owner', 'investment'], ['manager', 'muscat'], ['manager', 'barka']]) {
+  test(`${name} rejects retired investment onboarding before route, credential or Meta access`, async () => {
+    const f = runtime(name, { role: 'owner' });
+    const r = await f.invoke({ route_key: 'investment', code: 'TEST-only' });
+    assert.equal(r.status, 409); assert.equal(r.body.error, 'investment_uses_muscat');
+    assert.equal(r.body.transport_route_key, 'muscat');
+    assert(f.calls.every(call => call.table === 'profiles'));
+    assert.equal(f.writes.length, 0); assert.equal(f.fetches.length, 0);
+  });
+  test(`${name} existing branch manager retains route-lookup access`, async () => {
+    for (const [role, route] of [['owner', 'muscat'], ['manager', 'muscat'], ['manager', 'barka']]) {
       const f = runtime(name, { role }); const r = await f.invoke({ route_key: route, code: 'TEST-only' });
       assert.equal(r.status, 404); assert.equal(r.body.error, 'route_not_found');
       assert(f.calls.some(call => call.table === 'company_lead_routes')); assert.equal(f.fetches.length, 0);
     }
   });
 }
+test('inbound activity carries private message provenance when its parent contact is ordinary', async () => {
+  const f = runtime('whatsapp-webhook', { role: 'owner', clientRoute: 'muscat', conversationRoute: 'investment' });
+  f.rows.activities = [];
+  const evidence = { conversationId: 'TEST-conversation', messageId: 'TEST-message', routeKey: 'investment', messageAt: '2026-10-19T20:00:01Z' };
+  await f.ctx.logInboundActivity('TEST-client', OWNER, 'TEST-private-body', 'text', 0, false, evidence);
+  assert.equal(f.rows.activities.length, 1);
+  const activity = f.rows.activities[0];
+  assert.equal(activity.client_id, 'TEST-client');
+  assert.equal(activity.after_data.route_key, 'investment');
+  assert.equal(activity.after_data.conversation_id, evidence.conversationId);
+  assert.equal(activity.after_data.message_id, evidence.messageId);
+  assert.equal(activity.actor_type, 'system'); assert.equal(activity.direction, 'inbound');
+  assert.equal(activity.occurred_at, evidence.messageAt);
+  assert.equal(activity.after_data.source_actor_type, 'customer');
+  assert.equal(f.fetches.length, 0);
+});
 test('webhook AI context separates investment requests before pagination in both directions', async () => {
   const f = runtime('whatsapp-webhook', { requestRoute: 'investment', extraRequests: [
     { id: 'TEST-muscat', company_id: COMPANY, client_id: 'TEST-client', route_key: 'muscat', branch_key: 'muscat', status: 'active' },

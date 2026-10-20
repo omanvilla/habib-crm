@@ -40,6 +40,7 @@ Deno.serve(async(req)=>{
 
     const body=await req.json().catch(()=>({}));routeKey=String(body?.route_key||"").trim();if(!["muscat","barka","investment"].includes(routeKey))return json({ok:false,error:"invalid_route"},400);
     if(routeKey==="investment"&&(profile.role!=="owner"||profile.is_active!==true))return json({ok:false,error:"owner_required"},403);
+    if(routeKey==="investment")return json({ok:false,error:"investment_uses_muscat",route_key:"investment",transport_route_key:"muscat",message:"استقبال المستثمرين يستخدم رقم مسقط. لا يوجد ربط مستقل لرقم المستثمر."},409);
     const suppliedUserToken=String(body?.user_access_token||"").trim();
     const {data:route,error:re}=await admin.from("company_lead_routes").select("id,route_key,whatsapp_number,meta_waba_id,meta_phone_number_id").eq("company_id",profile.company_id).eq("route_key",routeKey).single();
     if(re||!route)return json({ok:false,error:"route_not_found"},404);if(!route.whatsapp_number)return json({ok:false,error:"route_phone_missing"},400);

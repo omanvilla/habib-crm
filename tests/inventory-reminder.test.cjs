@@ -23,14 +23,14 @@ function fixture(){
     supa:{rpc:name=>new Promise((resolve,reject)=>pending.push({name,resolve,reject}))}};
   context.window=context;
   context.crmSessionCurrent=(generation,user)=>generation===context.crmSessionGeneration&&user===context.currentUser?.id;
-  vm.createContext(context);vm.runInContext(source.slice(start,end),context);
+  context.updateUserUI=()=>{};vm.createContext(context);vm.runInContext(source.slice(source.indexOf('function crmBranchName('),source.indexOf('function crmMemberChoiceLabel('))+'\n'+source.slice(start,end),context);
   return {context,pending,warnings,card,box,snapshot:()=>({state:context.employeeInventoryState&&{...context.employeeInventoryState},content,display:card.style.display,warnings:warnings.length})};
 }
-const response=(inventory,id='synthetic-muscat')=>({data:{employees:[{id,inventory,goals:{inventory:10},new_properties:0}]},error:null});
+const response=(inventory,id='synthetic-muscat')=>{const branch=id==='synthetic-barka'?'barka':'muscat';return {data:{scope:'branch',branches:[{id:branch,branch,inventory,goals:{inventory:10},new_properties:0}]},error:null};};
 
 for(const inventory of [15,4])test('latest inventory '+inventory+' cannot be overwritten by an older zero response',async()=>{
   const f=fixture(),older=f.context.loadEmployeeTargetReminder(),latest=f.context.loadEmployeeTargetReminder();
-  assert.deepEqual(f.pending.map(x=>x.name),['crm_employee_target_snapshot','crm_employee_target_snapshot']);
+  assert.deepEqual(f.pending.map(x=>x.name),['crm_branch_target_snapshot','crm_branch_target_snapshot']);
   f.pending[1].resolve(response(inventory));await latest;
   const expected=f.snapshot();
   assert.deepEqual(expected.state,{active:inventory,required:10,needed:Math.max(0,10-inventory)});

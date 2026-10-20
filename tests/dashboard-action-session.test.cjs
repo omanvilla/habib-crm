@@ -13,7 +13,7 @@ function fixture(){
   const context={$:node,currentUser:{id:'synthetic-owner'},currentProfile:{full_name:'SYNTHETIC OWNER'},crmSessionGeneration:1,
     currentCompany:{id:'synthetic-company'},allTasks:[],allMembers:[],crmSavingForms:new Set(),crmSaveAttempts:new Set(),viewingFormGeneration:0,viewingRequestGeneration:0,
     supa:{from:query},crmDataFrom:query,crmReadAll:factory=>{const q=factory();return new Promise(resolve=>pending.push({table:q.table,resolve}));},
-    canEdit:()=>true,canManage:()=>true,escapeHtml:String,roleAr:String,showPermissionDenied:()=>{},showToast:(...args)=>toasts.push(args),
+    crmMemberChoiceLabel:()=> 'حساب الفرع',canEdit:()=>true,canManage:()=>true,escapeHtml:String,roleAr:String,showPermissionDenied:()=>{},showToast:(...args)=>toasts.push(args),
     updateViewingOutcomeFields:()=>{},loadViewingChoices:async()=>{}};
   context.crmSessionCurrent=(generation,user)=>generation===context.crmSessionGeneration&&user===context.currentUser?.id;
   context.window=context;vm.createContext(context);vm.runInContext(code,context);

@@ -17,10 +17,14 @@
     })
   }
   function assigneeName(task){
-    if(task.user&&task.user.full_name)return task.user.full_name;
-    if(task.user_id&&typeof currentUser!=='undefined'&&currentUser&&task.user_id===currentUser.id&&typeof currentProfile!=='undefined'&&currentProfile)return currentProfile.full_name||'';
+    if(typeof crmRecordBranchLabel==='function'){var label=crmRecordBranchLabel(task);if(label!=='المسار غير متاح')return label;}
+    var client=task.client||(typeof allClients!=='undefined'&&allClients||[]).find(function(c){return c.id===task.client_id});
+    var request=(typeof clientWorkRequests!=='undefined'&&clientWorkRequests||[]).find(function(r){return r.id===task.request_id});
+    var branch=request&&request.route_key||task.branch_key||client&&client.lead_route;
+    if(branch&&typeof crmBranchName==='function')return crmBranchName(branch);
     var member=(typeof allMembers!=='undefined'&&allMembers||[]).find(function(x){return x.id===task.user_id});
-    return member&&member.full_name||'';
+    if(task.user_id&&typeof currentUser!=='undefined'&&currentUser&&task.user_id===currentUser.id&&typeof currentProfile!=='undefined')member=currentProfile;
+    return member&&member.is_active!==false&&typeof crmMemberChoiceLabel==='function'?crmMemberChoiceLabel({...member,id:member.id||task.user_id}):'حساب الفريق';
   }
   function hydrateAssignees(rows){
     (rows||[]).forEach(function(t){var name=assigneeName(t);if(name)t.user={full_name:name}});

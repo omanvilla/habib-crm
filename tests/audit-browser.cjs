@@ -59,10 +59,10 @@ const server=require('../preview/serve.cjs'),out=path.resolve('preview-results/a
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,role+' mobile overflow');
   await page.evaluate(()=>closeModal('mDeal',true));
   if(role==='owner'){
-   await page.evaluate(()=>navigate('team',null));await page.waitForFunction(()=>document.querySelector('[data-employee-goal-save]'));
-   const id=await page.locator('[data-employee-goal-save]').first().getAttribute('data-employee-goal-save');
-   await page.locator('#etDaily_'+id).fill('13');await page.locator('[data-employee-goal-save="'+id+'"]').click();
-   await page.waitForFunction(id=>document.querySelector('#etDaily_'+id)?.value==='13'&&CRMPREVIEW.db.employee_monthly_targets?.some(x=>x.employee_id===id&&x.daily_followups_target===13),id);
+   await page.evaluate(()=>navigate('team',null));await page.waitForFunction(()=>document.querySelector('[data-branch-goal-save]'));
+   const id=await page.locator('[data-branch-goal-save]').first().getAttribute('data-branch-goal-save');
+   await page.locator('#etDaily_'+id).fill('13');await page.locator('[data-branch-goal-save="'+id+'"]').click();
+   await page.waitForFunction(id=>document.querySelector('#etDaily_'+id)?.value==='13'&&CRMPREVIEW.db.branch_monthly_targets?.some(x=>x.branch_key===id&&x.daily_followups_target===13),id);
    await page.evaluate(()=>navigate('dash',null));await page.waitForFunction(()=>document.querySelector('#opsEmployeeTargets').textContent.includes('13'));
   }
   report.roles.push({role,routes,checks:['outcome validation','activity failure retains inputs','same key retry','acknowledged save','deposit stage confirms in one payload','three decimals','owner-only corrections','mobile width',...(role==='owner'?['1205+ deal selector','saved target drives dashboard']:[])]});

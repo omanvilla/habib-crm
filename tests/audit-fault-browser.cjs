@@ -75,25 +75,25 @@ async function bookingForm(page,picked){
    for(const [kind,[from,to]] of Object.entries(periods)){
     await page.evaluate(kind=>crmDashboardPerformancePeriod(kind),kind);
     await page.waitForFunction(()=>document.querySelector('#opsDashboardPerformanceResults .ops-performance-caption'));
-    const call=await page.evaluate(()=>CRMPREVIEW.calls.filter(c=>c.rpc==='crm_employee_performance').at(-1));
+    const call=await page.evaluate(()=>CRMPREVIEW.calls.filter(c=>c.rpc==='crm_branch_performance').at(-1));
     assert.deepEqual(call.args,{p_from:from,p_to:to},role+': '+kind);
    }
    await page.clock.setFixedTime(new Date('2026-05-31T19:59:00Z'));
    await page.evaluate(()=>crmDashboardPerformancePeriod('months3'));await page.waitForFunction(()=>document.querySelector('#opsDashboardPerformanceResults .ops-performance-caption'));
-   assert.equal(await page.evaluate(()=>CRMPREVIEW.calls.filter(c=>c.rpc==='crm_employee_performance').at(-1).args.p_from),'2026-02-28');
+   assert.equal(await page.evaluate(()=>CRMPREVIEW.calls.filter(c=>c.rpc==='crm_branch_performance').at(-1).args.p_from),'2026-02-28');
    await page.clock.setFixedTime(new Date('2026-05-31T20:01:00Z'));
    checks.push('six period bounds use Oman date across UTC midnight','May31 rolling quarter clamps to February28');
    // Inject bounded data failures independently of the production transport.
    await page.evaluate(()=>{
     window.auditBaseRpc=supa.rpc;window.auditMode='target-error';window.auditDealCalls=[];
     supa.rpc=async function(name,args){
-     if(name==='crm_employee_target_snapshot'&&window.auditMode==='target-error')return{data:null,error:{message:'SYNTHETIC TARGET UNAVAILABLE'}};
+     if(name==='crm_branch_target_snapshot'&&window.auditMode==='target-error')return{data:null,error:{message:'SYNTHETIC TARGET UNAVAILABLE'}};
      if(name==='crm_save_deal_workflow'&&window.auditMode==='deferred-deal'){
       window.auditDealCalls.push(structuredClone(args));return new Promise(resolve=>window.auditDealResolve=resolve);
      }
      const result=await window.auditBaseRpc.apply(this,arguments);
-     if(name==='crm_employee_performance'&&window.auditMode==='report-fixture'){
-      for(const employee of result.data.employees)Object.assign(employee,{inquiry_clients:4,replied_inquiry_clients:3,successful_staff_messages:7,reservations:2,active_reservations:2,cancelled_reservations:0,expected_commission:4500,commission_collected:500.005});
+     if(name==='crm_branch_performance'&&window.auditMode==='report-fixture'){
+      for(const employee of result.data.branches)Object.assign(employee,{inquiry_clients:4,replied_inquiry_clients:3,successful_staff_messages:7,reservations:2,active_reservations:2,cancelled_reservations:0,expected_commission:4500,commission_collected:500.005});
      }
      return result;
     };
@@ -105,14 +105,14 @@ async function bookingForm(page,picked){
    await page.locator('#opsEmployeeTargets .ops-person').first().waitFor();assert.equal(await page.locator('#opsEmployeeTargets .ops-person').count(),role==='owner'?2:1);
    checks.push('target load failure is explicit and retry restores scoped values');
    if(role==='owner'){
-    await page.evaluate(()=>navigate('team',null));await page.locator('[data-employee-goal-save]').first().waitFor();
-    const id=await page.locator('[data-employee-goal-save]').first().getAttribute('data-employee-goal-save');
+    await page.evaluate(()=>navigate('team',null));await page.locator('[data-branch-goal-save]').first().waitFor();
+    const id=await page.locator('[data-branch-goal-save]').first().getAttribute('data-branch-goal-save');
     await page.locator('#etDaily_'+id).fill('13');
-    await page.evaluate(()=>CRMPREVIEW.failNext='employee_monthly_targets');await page.locator('[data-employee-goal-save="'+id+'"]').click();
+    await page.evaluate(()=>CRMPREVIEW.failNext='crm_save_branch_monthly_targets');await page.locator('[data-branch-goal-save="'+id+'"]').click();
     await page.waitForFunction(()=>document.querySelector('#toast').textContent.includes('تعذر حفظ الأهداف'));
-    assert.equal(await page.locator('#etDaily_'+id).inputValue(),'13');assert.equal(await page.locator('[data-employee-goal-save="'+id+'"]').isDisabled(),false);
-    await page.locator('[data-employee-goal-save="'+id+'"]').click();
-    await page.waitForFunction(id=>CRMPREVIEW.db.employee_monthly_targets?.some(x=>x.employee_id===id&&x.daily_followups_target===13),id);
+    assert.equal(await page.locator('#etDaily_'+id).inputValue(),'13');assert.equal(await page.locator('[data-branch-goal-save="'+id+'"]').isDisabled(),false);
+    await page.locator('[data-branch-goal-save="'+id+'"]').click();
+    await page.waitForFunction(id=>CRMPREVIEW.db.branch_monthly_targets?.some(x=>x.branch_key===id&&x.daily_followups_target===13),id);
     await page.waitForFunction(id=>document.querySelector('#etDaily_'+id)?.value==='13',id);
     await page.evaluate(()=>navigate('dash',null));await page.waitForFunction(()=>document.querySelector('#opsEmployeeTargets').textContent.includes('13'));
     checks.push('failed target save preserves inputs and re-enables save','acknowledged goal persistence refreshes dashboard');
@@ -120,16 +120,16 @@ async function bookingForm(page,picked){
     await page.locator('#teamLeaderboard .ops-person').first().waitFor();
     assert.deepEqual(await page.locator('[data-report-period]').evaluateAll(es=>es.map(e=>e.dataset.reportPeriod)),['month','quarter','halfyear','nine_months','year','all']);
     await page.locator('#reportMonthPicker').fill('2024-02');await page.locator('#reportMonthPicker').dispatchEvent('change');
-    await page.waitForFunction(()=>CRMPREVIEW.calls.filter(c=>c.rpc==='crm_employee_performance').at(-1)?.args.p_from==='2024-02-01');
+    await page.waitForFunction(()=>CRMPREVIEW.calls.filter(c=>c.rpc==='crm_branch_performance').at(-1)?.args.p_from==='2024-02-01');
     await page.waitForFunction(()=>document.querySelector('#teamLeaderboard .ops-performance-caption')?.textContent.includes('2024-02-29'));
-    const span=await page.evaluate(()=>CRMPREVIEW.calls.filter(c=>c.rpc==='crm_employee_performance').at(-1).args);
+    const span=await page.evaluate(()=>CRMPREVIEW.calls.filter(c=>c.rpc==='crm_branch_performance').at(-1).args);
     assert.deepEqual(span,{p_from:'2024-02-01',p_to:'2024-03-01'});
     const team=await page.locator('#teamLeaderboard').innerText();
-    for(const label of ['عملاء استفسروا عن عقار','مستفسرون ردّت عليهم الموظفة','رسائل أرسلتها الموظفة','حجوزات مؤكدة في الفترة','عمولات حجوزات الفترة','عمولات المكتب المحصلة فعليًا في الفترة','4,500','500.005'])assert(team.includes(label),label);
+    for(const label of ['عملاء استفسروا عن عقار','مستفسرون ردّ عليهم الفريق','رسائل أرسلها الفريق','حجوزات مؤكدة في الفترة','عمولات حجوزات الفترة','عمولات المكتب المحصلة فعليًا في الفترة','4,500','500.005'])assert(team.includes(label),label);
     await page.screenshot({path:path.join(out,'owner-report-team-desktop.png'),fullPage:true,animations:'disabled'});
     await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,'owner report mobile width');
     await page.screenshot({path:path.join(out,'owner-report-team-mobile.png'),fullPage:true,animations:'disabled'});await page.setViewportSize({width:1440,height:1000});
-    await page.locator('[data-report-period="quarter"]').click();await page.waitForFunction(()=>CRMPREVIEW.calls.filter(c=>c.rpc==='crm_employee_performance').at(-1)?.args.p_from==='2026-03-01');
+    await page.locator('[data-report-period="quarter"]').click();await page.waitForFunction(()=>CRMPREVIEW.calls.filter(c=>c.rpc==='crm_branch_performance').at(-1)?.args.p_from==='2026-03-01');
     assert.equal(await page.locator('#reportMonthPicker').inputValue(),'');
     checks.push('Reports team uses shared performance source with selected month and leap-day end','report labels separate unique inquiries, human replies/messages, bookings, expected and collected money','six report presets reset the explicit month','Reports team fits desktop and390px');
     await page.evaluate(()=>window.auditMode='');

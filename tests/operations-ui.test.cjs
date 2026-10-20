@@ -18,7 +18,8 @@ function fixture(setup=()=>{}){
   context.window=context;setup(context,nodes);vm.createContext(context);vm.runInContext(source,context);
   return {context,nodes,pending,finishTeam:()=>finishTeam(),flush:()=>new Promise(resolve=>setImmediate(resolve))};
 }
-const result=name=>({data:{from:'2026-10-01',employees:[{name,active_inventory:10,targets:{}}]},error:null});
+// The synthetic period caption identifies each delayed response; branch names remain stable.
+const result=marker=>({data:{scope:'branch',from:marker,branches:[{id:'muscat',branch:'muscat',active_inventory:10,targets:{}}]},error:null});
 
 test('late employee period result cannot overwrite the selected newer period',async()=>{
   for(const method of ['crmPerformancePeriod','crmDashboardPerformancePeriod']){
@@ -57,8 +58,8 @@ test('finishing team load preserves the period selected while it was loading',as
 });
 test('empty employee list displays a clear empty state',async()=>{
   const f=fixture();f.context.crmPerformancePeriod('month');
-  f.pending[0].resolve({data:{employees:[]},error:null});await f.flush();
-  assert.match(f.nodes.get('employeePerformanceResults').innerHTML,/لا يوجد موظفون نشطون/);
+  f.pending[0].resolve({data:{branches:[]},error:null});await f.flush();
+  assert.match(f.nodes.get('employeePerformanceResults').innerHTML,/لا توجد فروع متاحة لهذا الحساب/);
 });
 
 function exportFixture(){
@@ -95,18 +96,18 @@ test('report team uses the selected complete month and the same reservation and 
   const f=fixture();
   f.context.crmReportPerformance('month',{from:'2024-10-01',to:'2024-11-01'});
   assert.deepEqual(JSON.parse(JSON.stringify(f.pending[0].args)),{p_from:'2024-10-01',p_to:'2024-11-01'});
-  f.pending[0].resolve({data:{from:'2024-10-01',employees:[{name:'TEST report employee',reservations:2,expected_commission:4500,commission_collected:0,inquiry_clients:7,replied_inquiry_clients:5,successful_staff_messages:13,targets:{}}]},error:null});
+  f.pending[0].resolve({data:{from:'2024-10-01',branches:[{id:'muscat',branch:'muscat',name:'TEST historical account',reservations:2,expected_commission:4500,commission_collected:0,inquiry_clients:7,replied_inquiry_clients:5,successful_staff_messages:13,targets:{}}]},error:null});
   await f.flush();const html=f.nodes.get('teamLeaderboard').innerHTML;
   assert.match(html,/2024-10-01/);assert.match(html,/2024-10-31/);
   assert.match(html,/حجوزات مؤكدة في الفترة/);assert.match(html,/4,500/);
-  assert.match(html,/عملاء استفسروا عن عقار/);assert.match(html,/مستفسرون ردّت عليهم الموظفة/);assert.match(html,/رسائل أرسلتها الموظفة/);
+  assert.match(html,/عملاء استفسروا عن عقار/);assert.match(html,/مستفسرون ردّ عليهم الفريق/);assert.match(html,/رسائل أرسلها الفريق/);
   assert.doesNotMatch(html,/رسائل واتساب صادرة من الفريق/);
 });
 test('missing performance response is an error, never an empty or zero result',async()=>{
  const f=fixture();f.context.crmPerformancePeriod('month');
  f.pending[0].resolve({data:{},error:null});await f.flush();
  assert.match(f.nodes.get('employeePerformanceResults').innerHTML,/تعذر تحميل الأداء/);
- assert.doesNotMatch(f.nodes.get('employeePerformanceResults').innerHTML,/لا يوجد موظفون نشطون/);
+ assert.doesNotMatch(f.nodes.get('employeePerformanceResults').innerHTML,/لا توجد فروع متاحة لهذا الحساب/);
 });
 
 test('refreshing dashboard work refreshes only open performance and retains its selected rolling period',async()=>{
@@ -114,9 +115,9 @@ test('refreshing dashboard work refreshes only open performance and retains its 
  const initial=f.context.crmDashboardPerformancePeriod('months3');f.pending[0].resolve(result('TEST BEFORE MUTATION'));await initial;
  const span=JSON.parse(JSON.stringify(f.pending[0].args));panel.open=true;
  const refreshing=f.context.loadDashboard();assert.match(box.innerHTML,/جاري تحميل الأداء/);await f.flush();
- const reads=f.pending.slice(1);assert.deepEqual(reads.map(r=>r.name),['crm_dashboard_work','crm_dashboard_work','crm_employee_performance']);
- const performance=reads.find(r=>r.name==='crm_employee_performance');assert.deepEqual(JSON.parse(JSON.stringify(performance.args)),span);
- reads.forEach(r=>r.resolve(r.name==='crm_employee_performance'?result('TEST AFTER MUTATION'):{data:{scope:r.args.p_scope,counts:{}},error:null}));await refreshing;
+ const reads=f.pending.slice(1);assert.deepEqual(reads.map(r=>r.name),['crm_dashboard_work','crm_dashboard_work','crm_branch_performance']);
+ const performance=reads.find(r=>r.name==='crm_branch_performance');assert.deepEqual(JSON.parse(JSON.stringify(performance.args)),span);
+ reads.forEach(r=>r.resolve(r.name==='crm_branch_performance'?result('TEST AFTER MUTATION'):{data:{scope:r.args.p_scope,counts:{}},error:null}));await refreshing;
  assert.match(box.innerHTML,/TEST AFTER MUTATION/);assert.doesNotMatch(box.innerHTML,/TEST BEFORE MUTATION/);
  assert.equal(f.nodes.get('employeePerformanceResults').innerHTML,'');assert.equal(f.nodes.get('teamLeaderboard').innerHTML,'');
  panel.open=false;const next=f.pending.length,closed=f.context.loadDashboard();await f.flush();

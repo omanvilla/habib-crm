@@ -141,11 +141,15 @@ Deno.serve(async (req) => {
         return json({ok:false,error:"inbound_image_required"},400);
       try {
         const tokens:string[]=[];
+        const physical=await admin.rpc("resolve_whatsapp_route",{p_company_id:companyId,p_meta_phone_number_id:String(conversation.meta_phone_number_id||"")});
+        const physicalRoute=Array.isArray(physical.data)?physical.data[0]:physical.data;
+        const credentialRoute=String(physicalRoute?.route_key||"");
+        if(physical.error||!physicalRoute?.whatsapp_number||!["muscat","barka"].includes(credentialRoute)) throw new Error("media_credentials_unavailable");
         const credential=await admin.from("whatsapp_route_credentials").select("token_ciphertext,token_iv,expires_at")
-          .eq("company_id",companyId).eq("route_key",String(conversation.route_key||"")).maybeSingle();
+          .eq("company_id",companyId).eq("route_key",credentialRoute).maybeSingle();
         if (credential.error) throw new Error("media_credentials_unavailable");
         if (credential.data && META_APP_SECRET && (!credential.data.expires_at || Date.parse(credential.data.expires_at)>Date.now()+60000)) {
-          try { tokens.push(await decryptMediaToken(credential.data.token_ciphertext,credential.data.token_iv,companyId,String(conversation.route_key||""))); }
+          try { tokens.push(await decryptMediaToken(credential.data.token_ciphertext,credential.data.token_iv,companyId,credentialRoute)); }
           catch { /* The existing server credential may still read this route's media. */ }
         }
         if (WHATSAPP_ACCESS_TOKEN && !tokens.includes(WHATSAPP_ACCESS_TOKEN)) tokens.push(WHATSAPP_ACCESS_TOKEN);

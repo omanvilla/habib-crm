@@ -17,10 +17,10 @@ async function expectMetrics(card,values){for(const [key,value] of Object.entrie
    await page.evaluate(()=>{
     const original=supa.rpc;window.coherenceMode='base';
     supa.rpc=async function(name,args){
-     if(name==='crm_employee_performance'&&window.coherenceMode==='error')return {data:null,error:{message:'SYNTHETIC PERFORMANCE UNAVAILABLE'}};
+     if(name==='crm_branch_performance'&&window.coherenceMode==='error')return {data:null,error:{message:'SYNTHETIC PERFORMANCE UNAVAILABLE'}};
      const result=await original.call(this,name,args);
-     if(name!=='crm_employee_performance'||result.error)return result;
-     result.data.employees.forEach(x=>{
+     if(name!=='crm_branch_performance'||result.error)return result;
+     result.data.branches.forEach(x=>{
       Object.assign(x,{active_inventory:98765,inquiry_clients:13,inquiries:277,inquiry_property_pairs:16,replied_inquiry_clients:13,inquiry_to_visit:44,inquiry_pair_to_visit:1,successful_staff_messages:864,new_properties:2,
        visits_booked:93,visits_done:8,visit_cohort_total:5,visit_cohort_done:4,visit_cohort_pending:1,visit_cohort_cancelled:0,
        reservations:2,active_reservations:1,cancelled_reservations:1,sales:1,visit_to_sale:1,activities:99,followup_clients:window.coherenceFollowups??6,sales_without_reservation:1,
@@ -55,23 +55,23 @@ async function expectMetrics(card,values){for(const [key,value] of Object.entrie
    await page.evaluate(()=>{window.coherenceMode='error';crmDashboardPerformancePeriod('months3')});await panel.locator('[role="alert"]').waitFor();assert.equal(await panel.locator('.ops-performance-person').count(),0);
    await page.evaluate(()=>window.coherenceMode='base');await panel.locator('[data-performance-retry]').click();await panel.locator('.ops-performance-person').first().waitFor();assert.match(await panel.locator('.ops-performance-caption').innerText(),/2026-07-19.*2026-10-19/);
    assert.match(await panel.locator('.ops-person-title').first().innerText(),/لا تُقارن بهدف شهر واحد/);checks.push('failed request clears earlier results and retry retains the selected rolling period');
-   const beforeRefresh=await page.evaluate(()=>CRMPREVIEW.calls.filter(c=>c.rpc==='crm_employee_performance').length);
+   const beforeRefresh=await page.evaluate(()=>CRMPREVIEW.calls.filter(c=>c.rpc==='crm_branch_performance').length);
    await page.evaluate(async()=>{window.coherenceFollowups=7;await loadDashboard();});
    await expectMetrics(panel.locator('.ops-performance-person').first(),{followup_clients:'7'});assert.match(await panel.locator('.ops-performance-caption').innerText(),/2026-07-19.*2026-10-19/);
-   assert.equal(await page.evaluate(()=>CRMPREVIEW.calls.filter(c=>c.rpc==='crm_employee_performance').length),beforeRefresh+1);
+   assert.equal(await page.evaluate(()=>CRMPREVIEW.calls.filter(c=>c.rpc==='crm_branch_performance').length),beforeRefresh+1);
    await page.evaluate(()=>window.coherenceFollowups=6);checks.push('workspace refresh updates an open performance result once while retaining the selected rolling period');
    if(role==='owner'){
     await page.evaluate(()=>navigate('team',null));await page.locator('#employeePerformanceResults .ops-performance-person').first().waitFor();await expectMetrics(page.locator('#employeePerformanceResults .ops-performance-person').first(),{inquiry_clients:'13',visit_cohort_total:'5',followup_clients:'6'});
     await page.evaluate(()=>navigate('reports',null));await page.locator('#repTeamTab').click();await page.locator('#reportMonthPicker').fill('2024-02');await page.locator('#reportMonthPicker').dispatchEvent('change');
     await page.waitForFunction(()=>document.querySelector('#teamLeaderboard .ops-performance-caption')?.textContent.includes('2024-02-29'));await expectMetrics(page.locator('#teamLeaderboard .ops-performance-person').first(),{inquiry_clients:'13',visit_cohort_total:'5',followup_clients:'6',expected_commission:'4,500',commission_collected:'500.005'});
-    const args=await page.evaluate(()=>CRMPREVIEW.calls.filter(c=>c.rpc==='crm_employee_performance').at(-1).args);assert.deepEqual(args,{p_from:'2024-02-01',p_to:'2024-03-01'});
+    const args=await page.evaluate(()=>CRMPREVIEW.calls.filter(c=>c.rpc==='crm_branch_performance').at(-1).args);assert.deepEqual(args,{p_from:'2024-02-01',p_to:'2024-03-01'});
     checks.push('Team and Reports reuse the same presentation/response including an explicit historical leap-month filter');
     await page.locator('#repFunnelTab').click();const journey=page.locator('#conversionFunnel');await journey.locator('.ops-performance-person').first().waitFor();
     assert.equal(await journey.locator('.ops-performance-person').count(),2);assert.equal(await journey.locator('.ops-performance-stage').count(),6);assert.equal(await journey.locator('.ops-performance-finance,.ops-performance-work,.funnel-rate').count(),0);
     await expectMetrics(journey.locator('.ops-performance-person').first(),{inquiry_clients:'13',inquiry_property_pairs:'16',inquiry_pair_to_visit:'1',visit_cohort_total:'5',visit_cohort_done:'4',reservations:'2',sales:'1'});
     assert.match(await journey.locator('.ops-performance-caption').innerText(),/2024-02-01.*2024-02-29/);assert.match(await page.locator('#reportDataNotice').innerText(),/بيانات المستثمرين الخاصة غير مشمولة/);
     await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);await journey.locator('.ops-performance-person').first().screenshot({path:path.join(out,'owner-report-journey-mobile.png'),animations:'disabled'});await page.setViewportSize({width:1440,height:1050});
-    checks.push('report journey shows real per-employee stages from the same historical period with no proxy visit or fabricated conversion ratio and fits390px');
+    checks.push('report journey shows real per-branch stages from the same historical period with no proxy visit or fabricated conversion ratio and fits390px');
     await page.evaluate(async()=>{await loadClients();await viewClient(allClients[0].id);});await page.locator('#cdTabJourney .c360-metric').first().waitFor({state:'attached'});
     assert.equal(await page.evaluate(()=>window.client360Data?.client.id===viewingClient.id),true);assert.equal(await page.locator('#cdActivities [role="alert"],#cdTabInterests [role="alert"],#cdTabRequests [role="alert"]').count(),0);
     checks.push('integrated client360 and related panes render the selected synthetic client using the guarded production functions');

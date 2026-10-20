@@ -27,9 +27,10 @@ function runtime(name, { attributionError = null, duplicateMessage = false, fetc
   };
   const db = {
     auth: { getUser: async () => ({ data: { user: { id: OWNER } }, error: null }) },
-    rpc: async name => {
-      assert.equal(name, 'resolve_whatsapp_route');
-      return { data: [rows.company_lead_routes[0]], error: null };
+    rpc: async (name, args) => {
+      if (name === 'resolve_whatsapp_route') return { data: [rows.company_lead_routes[0]], error: null };
+      assert.equal(name, 'crm_resolve_whatsapp_business_route');
+      return { data: { route_key: args.p_physical_route_key, transport_route_key: args.p_physical_route_key, assigned_to: OWNER, owner_only_inbox: false }, error: null };
     },
     from(table) {
       assert(Object.hasOwn(rows, table), `Unexpected table: ${table}`);
@@ -144,7 +145,7 @@ test('unsupported images and provider errors fail explicitly before an attributi
 function echoFixture(options = {}) {
   const f = runtime('whatsapp-webhook', options);
   f.ctx.resolveRoute = async () => ({ ...f.rows.company_lead_routes[0], mapped: true });
-  f.ctx.getOrCreateConversation = async () => f.rows.whatsapp_conversations[0];
+  f.ctx.getOrCreateConversation = async () => ({ conversation: f.rows.whatsapp_conversations[0], route: { ...f.rows.company_lead_routes[0], transport_route_key: 'muscat' } });
   f.ctx.upsertClientIdentity = async () => ({ client_id: 'TEST-client', assigned_to: OWNER });
   return f;
 }

@@ -39,6 +39,7 @@ jobs:
       - run: node tests/audit-fault-browser.cjs
       - run: node tests/inventory-target-browser.cjs
       - run: node tests/performance-coherence-browser.cjs
+      - run: node tests/branch-operations-browser.cjs
       - run: node tests/deal-date-coherence-browser.cjs
       - run: node tests/inquiry-followup-browser.cjs
       - uses: actions/upload-artifact@v4
@@ -321,6 +322,83 @@ jobs:
           psql -d crm_staff_volume_test -v ON_ERROR_STOP=1 -f db/changes/30-staff-message-volume-scope.rollback.sql
           psql -d crm_staff_volume_test -v ON_ERROR_STOP=1 -f tests/fixtures/staff-message-volume-rollback-assert.sql
           dropdb crm_staff_volume_test
+          # SQL31 introduces branch identities without modifying old endpoints.
+          # Keep goal-save and inactive-account fixtures out of older fingerprints.
+          createdb crm_branch_operations_test
+          psql -d crm_branch_operations_test -v ON_ERROR_STOP=1 -f /tmp/habib-followup-catalog.sql
+          psql -d crm_branch_operations_test -v ON_ERROR_STOP=1 -f db/changes/29-inquiry-followup-coherence.forward.sql
+          psql -d crm_branch_operations_test -v ON_ERROR_STOP=1 -f db/changes/30-staff-message-volume-scope.forward.sql
+          psql -d crm_branch_operations_test -v ON_ERROR_STOP=1 -f tests/fixtures/branch-operations-before.sql
+          cmp db/changes/31-branch-operations.forward.sql supabase/migrations/*_branch_operations_20261020.sql
+          psql -d crm_branch_operations_test -v ON_ERROR_STOP=1 -f db/changes/31-branch-operations.forward.sql
+          psql -d crm_branch_operations_test -v ON_ERROR_STOP=1 -f db/changes/31-branch-operations.forward.sql
+          psql -d crm_branch_operations_test -v ON_ERROR_STOP=1 -f tests/fixtures/branch-operations-assert.sql
+          HABIB_BRANCH_TEST_DATABASE=crm_branch_operations_test node tests/branch-target-concurrency.cjs
+          psql -d crm_branch_operations_test -v ON_ERROR_STOP=1 -f tests/fixtures/branch-operations-rollback-guard-before.sql
+          if psql -d crm_branch_operations_test -v ON_ERROR_STOP=1 -f db/changes/31-branch-operations.forward.sql > /tmp/habib-branch-apply-guard.log 2>&1; then
+            cat /tmp/habib-branch-apply-guard.log
+            exit 1
+          fi
+          grep -F 'SQL31 apply refused: function or permissions changed' /tmp/habib-branch-apply-guard.log
+          if psql -d crm_branch_operations_test -v ON_ERROR_STOP=1 -f db/changes/31-branch-operations.rollback.sql > /tmp/habib-branch-rollback-guard.log 2>&1; then
+            cat /tmp/habib-branch-rollback-guard.log
+            exit 1
+          fi
+          grep -F 'SQL31 rollback refused: function or permissions changed' /tmp/habib-branch-rollback-guard.log
+          psql -d crm_branch_operations_test -v ON_ERROR_STOP=1 -f tests/fixtures/branch-operations-rollback-guard-restore.sql
+          psql -d crm_branch_operations_test -v ON_ERROR_STOP=1 -f db/changes/31-branch-operations.rollback.sql
+          psql -d crm_branch_operations_test -v ON_ERROR_STOP=1 -f tests/fixtures/branch-operations-rollback-assert.sql
+          psql -d crm_branch_operations_test -v ON_ERROR_STOP=1 -f db/changes/31-branch-operations.forward.sql
+          psql -d crm_branch_operations_test -v ON_ERROR_STOP=1 -f tests/fixtures/branch-operations-reapply-assert.sql
+          dropdb crm_branch_operations_test
+          # SQL32 keeps a private business route while receiving on Muscat.
+          # Its synthetic reception, rollback and concurrent writes use a separate
+          # complete-catalog clone so earlier release fingerprints stay unchanged.
+          createdb crm_shared_muscat_test
+          psql -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f /tmp/habib-followup-catalog.sql
+          psql -1 -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f db/changes/29-inquiry-followup-coherence.forward.sql
+          psql -1 -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f db/changes/30-staff-message-volume-scope.forward.sql
+          psql -1 -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f db/changes/31-branch-operations.forward.sql
+          psql -1 -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f tests/fixtures/shared-muscat-before.sql
+          cmp db/changes/32-shared-muscat-reception.forward.sql supabase/migrations/*_shared_muscat_reception_20261020.sql
+          psql -1 -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f db/changes/32-shared-muscat-reception.forward.sql
+          psql -1 -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f db/changes/32-shared-muscat-reception.forward.sql
+          psql -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f tests/fixtures/shared-muscat-assert.sql
+          HABIB_SHARED_MUSCAT_TEST_DATABASE=crm_shared_muscat_test node tests/shared-muscat-concurrency.cjs
+          psql -1 -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f tests/fixtures/shared-muscat-rollback-before.sql
+          psql -1 -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f tests/fixtures/shared-muscat-rollback-guard-before.sql
+          if psql -1 -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f db/changes/32-shared-muscat-reception.forward.sql > /tmp/habib-shared-muscat-apply-guard.log 2>&1; then
+            cat /tmp/habib-shared-muscat-apply-guard.log
+            exit 1
+          fi
+          grep -F 'SQL32 apply refused: function or permissions changed since release' /tmp/habib-shared-muscat-apply-guard.log
+          if psql -1 -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f db/changes/32-shared-muscat-reception.rollback.sql > /tmp/habib-shared-muscat-rollback-guard.log 2>&1; then
+            cat /tmp/habib-shared-muscat-rollback-guard.log
+            exit 1
+          fi
+          grep -F 'SQL32 rollback refused: function or permissions changed since release' /tmp/habib-shared-muscat-rollback-guard.log
+          psql -1 -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f tests/fixtures/shared-muscat-rollback-guard-restore.sql
+          psql -1 -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -c 'ALTER TABLE public.whatsapp_conversations DISABLE TRIGGER a01_shared_whatsapp_conversation'
+          if psql -1 -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f db/changes/32-shared-muscat-reception.forward.sql > /tmp/habib-shared-muscat-trigger-apply-guard.log 2>&1; then
+            cat /tmp/habib-shared-muscat-trigger-apply-guard.log
+            exit 1
+          fi
+          grep -F 'SQL32 apply refused: trigger enablement changed since release' /tmp/habib-shared-muscat-trigger-apply-guard.log
+          if psql -1 -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f db/changes/32-shared-muscat-reception.rollback.sql > /tmp/habib-shared-muscat-trigger-rollback-guard.log 2>&1; then
+            cat /tmp/habib-shared-muscat-trigger-rollback-guard.log
+            exit 1
+          fi
+          grep -F 'SQL32 rollback refused: trigger changed since release' /tmp/habib-shared-muscat-trigger-rollback-guard.log
+          psql -1 -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -c "SELECT test_reservation_assert((SELECT tgenabled='D' FROM pg_trigger WHERE tgrelid='public.whatsapp_conversations'::regclass AND tgname='a01_shared_whatsapp_conversation'),'guard preserves the independent trigger edit'); ALTER TABLE public.whatsapp_conversations ENABLE TRIGGER a01_shared_whatsapp_conversation"
+          psql -1 -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f db/changes/32-shared-muscat-reception.rollback.sql
+          psql -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f tests/fixtures/shared-muscat-rollback-assert.sql
+          psql -1 -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f db/changes/32-shared-muscat-reception.forward.sql
+          psql -d crm_shared_muscat_test -v ON_ERROR_STOP=1 -f tests/fixtures/shared-muscat-reapply-assert.sql
+          # SQL32 account-retirement insertion point: clone the reapplied source here.
+          createdb --template=crm_shared_muscat_test crm_account_retirement_test
+          HABIB_RETIREMENT_TEST_DATABASE=crm_account_retirement_test node tests/account-retirement.cjs
+          dropdb crm_account_retirement_test
+          dropdb crm_shared_muscat_test
           psql -v ON_ERROR_STOP=1 -f tests/fixtures/performance-coherence-rollback-guard-before.sql
           if psql -v ON_ERROR_STOP=1 -f db/changes/28-performance-coherence.rollback.sql > /tmp/habib-performance-rollback-guard.log 2>&1; then
             cat /tmp/habib-performance-rollback-guard.log

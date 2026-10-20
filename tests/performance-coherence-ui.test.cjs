@@ -10,12 +10,12 @@ function fixture(role='owner'){
  context.crmSessionCurrent=(generation,user)=>context.crmSessionGeneration===generation&&context.currentUser?.id===user;context.window=context;vm.createContext(context);vm.runInContext(source,context);
  return {context,nodes,calls:$calls,flush:()=>new Promise(resolve=>setImmediate(resolve))};
 }
-const employee=(extra={})=>({employee_id:'TEST-employee',name:'موظفة اصطناعية',inquiry_clients:13,inquiries:277,inquiry_property_pairs:16,replied_inquiry_clients:13,inquiry_to_visit:44,inquiry_pair_to_visit:1,successful_staff_messages:864,new_properties:2,
+const employee=(extra={})=>({id:'muscat',employee_id:'muscat',branch:'muscat',name:'موظفة اصطناعية',inquiry_clients:13,inquiries:277,inquiry_property_pairs:16,replied_inquiry_clients:13,inquiry_to_visit:44,inquiry_pair_to_visit:1,successful_staff_messages:864,new_properties:2,
  active_inventory:98765,visits_booked:93,visits_done:8,visit_cohort_total:5,visit_cohort_done:4,visit_cohort_pending:1,visit_cohort_cancelled:0,
  reservations:2,active_reservations:1,cancelled_reservations:1,sales:1,visit_to_sale:1,activities:99,followup_clients:6,sales_without_reservation:0,
  expected_commission:4500,company_commission:2500,commission_collected:500.005,unknown_expected_commission:0,targets:{reservations_target:2,booking_commission_target:4000},...extra});
 async function render(row,method='crmPerformancePeriod',role='owner'){
- const f=fixture(role);f.context[method]('month',{from:'2024-10-01',to:'2024-11-01'});f.calls[0].resolve({data:{from:'2024-10-01',employees:[row]},error:null});await f.flush();
+ const f=fixture(role);f.context[method]('month',{from:'2024-10-01',to:'2024-11-01'});f.calls[0].resolve({data:{from:'2024-10-01',branches:[row]},error:null});await f.flush();
  const box=method==='crmReportPerformance'?'teamLeaderboard':method==='crmDashboardPerformancePeriod'?'opsDashboardPerformanceResults':'employeePerformanceResults';
  return {html:f.nodes.get(box).innerHTML,f};
 }
@@ -63,19 +63,19 @@ test('a completed sale missing its booking record is diagnosed and cannot satisf
  assert.match(html,/1 من مبيعات الفترة تفتقد تاريخ حجز مؤكدًا/);assert.match(html,/هدف الحجوزات: 0 \/ 2/);assert.doesNotMatch(html,/هدف الحجوزات الشهري متحقق/);assert.equal(value(html,'commission_collected'),'2,500');
 });
 
-test('report journey uses the same real three-stage contract per employee without repeated finances or invalid conversion percentages',async()=>{
+test('report journey uses the same real three-stage contract per branch without repeated finances or invalid conversion percentages',async()=>{
  const f=fixture(),pending=f.context.crmReportPerformance('month',{from:'2024-10-01',to:'2024-11-01'},'conversionFunnel');
- f.calls[0].resolve({data:{from:'2024-10-01',employees:[employee({name:'TEST Muscat'}),employee({name:'TEST Barka',inquiry_clients:4})]},error:null});await pending;
+ f.calls[0].resolve({data:{from:'2024-10-01',branches:[employee({name:'TEST Muscat'}),employee({id:'barka',employee_id:'barka',branch:'barka',name:'TEST Barka',inquiry_clients:4})]},error:null});await pending;
  const html=f.nodes.get('conversionFunnel').innerHTML;
  assert.equal((html.match(/data-performance-stage="inquiries"/g)||[]).length,2);
  assert.equal((html.match(/data-performance-stage="visits"/g)||[]).length,2);assert.equal((html.match(/data-performance-stage="deals"/g)||[]).length,2);
- assert.equal(value(html,'visit_cohort_total'),'5');assert.equal(value(html,'visit_cohort_done'),'4');assert.match(html,/TEST Muscat/);assert.match(html,/TEST Barka/);
+ assert.equal(value(html,'visit_cohort_total'),'5');assert.equal(value(html,'visit_cohort_done'),'4');assert.match(html,/data-performance-branch="muscat"/);assert.match(html,/data-performance-branch="barka"/);assert.doesNotMatch(html,/TEST Muscat|TEST Barka/);
  assert.doesNotMatch(html,/ops-performance-work|ops-performance-finance|من السابق|17 عميل|data-performance-metric="(?:successful_staff_messages|company_commission)"/);
  assert.match(html,/2024-10-01 — 2024-10-31 · بتوقيت مسقط/);
 });
 test('missing closed-sale commission is explicitly diagnosed while gross office basis is clearly labelled',async()=>{
  const {html}=await render(employee({company_commission:0,unknown_company_commission:1}));
- assert.match(html,/عمولات المكتب من المبيعات المكتملة في الفترة/);assert.match(html,/قبل خصم نصيب الموظفة/);
+ assert.match(html,/عمولات المكتب من المبيعات المكتملة في الفترة/);assert.match(html,/قبل خصم نصيب الموظف/);
  assert.match(html,/مبيعات مكتملة لم تُحدد عمولة المكتب فيها: 1/);assert.match(html,/الإجمالي يشمل القيم المعروفة فقط/);
 });
 test('reports funnel entry delegates to the period RPC before unrelated client/deal reads, preserving Oman boundaries and lifetime',async()=>{
@@ -85,8 +85,8 @@ test('reports funnel entry delegates to the period RPC before unrelated client/d
   const f=fixture(),c=f.context,notices=[];
   Object.assign(c,{isOwner:()=>true,reportLoadSeq:0,reportTab:'funnel',reportPeriod:lifetime?'all':'month',showReportNotice:text=>notices.push(text),getPeriodRange:()=>({start:new Date('2024-09-30T20:00:00Z'),end:new Date('2024-10-31T20:00:00Z')}),supa:{...c.supa,from:()=>assert.fail('journey must not infer metrics from a client/deal list')}});
   vm.runInContext(fn('renderFunnel')+'\n'+fn('loadReports'),c);const loading=c.loadReports();
-  assert.equal(f.calls.length,1);assert.equal(f.calls[0].name,'crm_employee_performance');assert.deepEqual(JSON.parse(JSON.stringify(f.calls[0].args)),{p_from:lifetime?null:'2024-10-01',p_to:'2024-11-01'});
-  f.calls[0].resolve({data:{from:'2024-10-01',employees:[employee()]},error:null});await loading;
+  assert.equal(f.calls.length,1);assert.equal(f.calls[0].name,'crm_branch_performance');assert.deepEqual(JSON.parse(JSON.stringify(f.calls[0].args)),{p_from:lifetime?null:'2024-10-01',p_to:'2024-11-01'});
+  f.calls[0].resolve({data:{from:'2024-10-01',branches:[employee()]},error:null});await loading;
   assert.match(notices[0],/بيانات المستثمرين الخاصة غير مشمولة/);assert.match(f.nodes.get('conversionFunnel').innerHTML,/data-performance-stage="visits"/);
  }
 });
