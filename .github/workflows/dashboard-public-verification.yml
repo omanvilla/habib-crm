@@ -1,0 +1,57 @@
+name: Verify deployed compact dashboard assets
+on:
+  push:
+    branches: ['codex/dashboard-public-verification-20261020']
+permissions:
+  contents: read
+jobs:
+  public-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compare served static assets with validated source
+        shell: python
+        run: |
+          import concurrent.futures, datetime, hashlib, json, pathlib, re, urllib.request
+          base = 'https://omanvilla.github.io/habib-crm/'
+          version = '20261020-dashboard-v12'
+          root = pathlib.Path('.')
+          index = (root / 'index.html').read_text()
+          references = re.findall(r'(?:src|href)="([^\"]+)"', index)
+          urls = [(base, 'index.html'), (base+'app-base-v15.html?v='+version, 'app-base-v15.html')]
+          urls += [(base+x, x.split('?')[0]) for x in references if not x.startswith(('http:', 'https:', 'data:'))]
+          urls = list(dict.fromkeys(urls))
+          assert len(urls) == 20, ('Unexpected runtime asset inventory', urls)
+          def verify(item):
+              url, file = item
+              result = {'url':url, 'file':file, 'expected_sha256':hashlib.sha256((root/file).read_bytes()).hexdigest()}
+              try:
+                  request=urllib.request.Request(url, headers={'Cache-Control':'no-cache', 'User-Agent':'Habib-CRM-deployment-verification'})
+                  with urllib.request.urlopen(request, timeout=30) as response:
+                      data=response.read(5*1024*1024+1)
+                      result.update(status=response.status, final_url=response.url, content_type=response.headers.get('Content-Type'), last_modified=response.headers.get('Last-Modified'), etag=response.headers.get('ETag'))
+                  assert len(data)<=5*1024*1024, 'asset unexpectedly large'
+                  result['served_sha256']=hashlib.sha256(data).hexdigest()
+                  result['matches']=result['served_sha256']==result['expected_sha256']
+                  if file=='index.html':
+                      found=re.search(rb'<meta name="app-version" content="([^\"]+)">',data)
+                      result['app_version']=found.group(1).decode() if found else None
+                      result['matches']=result['matches'] and result['app_version']==version
+              except Exception as error:
+                  result.update(matches=False,error=str(error))
+              return result
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+              results=list(pool.map(verify,urls))
+          report={'checked_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(), 'version':version, 'validated_runtime_commit':'44e18225f664bd0c95bc389e7d718ea73bdfbef9', 'read_only':True, 'authenticated':False, 'assets':results, 'all_match':all(x['matches'] for x in results)}
+          pathlib.Path('public-verification').mkdir(exist_ok=True)
+          pathlib.Path('public-verification/report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
+          print(json.dumps(report,ensure_ascii=False,indent=2))
+          assert report['all_match'], 'Public production differs from validated source; do not claim byte equality'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dashboard-v12-public-assets
+          path: public-verification/
