@@ -1,0 +1,32 @@
+name: Dashboard compact checks
+on:
+  push:
+    branches: ['codex/dashboard-compact-20261020']
+permissions:
+  contents: read
+jobs:
+  compact-interface:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/*.test.cjs
+      - run: node tests/security-regressions.cjs
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/dashboard-compact-browser.cjs
+      - run: node tests/branch-operations-browser.cjs
+      - run: node tests/inventory-target-browser.cjs
+      - run: node tests/investment-browser.cjs
+      - run: node tests/deal-date-coherence-browser.cjs
+      - run: node tests/inquiry-followup-browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compact-dashboard-verification
+          path: preview-results/
