@@ -123,5 +123,8 @@
     const results=detachedPerformance?.querySelector('#opsDashboardPerformanceResults');if(results)results.replaceChildren();
     return reset.apply(this,arguments);
   };
+  // Later presentation modules are parsed before DOMContentLoaded. Repaint once
+  // without a data request so a fast initial snapshot never keeps fallback glyphs.
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',refresh,{once:true});
   refresh();
 })();
