@@ -1,0 +1,22 @@
+name: Interface audit source
+on:
+  push:
+    branches: ['codex/interface-audit-20261020']
+    paths: ['.github/workflows/interface-review-source.yml']
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: git bundle create /tmp/habib-review.bundle --all
+      - uses: actions/upload-artifact@v4
+        with:
+          name: interface-review-source
+          path: /tmp/habib-review.bundle
+          retention-days: 1
