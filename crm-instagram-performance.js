@@ -2,7 +2,7 @@
 (function(){
   'use strict';
   const el=id=>document.getElementById(id),esc=v=>escapeHtml(String(v==null?'':v));
-  const syncing=new Set();let statusSeq=0,connecting=false;
+  const syncing=new Set();let statusSeq=0,connecting=false,pendingOAuth=null,oauthBusy=false;
   const identity=()=>typeof currentUser!=='undefined'&&currentUser&&currentProfile?currentUser.id+':'+currentProfile.company_id+':'+crmSessionGeneration:'';
   async function invoke(body){
     const result=await supa.functions.invoke('instagram-api',{body});
@@ -27,17 +27,24 @@
   function connectInstagram(){
     if(connecting||!isOwner())return;connecting=true;
     const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);const state=Array.from(bytes,x=>x.toString(16).padStart(2,'0')).join('');
-    sessionStorage.setItem('instagram_oauth_state',state);
+    sessionStorage.setItem('instagram_oauth_state',state);sessionStorage.setItem('instagram_oauth_user',currentUser.id);
     const scope='pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_insights';
     location.assign('https://www.facebook.com/v25.0/dialog/oauth?client_id=1639659247753419&redirect_uri='+encodeURIComponent('https://omanvilla.github.io/habib-crm/')+'&response_type=token&auth_type=rerequest&return_scopes=true&scope='+encodeURIComponent(scope)+'&state='+encodeURIComponent(state));
   }
-  async function oauthReturn(){
+  function captureOAuth(){
     const params=new URLSearchParams(location.hash.replace(/^#/,'')),token=params.get('access_token');if(!token)return;
-    const scope=identity();if(!scope||!isOwner())return;
-    const expected=sessionStorage.getItem('instagram_oauth_state');history.replaceState(null,'',location.pathname+location.search);sessionStorage.removeItem('instagram_oauth_state');
+    const expected=sessionStorage.getItem('instagram_oauth_state'),user=sessionStorage.getItem('instagram_oauth_user');
+    history.replaceState(null,'',location.pathname+location.search);sessionStorage.removeItem('instagram_oauth_state');sessionStorage.removeItem('instagram_oauth_user');
     if(!expected||expected!==params.get('state')){showToast('تعذر التحقق من جلسة ربط Meta. أعد المحاولة.','error');return;}
-    try{await invoke({action:'connect',access_token:token,instagram_user_id:'17841444560608289'});if(scope!==identity())return;showToast('تم حفظ اتصال Instagram؛ القياسات المتاحة تظهر في أداء العقارات.','success');navigate('instagram',null);}
-    catch(error){if(scope===identity())showToast(error.message,'error');}finally{connecting=false;}
+    pendingOAuth={token,user};completeOAuth();
+  }
+  async function completeOAuth(){
+    const scope=identity();if(!pendingOAuth||oauthBusy||!scope)return;
+    const attempt=pendingOAuth;pendingOAuth=null;
+    if(!isOwner()||(attempt.user&&attempt.user!==currentUser.id)){showToast('أكمل الربط من حساب المالك الذي بدأ العملية.','error');return;}
+    oauthBusy=true;
+    try{await invoke({action:'connect',access_token:attempt.token,instagram_user_id:'17841444560608289'});if(scope!==identity())return;showToast('تم حفظ اتصال Instagram؛ القياسات المتاحة تظهر في أداء العقارات.','success');navigate('instagram',null);}
+    catch(error){if(scope===identity())showToast(error.message,'error');}finally{connecting=false;oauthBusy=false;}
   }
   async function syncProperty(id){
     const scope=identity();if(!scope||!id||syncing.has(id)||!canManage())return null;syncing.add(id);
@@ -58,8 +65,9 @@
     window.connectInstagram=connectInstagram;window.loadInstagramPerformance=loadPerformance;
     window.setInstagramTab=loadPerformance;window.syncInstagramProperty=syncProperty;window.syncInstagramForCurrentProperty=()=>syncProperty(window.viewingProperty?.id);
     const oldNavigate=window.navigate;window.navigate=function(id,node){const result=oldNavigate.call(this,id,node);if(id==='instagram')loadPerformance();if(id==='settings'){el('instagramSettingsCard').hidden=!isOwner();if(isOwner())loadStatus();}return result;};
-    if(supa.auth)supa.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){statusSeq++;syncing.clear();['igPerformanceContent','igPerformanceStatus','instagramConnectionStatus'].forEach(id=>{if(el(id))el(id).textContent='';});}});
-    oauthReturn();
+    if(supa.auth)supa.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){statusSeq++;pendingOAuth=null;syncing.clear();['igPerformanceContent','igPerformanceStatus','instagramConnectionStatus'].forEach(id=>{if(el(id))el(id).textContent='';});}});
+    const app=el('appScreen');if(app)new MutationObserver(()=>{if(app.classList.contains('visible'))completeOAuth();}).observe(app,{attributes:true,attributeFilter:['class']});
+    captureOAuth();
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
 })();
