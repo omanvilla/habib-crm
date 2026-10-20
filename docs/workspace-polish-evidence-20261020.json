@@ -1,0 +1,17 @@
+{
+  "version": "20261020-workspace-v13",
+  "runtime_commit": "4f274fcdda7ec995f370ae59c343b4a9eac2ca62",
+  "previous_main": "43bdfe20dabc843744ce308b18bcbe68d4dd42c2",
+  "ci": {"run_id": 39455580967, "conclusion": "success", "node_suite": "passed", "security_harness": "passed", "deals_and_backend_byte_guard": "passed", "artifact_id": 12281420786},
+  "pages": {"run_id": 39459110072, "conclusion": "success"},
+  "public_verification": {"run_id": 39459400442, "conclusion": "success", "artifact_id": 12281214551, "checked_at_utc": "2026-10-20T16:39:49.647499+00:00", "http_200_assets": 22, "all_asset_hashes_match": true, "observed_meta_version": "20261020-workspace-v13"},
+  "public_browser": {"authenticated": false, "loginVisible": true, "templatesPagePresent": false, "instagramInboxPresent": false, "workspaceScriptLoaded": true, "performanceScriptLoaded": true, "errors": [], "failed_requests": [], "blocked_api_attempts": [], "production_writes": 0},
+  "synthetic_browser": {"workspace_groups": 11, "compact_dashboard_groups": 10, "deal_date_groups": 18, "inquiry_followup_groups": 21, "total_groups": 60, "external_requests": 0, "page_errors": 0, "production_writes": 0, "ten_narrow_workspaces": "passed", "physical_phone_tested": false},
+  "unchanged": ["app-base-v15.html", "crm-deal-workflow.js", "crm-deal-workflow.css", "db/", "supabase/"],
+  "database_migrations": [],
+  "edge_deployments": [],
+  "customer_messages_sent": 0,
+  "ui_removal_not_provider_revocation": true,
+  "historical_records_deleted": false,
+  "limitations": ["No fresh authenticated production v13 journey", "No new live provider OAuth/metrics test", "YouTube and Oman Reel views remain manual", "No new database-wide canonical-link uniqueness guarantee across separate concurrent tabs", "Earlier Storage/Realtime/physical-device/physical-restore and historical data-quality limits remain"]
+}
