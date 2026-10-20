@@ -4,7 +4,8 @@
   'use strict';
   const fields={followups:'followups',tasks:'tasks',visits:'visits',deals:'deals',hot:'hotRequests',contact:'contactQueue'};
   const labels={followups:'المتابعات المستحقة',tasks:'المهام العاجلة',visits:'الزيارات',deals:'الصفقات المفتوحة',hot:'الفرص الحارة',contact:'بانتظار التواصل'};
-  const icons={followups:'↻',tasks:'✓',visits:'⌂',deals:'◇',hot:'★',contact:'✉'};
+  const icons={followups:'refresh',tasks:'checklist',visits:'eye',deals:'deal',hot:'star',contact:'message'};
+  const iconFallback={followups:'↻',tasks:'✓',visits:'⌂',deals:'◇',hot:'★',contact:'✉'};
   const byId=id=>document.getElementById(id);
   const isOwner=()=>typeof currentProfile!=='undefined'&&currentProfile?.role==='owner';
   let selected=null,scope='branches',session='',focusNext=null,observed=null;
@@ -66,7 +67,7 @@
         button.setAttribute('aria-expanded',String(selected===category));
         button.setAttribute('aria-controls','opsScopeWork');
         // Only constant labels and numeric counts are rendered here, never CRM text.
-        button.innerHTML='<span class="ops-shortcut-icon" aria-hidden="true">'+icons[category]+'</span><span class="ops-shortcut-label">'+labels[category]+'</span><b class="ops-shortcut-count" dir="ltr">'+(known?Number(count).toLocaleString('en-US'):'—')+'</b>';
+        button.innerHTML='<span class="ops-shortcut-icon" aria-hidden="true">'+(window.CRMDesign?window.CRMDesign.icon(icons[category]):iconFallback[category])+'</span><span class="ops-shortcut-label">'+labels[category]+'</span><b class="ops-shortcut-count" dir="ltr">'+(known?Number(count).toLocaleString('en-US'):'—')+'</b>';
       }
       const opened=Boolean(selected&&ready);
       work.toggleAttribute('data-compact-open',opened);

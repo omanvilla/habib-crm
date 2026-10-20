@@ -1,0 +1,80 @@
+name: Interface design and full regression audit
+on:
+  push:
+    branches: ['codex/interface-audit-20261020']
+    paths-ignore: ['.github/workflows/interface-review-source.yml','docs/**']
+permissions:
+  contents: read
+jobs:
+  node-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Keep Deals and database implementation unchanged
+        run: git diff --exit-code 70f413f9e5e95824f8237ffc99a52a5418d78c33 -- app-base-v15.html crm-deal-workflow.js crm-deal-workflow.css db/ supabase/
+      - run: node --test tests/*.test.cjs
+      - run: node tests/security-regressions.cjs
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/design-browser.cjs
+      - run: node tests/workspace-browser.cjs
+      - run: node tests/dashboard-compact-browser.cjs
+      - run: node tests/deal-date-coherence-browser.cjs
+      - run: node tests/inquiry-followup-browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: interface-v14-browser
+          path: preview-results/
+  database:
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [attribution-sql, workflows-sql, investment-sql, reservations-sql, comprehensive-audit-sql]
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: synthetic-test-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGPASSWORD: synthetic-test-only
+      PGHOST: 127.0.0.1
+      PGUSER: postgres
+      PGPORT: 5432
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python3 -m pip install PyYAML==6.0.2
+      - name: Run unchanged native PostgreSQL acceptance steps
+        env:
+          AUDIT_SQL_SUITE: ${{ matrix.suite }}
+        run: python3 tests/run-existing-sql.py

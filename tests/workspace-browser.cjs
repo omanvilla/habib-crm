@@ -27,17 +27,17 @@ async function load(page,role){
   report.checks.push('owner compact dashboard/top actions/branch goals unchanged; templates removed');
   await page.evaluate(()=>navigate('clients',null));await page.locator('#clientsList [data-client-row]').first().waitFor();
   const initialClients=await page.locator('[data-client-row]').count();assert(initialClients>0);assert.equal(await page.locator('#clientsList .ops-client').count(),0);
-  await page.locator('[onclick="filterClientRole(\'buyer\',this)"]').click();assert(await page.locator('[data-client-row]').count()<initialClients);
-  await page.locator('[onclick="filterClientRole(\'all\',this)"]').click();await page.locator('#csText').fill('NO-SUCH-SYNTHETIC-NAME');assert.equal(await page.locator('[data-client-row]').count(),0);await page.locator('#csText').fill('');await page.locator('[data-client-row]').first().waitFor();
-  await page.locator('[data-client-branch="barka"]').click();assert.doesNotMatch(await page.locator('#clientsList').innerText(),/عميل مسقط/);
+  await page.locator('#uiClientType').selectOption('buyer');assert(await page.locator('[data-client-row]').count()<initialClients);
+  await page.locator('#uiClientType').selectOption('all');await page.locator('#csText').fill('NO-SUCH-SYNTHETIC-NAME');assert.equal(await page.locator('[data-client-row]').count(),0);await page.locator('#csText').fill('');await page.locator('[data-client-row]').first().waitFor();
+  await page.locator('#uiClientBranch').selectOption('barka');assert.doesNotMatch(await page.locator('#clientsList').innerText(),/عميل مسقط/);
   await page.evaluate(()=>{window.__capturedCSV=null;window.downloadCSV=(name,headers,rows)=>{window.__capturedCSV={name,headers,rows}};exportClients();});assert(await page.evaluate(()=>!!window.__capturedCSV));
   report.checks.push('client rows preserve role/search/branch filters, empty recovery and filtered export');
-  await page.screenshot({path:path.join(out,'clients-desktop.png'),fullPage:true});
+  await page.screenshot({path:path.join(out,'clients-desktop.png'),fullPage:true,animations:'disabled'});
   await page.evaluate(()=>navigate('properties',null));await page.locator('[data-property-row]').first().waitFor();assert.equal(await page.locator('#propertiesList .ops-property').count(),0);
   await page.locator('#opsPropertyBranch').selectOption('muscat');await page.locator('#opsPropertyStatus').selectOption('available');assert.equal(await page.locator('[data-property-row]').count(),2);
   await page.locator('#opsPropertyArea').selectOption('الخوض');assert.equal(await page.locator('[data-property-row]').count(),1);
   report.checks.push('properties are single ordered rows; branch/area/status filters share original result/export source');
-  await page.screenshot({path:path.join(out,'properties-desktop.png'),fullPage:true});
+  await page.screenshot({path:path.join(out,'properties-desktop.png'),fullPage:true,animations:'disabled'});
   await page.evaluate(()=>{CRMPREVIEW.failNext='property_inquiries'});await page.locator('[data-workspace-action="property-marketing"]').click();await page.locator('#wsMarketingBody table').waitFor();
   assert.match(await page.locator('#wsMarketingBody').innerText(),/Instagram/);report.checks.push('marketing remains usable when the older property performance loader fails');assert.match(await page.locator('#wsMarketingBody').innerText(),/0/);
   await page.locator('[data-workspace-action="add-marketing"]').click();await page.locator('#pmChannel').selectOption('youtube');await page.locator('#pmUrl').fill('https://youtu.be/TESTVID001?si=TEST');await page.locator('#pmViews').fill('123');
@@ -51,7 +51,7 @@ async function load(page,role){
   await page.locator('[data-workspace-action="add-marketing"]').click();await page.locator('#pmChannel').selectOption('oman_reel');await page.locator('#pmUrl').fill('https://example.test/oman-reel/TESTPOST');await page.locator('#pmPublishedAt').fill('2026-09-30T23:30');await page.locator('#pmViews').fill('');await page.locator('#mPropertyMarketing button[onclick="savePropertyMarketingEvent()"] ').click();await page.locator('#mPropertyMarketing').waitFor({state:'hidden'});
   const oman=await page.evaluate(()=>CRMPREVIEW.db.property_marketing_events.find(m=>m.channel==='oman_reel'));assert.equal(oman.published_at,'2026-09-30T19:30:00.000Z');assert.equal(oman.views,null);
   report.checks.push('Oman Reel shares the existing property journal; unknown views and entered Muscat publication date are preserved');
-  await page.screenshot({path:path.join(out,'marketing-desktop.png'),fullPage:true});
+  await page.screenshot({path:path.join(out,'marketing-desktop.png'),fullPage:true,animations:'disabled'});
   await page.evaluate(()=>navigate('instagram',null));await page.locator('#igPerformanceContent .cf-property').first().waitFor();assert.equal(await page.locator('#igInboxTab,#igInboxPanel,#igCompose').count(),0);assert.equal(await page.evaluate(()=>typeof window.sendInstagramMessage),'undefined');
   assert.equal(await page.evaluate(()=>CRMPREVIEW.calls.filter(x=>x.function==='instagram-api'&&['list','messages','send','mark_read'].includes(x.body?.action)).length),0);
   report.checks.push('Instagram performance available without inbox UI, messaging exports or message calls');
@@ -59,7 +59,7 @@ async function load(page,role){
   assert.equal(await page.locator('#teamLeaderboard .ops-performance-person').count(),2);assert.equal(await page.locator('#page-reports .period-btn').count(),6);
   await page.locator('#reportMonthPicker').fill('2024-02');await page.locator('#reportMonthPicker').dispatchEvent('change');await page.waitForFunction(()=>document.querySelector('#teamLeaderboard')?.textContent.includes('2024-02-29'));
   report.checks.push('Reports redesign retains branch performance, six periods and exact leap-month boundaries');
-  await page.screenshot({path:path.join(out,'reports-desktop.png'),fullPage:true});
+  await page.screenshot({path:path.join(out,'reports-desktop.png'),fullPage:true,animations:'disabled'});
   for(const name of ['daily','calendar','viewings','deposits','owners','expenses','activityLog','team']){await page.evaluate(n=>navigate(n,null),name);await page.locator('#page-'+name+'.active').waitFor();assert.equal(await page.locator('#page-'+name).evaluate(e=>e.classList.contains('ws-page')),true);}
   await page.evaluate(()=>navigate('deals',null));assert.equal(await page.locator('#page-deals').evaluate(e=>e.classList.contains('ws-page')),false);
   report.checks.push('requested workspaces retain their pages/actions; deals excluded from all new page/modal styling');
@@ -67,7 +67,7 @@ async function load(page,role){
   for(const name of ['clients','properties','reports','viewings','deposits','owners','expenses','activityLog','team','calendar']){
     await page.evaluate(n=>navigate(n,null),name);await page.waitForTimeout(400);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false,'overflow '+name);
-    if(['clients','properties','reports','owners','viewings'].includes(name))await page.screenshot({path:path.join(out,name+'-mobile.png'),fullPage:true});
+    if(['clients','properties','reports','owners','viewings'].includes(name))await page.screenshot({path:path.join(out,name+'-mobile.png'),fullPage:true,animations:'disabled'});
   }
   report.checks.push('all ten redesigned workspaces fit a 390px viewport');await context.close();
   for(const role of ['barka','muscat','viewer']){
