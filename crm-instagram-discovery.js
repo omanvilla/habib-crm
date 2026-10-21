@@ -5,7 +5,8 @@
  const number=v=>Number(v).toLocaleString('en-US');
  const date=v=>v?new Date(v).toLocaleString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat',dateStyle:'medium',timeStyle:'short'}):'لم يتم بعد';
  const reason={unclear_content:'الوصف لا يوضح نوع الفيديو',property_not_found:'لا يوجد عقار مطابق في السجلات',insufficient_specifications:'المواصفات غير كافية',multiple_matches:'أكثر من عقار يطابق المواصفات',multiple_units:'الإعلان يذكر عدة وحدات',conflicting_specifications:'توجد مواصفات مختلفة عن السجل',mixed_advice_and_offer:'يحتمل نصيحة أو إعلانًا',advice:'نصيحة أو محتوى عام',not_video:'منشور غير فيديو',existing_link:'مرتبط سابقًا',existing_conflict:'تعارض في الربط السابق',unique_specification_match:'تطابق واضح للمواصفات',owner_review:'قرار المالك',new_media:'قيد الفحص'};
- const scope=()=>typeof currentUser!=='undefined'&&currentUser&&currentProfile&&isOwner()?currentUser.id+':'+currentProfile.company_id+':'+crmSessionGeneration:'';
+ let resetEpoch=0;
+ const scope=()=>typeof currentUser!=='undefined'&&currentUser&&currentProfile&&isOwner()?currentUser.id+':'+currentProfile.company_id+':'+crmSessionGeneration+':'+resetEpoch:'';
  let sequence=0,rows=[],properties=[],offset=0,filter='needs_review',busy=new Set();
  function safeLink(value){try{const u=new URL(value);return u.protocol==='https:'&&/^(www\.)?instagram\.com$/.test(u.hostname)&&/^\/(p|reels?|tv)\/[\w-]+\/?$/.test(u.pathname)?u.href:'';}catch{return '';}}
  function mount(){
@@ -64,7 +65,7 @@
  }
  function install(){
   mount();const nav=window.navigate;window.navigate=function(id,node){const result=nav.apply(this,arguments);if(id==='instagram')load();if(id==='dash'&&scope())overview().catch(()=>{});return result;};
-  const reset=window.crmResetOperations;window.crmResetOperations=function(){sequence++;rows=[];properties=[];offset=0;busy.clear();['igDiscoveryRows','igDiscoveryStatus','igDiscoveryPages','igDiscoveryAlert'].forEach(id=>{if($(id))$(id).textContent='';});if($('igDiscovery'))$('igDiscovery').hidden=true;if($('igDiscoveryAlert'))$('igDiscoveryAlert').hidden=true;return reset.apply(this,arguments);};
+  const reset=window.crmResetOperations;window.crmResetOperations=function(){resetEpoch++;sequence++;rows=[];properties=[];offset=0;filter='needs_review';if($('igDiscoveryFilter'))$('igDiscoveryFilter').value=filter;busy.clear();['igDiscoveryRows','igDiscoveryStatus','igDiscoveryPages','igDiscoveryAlert'].forEach(id=>{if($(id))$(id).textContent='';});if($('igDiscovery'))$('igDiscovery').hidden=true;if($('igDiscoveryAlert'))$('igDiscoveryAlert').hidden=true;/* Clear the dynamic branch source too: later layout observers must not resurrect old-session options. Its original renderer rebuilds it after the next authorized load. */$('opsClientBranches')?.replaceChildren();return reset.apply(this,arguments);};
   const notifications=window.loadNotifications;window.loadNotifications=async function(){const identity=scope();await notifications.apply(this,arguments);if(!identity||identity!==scope())return;
    try{const result=await supa.from('notifications').select('id,title,body,created_at').eq('user_id',currentUser.id).eq('type','instagram_discovery').order('created_at',{ascending:false}).limit(20);if(result.error)throw result.error;if(identity!==scope())return;
     const read=readNotificationReceipts();const additional=(result.data||[]).map(n=>({id:'ig-'+n.id,type:'task',icon:window.CRMDesign?.icon('property')||'↗',text:'<strong>'+escape(n.title)+'</strong><br>'+escape(n.body),time:n.created_at,onclick:"navigate('instagram',null)"})).filter(n=>!read.has(notificationReceiptId(n)));
