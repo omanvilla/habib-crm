@@ -1,0 +1,21 @@
+name: Client workflow source
+on:
+  push:
+    branches: ['codex/client-whatsapp-20261021']
+    paths: ['.github/workflows/client-work-source.yml']
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: git bundle create habib-current.bundle HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: client-work-current-source
+          path: habib-current.bundle
+          retention-days: 1
