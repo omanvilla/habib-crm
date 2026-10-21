@@ -1,0 +1,61 @@
+name: Client chronology and WhatsApp trial acceptance
+on:
+  push:
+    branches: ['codex/client-whatsapp-20261021']
+    paths-ignore: ['.github/workflows/client-work-source.yml', 'docs/**']
+permissions:
+  contents: read
+jobs:
+  interface:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Preserve dedicated Deals and webhook/send entrypoints
+        run: git diff --exit-code ccd8d19d24ff22be32f43f64b0be015f831569ab -- crm-deal-workflow.js crm-deal-workflow.css supabase/functions/whatsapp-webhook/index.ts supabase/functions/whatsapp-send/index.ts
+      - run: node --test tests/*.test.cjs
+      - run: node tests/security-regressions.cjs
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/client-whatsapp-browser.cjs
+      - run: node tests/workspace-browser.cjs
+      - run: node tests/design-browser.cjs
+      - run: node tests/marketing-browser.cjs
+      - run: node tests/instagram-discovery-browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: client-whatsapp-verification
+          path: preview-results/
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: synthetic-test-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGPASSWORD: synthetic-test-only
+      PGHOST: 127.0.0.1
+      PGUSER: postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Native chronology, branch privacy and contextual inquiry acceptance
+        run: |
+          createdb crm_client_test
+          for file in tests/fixtures/investment-owner-only.sql db/changes/18-investment-owner-only.forward.sql tests/fixtures/semantic-inquiries-before.sql db/changes/22-semantic-inquiries.forward.sql db/changes/34-client-chronology-and-context.forward.sql tests/fixtures/client-chronology-context-assert.sql tests/fixtures/semantic-inquiries-assert.sql db/changes/34-client-chronology-and-context.rollback.sql db/changes/34-client-chronology-and-context.forward.sql; do
+            echo "Testing $file"
+            if ! psql -q -d crm_client_test -v ON_ERROR_STOP=1 -f "$file" > /tmp/sql-check.log 2>&1; then tail -80 /tmp/sql-check.log; exit 1; fi
+          done

@@ -23,7 +23,6 @@ INSERT INTO whatsapp_messages(id,company_id,conversation_id,client_id,whatsapp_m
 (test_id(9308),test_id(1),test_id(9201),test_id(9001),'wamid.context.9308','inbound','text',NULL,NULL,'هلا','2026-10-21T08:00:00Z');
 CREATE TEMP TABLE before_visits AS SELECT (SELECT count(*) FROM viewings) AS visits,(SELECT count(*) FROM appointments) AS appointments;
 GRANT SELECT ON before_visits TO service_role;
--- Security-invoker time reads ignore earlier outgoing messages and preserve first inbound.
 SET LOCAL ROLE authenticated;
 SELECT set_config('test.actor',test_id(10)::text,true);
 SELECT test_assert((SELECT first_contact_at='2026-10-20T20:05:00Z' AND first_contact_source='whatsapp' FROM crm_client_first_contacts(ARRAY[test_id(9000)])),'wrong actual first inbound');
@@ -40,13 +39,13 @@ SELECT test_assert(NOT has_function_privilege('authenticated','public.crm_record
 SET LOCAL ROLE service_role;
 SELECT test_assert(EXISTS(SELECT 1 FROM jsonb_array_elements(crm_property_inquiry_candidates(test_id(9301))->'candidates') p WHERE p->>'id'=test_id(9100)::text AND p->>'map_url'='https://maps.app.goo.gl/SYNTH34MAP'),'candidate map missing');
 SELECT test_assert(NOT EXISTS(SELECT 1 FROM jsonb_array_elements(crm_property_inquiry_candidates(test_id(9301))->'candidates') p WHERE p->>'id'=test_id(9101)::text),'candidate branch widened');
-SELECT test_assert((crm_apply_verified_property_inquiries(test_id(9301),jsonb_build_array(jsonb_build_object('property_id',test_id(9100),'method','ai_verified','evidence',jsonb_build_object('kind','text','quote','فيلا الخوض 120 ألف','source_message_ids',jsonb_build_array(test_id(9301)),'matched_facts','{}'::jsonb))))->>'matched_count')::int=1,'initial identity not established');
+SELECT test_assert((crm_apply_verified_property_inquiries(test_id(9301),jsonb_build_array(jsonb_build_object('property_id',test_id(9100),'method','ai_verified','evidence',jsonb_build_object('kind','text','quote','فيلا الخوض 120 ألف','source_message_ids',jsonb_build_array(test_id(9301)),'matched_facts',jsonb_build_object('area','الخوض','price',120000)))))->>'matched_count')::int=1,'initial identity not established');
 SELECT test_assert((crm_apply_property_context_followup(test_id(9302),test_id(9301),test_id(9100))->>'matched_count')::int=1,'location followup not attached');
 SELECT test_assert((SELECT count(*) FROM client_request_events WHERE whatsapp_message_id=test_id(9302) AND event_type='location_requested' AND occurred_at='2026-10-20T20:06:00Z' AND after_data->>'appointment_created'='false')=1,'location intent missing or wrong timestamp');
 SELECT test_assert((crm_apply_property_context_followup(test_id(9302),test_id(9301),test_id(9100))->>'matched_count')::int=0,'retry duplicate attribution');
 SELECT test_assert((SELECT count(*) FROM client_request_events WHERE whatsapp_message_id=test_id(9302) AND event_type='location_requested')=1,'retry duplicate interest');
 SELECT test_assert((crm_apply_property_context_followup(test_id(9305),test_id(9304),test_id(9100))->>'blocked_reason')='followup_source_not_verified','unverified staff broadcast was accepted');
-SELECT test_assert((crm_apply_verified_property_inquiries(test_id(9303),jsonb_build_array(jsonb_build_object('property_id',test_id(9100),'method','ai_verified','evidence',jsonb_build_object('kind','conversation','quote','فيلا الخوض 120 ألف','source_message_ids',jsonb_build_array(test_id(9303),test_id(9304)),'matched_facts','{}'::jsonb))))->>'matched_count')::int=1,'verified staff answer failed');
+SELECT test_assert((crm_apply_verified_property_inquiries(test_id(9303),jsonb_build_array(jsonb_build_object('property_id',test_id(9100),'method','ai_verified','evidence',jsonb_build_object('kind','conversation','quote','فيلا الخوض 120 ألف','source_message_ids',jsonb_build_array(test_id(9303),test_id(9304)),'matched_facts',jsonb_build_object('area','الخوض','price',120000)))))->>'matched_count')::int=1,'verified staff answer failed');
 SELECT test_assert((crm_apply_property_context_followup(test_id(9305),test_id(9304),test_id(9100))->>'matched_count')::int=1,'verified staff context not reusable');
 SELECT test_assert((crm_apply_property_context_followup(test_id(9306),test_id(9305),test_id(9100))->>'matched_count')::int=0,'alternative reused old identity');
 SELECT test_assert((crm_apply_property_context_followup(test_id(9307),test_id(9305),test_id(9100))->>'matched_count')::int=0,'old context reused after24h');
