@@ -11,7 +11,7 @@ const message = (id, body, extra = {}) => ({ id, company_id: 'company', client_i
 const outgoing = (id, body, minutes = 1, extra = {}) => message(id, body, { direction: 'outbound', actor_type: 'human',
   delivery_status: 'sent', message_timestamp: at(minutes), ...extra });
 
-function fixture({ messages = [], candidates = [property()], conversation = {}, rpcError, fetchImpl, applyResult, candidatePages } = {}) {
+function fixture({ messages = [], candidates = [property()], conversation = {}, rpcError, fetchImpl, applyResult, candidatePages, contextResult } = {}) {
   const tables = { whatsapp_messages: structuredClone(messages), whatsapp_conversations: [{ id: 'conversation', company_id: 'company',
     client_id: 'client', route_key: 'muscat', human_handoff_required: false, handoff_reason: null, ...conversation }], unmatched_property_links: [] };
   const calls = [], aiCalls = [];
@@ -50,6 +50,8 @@ function fixture({ messages = [], candidates = [property()], conversation = {}, 
     if (name === 'crm_apply_verified_property_inquiries') return { data: applyResult || {
       matched_count: args.p_matches.length, property_ids: args.p_matches.map(match => match.property_id), review_required: args.p_needs_review,
     } };
+    if(name==='crm_record_location_interest')return {data:0};
+    if(name==='crm_apply_property_context_followup')return {data:contextResult||{matched_count:0,property_ids:[],review_required:true,blocked_reason:'source_unverified'}};
     throw new Error(`Unexpected RPC ${name}`);
   } };
   const fetcher = async (url, options) => {
@@ -330,4 +332,19 @@ test('forwarded advertisement CTA is not a customer inquiry; genuine prefixed qu
     const genuine = fixture({ candidates, messages: [message('ask', body), outgoing('answer', 'فيلا الخوض 135 ألف')] });
     assert.equal((await (await genuine.service()).attributeInbound('ask')).matched_count, 1);
   }
+});
+
+
+test('location-only followup uses immediately preceding proven property through a guarded RPC, never creates visit or replies',async()=>{
+ const f=fixture({messages:[message('prior','https://instagram.com/reel/SYNTH/',{message_timestamp:at(-1),matched_property_id:'p1',property_match_status:'auto_matched'}),message('next','أرسل اللوكيشن')],contextResult:{matched_count:1,property_ids:['p1'],review_required:false}});
+ const result=await(await f.service()).attributeInbound('next');assert.deepEqual(result.property_ids,['p1']);const call=f.calls.find(c=>c.rpc==='crm_apply_property_context_followup');assert.equal(call.args.p_source_message_id,'prior');assert.equal(f.applied().length,0);assert.equal(f.aiCalls.length,0);assert(!f.calls.some(c=>['viewings','appointments'].includes(c.table)));
+});
+test('intervening unrelated reply and request for another property do not reuse old context',async()=>{
+ for(const body of ['الموقع','موقع بيت ثاني']){const f=fixture({messages:[message('prior','فيلا الخوض 135 ألف',{message_timestamp:at(-2),matched_property_id:'p1'}),outgoing('other','نتواصل لاحقاً',-1),message('next',body)]});await(await f.service()).attributeInbound('next');assert(!f.calls.some(c=>c.rpc==='crm_apply_property_context_followup'));}
+});
+test('exact saved map returned by staff is anchored to the customer location request, not counted as a new outbound inquiry',async()=>{
+ const f=fixture({messages:[message('ask','أرسل اللوكيشن'),outgoing('answer','https://maps.app.goo.gl/SYNTHp1')],candidates:[property('p1',{map_url:'https://maps.app.goo.gl/SYNTHp1'})]});const result=await(await f.service()).attributeOutbound('answer');assert.equal(result.matched_count,1);assert.equal(f.applied()[0].args.p_message_id,'ask');assert(f.calls.some(c=>c.rpc==='crm_record_location_interest'));
+});
+test('native shared GPS pin matches only exactly saved coordinates and retains original body evidence',async()=>{
+ const body='Synthetic map | 23.123456 | 58.123456';const f=fixture({messages:[message('gps',body,{message_type:'location',raw_payload:{location:{latitude:23.123456,longitude:58.123456}}})],candidates:[property('p1',{map_url:'https://maps.google.com/?q=23.123456,58.123456'})]});const result=await(await f.service()).attributeInbound('gps');assert.equal(result.matched_count,1);assert.equal(f.applied()[0].args.p_matches[0].evidence.quote,body);
 });

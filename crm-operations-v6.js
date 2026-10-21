@@ -406,8 +406,7 @@
     const matches=r=>clientWorkFilter==='all'||(clientWorkFilter==='due'&&r.next_followup&&workDate(r.next_followup)<=today)||(clientWorkFilter==='qualified'&&(r.qualified_at||r.pipeline_stage==='qualified'))||(clientWorkFilter==='unplanned'&&!r.next_followup);
     const bar=$id('opsClientsWork');if(bar)bar.innerHTML=[['all','كل العمل'],['due','المتابعة المستحقة'],['qualified','طلبات مؤهلة'],['unplanned','متابعة غير محددة']].map(([key,label])=>'<button class="ops-filter '+(clientWorkFilter===key?'active':'')+'" data-work-filter="'+key+'" aria-pressed="'+(clientWorkFilter===key)+'">'+label+'</button>').join('');
     const sorted=clients.filter(c=>clientWorkFilter==='all'||(byClient.get(c.id)||[]).some(matches)).slice().sort((a,b)=>{
-      const earliest=c=>(byClient.get(c.id)||[]).map(r=>workDate(r.next_followup)||'9999').sort()[0]||'9999';
-      return earliest(a).localeCompare(earliest(b))||String(b.created_at).localeCompare(String(a.created_at));});
+      return window.CRMClientChronology?window.CRMClientChronology.compare(a,b):String(b.created_at).localeCompare(String(a.created_at))||String(a.id).localeCompare(String(b.id));});
     captureListExport('clients',sorted);
     if(!sorted.length){list.innerHTML='<div class="ops-state">لا يوجد عملاء يطابقون هذا العرض. '+workButton('clear-clients','عرض الكل')+'</div>';return;}
     list.innerHTML=sorted.map(c=>{

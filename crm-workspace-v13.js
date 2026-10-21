@@ -23,8 +23,10 @@
       const requests=[...card.querySelectorAll('.ops-request')],first=requests[0];
       const roleNames={buyer:'مشتري',seller:'بائع',investor:'مستثمر',tenant:'مستأجر',landlord:'مؤجر',consultation:'استشارة'};
       const roles=typeof getRoles==='function'?getRoles(c):[c.client_type];
-      const identity=(title?.outerHTML||esc(c.name))+'<div class="ws-tags">'+[...new Set(roles)].filter(x=>roleNames[x]).map(r=>'<span>'+roleNames[r]+'</span>').join('')+'</div>';
-      const request=first?'<strong>'+esc(first.querySelector('strong')?.textContent||'')+'</strong>'+ (requests.length>1?'<small>و'+num(requests.length-1)+' طلب آخر في الملف</small>':''):'<span class="ws-muted">لا يوجد طلب نشط</span>';
+      const arrival=window.CRMClientChronology?.arrival(c);
+      const firstContact=arrival?'<small class="ws-first-contact" data-first-contact="'+esc(arrival.source||'')+'">'+esc(arrival.label)+'<br><time dir="ltr" datetime="'+esc(arrival.at||'')+'">'+esc(window.CRMClientChronology.format(arrival.at))+'</time> · مسقط</small>':'';
+      const identity=(title?.outerHTML||esc(c.name))+firstContact+'<div class="ws-tags">'+[...new Set(roles)].filter(x=>roleNames[x]).map(r=>'<span>'+roleNames[r]+'</span>').join('')+'</div>';
+      const request=first?'<strong>'+esc(first.querySelector('strong')?.textContent||'')+'</strong>'+ (requests.length>1?'<small>و'+num(requests.length-1)+' طلب آخر في الملف</small>':''):'<span class="ws-muted">'+(c.client_type?'لا يوجد طلب نشط':'لم يتحدد الطلب بعد')+'</span>';
       const next=first?'<span>'+esc(first.querySelector('small')?.textContent||'')+'</span><small>'+esc(first.querySelector('.ops-next-action')?.textContent||'')+'</small>':'<span class="ws-muted">—</span>';
       const contact=card.querySelector('.ops-client-contact')?.outerHTML||'—';
       const controls=card.querySelector('.ops-client-foot')?.innerHTML||'';

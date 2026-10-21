@@ -1,4 +1,4 @@
-import { matchListingReferences, isPropertyRequest, isHumanListingResponse, normalizeListingText } from './property-inquiry-matcher.mjs';
+import { matchListingReferences, isPropertyRequest, isHumanListingResponse, normalizeListingText, isLocationRequest, isContextFollowup } from './property-inquiry-matcher.mjs';
 
 // This module never sends a WhatsApp message. It attributes only an existing
 // inbound inquiry; every write is revalidated atomically by the service RPC.
@@ -8,6 +8,13 @@ const REVIEW_REASON = 'استفسار عن عقار يحتاج تحديده ور
 const emptyResult = (extra = {}) => ({ matched_count: 0, property_ids: [], review_required: false, ...extra });
 const timestamp = row => Date.parse(row?.message_timestamp || '');
 const textOf = row => String(row?.body || '');
+function referenceText(row){
+  const loc=row?.message_type==='location'?row?.raw_payload?.location:null;
+  const lat=Number(loc?.latitude),lng=Number(loc?.longitude);
+  return textOf(row)+(loc&&loc.latitude!=null&&loc.longitude!=null&&Number.isFinite(lat)&&Number.isFinite(lng)&&Math.abs(lat)<=90&&Math.abs(lng)<=180?'\nhttps://maps.google.com/?q='+lat.toFixed(6)+','+lng.toFixed(6):'');
+}
+const referencesOf=(row,candidates,options)=>{const found=matchListingReferences(referenceText(row),candidates,options);return {...found,matches:found.matches.map(m=>({...m,quote:textOf(row).trim().slice(0,6000)}))};};
+
 const isRejection = text => /(?:لا\s*(?:شكرا|اريد|ابغي)|ما\s*(?:يناسب|ابي|اريد|متوفر|موجود)|غير\s*(?:مهتم|متوفر)|مو\s*متوفر|تم\s*البيع|انباع|not\s*(?:interested|available)|no\s*thanks|already\s*sold|stop\b|الغي)/i.test(normalizeListingText(text));
 const exactQuote = (text, quote) => typeof quote === 'string' && quote.trim().length >= 3 && String(text || '').includes(quote);
 const hasListingLink = text => /(?:https?:\/\/|www\.)(?:www\.)?(?:instagram\.com\/(?:reel|reels|p|tv|share)\/|youtu\.be\/|youtube\.com\/(?:shorts\/|watch\?))/i.test(text);
@@ -29,9 +36,9 @@ const genuineAsk = row => !isRejection(textOf(row)) && !isAdvertisementWithoutQu
   && (isPropertyRequest(textOf(row)) || hasListingLink(textOf(row)));
 const asksAlternative = row => /(?:ثاني|ثانيه|اخر|اخري|غيرها|غيره|بديل|another|other|else)/i.test(normalizeListingText(textOf(row)));
 const contextDependentAsk = row => !asksAlternative(row) && normalizeListingText(textOf(row)).length <= 180
-  && /(?:تفاصيل|تفاصل|معلومات|موقع|وين|السعر|سعرها|سعره|متوفر|هل\s+موجود)/i.test(normalizeListingText(textOf(row)));
+  && /(?:تفاصيل|تفاصل|معلومات|موقع|لوكيشن|لوكيشين|وين|السعر|سعرها|سعره|متوفر|هل\s+موجود)/i.test(normalizeListingText(textOf(row)));
 const storedImageEvidence = row => row?.property_image_analysis?.vision_version === 2 ? row.property_image_analysis : undefined;
-const messageFields = 'id,company_id,conversation_id,client_id,whatsapp_message_id,direction,message_type,body,message_timestamp,reply_to_message_id,actor_type,channel_source,delivery_status,raw_payload,property_image_analysis,matched_property_id,property_match_status';
+const messageFields = 'id,created_at,company_id,conversation_id,client_id,whatsapp_message_id,direction,message_type,body,message_timestamp,reply_to_message_id,actor_type,channel_source,delivery_status,raw_payload,property_image_analysis,matched_property_id,property_match_status';
 
 function assertResult(result, operation) {
   if (result?.error) throw new Error(`property_inquiry_${operation}:${result.error.message || result.error.code || 'failed'}`);
@@ -98,7 +105,7 @@ export function createPropertyInquiryService({ db, companyId, apiKey, model, fet
       const page = assertResult(await db.from('whatsapp_messages').select(messageFields)
         .eq('company_id', companyId).eq('conversation_id', message.conversation_id).eq('client_id', message.client_id)
         .gte('message_timestamp', since).lte('message_timestamp', message.message_timestamp)
-        .order('message_timestamp', { ascending: false }).order('id', { ascending: false })
+        .order('message_timestamp', { ascending: false }).order('created_at', { ascending: false }).order('id', { ascending: false })
         .range(offset, offset + PAGE_SIZE - 1), 'context');
       if (!Array.isArray(page)) throw new Error('property_inquiry_context_invalid');
       rows.push(...page.filter(row => row.id !== message.id));
@@ -135,6 +142,7 @@ export function createPropertyInquiryService({ db, companyId, apiKey, model, fet
       throw new Error('property_inquiry_apply_invalid');
     }
     if (result.review_required || result.blocked_reason || needsReview) await queueReview(anchor.id);
+    if(result.property_ids.length&&isLocationRequest(textOf(anchor)))assertResult(await db.rpc('crm_record_location_interest',{p_message_id:anchor.id}),'location_interest');
     return result;
   }
 
@@ -201,7 +209,7 @@ export function createPropertyInquiryService({ db, companyId, apiKey, model, fet
       if (isAdvertisementWithoutQuestion(body)) return emptyResult({ blocked_reason: 'advertisement_without_customer_question' });
       if (!body.trim() && !hasImage) return emptyResult();
       const candidates = await candidatesFor(message);
-      const direct = matchListingReferences(body, candidates, { requireIntent: true });
+      const direct = referencesOf(message, candidates, { requireIntent: true });
       needsReview = Boolean(direct.ambiguous);
       let matches = evidenceMatches(direct.matches || [], 'text', message);
       if (hasImage && imageEvidence?.is_property_listing === true && Number(imageEvidence.confidence) >= 0.93) {
@@ -219,12 +227,26 @@ export function createPropertyInquiryService({ db, companyId, apiKey, model, fet
       if (!matches.length && ask && message.reply_to_message_id) {
         const quoted = await quotedMessage(message);
         if (quoted && isHumanListingResponse(quoted) && !isRejection(textOf(quoted))) {
-          const referenced = matchListingReferences(textOf(quoted), candidates, { requireIntent: false });
+          const referenced = referencesOf(quoted, candidates, { requireIntent: false });
           matches = evidenceMatches(referenced.matches || [], 'conversation', message, [quoted]);
           needsReview ||= Boolean(referenced.ambiguous);
         }
       }
       if (matches.length) return await apply(message, matches, needsReview);
+      if(!needsReview&&!direct.generalRequest&&isContextFollowup(body)){
+        const history=await contextMessages(message,24);
+        const prior=history.find(r=>timestamp(r)<timestamp(message)||timestamp(r)===timestamp(message)&&r.created_at&&message.created_at&&r.created_at<message.created_at);
+        if(prior&&!isRejection(textOf(prior))){
+          const inferred=prior.direction==='inbound'&&prior.matched_property_id&&!['partial_match','multiple_matched'].includes(prior.property_match_status)
+            ?{matches:[{property_id:prior.matched_property_id}],ambiguous:false}
+            :isHumanListingResponse(prior)?referencesOf(prior,candidates,{requireIntent:false}):null;
+          if(inferred?.matches.length===1&&!inferred.ambiguous&&candidates.some(p=>p.id===inferred.matches[0].property_id)){
+            const linked=assertResult(await db.rpc('crm_apply_property_context_followup',{p_message_id:message.id,p_source_message_id:prior.id,p_property_id:inferred.matches[0].property_id}),'context_followup');
+            if(!linked||!Array.isArray(linked.property_ids))throw new Error('property_inquiry_context_result_invalid');
+            if(linked.property_ids.length)return linked;
+          }
+        }
+      }
       // A general request is intentionally held until a genuine listing answer
       // exists; it is not falsely attached to an arbitrary nearby property.
       if (needsReview || (ask && !direct.generalRequest)) return await queueReview(message.id);
@@ -264,7 +286,7 @@ export function createPropertyInquiryService({ db, companyId, apiKey, model, fet
         return emptyResult({ blocked_reason: 'intervening_rejection' });
       }
       const candidates = await candidatesFor(anchor);
-      const references = matchListingReferences(textOf(response), candidates, { requireIntent: false });
+      const references = referencesOf(response, candidates, { requireIntent: false });
       if (!references.matches?.length) {
         if (references.ambiguous) return await queueReview(anchor.id);
         return emptyResult({ blocked_reason: 'response_listing_unproven' });

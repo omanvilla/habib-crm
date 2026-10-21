@@ -16,8 +16,8 @@ export function normalizeListingText(value) {
 }
 const whole = (body, value) => Boolean(value) && (` ${body} `).includes(` ${value} `);
 const propertyWords = /(?:فيلا|فلل|فله|عقار|بيت|بيوت|منزل|شقه|شقق|ارض|اراضي|تاون هاوس|توين|villa|house|apartment|property|land|listing)/i;
-const askWords = /(?:تفاصيل|تفاصل|معلومات|صور|سعر|قيمه|موجود|متوفر|متاح|نعاين|اعاين|اشوف|نشوف|زياره|زيارة|وين|موقع|اريد|بغيت|ابغي|ابغى|ابحث|نبحث|ادور|ندور|كلمتك|بخصوص|ممكن|هل|عندك|looking|searching|details|available|viewing|interested|price|location|information)/i;
-const specificAsk = /(?:تفاصيل|تفاصل|معلومات|صور|سعرها|قيمتها|هذا|هذي|هذه|هاذي|المعلن|الاعلان|معروض|موجود|متوفر|متاح|نعاين|اعاين|اشوف|نشوف|زياره|موقع|details|available|this|viewing|the villa|the property)/i;
+const askWords = /(?:تفاصيل|تفاصل|معلومات|صور|سعر|قيمه|موجود|متوفر|متاح|نعاين|اعاين|اشوف|نشوف|زياره|زيارة|وين|موقع|لوكيشن|لوكيشين|اريد|بغيت|ابغي|ابغى|ابحث|نبحث|ادور|ندور|كلمتك|بخصوص|ممكن|هل|عندك|looking|searching|details|available|viewing|interested|price|location|information)/i;
+const specificAsk = /(?:تفاصيل|تفاصل|معلومات|صور|سعرها|قيمتها|هذا|هذي|هذه|هاذي|المعلن|الاعلان|معروض|موجود|متوفر|متاح|نعاين|اعاين|اشوف|نشوف|زياره|موقع|لوكيشن|لوكيشين|details|available|this|viewing|the villa|the property)/i;
 const generalSearch = /(?:ابحث|نبحث|ادور|ندور|دور لي|تبحث|ميزاني|بحدود|حدود ميزان|بحد اقصي|بحد اقصى|ما يزيد|اقل من|لا يتجاوز|لا تتجاوز|بين \d|عندكم (?:فلل|بيوت|شقق|اراضي|عقارات)|عندك (?:فلل|بيوت|شقق|اراضي|عقارات)|looking for|searching|budget|up to|under \d)/i;
 const rejection = /(?:غير مهتم|مو مهتم|لست مهتم|ما مهتم|ما (?:اريد|بغيت|ابغي|ابغى|يناسب|يناسبني|ناسبني|عجبني)|لا (?:اريد|ابغي|ابغى|يناسب|يناسبني)|لم يناسب|لا شكرا|تم البيع|انباع|not interested|do not want|don't want|not suitable|already sold)/i;
 const seller = /(?:انا المالك|انا مالك|عندي (?:فيلا|فله|عقار|بيت|منزل|شقه|ارض).{0,45}(?:للبيع|للايجار)|اريد ابيع|بغيت ابيع|اعرض (?:عقار|فيلا|بيت)|i am the owner|my (?:villa|house|property) for sale)/i;
@@ -82,10 +82,10 @@ function propertyIntentInfo(text, areas = areaOccurrences(normalizeListingText(t
   const indefiniteSearch = /(?:اريد|بغيت|ابغي|ابغى|عندك|عندكم) (?:اشتري |شراء )?(?:فيلا|فله|بيت|عقار|منزل|شقه|ارض)(?: |$)/.test(body) && !explicit;
   const generic = (generalSearch.test(body) || indefiniteSearch) && !/(?:تفاصيل (?:هذا|هذي|هذه|الفيلا|البيت|العقار)|this (?:villa|house|property))/i.test(body);
   const terse = areas.length > 0 && /\d/.test(body) && body.split(' ').length <= 10 && !generic;
-  const bareQuestion = /^(?:ممكن |لو سمحت |اريد |بغيت )?(?:(?:ال)?(?:تفاصيل|تفاصل|معلومات|صور)|كم السعر|كم سعرها|كم قيمتها|السعر|الموقع|متوفر|متاح|وين موقعها|وين الموقع|هل متوفر|how much|what is the price|is it available)(?: |$)/i.test(body)
+  const bareQuestion = /^(?:ممكن |لو سمحت |اريد |بغيت )?(?:(?:ال)?(?:تفاصيل|تفاصل|معلومات|صور)|كم السعر|كم سعرها|كم قيمتها|السعر|الموقع|اللوكيشن|لوكيشن|لوكيشين|متوفر|متاح|وين موقعها|وين الموقع|هل متوفر|how much|what is the price|is it available)(?: |$)/i.test(body)
     || /^(?:هل )?(?:هذا|هذي|هذه|هاذي).{0,20}(?:متوفر|موجود|متاح)/.test(body);
   const sendRequest = /(?:^| )(?:ارسل|ارسلي|ارسلوا|ترسل|ترسلي|تبعتيلي|تبعتي|ابعث|ابعثي)(?: |$)/.test(body)
-    && (areas.length > 0 || propertyWords.test(body) || /(?:الموقع|التفاصيل|الصور)/.test(body));
+    && (areas.length > 0 || propertyWords.test(body) || /(?:الموقع|اللوكيشن|لوكيشن|التفاصيل|الصور)/.test(body));
   const intent = !denied && ((propertyWords.test(body) && askWords.test(body)) || (explicit && areas.length > 0) || bareQuestion || sendRequest || terse);
   return {body, denied, explicit, generic, terse, intent};
 }
@@ -109,6 +109,44 @@ export function normalizeListingUrl(input) {
   match = value.match(/^(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?[^#]*\bv=([A-Za-z0-9_-]+)/i);
   return match ? `youtube:${match[1]}` : null;
 }
+// Compare saved map identities without fetching redirect targets or trusting arbitrary URLs.
+export function normalizeMapUrl(input) {
+  try {
+    const u=new URL(String(input||'').trim().replace(/[\])}>,.;!؟،]+$/g,''));
+    if(!['https:','http:'].includes(u.protocol)||u.username||u.password)return null;
+    const host=u.hostname.toLowerCase().replace(/^www\./,'');
+    if(host==='maps.app.goo.gl'||host==='goo.gl'&&u.pathname.startsWith('/maps/')){
+      return /^\/(?:maps\/)?[A-Za-z0-9_-]+\/?$/.test(u.pathname)?'map:'+host+u.pathname.replace(/\/$/,''):null;
+    }
+    if(!['maps.google.com','google.com','maps.google.co.om','google.co.om'].includes(host)||host.startsWith('google.')&&!u.pathname.startsWith('/maps'))return null;
+    const point=u.searchParams.get('q')||u.searchParams.get('query')||u.searchParams.get('ll');
+    if(point&&/^-?\d{1,3}\.\d{5,},\s*-?\d{1,3}\.\d{5,}$/.test(point)){
+      const [lat,lng]=point.split(',').map(Number);
+      if(Math.abs(lat)<=90&&Math.abs(lng)<=180)return 'geo:'+lat.toFixed(6)+','+lng.toFixed(6);
+      return null;
+    }
+    for(const key of [...u.searchParams.keys()])if(/^(utm_|g_st$|hl$|entry$|g_ep$)/i.test(key))u.searchParams.delete(key);
+    u.searchParams.sort();u.hash='';
+    return 'map:'+host+u.pathname.replace(/\/$/,'')+(u.search?'?'+u.searchParams.toString():'');
+  } catch {return null;}
+}
+export function isLocationRequest(text){
+  const t=normalizeListingText(text);
+  return !rejection.test(t)&&/(?:لوكيشن|لوكيشين|الموقع|موقعها|موقعه|وين موقع|location|directions|send (?:me )?(?:the )?pin)/i.test(t)
+    &&(/^(?:ال)?(?:لوكيشن|لوكيشين|موقع|location|directions)(?: فقط| لو سمحت| please)?$/.test(t)||/(?:ارسل|ارسلي|ممكن|لو سمحت|وين|اين|عطني|اعطيني|اريد|بغيت|ابغي|ابا |احتاج|send|where|please)/i.test(t));
+}
+export function isContextFollowup(text){
+  const t=normalizeListingText(text);
+  return t.length<=220&&!rejection.test(t)&&!seller.test(t)&&!generalSearch.test(t)
+    &&!/(?:ثاني|اخر|اخري|غيرها|غيره|بديل|another|other|else)/i.test(t)
+    &&(isLocationRequest(t)||/^(?:(?:هلا|اهلا|طيب|تمام|زين|اوكي) )?(?:(?:ارسل لي|ارسلي|ممكن|لو سمحت|اريد|بغيت) )?(?:التفاصيل|تفاصيل|معلومات|details)(?: |$)/i.test(t));
+}
+function specificationFacts(text){
+  const t=normalizeListingText(text),values=re=>[...new Set([...t.matchAll(re)].map(m=>Number(m[1])).filter(n=>n>0))];
+  return {land_size:values(/(?:مساحه (?:ال)?ارض|(?:ال)?ارض بمساحه|(?:ال)?ارض مساحتها|land (?:area|size)) (?:حوالي )?(\d+(?:\.\d+)?)/g),
+    built_size:values(/(?:مساحه (?:ال)?بناء|(?:ال)?بناء بمساحه|(?:ال)?بناء مساحته|built (?:area|size)) (?:حوالي )?(\d+(?:\.\d+)?)/g),
+    bedrooms:values(/(\d+) (?:غرف نوم|غرفه نوم|bedrooms)/g)};
+}
 function linksIn(text) {
   return [...new Set((String(text || '').match(/(?:https?:\/\/|www\.)[^\s<>"']+/gi) || []).map(normalizeListingUrl).filter(Boolean))];
 }
@@ -126,7 +164,7 @@ export function matchListingReferences(text, candidates, {requireIntent = true} 
   const result = {matches: [], ambiguous: false, hasPropertyIntent: info.intent, generalRequest: !info.denied && info.generic, areas: [...new Set(areas.map(x => x.name))]};
   if (!body || (requireIntent && (info.denied || info.generic))) return result;
   const matched = new Map(), conflicts = [], titlePriceEvidence = new Map();
-  const evidenceRank = {exact_link: 4, exact_code: 3, exact_title: 2, area_price: 1};
+  const evidenceRank = {exact_link: 6, exact_map: 6, exact_code: 5, exact_details: 4, specifications: 3, exact_title: 2, area_price: 1};
   const addGroup = (rows, facts, quote = raw.trim().slice(0, 6000)) => {
     if (rows.length > 1) { conflicts.push({ids: rows.map(x => String(x.id)), kind: facts.kind}); return; }
     if (rows.length === 1) {
@@ -137,6 +175,7 @@ export function matchListingReferences(text, candidates, {requireIntent = true} 
 
   // A pasted exact unique saved listing link/code is itself a specific reference.
   for (const key of linksIn(raw)) addGroup(inventory.filter(x => candidateLinks(x).has(key)), {kind: 'exact_link', link_key: key});
+  for (const key of new Set((raw.match(/(?:https?:\/\/)[^\s<>"']+/gi)||[]).map(normalizeMapUrl).filter(Boolean))) addGroup(inventory.filter(x=>normalizeMapUrl(x.map_url)===key),{kind:'exact_map',map_key:key});
   for (const value of new Set(inventory.map(x => normalizeListingText(x.property_code)).filter(x => x.length >= 3))) {
     if (!whole(body, value) || /^\d{7,}$/.test(value)) continue;
     if (/^\d+$/.test(value) && !new RegExp(`(?:رمز العقار|property code) ${escaped(value)}(?: |$)`).test(body)) continue;
@@ -144,6 +183,19 @@ export function matchListingReferences(text, candidates, {requireIntent = true} 
     addGroup(inventory.filter(x => normalizeListingText(x.property_code) === value), {kind: 'exact_code', code: value});
   }
   if (!requireIntent || info.intent) {
+    for(const details of new Set(inventory.map(x=>normalizeListingText(x.public_details)).filter(x=>x.length>=60&&propertyWords.test(x)))){
+      if(whole(body,details))addGroup(inventory.filter(x=>normalizeListingText(x.public_details)===details),{kind:'exact_details'});
+    }
+    // Two explicit dimensions and a unique area identify full staff/ad-photo details.
+    // Never combine specifications from several separately described listings.
+    const dimensions=specificationFacts(raw);
+    if(new Set(areas.map(x=>x.name)).size===1&&dimensions.land_size.length===1&&dimensions.built_size.length===1){
+      const area=areas[0];
+      const specRows=inventory.filter(x=>inventoryAreas(x).some(a=>a.name===area.name&&(!area.subarea||a.subarea===area.subarea))
+        &&Number(x.land_size)===dimensions.land_size[0]&&Number(x.built_size)===dimensions.built_size[0]
+        &&(dimensions.bedrooms.length!==1||!Number(x.bedrooms)||Number(x.bedrooms)===dimensions.bedrooms[0]));
+      addGroup(specRows,{kind:'specifications',area:area.name,land_size:dimensions.land_size[0],built_size:dimensions.built_size[0]});
+    }
     for (const title of new Set(inventory.map(x => normalizeListingText(x.title)).filter(x => x.length >= 8 && propertyWords.test(x)))) {
       if (whole(body, title) && (info.explicit || !requireIntent)) addGroup(inventory.filter(x => normalizeListingText(x.title) === title), {kind: 'exact_title', title});
     }
@@ -190,7 +242,7 @@ export function matchListingReferences(text, candidates, {requireIntent = true} 
         continue;
       }
       for (const candidate of inventory) {
-        if (matched.get(String(candidate.id))?.matched_facts.kind !== 'exact_title'
+        if (!['exact_title','specifications','exact_details'].includes(matched.get(String(candidate.id))?.matched_facts.kind)
           || !inventoryAreas(candidate).some(a => a.name === area.name && (!area.subarea || a.subarea === area.subarea))) continue;
         if (!titlePriceEvidence.has(String(candidate.id))) titlePriceEvidence.set(String(candidate.id), new Set());
         for (const value of possible) titlePriceEvidence.get(String(candidate.id)).add(value);
@@ -204,9 +256,15 @@ export function matchListingReferences(text, candidates, {requireIntent = true} 
   // area. A saved link/code still identifies the listing despite a stale price.
   for (const candidate of inventory) {
     const id = String(candidate.id), amounts = titlePriceEvidence.get(id);
-    if (matched.get(id)?.matched_facts.kind === 'exact_title' && amounts?.size && !amounts.has(Number(candidate.price))) {
+    if (['exact_title','specifications','exact_details'].includes(matched.get(id)?.matched_facts.kind) && amounts?.size && !amounts.has(Number(candidate.price))) {
       matched.delete(id); result.ambiguous = true;
     }
+  }
+  const stated=specificationFacts(raw);
+  if(new Set(areas.map(a=>a.name)).size===1)for(const candidate of inventory){
+    const id=String(candidate.id),m=matched.get(id);
+    if(m&&['area_price','exact_title','specifications'].includes(m.matched_facts.kind)
+      &&['land_size','built_size'].some(key=>stated[key].length===1&&Number(candidate[key])>0&&Number(candidate[key])!==stated[key][0])){matched.delete(id);result.ambiguous=true;}
   }
   result.matches = [...matched.values()];
   if (result.matches.length) result.hasPropertyIntent = true;

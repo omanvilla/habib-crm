@@ -192,6 +192,10 @@ rpc:async(name,args={})=>{
  state.calls.push({rpc:name,args:structuredClone(args)});
  if(signedOut)return {data:null,error:{message:'TEST signed out'}};
  if(state.failNext===name){state.failNext=null;return {data:null,error:{message:'TEST simulated RPC failure'}};}
+ if(name==='crm_client_first_contacts'){
+  const wanted=new Set(args.p_client_ids||[]),allowed=(await query('clients').select('*')).data||[];
+  return {data:allowed.filter(c=>wanted.has(c.id)).map(c=>{const contacts=[...(db.whatsapp_messages||[]).map(m=>({...m,source:'whatsapp'})),...(db.instagram_messages||[]).map(m=>({...m,source:'instagram'}))].filter(m=>m.client_id===c.id&&m.direction==='inbound'&&m.message_timestamp&&(profile.role==='owner'||db.whatsapp_conversations.find(w=>w.id===m.conversation_id)?.route_key!=='investment')).sort((a,b)=>Date.parse(a.message_timestamp)-Date.parse(b.message_timestamp));return {client_id:c.id,first_contact_at:contacts[0]?.message_timestamp||null,first_contact_source:contacts[0]?.source||null};}),error:null};
+ }
  if(name==='normalize_property_marketing_link')return {data:marketingLinkKey(args.p_url),error:null};
  if(['crm_branch_target_snapshot','crm_branch_performance','crm_branch_monthly_targets','crm_save_branch_monthly_targets'].includes(name)){
   if(profile.is_active===false||!['owner','manager','agent'].includes(profile.role))return {data:null,error:{message:'TEST branch access denied',code:'42501'}};

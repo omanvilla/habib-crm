@@ -2403,7 +2403,9 @@ async function loadClients(){
    crmReadAll(()=>supa.from('client_requests').select('id,client_id,request_type,status,pipeline_stage,qualified_at,preferred_area,property_type,subject_property_id,route_key,budget_min,budget_max,next_followup,next_action,branch_key',{count:'exact'}).in('status',['active','paused']).order('id'))
   ]);
   if(!current())return false;
-  clientWorkRequests=requests;allClients=clients.filter(c=>archived?c.archived===true:c.archived!==true);
+  const datedClients=window.CRMClientChronology?await window.CRMClientChronology.enrich(clients,current):clients;
+  if(!current())return false;
+  clientWorkRequests=requests;allClients=datedClients.filter(c=>archived?c.archived===true:c.archived!==true);
   updateRoleCounts();renderClients();return true;
  }catch(err){if(!current())return false;allClients=[];clientWorkRequests=[];console.error('[Clients]',err);list.innerHTML='<div class="empty" role="alert"><p>تعذر تحميل العملاء وطلباتهم. أعد المحاولة.</p><button class="btn-secondary" onclick="loadClients()">إعادة المحاولة</button></div>';return false;}
 }
@@ -2790,7 +2792,7 @@ async function configureClientRequestFields(clientId){
 }
 function addTaskForClient(cid){populateTaskSelects().then(function(){$('tClient').value=cid;$('tTitle').value='';$('tDueDate').value='';$('tNotes').value='';$('mTask').classList.add('on')})}
 function addDealForClient(cid){populateDealSelects().then(function(){$('dClient').value=cid;$('dValue').value='';$('dNotes').value='';$('mDeal').classList.add('on')})}
-function exportClients(){if(!allClients.length){showToast('لا توجد بيانات','error');return}const headers=['الاسم','الهاتف','البريد','النوع','المنطقة','نوع العقار','التصنيف','الميزانية من','الميزانية إلى','المصدر','ملاحظات','تاريخ التسجيل'];const rows=allClients.map(function(c){return[c.name||'',c.phone||'',c.email||'',clientTypeAr(c.client_type),c.preferred_area||'',propTypeAr(c.property_type)||'',c.status||'',c.budget_min||'',c.budget_max||'',c.source||'',c.notes||'',fmtDate(c.created_at)]});downloadCSV('عملاء',headers,rows)}
+function exportClients(){if(!allClients.length){showToast('لا توجد بيانات','error');return}const headers=['الاسم','الهاتف','البريد','النوع','المنطقة','نوع العقار','التصنيف','الميزانية من','الميزانية إلى','المصدر','ملاحظات','تاريخ التسجيل','أول تواصل مسجل · مسقط','مصدر أول تواصل'];const rows=allClients.map(function(c){return[c.name||'',c.phone||'',c.email||'',clientTypeAr(c.client_type),c.preferred_area||'',propTypeAr(c.property_type)||'',c.status||'',c.budget_min||'',c.budget_max||'',c.source||'',c.notes||'',fmtDate(c.created_at),window.CRMClientChronology?window.CRMClientChronology.format(c.first_contact_at):'',c.first_contact_source||'غير مسجل']});downloadCSV('عملاء',headers,rows)}
 function exportProperties(){if(!allProperties.length){showToast('لا توجد بيانات','error');return}const headers=['العنوان','النوع','المنطقة','السعر','الحالة','الغرف','الحمامات','مساحة الأرض','مساحة البناء','الوصف'];const rows=allProperties.map(function(p){return[p.title||'',propTypeAr(p.type),p.area||'',p.price||'',p.status||'',p.bedrooms||'',p.bathrooms||'',p.land_size||'',p.built_size||'',p.description||'']});downloadCSV('عقارات',headers,rows)}
 function exportDeals(){
   if(!allDeals.length){showToast('لا توجد بيانات','error');return;}
