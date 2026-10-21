@@ -1,0 +1,101 @@
+name: Prepare and verify client chronology v17
+on:
+  push:
+    branches: ['codex/client-whatsapp-20261021']
+    paths: ['.github/workflows/client-work-apply.yml']
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      source_sha: ${{ steps.commit.outputs.source_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify and materialize exact reviewed patch
+        run: |
+          test "$GITHUB_REF" = refs/heads/codex/client-whatsapp-20261021
+          test "$(git rev-parse HEAD^)" = 1be6d3880e2295aab8f6660fa874cab69f780e50
+          python3 - <<'PY'
+          import base64,hashlib,lzma,pathlib
+          data=''.join(pathlib.Path(f'.codex/client-v17.{n}.b64').read_text() for n in range(1,5))
+          patch=lzma.decompress(base64.b64decode(data))
+          assert hashlib.sha256(patch).hexdigest()=='d6ecda6f12e7903a4d8f3c947966a0f3dc6273fd856a77314919fca387e44b17'
+          pathlib.Path('/tmp/client-v17.patch').write_bytes(patch)
+          PY
+          git apply --check --unidiff-zero --exclude=.github/workflows/client-whatsapp-validation.yml /tmp/client-v17.patch
+          git apply --index --unidiff-zero --exclude=.github/workflows/client-whatsapp-validation.yml /tmp/client-v17.patch
+          git rm .codex/client-v17.*.b64
+      - id: commit
+        name: Save exact source on review branch without force
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Implement client first-contact chronology and guarded WhatsApp context with no-send reply simulator'
+          git push origin HEAD:refs/heads/codex/client-whatsapp-20261021
+          echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  interface:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Preserve dedicated Deals and webhook/send entrypoints
+        run: git diff --exit-code ccd8d19d24ff22be32f43f64b0be015f831569ab -- crm-deal-workflow.js crm-deal-workflow.css supabase/functions/whatsapp-webhook/index.ts supabase/functions/whatsapp-send/index.ts
+      - run: node --test tests/*.test.cjs
+      - run: node tests/security-regressions.cjs
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/client-whatsapp-browser.cjs
+      - run: node tests/workspace-browser.cjs
+      - run: node tests/design-browser.cjs
+      - run: node tests/marketing-browser.cjs
+      - run: node tests/instagram-discovery-browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: client-whatsapp-verification
+          path: preview-results/
+  database:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: synthetic-test-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGPASSWORD: synthetic-test-only
+      PGHOST: 127.0.0.1
+      PGUSER: postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          persist-credentials: false
+      - run: |
+          createdb crm_client_test
+          psql -d crm_client_test -v ON_ERROR_STOP=1 -f tests/fixtures/investment-owner-only.sql
+          psql -d crm_client_test -v ON_ERROR_STOP=1 -f db/changes/18-investment-owner-only.forward.sql
+          psql -d crm_client_test -v ON_ERROR_STOP=1 -f tests/fixtures/semantic-inquiries-before.sql
+          psql -d crm_client_test -v ON_ERROR_STOP=1 -f db/changes/22-semantic-inquiries.forward.sql
+          psql -d crm_client_test -v ON_ERROR_STOP=1 -f db/changes/34-client-chronology-and-context.forward.sql
+          psql -d crm_client_test -v ON_ERROR_STOP=1 -f tests/fixtures/client-chronology-context-assert.sql
+          psql -d crm_client_test -v ON_ERROR_STOP=1 -f tests/fixtures/semantic-inquiries-assert.sql
+          psql -d crm_client_test -v ON_ERROR_STOP=1 -f db/changes/34-client-chronology-and-context.rollback.sql
+          psql -d crm_client_test -v ON_ERROR_STOP=1 -f db/changes/34-client-chronology-and-context.forward.sql
