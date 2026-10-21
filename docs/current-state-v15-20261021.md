@@ -1,0 +1,27 @@
+# Habib CRM — current state
+
+Updated 2026-10-21. Read with `AGENTS.md`. The previous unified design, comprehensive audit results and outstanding limits remain in [the v14 archive](current-state-v14-20261020.md); its links preserve v13/v12/v11 history. Latest owner instructions govern.
+
+## Latest release: marketing link save conflict handling
+
+Frontend **`20261021-marketing-v15`** is deployed from validated commit **`a4ff233a632aa6529212ecfb6e6990f5c5368e7e`** (runtime introduced in `fec6380254a020c82574f3db12a4193919418f37`; the follow-up commit changes only a test bootstrap wait). [CI 39555333020](https://github.com/omanvilla/habib-crm/actions/runs/39555333020) passed both the interface gate and isolated PostgreSQL contract test. [Pages 39555585249](https://github.com/omanvilla/habib-crm/actions/runs/39555585249) succeeded.
+
+The owner reported a generic failure when saving an Instagram URL. Live read-only PostgreSQL logs showed unique-link violations, and a scoped record read confirmed an older event already owned that exact video identity. The actual index is company-wide `(company_id, link_key)`, independent of property/channel/event type. The old form checked only the current property/channel/publication URL, missing cross-property and shortcode-alias duplicates. This real index observation supersedes prior UI-only uncertainty about canonical uniqueness; unrecognized providers still have no new database uniqueness rule.
+
+The form now reads the key through the existing immutable normalizer, then checks that exact key under caller RLS. A same-property duplicate does not insert or overwrite history. A different visible-property duplicate identifies only the permitted property through `crm_properties_access`, keeps the form and explains that nothing was transferred. A hidden conflict remains unnamed. Feedback stays beside the URL, is text-only, and clears on form open/session reset. Concurrent duplicate insertion is rechecked; exact lost-ack recovery, double-click guards and input retention remain. Existing dates, views, sync state and linkage are never silently overwritten. Duplicate manual metric-update attempts explicitly remain unsaved; this is not a new metric-editing feature.
+
+No database migration, Edge deployment, privilege/role change, real business write or customer message occurred. The unique index, RLS, identity/reconciliation/monitoring triggers, current design and Deals workflow remain unchanged. A final live read found exactly one matching original event, with all inspected identity/linkage/date/view/sync fields unchanged. Real property names, IDs, URLs and metrics are omitted from repository evidence.
+
+### Tests and production evidence
+
+The complete Node suite and existing security harness passed, including **15 focused new marketing cases**. Actual index/server bootstrap with synthetic accounts passed **5 marketing**, **11 workspace** and **10 design** scenario groups, with zero recorded page errors, external requests or production writes. The synthetic SDK now models the real company-wide unique key instead of accepting every insert. The exact existing normalizer, trigger and index were separately tested in isolated PostgreSQL16: cross-property/channel/type duplicates, preserved original row, alias equivalence, case sensitivity and company isolation. This isolated minimal table is not new production RLS evidence.
+
+[Public verification 39555753561](https://github.com/omanvilla/habib-crm/actions/runs/39555753561) at **2026-10-21 06:29:53 UTC** found **24/24 runtime responses HTTP200 and SHA256-identical** to validated source. An empty Chromium session loaded the exact v15 sign-in form and marketing saver with zero observed page errors, failed requests or business API attempts. This is publication/startup verification, not a signed-in production write. CI artifact ID `12325846308`; public artifact ID `12325616633`. The one-time read-only verification branch is `codex/marketing-public-verification-20261021` at `2498ff7e4e4f5f40f6b7d5f9932e1e99745f2c15`; it is not recurring monitoring. Application review branch: `codex/marketing-save-20261021`.
+
+See [diagnosis, implementation and verification](marketing-save-20261021.md). Documentation-only commits after the validated release do not change runtime bytes. Rollback restores the v14 frontend; never drop the uniqueness index or reassign marketing history just to make a duplicate save succeed.
+
+## Preserved rules and limits
+
+Keep the approved stacked client/property lists, always-visible Marketing, compact owner dashboard, branch goals, Reports performance, calendar and performance-only Instagram. Do not reintroduce DM/templates or change Deals. Original authors, allocations, actual booking/closing/receipt dates and milli-OMR remain authoritative. Muscat/Barka operational identities and private investment boundaries are unchanged. Hadeel stays retired; Barka account is retained; Muscat awaits the branch-owned replacement email. Latest live SQL remains31/32 and scheduled follow-ups remain disabled.
+
+No fresh authenticated v15 production save was performed. Synthetic tests and public startup do not establish real user sessions, provider analytics/OAuth, physical-device behavior, Storage/Realtime or physical backup restoration. Previous financial data-quality gaps and security advisories including disabled leaked-password protection remain documented in v14 history, not silently resolved by this targeted fix.
