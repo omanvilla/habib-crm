@@ -106,6 +106,18 @@ function decorate(row){
  if(profile.role!=='owner')for(const field of ['owner_net','expected_commission','company_commission','agent_commission','commission_total','company_share','agent_share','broker_id','broker_commission','employee_commission_percent'])result[field]=null;
  return result;
 }
+// Marketing identity/index adapter for synthetic tests. Real SQL parity is
+// checked separately; the application calls the existing database normalizer.
+function marketingLinkKey(raw){
+ try{const u=new URL(String(raw||'').trim()),host=u.hostname.toLowerCase().replace(/^www\./,'');let m;
+  if(['instagram.com','instagr.am'].includes(host)){
+   m=u.pathname.match(/^\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)(?:[/?#]|$)/i);if(m)return 'instagram:'+m[1];
+   m=u.pathname.match(/^\/share\/(?:reel|p)\/([A-Za-z0-9_-]+)(?:[/?#]|$)/i);if(m)return 'instagram-share:'+m[1];
+  }
+  if(host==='youtu.be'){m=u.pathname.match(/^\/([A-Za-z0-9_-]+)(?:[/?#]|$)/);if(m)return 'youtube:'+m[1];}
+  if(host==='youtube.com'){m=u.pathname.match(/^\/shorts\/([A-Za-z0-9_-]+)(?:[/?#]|$)/i);if(m)return 'youtube:'+m[1];if(u.pathname==='/watch'&&/^[A-Za-z0-9_-]+$/.test(u.searchParams.get('v')||''))return 'youtube:'+u.searchParams.get('v');}
+ }catch(_){}return null;
+}
 function query(name){
  const table=({crm_properties_access:'properties',crm_deals_access:'deals'}[name]||name);
  let predicates=[],orders=[],range=null,limit=null,single=false,head=false,operation=null;
@@ -126,7 +138,9 @@ function query(name){
   state.calls.push({table,operation:operation?.[0]||'read'});
   if(signedOut)return {data:null,error:{message:'TEST session signed out'}};
   if(state.failNext===table){state.failNext=null;return {data:null,error:{message:'TEST simulated save/load failure'}};}
-  let source=db[table]||[],rows=source.filter(r=>allowed(r,table)&&predicates.every(p=>p(r)));
+  let source=db[table]||[];
+  if(table==='property_marketing_events')source.forEach(r=>{r.link_key=marketingLinkKey(r.url);});
+  let rows=source.filter(r=>allowed(r,table)&&predicates.every(p=>p(r)));
   if(operation){
    if(operation[0]==='delete')return {data:null,error:{message:'TEST permanent delete disabled'}};
    if(operation[0]==='insert'||operation[0]==='upsert'){
@@ -143,6 +157,7 @@ function query(name){
      if(table==='properties'&&!record.branch_key)record.branch_key=record.wilayat==='بركاء'?'barka':'muscat';
      if(!allowed(record,table))return {data:null,error:{message:'TEST fixture scope denial'}};
      if(source.some(r=>r.id===record.id))return {data:null,error:{code:'23505',message:'TEST duplicate ID'}};
+     if(table==='property_marketing_events'){record.link_key=marketingLinkKey(record.url);if(record.link_key&&source.some(r=>r.company_id===record.company_id&&r.link_key===record.link_key))return {data:null,error:{code:'23505',message:'TEST property_marketing_link_key_unique'}};}
      source.push(record);rows.push(record);
     }
     db[table]=source;
@@ -177,6 +192,7 @@ rpc:async(name,args={})=>{
  state.calls.push({rpc:name,args:structuredClone(args)});
  if(signedOut)return {data:null,error:{message:'TEST signed out'}};
  if(state.failNext===name){state.failNext=null;return {data:null,error:{message:'TEST simulated RPC failure'}};}
+ if(name==='normalize_property_marketing_link')return {data:marketingLinkKey(args.p_url),error:null};
  if(['crm_branch_target_snapshot','crm_branch_performance','crm_branch_monthly_targets','crm_save_branch_monthly_targets'].includes(name)){
   if(profile.is_active===false||!['owner','manager','agent'].includes(profile.role))return {data:null,error:{message:'TEST branch access denied',code:'42501'}};
   const month=args.p_month||today.slice(0,7)+'-01';

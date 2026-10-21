@@ -109,8 +109,48 @@
     if(channel==='youtube'&&/^(www\.|m\.)?youtube\.com$|^youtu\.be$/.test(u.hostname)) {let id=u.hostname==='youtu.be'?u.pathname.slice(1):u.searchParams.get('v');if(!id)id=u.pathname.match(/^\/(?:shorts|embed|live)\/([\w-]+)/)?.[1];if(id)return 'https://www.youtube.com/watch?v='+encodeURIComponent(id);}
     return url;
   }
+  // Use the server's own identity function: the existing unique index is
+  // (company_id, link_key), NOT (property_id, channel, event_type, url).
+  // Reads remain under the caller's RLS. Never move/update an existing video here.
+  function marketingFeedback(message, type='error') {
+    let box=el('pmSaveFeedback');
+    if(!box&&el('pmUrl')){box=document.createElement('div');box.id='pmSaveFeedback';el('pmUrl').after(box);}
+    if(box){box.className=type==='error'?'ws-error':'ws-subtitle';box.setAttribute('role',type==='error'?'alert':'status');box.textContent=message;}
+    showToast(message,type);
+  }
+  async function findMarketingDuplicate(payload, key) {
+    let query=supa.from('property_marketing_events').select('id,property_id,channel,event_type,url',{count:'exact'}).eq('company_id',payload.company_id);
+    if(key){
+      const result=await query.eq('link_key',key).limit(1);
+      if(result.error)throw new InputError('تعذر التحقق من الرابط المحفوظ. بياناتك باقية؛ أعد المحاولة.');
+      if(!Array.isArray(result.data))throw new InputError('تعذر التحقق من سجل التسويق. بياناتك باقية؛ أعد المحاولة.');
+      return result.data[0]||null;
+    }
+    // Other providers have no server link_key. Retain the existing publication
+    // deduplication for this property, without inventing a global URL identity.
+    if(payload.event_type!=='publish')return null;
+    const rows=await crmReadAll(()=>supa.from('property_marketing_events').select('id,property_id,channel,event_type,url',{count:'exact'}).eq('company_id',payload.company_id).eq('property_id',payload.property_id).eq('channel',payload.channel).eq('event_type','publish').order('id'));
+    return rows.find(row=>canonicalLink(row.url,payload.channel)===payload.url)||null;
+  }
+  async function reportMarketingDuplicate(row,ctx,kind,valid) {
+    if(!valid())return;
+    if(row.property_id===ctx.id){
+      const message='هذا الرابط مسجل لهذا العقار بالفعل. لم نضف نسخة ثانية ولم نغيّر تاريخ النشر أو المشاهدات المحفوظة.';
+      if(kind==='publish'){crmFinishSave('mPropertyMarketing');showToast(message,'info');await loadMarketing(ctx.id);}
+      else marketingFeedback(message+' لإضافة فيديو جديد استخدم رابطًا مختلفًا.','info');
+      return;
+    }
+    // Obtain a title only through the protected view, never from the conflicting
+    // error detail or a privileged endpoint; a hidden record stays unnamed.
+    const result=await supa.from('crm_properties_access').select('id,title').eq('company_id',currentProfile.company_id).eq('id',row.property_id).limit(1);
+    if(!valid())return;
+    const property=!result.error&&Array.isArray(result.data)?result.data.find(p=>p.id===row.property_id):null;
+    const label=property?.title?'للعقار «'+property.title+'»':'في سجل تسويق موجود';
+    marketingFeedback('هذا الرابط مسجل مسبقًا '+label+'. لم يُضف إلى العقار الحالي ولم يُنقل. استخدم رابط إعلان مختلفًا؛ تصحيح ربط الرابط القديم يحتاج مراجعة منفصلة.');
+  }
   function openMarketing() {
     if(!canEdit()||!window.viewingProperty||crmSavingForms.has('mPropertyMarketing'))return;
+    el('pmSaveFeedback')?.remove();
     const p=window.viewingProperty;marketingContext={id:p.id,user:currentUser.id,generation:crmSessionGeneration};
     el('pmChannel').value='instagram';el('pmEventType').value='publish';el('pmPublishedAt').value=new Date(Date.now()+14400000).toISOString().slice(0,16);
     ['pmViews','pmUrl','pmNotes'].forEach(id=>el(id).value='');
@@ -119,7 +159,9 @@
   async function saveMarketing() {
     const ctx=marketingContext,modal='mPropertyMarketing';
     if(!ctx||!canEdit()||!crmSessionCurrent(ctx.generation,ctx.user)||ctx.id!==window.viewingProperty?.id||!crmBeginSave(modal))return;
-    const valid=()=>marketingContext===ctx&&crmSessionCurrent(ctx.generation,ctx.user);
+    const current=()=>marketingContext===ctx&&crmSessionCurrent(ctx.generation,ctx.user);
+    const valid=()=>current()&&canEdit()&&window.viewingProperty?.id===ctx.id;
+    el('pmSaveFeedback')?.remove();
     try {
       const channel=el('pmChannel').value,kind=el('pmEventType').value,raw=el('pmUrl').value.trim(),url=raw?canonicalLink(raw,channel):null,viewRaw=el('pmViews').value.trim(),rawDate=el('pmPublishedAt').value;
       if(!(channel in labels)||!['publish','update','install','remove','other'].includes(kind))throw new InputError('اختر قناة ونوع نشاط صحيحين');
@@ -131,26 +173,41 @@
       const published=rawDate?new Date(rawDate+':00+04:00'):null;
       if(published&&(!Number.isFinite(published.getTime())||new Date(published.getTime()+14400000).toISOString().slice(0,16)!==rawDate))throw new InputError('راجع تاريخ النشر ووقته بتوقيت مسقط');
       const payload={company_id:currentProfile.company_id,property_id:ctx.id,channel,event_type:kind,published_at:published?published.toISOString():null,views,url,notes:el('pmNotes').value.trim()||null,created_by:ctx.user,auto_sync:false,sync_status:'manual'};
-      // A second publication of the same content is not a new video. Update metrics via an explicit update event.
-      if(url&&kind==='publish'){
-        const existing=await crmReadAll(()=>supa.from('property_marketing_events').select('id,url',{count:'exact'}).eq('company_id',payload.company_id).eq('property_id',ctx.id).eq('channel',channel).eq('event_type','publish').order('id'));
+      let linkKey=null;
+      if(url){
+        const identity=await supa.rpc('normalize_property_marketing_link',{p_url:url},{get:true});
         if(!valid())return;
-        if(existing.some(r=>canonicalLink(r.url,channel)===url)){crmFinishSave(modal);showToast('الرابط مسجل لهذا العقار بالفعل؛ لم تتم إضافته مرتين. لتسجيل قياس جديد اختر تحديث أداء.','info');await loadMarketing(ctx.id);return;}
+        if(identity.error||(identity.data!==null&&typeof identity.data!=='string'))throw new InputError('تعذر التحقق من هوية الرابط. بياناتك باقية؛ أعد المحاولة.');
+        linkKey=identity.data;
+        const duplicate=await findMarketingDuplicate(payload,linkKey);
+        if(!valid())return;
+        if(duplicate){await reportMarketingDuplicate(duplicate,ctx,kind,valid);return;}
       }
       const id=crmSaveKey(modal,payload);let result=await supa.from('property_marketing_events').insert({...payload,id}).select('id').single();
       if(!valid())return;
       if(result.error||result.data?.id!==id){
-        const stored=await supa.from('property_marketing_events').select('*').eq('id',id).eq('property_id',ctx.id).maybeSingle();
+        const stored=await supa.from('property_marketing_events').select('*').eq('id',id).eq('company_id',payload.company_id).eq('property_id',ctx.id).maybeSingle();
         if(!valid())return;
         const same=stored.data&&Object.entries(payload).every(([key,value])=>key==='published_at'?(value===null?stored.data[key]==null:Date.parse(stored.data[key])===Date.parse(value)):stored.data[key]===value);
-        if(stored.error||!same)throw new InputError('لم يؤكد الخادم حفظ النشاط. بياناتك باقية؛ أعد المحاولة دون إغلاق النافذة.');
+        if(stored.error||!same){
+          // A competing tab may save after our preflight read. Re-read by the
+          // authoritative key under the same RLS before classifying the conflict.
+          if(result.error?.code==='23505'){
+            if(url){const duplicate=await findMarketingDuplicate(payload,linkKey);if(!valid())return;if(duplicate){await reportMarketingDuplicate(duplicate,ctx,kind,valid);return;}}
+            throw new InputError('تعذر حفظ الرابط بسبب تعارض مع سجل موجود. لم نغيّر أي سجل؛ راجع المالك للتحقق من الربط.');
+          }
+          console.warn('property_marketing_insert_unacknowledged',{code:result.error?.code||'no_ack',verificationCode:stored.error?.code||null});
+          if(result.error?.code==='42501')throw new InputError('لا تسمح صلاحيات حسابك بحفظ نشاط لهذا العقار. بياناتك باقية؛ راجع المالك.');
+          if(['23503','23514','23502','22003','22007','22P02'].includes(result.error?.code))throw new InputError('رفض الخادم بعض بيانات النشاط. راجع القناة والتاريخ والمشاهدات؛ لم تُمسح مدخلاتك.');
+          throw new InputError('لم يؤكد الخادم حفظ النشاط. بياناتك باقية؛ أعد المحاولة دون إغلاق النافذة.');
+        }
       }
       crmFinishSave(modal);showToast('تم حفظ النشاط وربطه بالعقار','success');
       if(window.viewingProperty?.id===ctx.id){await loadMarketing(ctx.id);if(valid())loadPropertyPerformance(ctx.id);}
       if(valid()&&window.CRMFunnel)window.CRMFunnel.refreshProperty(ctx.id).catch(error=>console.warn('marketing_funnel_refresh',error));
       if(valid()&&window.viewingProperty?.id===ctx.id&&typeof loadPropertyDecisionPanel==='function')loadPropertyDecisionPanel(ctx.id);
-    }catch(error){if(valid()){console.warn('property_marketing_save_failed',error);showToast(error instanceof InputError?error.message:'تعذر حفظ النشاط. المدخلات محفوظة في النافذة؛ أعد المحاولة.','error');}}
-    finally{if(valid())crmEndSave(modal);}
+    }catch(error){if(valid()){console.warn('property_marketing_save_failed',error);marketingFeedback(error instanceof InputError?error.message:'تعذر حفظ النشاط. المدخلات محفوظة في النافذة؛ أعد المحاولة.');}}
+    finally{if(current())crmEndSave(modal);}
   }
 
   function install() {
@@ -170,7 +227,7 @@
     window.openPropertyMarketingModal=openMarketing;window.savePropertyMarketingEvent=saveMarketing;
     const title=el('pmPublishedAt')?.previousElementSibling;if(title)title.textContent='تاريخ النشر ووقته · مسقط';
     const originalReset=window.crmResetOperations;
-    window.crmResetOperations=function(){marketingSeq++;marketingContext=null;el('wsMarketing')?.remove();return originalReset.apply(this,arguments);};
+    window.crmResetOperations=function(){marketingSeq++;marketingContext=null;el('pmSaveFeedback')?.remove();el('wsMarketing')?.remove();return originalReset.apply(this,arguments);};
     const team=el('employeeTargetsPanel')?.parentElement;if(team&&!el('wsBranchHelp')){const help=document.createElement('p');help.id='wsBranchHelp';help.className='ws-subtitle';help.textContent='الأهداف تخص الفرع، لا اسم الموظف. إدارة حسابات الدخول والصلاحيات في القسم المستقل أدناه.';team.prepend(help);}
     document.addEventListener('click',async event=>{
       const b=event.target.closest('[data-workspace-action]');if(!b)return;event.preventDefault();const action=b.dataset.workspaceAction;

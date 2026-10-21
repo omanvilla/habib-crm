@@ -1,0 +1,54 @@
+name: Marketing save regression
+on:
+  push:
+    branches: ['codex/marketing-save-20261021']
+permissions:
+  contents: read
+jobs:
+  interface:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Preserve Deals and backend
+        run: git diff --exit-code 0f614a5689387f8be538c653b7b35903c8f2a630 -- app-base-v15.html crm-deal-workflow.js crm-deal-workflow.css db/ supabase/
+      - run: node --test tests/*.test.cjs
+      - run: node tests/security-regressions.cjs
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/marketing-browser.cjs
+      - run: node tests/workspace-browser.cjs
+      - run: node tests/design-browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: marketing-save-verification
+          path: preview-results/
+  exact-link-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: synthetic-test-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: synthetic-test-only
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test original server normalizer and unique index in isolated PostgreSQL
+        run: python3 tests/marketing-contract-sql.py | psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1
