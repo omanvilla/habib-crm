@@ -1,0 +1,59 @@
+name: Instagram discovery acceptance
+on:
+  push:
+    branches: ['codex/instagram-discovery-20261021']
+    paths-ignore: ['.github/workflows/instagram-source.yml','docs/**']
+permissions:
+  contents: read
+jobs:
+  ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: git diff --exit-code fd9ac9b0a353d2093c53b39b18628a1ef0e42924 -- app-base-v15.html crm-deal-workflow.js crm-deal-workflow.css
+      - run: node --test tests/*.test.cjs
+      - run: node tests/security-regressions.cjs
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/instagram-discovery-browser.cjs
+      - run: node tests/marketing-browser.cjs
+      - run: node tests/workspace-browser.cjs
+      - run: node tests/design-browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: instagram-discovery-verification
+          path: preview-results/
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: synthetic-test-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGPASSWORD: synthetic-test-only
+      PGHOST: 127.0.0.1
+      PGUSER: postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: |
+          createdb crm_instagram_test
+          psql -d crm_instagram_test -v ON_ERROR_STOP=1 -f tests/fixtures/investment-owner-only.sql
+          psql -d crm_instagram_test -v ON_ERROR_STOP=1 -f db/changes/18-investment-owner-only.forward.sql
+          psql -d crm_instagram_test -v ON_ERROR_STOP=1 -f tests/fixtures/instagram-discovery-before.sql
+          psql -d crm_instagram_test -v ON_ERROR_STOP=1 -f db/changes/33-instagram-discovery.forward.sql
+          psql -d crm_instagram_test -v ON_ERROR_STOP=1 -f tests/fixtures/instagram-discovery-assert.sql

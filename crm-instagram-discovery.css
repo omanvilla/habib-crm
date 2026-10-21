@@ -1,0 +1,7 @@
+.ig-discovery[hidden],.ig-discovery-alert[hidden]{display:none!important}
+.ig-discovery{margin-bottom:20px}.ig-discovery .card-body{padding:18px}
+.ig-discovery-counts{display:flex;flex-wrap:wrap;gap:16px;margin:12px 0;color:#53675e}.ig-discovery-counts strong{color:#214e3d;margin-right:6px}
+.ig-discovery-filter{display:flex;align-items:center;gap:12px;margin:16px 0}.ig-discovery-filter select{max-width:280px}
+.ig-discovery-row{padding:18px 0;border-top:1px solid #dce6e2;overflow-wrap:anywhere}.ig-discovery-row .ws-actions{justify-content:space-between;font-size:12px}.ig-discovery-caption{white-space:pre-line;line-height:1.9;max-height:220px;overflow:auto;font-size:13px;color:#456052}.ig-discovery-row details{background:#f5f8f6;border-radius:10px;padding:12px}.ig-discovery-row summary{cursor:pointer;font-size:13px;color:#176b56}.ig-discovery-row label{display:block;margin:12px 0}.ig-discovery-row select{width:100%;margin-top:8px}
+.ig-discovery-alert{margin:12px 0;padding:14px 18px;border:1px solid #ddcda9;border-radius:12px;background:#fffaf0;display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;color:#655130}
+@media(max-width:650px){.ig-discovery .card-body{padding:12px}.ig-discovery-row{padding:14px 0}.ig-discovery-filter{align-items:stretch;flex-direction:column}.ig-discovery-filter select{max-width:none}.ig-discovery-row .ws-actions{justify-content:flex-start}.ig-discovery .card-head{align-items:flex-start}.ig-discovery-alert{padding:12px}}
