@@ -2,6 +2,16 @@
 
 Updated 2026-10-21. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 24 October 2026 — same-origin SDK and database hardening (SQL35/36)
+
+Frontend is still **20261021-client-v17**. PR #2 (merge `9234553`) only makes `index.html` load the identical pinned supabase-js 2.118.0 from `vendor/` instead of jsdelivr, keeping the SRI hash; `app-base-v15.html` is unchanged. Live: 34/34 files byte-identical to main, vendored file matches SRI, Chrome's cross-site `document.write` warning gone.
+
+**SQL35** `20261024081343_profile_commission_guard_20261024`: staff can no longer change their own `profiles.commission_rate` through the self-edit policy; the owner still can. The column feeds no function or view today. Transaction-local role test (rolled back): agent rate change blocked, agent name change allowed, owner own/agent rate change allowed. **SQL36** `20261024081419_revoke_anon_table_privileges_20261024`: `anon` holds no privileges on any public table (274 grants on 40 tables saved in `crm_repair_private.anon36_grants_backup`); postgres default privileges for new public tables/sequences no longer include `anon`. `authenticated`/`service_role` grants unchanged; function EXECUTE grants untouched. Anonymous REST reads/inserts now return `42501` instead of empty results.
+
+Verified after apply: owner's real session loaded the dashboard (18 calls, all 200) and the client list (1,409 clients, 10 calls, 0 errors). Not covered: employee sessions, every page, writes. Rollback: `db/changes/36-…rollback.sql` then `35-…rollback.sql`.
+
+Open from the same review: leaked-password protection still disabled (Dashboard → Auth; not available through the connector); 6 deployed Edge functions are not in the repo (4 return 410, `whatsapp-save-system-token` and `whatsapp-meta-login-log` require owner/manager); 37 `auth_rls_initplan` performance warnings.
+
 ## Deployed: client chronology and guarded WhatsApp context — v17
 
 Frontend **20261021-client-v17**, accepted runtime **f120eabc201cf9849c3fe3e6c6ef9e893db31635**, is on main. Delivery-only commit **b70ccdd7d8ab5be95a173c037412a5410ba5f9d9** adds `.nojekyll` so the pure trial modules under `_shared` are served unchanged. SQL34 is applied as **20261021130950_client_chronology_and_context_20261021**. WhatsApp webhook is **39**, send is **17**. Both Edge deployments pin the exact accepted repository entrypoint and its relative imports by immutable commit URL; the original entrypoint authentication/send logic is unchanged, while the shared attribution implementation changes. No new auto-reply rollout occurred.
