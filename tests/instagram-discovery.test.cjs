@@ -20,3 +20,9 @@ test('image posts are separately cataloged, not confused with video',async()=>{a
 test('a changed price or room count requires review rather than changing property facts',async()=>{for(const change of [caption.replace('59,000','57,000'),caption.replace('4 غرف','5 غرف')])assert.equal((await matcher).matchMedia(media(change),[property]).decision,'needs_review');});
 test('worker neither requests DM data nor follows credential-bearing pagination URLs',()=>{const src=fs.readFileSync('supabase/functions/instagram-discovery/index.ts','utf8');assert(!src.includes('/messages'));assert(!src.includes('fetch(data.paging'));assert(src.includes("'x-crm-cron'"));assert(src.includes("'crm_instagram_job_auth'"));assert(!src.includes('console.log'));});
 test('UI keeps unsafe provider and caption HTML out of links/markup',()=>{const src=fs.readFileSync('crm-instagram-discovery.js','utf8');assert(src.includes('escape(row.caption'));assert(src.includes('safeLink(row.permalink)'));assert(src.includes("isOwner()?"));assert(src.includes("p_expected:row.updated_at"));});
+test('scheduled worker refreshes saved-link metrics in small batches without erasing earlier numbers',()=>{const src=fs.readFileSync('supabase/functions/instagram-discovery/index.ts','utf8');
+ assert.match(src,/METRICS_PER_RUN=6,METRIC_AGE_MS=12\*3600000/);
+ assert.match(src,/last_synced_at\.is\.null,last_synced_at\.lt\./);
+ assert.match(src,/if\(!Number\.isFinite\(m\.views\)\)\{await db\(where,'PATCH',\{sync_status:'error',sync_error:'instagram_views_unavailable_previous_values_preserved'/);
+ assert(src.includes("new URL('https://graph.facebook.com/v25.0/'+path)"),'fixed provider host');
+});

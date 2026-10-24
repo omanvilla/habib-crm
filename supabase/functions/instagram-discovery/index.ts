@@ -4,7 +4,7 @@ const BASE=Deno.env.get('SUPABASE_URL')||'';
 const KEY=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||'';
 const APP_SECRET=Deno.env.get('META_APP_SECRET')||'';
 const COMPANY=Deno.env.get('CRM_COMPANY_ID')||'';
-const VERSION='instagram-discovery-v1';
+const VERSION='instagram-discovery-v2';
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 class SafeError extends Error {constructor(public code:string){super(code);}}
 async function db(path:string,method='GET',body?:unknown){
@@ -31,10 +31,65 @@ async function page(a:any,token:string,after:string|null,limit:number){
  if(hasMore&&(!cursor||cursor.length>4000))throw new SafeError('meta_invalid_cursor');
  return {media:data.data.map((m:any)=>({id:m.id,caption:m.caption||'',permalink:m.permalink,media_type:m.media_type,media_product_type:m.media_product_type,timestamp:m.timestamp,like_count:m.like_count??null,comments_count:m.comments_count??null})),cursor,complete:!hasMore};
 }
+// Metric refresh for saved publications. The manual "sync" button was the only
+// writer, so links saved later (catalog, staff) showed "metrics unavailable".
+// A few links per run, each refreshed every 12 hours; values are only replaced
+// when Meta returns views, so a temporary gap never erases earlier numbers.
+const METRICS=['views','reach','likes','comments','shares','saved','total_interactions','ig_reels_avg_watch_time','ig_reels_video_view_total_time'];
+const METRICS_PER_RUN=6,METRIC_AGE_MS=12*3600000;
+async function graphGet(path:string,token:string){
+ const url=new URL('https://graph.facebook.com/v25.0/'+path);
+ const r=await fetch(url,{headers:{Authorization:'Bearer '+token},redirect:'error',signal:AbortSignal.timeout(20000)});const data=await r.json().catch(()=>({}));
+ if(!r.ok){const code=data.error?.code;throw new SafeError(code===190?'meta_reconnect_required':r.status===429||[4,17,32,613].includes(code)?'meta_rate_limited':'meta_metric_'+String(code||r.status));}
+ return data;
+}
+const metricValue=(item:any)=>Number(item?.total_value?.value??item?.values?.[0]?.value??item?.value);
+async function mediaInsights(mediaId:string,token:string){
+ const metrics:Record<string,number>={};
+ try{
+  const data=await graphGet(mediaId+'/insights?metric='+METRICS.join(','),token);
+  for(const item of Array.isArray(data.data)?data.data:[]){const v=metricValue(item);if(item?.name&&Number.isFinite(v))metrics[item.name]=v;}
+ }catch(error){
+  if(error instanceof SafeError&&['meta_reconnect_required','meta_rate_limited'].includes(error.code))throw error;
+  // One unsupported metric fails the combined request; read them one by one.
+  for(const name of METRICS){
+   try{const data=await graphGet(mediaId+'/insights?metric='+name,token);const v=metricValue(data?.data?.[0]);if(Number.isFinite(v))metrics[name]=v;}
+   catch(inner){if(inner instanceof SafeError&&['meta_reconnect_required','meta_rate_limited'].includes(inner.code))throw inner;}
+  }
+ }
+ const media=await graphGet(mediaId+'?fields=like_count,comments_count',token).catch(()=>({}));
+ if(Number.isFinite(Number(media.like_count)))metrics.likes=Number(media.like_count);
+ if(Number.isFinite(Number(media.comments_count)))metrics.comments=Number(media.comments_count);
+ if(!Number.isFinite(metrics.total_interactions)&&['likes','comments','shares','saved'].every(k=>Number.isFinite(metrics[k])))metrics.total_interactions=metrics.likes+metrics.comments+metrics.shares+metrics.saved;
+ return metrics;
+}
+async function refreshMetrics(a:any,token:string,deadline:number){
+ const before=new Date(Date.now()-METRIC_AGE_MS).toISOString();
+ const due=await db('property_marketing_events?select=id,link_key,instagram_media_id&company_id=eq.'+a.company_id+'&channel=eq.instagram&link_key=like.instagram:*'
+  +'&or=(last_synced_at.is.null,last_synced_at.lt."'+before+'")&order=last_synced_at.asc.nullsfirst,id&limit='+METRICS_PER_RUN);
+ let synced=0,failed=0;
+ for(const e of due){
+  if(Date.now()>deadline)break;
+  const now=new Date().toISOString(),where='property_marketing_events?id=eq.'+e.id+'&company_id=eq.'+a.company_id;
+  let mediaId=/^\d{5,40}$/.test(String(e.instagram_media_id||''))?String(e.instagram_media_id):'';
+  if(!mediaId){
+   const found=await db('instagram_media_catalog?select=instagram_media_id&account_id=eq.'+a.id+'&link_key=eq.'+encodeURIComponent(e.link_key)+'&limit=1');
+   mediaId=/^\d{5,40}$/.test(String(found?.[0]?.instagram_media_id||''))?String(found[0].instagram_media_id):'';
+  }
+  if(!mediaId){await db(where,'PATCH',{sync_status:'error',sync_error:'instagram_media_not_found_or_not_owned_by_omanvilla',last_synced_at:now});failed++;continue;}
+  const m=await mediaInsights(mediaId,token);
+  if(!Number.isFinite(m.views)){await db(where,'PATCH',{sync_status:'error',sync_error:'instagram_views_unavailable_previous_values_preserved',last_synced_at:now,instagram_media_id:mediaId});failed++;continue;}
+  await db(where,'PATCH',{instagram_media_id:mediaId,auto_sync:true,sync_status:'synced',sync_error:null,last_synced_at:now,
+   views:m.views,reach:m.reach??null,likes:m.likes??null,comments:m.comments??null,shares:m.shares??null,saves:m.saved??null,total_interactions:m.total_interactions??null,
+   watch_time_ms:m.ig_reels_video_view_total_time??null,avg_watch_time_ms:m.ig_reels_avg_watch_time??null,insights_payload:{metrics:m,synced_at:now,source:VERSION}});
+  synced++;
+ }
+ return {metrics_synced:synced,metrics_failed:failed};
+}
 async function runAccount(a:any,deadline:number){
  const state=await rpc('crm_instagram_claim',{p_account:a.id});if(!state)return {account_id:a.id,skipped:true};
  const lease=state.lease_id,where='instagram_discovery_state?account_id=eq.'+a.id+'&lease_id=eq.'+lease;
- const counts={fetched:0,linked:0,added:0,review:0,non_property:0};
+ const counts:Record<string,unknown>={fetched:0,linked:0,added:0,review:0,non_property:0};
  try{
   const token=await tokenFor(a);
   const latest=await page(a,token,null,25);await rpc('crm_instagram_ingest',{p_account:a.id,p_lease:lease,p_media:latest.media});counts.fetched+=latest.media.length;
@@ -64,6 +119,10 @@ async function runAccount(a:any,deadline:number){
    }
    await rpc('crm_instagram_notify',{p_account:a.id});
   }
+  let metrics={};
+  try{metrics=await refreshMetrics(a,token,deadline);}
+  catch(error){if(error instanceof SafeError&&['meta_reconnect_required','meta_rate_limited'].includes(error.code))throw error;metrics={metrics_error:error instanceof SafeError?error.code:'metrics_failed'};}
+  Object.assign(counts,metrics);
   await db(where,'PATCH',{last_success_at:new Date().toISOString(),last_error_code:null,error_count:0,next_retry_at:null,lease_id:null,lease_until:null,updated_at:new Date().toISOString()});
   return {account_id:a.id,ok:true,...counts};
  }catch(error){
