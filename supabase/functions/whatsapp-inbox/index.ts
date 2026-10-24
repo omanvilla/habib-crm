@@ -18,6 +18,17 @@ function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "content-type": "application/json; charset=utf-8", "cache-control": "private, no-store" } });
 }
 
+// Unverified "sub" claim, used only to prefetch a profile that is discarded
+// unless auth.getUser() returns the same user id.
+function jwtSubject(authHeader: string) {
+  try {
+    const part = authHeader.slice(7).trim().split(".")[1] || "";
+    const b64 = part.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(part.length / 4) * 4, "=");
+    const sub = JSON.parse(atob(b64))?.sub;
+    return typeof sub === "string" && /^[0-9a-f-]{36}$/i.test(sub) ? sub : "";
+  } catch { return ""; }
+}
+
 function allowedMediaUrl(value: string) {
   try {
     const u = new URL(value);
@@ -96,12 +107,21 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } }, auth: { persistSession: false, autoRefreshToken: false },
     });
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-    const { data: userData, error: userError } = await userClient.auth.getUser();
+    // Fetch the profile for the token subject alongside getUser() (each is a
+    // round trip to the database region). It is used only when getUser()
+    // confirms that same user; otherwise the profile is read for user.id.
+    const tokenSubject = jwtSubject(authHeader);
+    const profileQuery = (id: string) => admin.from("profiles")
+      .select("id,company_id,role,is_active,full_name").eq("id", id).single();
+    const [{ data: userData, error: userError }, earlyProfile] = await Promise.all([
+      userClient.auth.getUser(),
+      tokenSubject ? profileQuery(tokenSubject) : Promise.resolve(null),
+    ]);
     const user = userData?.user;
     if (userError || !user) return json({ ok: false, error: "invalid_auth" }, 401);
 
-    const { data: profile, error: profileError } = await admin.from("profiles")
-      .select("id,company_id,role,is_active,full_name").eq("id", user.id).single();
+    const { data: profile, error: profileError } =
+      earlyProfile && user.id === tokenSubject ? earlyProfile : await profileQuery(user.id);
     if (profileError || !profile || profile.is_active === false) return json({ ok: false, error: "profile_not_authorized" }, 403);
     if (CRM_COMPANY_ID && profile.company_id !== CRM_COMPANY_ID) return json({ ok: false, error: "wrong_company" }, 403);
     if (!["owner","manager","agent"].includes(String(profile.role))) return json({ ok: false, error: "whatsapp_inbox_not_allowed" }, 403);
@@ -110,11 +130,12 @@ Deno.serve(async (req) => {
     const action = String(payload?.action || "list");
     const companyId = profile.company_id;
 
-    const routesR = await admin.from("company_lead_routes")
-      .select("route_key,owner_only_inbox").eq("company_id", companyId);
+    const [routesR, staffR] = await Promise.all([
+      admin.from("company_lead_routes").select("route_key,owner_only_inbox").eq("company_id", companyId),
+      admin.from("profiles").select("phone").eq("company_id",companyId).eq("is_active",true),
+    ]);
     if (routesR.error) throw new Error(`route_access_failed: ${routesR.error.message}`);
     const ownerOnly = new Set((routesR.data || []).filter((r:any)=>r.owner_only_inbox===true).map((r:any)=>String(r.route_key)));
-    const staffR=await admin.from("profiles").select("phone").eq("company_id",companyId).eq("is_active",true);
     if(staffR.error)throw new Error("internal_contacts_unavailable");
     const internalWaIds=new Set((staffR.data||[]).map((p:any)=>{const digits=String(p.phone||"").replace(/\D/g,"");return digits.length===8?"968"+digits:digits.startsWith("00")?digits.slice(2):digits}).filter((phone:string)=>phone.length>=8));
 
@@ -173,30 +194,39 @@ Deno.serve(async (req) => {
         .eq("company_id", companyId);
       if (profile.role !== "owner" && ownerOnly.size) q = q.not("route_key", "in", `(${[...ownerOnly].join(",")})`);
       if(internalWaIds.size)q=q.not("customer_wa_id","in",`(${[...internalWaIds].join(",")})`);
-      const r = await q.order("last_message_at", { ascending: false, nullsFirst: false })
-        .order("id", { ascending: false }).range(offset, offset + pageSize);
+      // Independent reads run together; errors are still reported in the original order.
+      const [r, counters, hidden] = await Promise.all([
+        q.order("last_message_at", { ascending: false, nullsFirst: false })
+          .order("id", { ascending: false }).range(offset, offset + pageSize),
+        userClient.rpc("crm_whatsapp_inbox_counts"),
+        internalWaIds.size
+          ? userClient.from("whatsapp_conversations").select("unread_count,human_handoff_required").eq("company_id",companyId).in("customer_wa_id",[...internalWaIds])
+          : Promise.resolve(null),
+      ]);
       if (r.error) throw new Error(`conversation_list_failed: ${r.error.message}`);
       const hasMore = (r.data || []).length > pageSize;
       const conversations = (r.data || []).slice(0, pageSize);
       const clientIds = [...new Set(conversations.map((c:any)=>c.client_id).filter(Boolean))];
       const clientsMap: Record<string, any> = {};
-      if (clientIds.length) {
-        const cr = await userClient.from("clients")
-          .select("id,name,phone,phone_normalized,preferred_area,lead_temperature,status,pipeline_stage,assigned_to")
-          .eq("company_id", companyId).in("id", clientIds);
+      const [cr, previews] = await Promise.all([
+        clientIds.length
+          ? userClient.from("clients")
+            .select("id,name,phone,phone_normalized,preferred_area,lead_temperature,status,pipeline_stage,assigned_to")
+            .eq("company_id", companyId).in("id", clientIds)
+          : Promise.resolve(null),
+        userClient.rpc("crm_whatsapp_latest_messages", { p_conversation_ids: conversations.map((c:any)=>c.id) }),
+      ]);
+      if (cr) {
         if (cr.error) throw new Error(`client_list_failed: ${cr.error.message}`);
         for (const c of cr.data || []) clientsMap[c.id] = c;
       }
-      const counters = await userClient.rpc("crm_whatsapp_inbox_counts");
       if (counters.error) throw new Error(`inbox_counts_failed: ${counters.error.message}`);
       const counts = Array.isArray(counters.data) ? counters.data[0] : counters.data;
-      if(internalWaIds.size){
-        const hidden=await userClient.from("whatsapp_conversations").select("unread_count,human_handoff_required").eq("company_id",companyId).in("customer_wa_id",[...internalWaIds]);
+      if(hidden){
         if(hidden.error)throw new Error("internal_counts_failed");
         counts.unread_total=Math.max(0,Number(counts.unread_total||0)-(hidden.data||[]).reduce((n:any,c:any)=>n+Number(c.unread_count||0),0));
         counts.handoff_total=Math.max(0,Number(counts.handoff_total||0)-(hidden.data||[]).filter((c:any)=>c.human_handoff_required).length);
       }
-      const previews = await userClient.rpc("crm_whatsapp_latest_messages", { p_conversation_ids: conversations.map((c:any)=>c.id) });
       if (previews.error) throw new Error(`message_previews_failed: ${previews.error.message}`);
       const latestMap: Record<string, any> = {};
       for (const m of previews.data || []) latestMap[m.conversation_id] = m;
