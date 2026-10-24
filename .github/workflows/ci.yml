@@ -19,6 +19,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # security-regressions.cjs compares against earlier commits with git show.
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
