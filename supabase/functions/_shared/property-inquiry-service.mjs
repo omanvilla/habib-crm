@@ -64,6 +64,10 @@ export function createPropertyInquiryService({ db, companyId, apiKey, model, fet
     const context = await readMessage(messageId);
     if (!context || context.message.direction !== 'inbound') return emptyResult({ blocked_reason: 'invalid_inbound_anchor' });
     const { message, conversation } = context;
+    // The insert trigger already attributed this message exactly (for example by
+    // its saved publication link), so it is not review work and raises no alert.
+    if (message.matched_property_id && ['auto_matched', 'resolved_manual'].includes(message.property_match_status))
+      return emptyResult({ already_attributed: true });
     assertResult(await db.from('unmatched_property_links').upsert({
       company_id: companyId, client_id: message.client_id, conversation_id: message.conversation_id,
       whatsapp_message_id: message.id, raw_url: textOf(message).slice(0, 6000) || '[صورة تحتاج تحديد العقار]',
