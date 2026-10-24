@@ -10,7 +10,11 @@ Frontend is still **20261021-client-v17**. PR #2 (merge `9234553`) only makes `i
 
 Verified after apply: owner's real session loaded the dashboard (18 calls, all 200) and the client list (1,409 clients, 10 calls, 0 errors). Not covered: employee sessions, every page, writes. Rollback: `db/changes/36-…rollback.sql` then `35-…rollback.sql`.
 
-Open from the same review: leaked-password protection still disabled (Dashboard → Auth; not available through the connector); 6 deployed Edge functions are not in the repo (4 return 410, `whatsapp-save-system-token` and `whatsapp-meta-login-log` require owner/manager); 37 `auth_rls_initplan` performance warnings.
+**SQL37** `20261024082708_rls_initplan_wrap_20261024`: every bare `auth.uid()`, `auth.jwt()`, `my_company()` and `my_role()` in public RLS policies is wrapped as `( SELECT f() )` so it is evaluated once per statement (85 policies; originals in `crm_repair_private.rls37_policy_backup`). Logic is unchanged; row-dependent helpers (`can_access_client`, `can_access_request`, `staff_can_access_branch`, `investment_row_allowed`) are untouched. The `auth_rls_initplan` advisor went from 37 to 0. Before apply: a rolled-back trial matched all 28 owner/agent visible-row counts, and a forward→rollback trial restored all policies byte-identical.
+
+Measured `count(*)` per visible table, best of 2–3, same session data (before → after): owner clients 137→59 ms, client_requests 125→75, activities 441→190, whatsapp_messages 1158→1148; agent clients 1670→1563, client_requests 2385→2185, activities 7955→5895, client_request_assignees 1409→562, deals 115→56, whatsapp_messages 14415→13530. Agent counts were identical before and after. The remaining agent cost is the per-row helper functions above, not this rewrite; `crm_dashboard_work` (≈2.5–2.9 s in the owner's live session) is a SECURITY DEFINER report and unaffected. Live after apply: owner dashboard 18/18 calls 200, client list 1,411 clients, 12 calls, 0 errors. Rollback: `db/changes/37-rls-initplan-wrap.rollback.sql`.
+
+Open from the same review: leaked-password protection still disabled (Dashboard → Auth; not available through the connector); 6 deployed Edge functions are not in the repo (4 return 410, `whatsapp-save-system-token` and `whatsapp-meta-login-log` require owner/manager); agent-side RLS helper cost (whatsapp_messages ≈13.5 s, activities ≈5.9 s for a full count).
 
 ## Deployed: client chronology and guarded WhatsApp context — v17
 
