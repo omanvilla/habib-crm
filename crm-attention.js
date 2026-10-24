@@ -62,7 +62,8 @@
     const total=Number(d.total_conversations||0),items=Array.isArray(d.items)?d.items:[];
     if(!total){box.innerHTML='<div class="crm-attention-head"><h3>يحتاج تدخل بشري</h3></div><div class="crm-attention-ok">✓ لا توجد محادثات تحتاج تدخلًا الآن.</div>';return;}
     let h='<div class="crm-attention-head"><h3>يحتاج تدخل بشري <b dir="ltr">'+total.toLocaleString('en-US')+'</b></h3><p>محادثات لم يحدد النظام موضوعها أو طلبت موظفًا. افتح المحادثة ثم حدّد: عقار محدد، طلب عام، أو خارج العقارات.</p>'
-      +'<div class="crm-attention-summary"><span>'+Number(d.images||0)+' صورة</span><span>'+Number(d.links||0)+' رابط</span><span>'+Number(d.texts||0)+' نص</span><span>'+Number(d.handoff_conversations||0)+' طلب تدخل</span></div></div><ul class="crm-attention-list">';
+      +'<div class="crm-attention-summary"><span>'+Number(d.images||0)+' صورة</span><span>'+Number(d.links||0)+' رابط</span><span>'+Number(d.texts||0)+' نص</span><span>'+Number(d.handoff_conversations||0)+' طلب تدخل</span>'
+      +(currentProfile.role==='owner'?'<button type="button" class="btn-secondary crm-attention-batch" data-attention="ai-batch">تحليل 5 محادثات بالذكاء الاصطناعي</button>':'')+'</div></div><ul class="crm-attention-list">';
     for(const row of items){
       h+='<li class="crm-attention-row"><button type="button" class="crm-attention-main" data-attention="open" data-conversation="'+esc(row.conversation_id)+'">'
         +'<strong>'+esc(row.name)+'</strong><span class="crm-attention-route">'+esc(routes[row.route_key]||row.route_key||'')+'</span><span class="crm-attention-time">'+esc(ago(row.latest_at))+'</span>'
@@ -89,13 +90,50 @@
     return [p.title||'عقار',p.area,price,p.bedrooms?p.bedrooms+' غرف':'',p.property_code].filter(Boolean).join(' · ');
   }
   const statusLabel={available:'متاح',reserved:'محجوز',sold:'مباع'};
+  const aiKinds={property:'عقار محدد',general:'طلب عام',non_real_estate:'خارج العقارات',unavailable:'عقار غير متاح',unclear:'غير واضح'};
+  function aiHtml(s){
+    if(!s||!s.kind)return '<button type="button" class="btn-secondary" data-attention="ai">اقتراح بالذكاء الاصطناعي</button><small> يقرأ المحادثة والصور وردود الموظف ويقترح التصنيف؛ لا يربط شيئًا قبل حفظك.</small>';
+    const pct=Math.round(Number(s.confidence||0)*100);
+    return '<p class="crm-attention-ai"><strong>اقتراح الذكاء الاصطناعي: '+esc(aiKinds[s.kind]||s.kind)+'</strong> <span dir="ltr">'+pct+'%</span><br>'+esc(s.reason||'')+'</p>'
+      +'<button type="button" class="btn-secondary" data-attention="ai">إعادة التحليل</button>';
+  }
+  // Applies a suggestion to the form only; staff still review and press save.
+  function applySuggestion(s){
+    if(!dialog||!s)return;
+    const kind=s.kind==='unclear'?null:s.kind;
+    if(kind){const radio=dialog.querySelector('input[name=crmAttentionKind][value="'+kind+'"]');if(radio){radio.checked=true;radio.dispatchEvent(new Event('change'));}}
+    const ids=new Set(Array.isArray(s.property_ids)?s.property_ids:[]);
+    dialog.querySelectorAll('#crmAttentionPropList input[type=checkbox]').forEach(x=>{if(ids.has(x.value))x.checked=true;});
+  }
+  async function suggest(conversationId,button){
+    const box=dialog&&dialog.querySelector('#crmAttentionAi');if(!box)return;
+    button.disabled=true;box.insertAdjacentHTML('beforeend','<small class="crm-attention-muted"> جارٍ التحليل… قد يستغرق 15 ثانية</small>');
+    try{
+      const r=await supa.functions.invoke('inquiry-ai-suggest',{body:{conversation_id:conversationId}});
+      if(r.error)throw r.error;
+      if(!r.data||r.data.ok!==true)throw new Error(r.data&&r.data.error||'تعذر التحليل');
+      if(!dialog.open)return;
+      box.innerHTML=aiHtml(r.data.suggestion);applySuggestion(r.data.suggestion);
+      const row=(state.data&&state.data.items||[]).find(x=>x.conversation_id===conversationId);if(row)row.ai_suggestion=r.data.suggestion;
+    }catch(error){box.innerHTML=aiHtml(null)+'<div class="crm-attention-error">'+esc(message(error))+'</div>';}
+  }
+  async function suggestBatch(button){
+    button.disabled=true;const label=button.textContent;button.textContent='جارٍ تحليل 5 محادثات…';
+    try{
+      const r=await supa.functions.invoke('inquiry-ai-suggest',{body:{action:'batch',limit:5}});
+      if(r.error)throw r.error;
+      toast('تم تحليل '+Number(r.data&&r.data.processed||0)+' محادثات؛ افتح كل واحدة لتأكيد الاقتراح','success');
+      state.data=null;await load();
+    }catch(error){toast(message(error),'error');}
+    finally{if(button.isConnected){button.disabled=false;button.textContent=label;}}
+  }
   async function classify(conversationId){
     const row=(state.data&&state.data.items||[]).find(x=>x.conversation_id===conversationId)||{conversation_id:conversationId};
     if(!dialog){dialog=document.createElement('dialog');dialog.className='crm-attention-dialog';dialog.setAttribute('dir','rtl');document.body.append(dialog);
       dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});}
     const suggested=new Set(row.ai_suggestion&&Array.isArray(row.ai_suggestion.property_ids)?row.ai_suggestion.property_ids:[]);
     dialog.innerHTML='<div class="crm-attention-dialog-head"><h3>تحديد الاستفسار'+(row.name?' · '+esc(row.name):'')+'</h3><button type="button" class="btn-secondary" data-attention="close">إغلاق</button></div>'
-      +(row.ai_suggestion&&row.ai_suggestion.reason?'<p class="crm-attention-ai">اقتراح الذكاء الاصطناعي: '+esc(row.ai_suggestion.reason)+'</p>':'')
+      +'<div id="crmAttentionAi" class="crm-attention-ai-box">'+aiHtml(row.ai_suggestion)+'</div>'
       +'<fieldset class="crm-attention-kinds"><legend>عن ماذا يستفسر العميل؟</legend>'+kinds.map((k,i)=>'<label><input type="radio" name="crmAttentionKind" value="'+k.id+'"'+(i===0?' checked':'')+'> '+esc(k.label)+'</label>').join('')+'</fieldset>'
       +'<div class="crm-attention-props"><label class="fl" for="crmAttentionSearch">اختر العقار أو العقارات (يمكن اختيار أكثر من عقار)</label><input id="crmAttentionSearch" class="fi" type="search" placeholder="ابحث بالمنطقة أو السعر أو الاسم"><div id="crmAttentionPropList" class="crm-attention-proplist">جارٍ تحميل العقارات…</div></div>'
       +'<label class="fl" for="crmAttentionNote">ملاحظة (اختياري، وإلزامية في "أخرى")</label><textarea id="crmAttentionNote" class="fta" rows="2" maxlength="1000"></textarea>'
@@ -141,6 +179,8 @@
     if(action==='open'){if(dialog&&dialog.open)dialog.close();openConversation(id);}
     else if(action==='classify')classify(id);
     else if(action==='save')save(id,el);
+    else if(action==='ai'){const s=dialog&&dialog.querySelector('[data-attention=save]');if(s)suggest(s.dataset.conversation,el);}
+    else if(action==='ai-batch')suggestBatch(el);
     else if(action==='close'&&dialog)dialog.close();
     else if(action==='retry'){state.data=null;load();}
     else if(action==='prev'&&state.page>0){state.page--;load();}

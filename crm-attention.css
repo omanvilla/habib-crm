@@ -36,3 +36,6 @@
 .crm-attention-dialog-actions{display:flex;gap:8px;justify-content:flex-end}
 .crm-attention-chat-btn{padding:6px 10px;font-size:10px;margin-inline-start:6px}
 @media (max-width:640px){.crm-attention-actions{width:100%}.crm-attention-actions button{flex:1}}
+.crm-attention-ai-box{margin:8px 0;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px}
+.crm-attention-ai-box .crm-attention-ai{width:100%;margin:0}
+.crm-attention-batch{padding:2px 8px;font-size:10px}

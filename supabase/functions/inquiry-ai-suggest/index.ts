@@ -109,6 +109,7 @@ const instructions = [
   "kind=general: a search or budget request without a specific listing. kind=non_real_estate: job seekers, suppliers, personal or unrelated messages.",
   "kind=unclear: evidence is insufficient. Never guess from price or area alone when several listings fit and nothing else distinguishes them; then return all fitting ids with low confidence or unclear.",
   "confidence: 0.9+ only when there is explicit evidence (matching photo, exact link, staff sent that listing's details, unique area+price).",
+  "In reason and evidence refer to listings by title, area and price, never by id.",
 ].join("\n");
 
 Deno.serve(async (req) => {

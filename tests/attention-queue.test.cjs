@@ -24,3 +24,21 @@ test('SQL keeps branch and investment separation on both functions',()=>{
 test('an explicit customer request for a person is not cleared by classification',()=>{
   assert.match(sql,/p_kind='non_real_estate' OR coalesce\(w\.handoff_reason,''\) LIKE '%تحديد%'/);
 });
+test('AI suggestion only fills the form; saving still goes through the classifier',()=>{
+  assert(js.includes("supa.functions.invoke('inquiry-ai-suggest'"));
+  assert(!/inquiry-ai-suggest[\s\S]{0,400}crm_classify_inquiry/.test(js.slice(js.indexOf('async function suggest('),js.indexOf('async function suggestBatch('))));
+  assert(js.includes("currentProfile.role==='owner'?'<button type=\"button\" class=\"btn-secondary crm-attention-batch\""));
+});
+test('AI function checks caller access with RLS and keeps the Instagram catalog owner-only',()=>{
+  const fn=fs.readFileSync('supabase/functions/inquiry-ai-suggest/index.ts','utf8');
+  assert.match(fn,/userClient\.from\("whatsapp_conversations"\)/);
+  assert.match(fn,/profile\.role === "owner"\s*\n\s*\? admin\.from\("instagram_media_catalog"\)/);
+  assert.match(fn,/if \(profile\.role !== "owner"\) return json\(\{ ok: false, error: "owner_only" \}, 403\)/);
+  assert(!fn.includes('metaSend'),'never sends WhatsApp messages');
+});
+test('SQL43 keeps cross-branch saved links for staff and records every automatic resolution',()=>{
+  const s43=fs.readFileSync('db/changes/43-saved-link-reconcile.forward.sql','utf8');
+  assert.match(s43,/w\.route_key IN \('barka','muscat'\) AND p\.branch_key IS DISTINCT FROM w\.route_key\) THEN CONTINUE/);
+  assert.match(s43,/INSERT INTO crm_repair_private\.sql43_auto_resolved/);
+  assert.match(s43,/handoff_reason IN \('استفسار عن عقار يحتاج تحديده وربطه بالعقار الصحيح','استفسار عن عقار محدد يحتاج تحديده'\)/);
+});
