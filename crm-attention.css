@@ -22,7 +22,7 @@
 .crm-attention-pager{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:10px;font-size:11px}
 .crm-attention-ok{font-size:12px;color:#166534;margin-top:6px}
 .crm-attention-muted{font-size:12px;color:var(--sand-dark,#8a7a6a);margin-top:6px}
-.crm-attention-dialog{max-width:620px;width:calc(100% - 32px);border:none;border-radius:14px;padding:16px}
+.crm-attention-dialog{max-width:620px;width:calc(100% - 32px);max-height:calc(100vh - 32px);overflow:auto;margin:auto;inset:0;border:none;border-radius:14px;padding:16px}
 .crm-attention-dialog::backdrop{background:rgba(0,0,0,.35)}
 .crm-attention-dialog-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .crm-attention-dialog-head h3{margin:0;font-size:15px}
