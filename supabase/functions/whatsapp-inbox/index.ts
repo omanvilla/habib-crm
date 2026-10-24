@@ -251,7 +251,20 @@ Deno.serve(async (req) => {
         if (cursor.error || !cursor.data) return json({ok:false,error:"invalid_message_cursor"},400);
         mq = mq.or(`message_timestamp.lt.${cursor.data.message_timestamp},and(message_timestamp.eq.${cursor.data.message_timestamp},id.lt.${cursor.data.id})`);
       }
-      const mr = await mq.order("message_timestamp",{ascending:false}).order("id",{ascending:false}).limit(pageSize+1);
+      // The page, client, requests and automation events are independent reads:
+      // run them together and check errors in the original order.
+      const [mr, cr, rr, ar] = await Promise.all([
+        mq.order("message_timestamp",{ascending:false}).order("id",{ascending:false}).limit(pageSize+1),
+        conversation.client_id
+          ? userClient.from("clients").select("id,name,phone,phone_normalized,email,preferred_area,lead_temperature,status,pipeline_stage,assigned_to").eq("company_id",companyId).eq("id",conversation.client_id).maybeSingle()
+          : Promise.resolve(null),
+        conversation.client_id
+          ? userClient.from("client_requests")
+            .select("id,request_type,property_type,property_types,preferred_area,preferred_areas,alternative_areas,wilayat,budget_min,budget_max,payment_method,financing_readiness,purchase_timing,purpose,bedrooms_min,bathrooms_min,must_haves,flexible_preferences,decision_maker_status,search_status,next_action,next_followup,status,pipeline_stage,priority,route_key,branch_key,assigned_to,closed_reason,needs_human_review,first_human_response_at,first_mutual_dialogue_at,requirements_completed_at,qualified_at,first_match_sent_at,first_appointment_booked_at,first_appointment_confirmed_at,first_attended_at,serious_interest_at,opportunity_opened_at,negotiation_started_at,deposit_paid_at,contract_completed_at,closed_won_at,last_mutual_contact_at,updated_at")
+            .eq("company_id",companyId).eq("client_id",conversation.client_id).order("updated_at",{ascending:false}).limit(20)
+          : Promise.resolve(null),
+        userClient.from("whatsapp_automation_events").select("id,message_id,property_id,viewing_id,deal_id,action_type,status,confidence,reason,payload,created_at,applied_at").eq("company_id",companyId).eq("conversation_id",conversationId).order("created_at",{ascending:false}).limit(50),
+      ]);
       if (mr.error) throw new Error(`messages_failed: ${mr.error.message}`);
       const hasMore = (mr.data||[]).length>pageSize;
       const pageMessages = (mr.data||[]).slice(0,pageSize);
@@ -260,18 +273,11 @@ Deno.serve(async (req) => {
         Number(b.ingestion_seq||0)-Number(a.ingestion_seq||0) || String(b.id).localeCompare(String(a.id)))[0]?.id || null;
       const messages = pageMessages.reverse();
       let client:any=null, requests:any[]=[];
-      if (conversation.client_id) {
-        const cr=await userClient.from("clients").select("id,name,phone,phone_normalized,email,preferred_area,lead_temperature,status,pipeline_stage,assigned_to").eq("company_id",companyId).eq("id",conversation.client_id).maybeSingle();
+      if (conversation.client_id && cr && rr) {
         client=cr.data||null;
-        let rrq=userClient.from("client_requests")
-          .select("id,request_type,property_type,property_types,preferred_area,preferred_areas,alternative_areas,wilayat,budget_min,budget_max,payment_method,financing_readiness,purchase_timing,purpose,bedrooms_min,bathrooms_min,must_haves,flexible_preferences,decision_maker_status,search_status,next_action,next_followup,status,pipeline_stage,priority,route_key,branch_key,assigned_to,closed_reason,needs_human_review,first_human_response_at,first_mutual_dialogue_at,requirements_completed_at,qualified_at,first_match_sent_at,first_appointment_booked_at,first_appointment_confirmed_at,first_attended_at,serious_interest_at,opportunity_opened_at,negotiation_started_at,deposit_paid_at,contract_completed_at,closed_won_at,last_mutual_contact_at,updated_at")
-          .eq("company_id",companyId).eq("client_id",conversation.client_id).order("updated_at",{ascending:false}).limit(20);
-        const rr=await rrq;
         if (rr.error) throw new Error(`requests_failed: ${rr.error.message}`);
         requests=rr.data||[];
-
       }
-      const ar=await userClient.from("whatsapp_automation_events").select("id,message_id,property_id,viewing_id,deal_id,action_type,status,confidence,reason,payload,created_at,applied_at").eq("company_id",companyId).eq("conversation_id",conversationId).order("created_at",{ascending:false}).limit(50);
       if (ar.error) throw new Error(`automation_events_failed: ${ar.error.message}`);
       return json({ok:true,conversation,client,requests,messages,automation_events:ar.data||[],
         has_more:hasMore,next_before:nextBefore,read_through_message_id:readThrough});
