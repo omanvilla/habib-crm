@@ -2,6 +2,51 @@
 
 Updated 2026-10-21. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 24 October 2026 — needs-intervention queue, saved-link reconciliation, AI suggestions (SQL42/43)
+
+Owner request: the CRM should work out what each WhatsApp inquiry is about, and send anything unclear to a clear human queue on the dashboard that opens the exact conversation.
+
+- **SQL42 (applied, migration `20261024162805`).**
+  - `crm_attention_queue(limit, offset)` lists conversations with pending review rows (`unmatched_property_links`) or a hand-off, grouped per conversation, with image/link/text counts.
+  - `crm_classify_inquiry(conversation, kind, property_ids[], note)` saves one of: property (1–10 listings, e.g. two villas in Al Rumais), general, unavailable, non_real_estate, other (note required).
+  - Property links reuse `record_property_link_inquiry_internal` and `crm_finalize_property_message`.
+  - Both functions require access to the exact conversation (branch separation, investment owner-only) and a property in the caller's branch.
+  - A customer's explicit request for a person is never cleared by classification.
+- **Frontend `crm-attention.js/.css`.**
+  - A card under the dashboard header: each row opens the conversation via `openDashboardWhatsAppConversation`, and "تحديد الاستفسار" opens the classifier.
+  - The same button appears in the open conversation header.
+- **SQL43 (applied, migration `20261024164513`).**
+  - The text checker in the webhook queued a second review row and raised a hand-off for messages that the insert trigger had already attributed by a saved publication link. A database trigger now skips such rows; the same guard is in `_shared/property-inquiry-service.mjs` for the next webhook deployment, which has not happened yet.
+  - Saving a publication link for a listing now links every pending review row carrying that exact link.
+  - Cross-branch rows (for example a Barka chat about a Muscat listing) stay with staff.
+  - The automatic "identify the property" hand-off is suppressed or cleared only when no pending review row remains.
+  - One-time catch-up: 89 rows linked by saved link and 1 already attributed, both recorded in `crm_repair_private.sql43_auto_resolved`; 55 stale hand-offs cleared, recorded in `sql43_cleared_handoffs`.
+- **Edge function `inquiry-ai-suggest` (v2, deployed).**
+  - Reads the last 60 messages: customer text, voice transcripts and image readings, plus staff replies with details and links.
+  - Also reads up to two customer images, the branch inventory, and saved link mappings. Instagram catalog captions are included for the owner only, because the catalog is owner-only.
+  - Stores a suggestion (kind, listings, confidence, Arabic reason) on the pending rows. It never links, replies or sends anything.
+  - The owner can analyse 5 conversations at a time; staff can analyse one conversation at a time.
+  - Limitation: no listing has photos in `properties.images`, so image-to-inventory comparison has nothing to compare against until cover photos are uploaded.
+- **Tests.**
+  - SQL42 was trialled in rolled-back transactions:
+    - Owner: 399 conversations in 42 ms.
+    - Barka: 192 conversations, all Barka, in 158 ms.
+    - Barka was refused on a Muscat conversation (`not_assigned`) and on a Muscat property (`invalid_property`).
+    - A two-villa link and a non-real-estate classification both worked.
+  - SQL43 was trialled the same way before it was applied.
+  - Real sessions:
+    - The owner card shows all branches and the deep link opens the right conversation.
+    - Barka sees only Barka conversations and Barka properties, with no batch button.
+    - The AI dialog works for both sessions.
+  - CI: 442 tests, 0 failures.
+- **Rollback.**
+  - Run `db/changes/43-saved-link-reconcile.rollback.sql`, then `42-attention-queue.rollback.sql`.
+  - Remove the two `crm-attention` entries from `index.html`.
+  - Delete the `inquiry-ai-suggest` function.
+- **Automatic replies: not enabled.**
+  - The existing runtime is in `test` mode with one allowed customer phone ending 1169 and the `buyer_intake_v1` scenario, which asks for missing requirements once.
+  - Any new reply wording (details without location, alternatives on budget or room changes, asking for a visit time, then handing to a person) starts in the owner-only dry-run under "واتساب > تجربة الردود" before the test number.
+
 ## 24 October 2026 — same-origin SDK and database hardening (SQL35/36)
 
 Frontend is still **20261021-client-v17**. PR #2 (merge `9234553`) only makes `index.html` load the identical pinned supabase-js 2.118.0 from `vendor/` instead of jsdelivr, keeping the SRI hash; `app-base-v15.html` is unchanged. Live: 34/34 files byte-identical to main, vendored file matches SRI, Chrome's cross-site `document.write` warning gone.

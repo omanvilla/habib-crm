@@ -348,3 +348,16 @@ test('exact saved map returned by staff is anchored to the customer location req
 test('native shared GPS pin matches only exactly saved coordinates and retains original body evidence',async()=>{
  const body='Synthetic map | 23.123456 | 58.123456';const f=fixture({messages:[message('gps',body,{message_type:'location',raw_payload:{location:{latitude:23.123456,longitude:58.123456}}})],candidates:[property('p1',{map_url:'https://maps.google.com/?q=23.123456,58.123456'})]});const result=await(await f.service()).attributeInbound('gps');assert.equal(result.matched_count,1);assert.equal(f.applied()[0].args.p_matches[0].evidence.quote,body);
 });
+
+test('a message already attributed by its saved link is not queued again or alerted', async () => {
+  for (const status of ['auto_matched', 'resolved_manual']) {
+    const f = fixture({ messages: [message('m1', 'https://www.instagram.com/reel/De3aOzRNKj9/?x=1', { matched_property_id: 'p1', property_match_status: status })] });
+    const result = await (await f.service()).queueReview('m1');
+    assert.equal(result.already_attributed, true);
+    assert.equal(f.tables.unmatched_property_links.length, 0);
+    assert.equal(f.tables.whatsapp_conversations[0].human_handoff_required, false);
+  }
+  const pending = fixture({ messages: [message('m2', 'ممكن تفاصيل', { property_match_status: 'partial_match', matched_property_id: 'p1' })] });
+  await (await pending.service()).queueReview('m2');
+  assert.equal(pending.tables.unmatched_property_links.length, 1);
+});
