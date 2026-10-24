@@ -2,6 +2,22 @@
 
 Updated 2026-10-21. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 24 October 2026 — Instagram metrics refresh (instagram-discovery v3)
+
+- **Problem.** Marketing showed "قياسات غير متاحة" for links saved after 23 September (catalog or staff), for example the Al Khoudh 7 villa at 135,000. The page reported views for only 10 of 33 posts.
+- **Cause.** Metrics were written only by the manual per-property `sync_property` button. The Instagram connection itself is healthy.
+- **Fix.**
+  - The scheduled worker now also refreshes metrics for 6 saved Instagram links per run (every 5 minutes); each link is refreshed every 12 hours.
+  - The media id comes from the event or the account catalog.
+  - Earlier values are kept when Meta returns no views.
+  - Links not owned by the account are marked `error` and retried after 12 hours.
+- **Limit.** YouTube links remain manual; there is no YouTube metrics integration.
+- **Rollback.** Redeploy `instagram-discovery` from commit `1e6e1cb`.
+
+**Deferred by the owner until they say "start testing":**
+- the WhatsApp AI reply test from the allowed number ending 1169;
+- uploading property cover photos, which image matching needs.
+
 ## 24 October 2026 — needs-intervention queue, saved-link reconciliation, AI suggestions (SQL42/43)
 
 Owner request: the CRM should work out what each WhatsApp inquiry is about, and send anything unclear to a clear human queue on the dashboard that opens the exact conversation.
