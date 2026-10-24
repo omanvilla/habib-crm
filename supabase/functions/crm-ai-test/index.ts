@@ -1,0 +1,1 @@
+Deno.serve(()=>new Response(JSON.stringify({ok:false,error:'test_endpoint_disabled'}),{status:410,headers:{'content-type':'application/json; charset=utf-8'}}));

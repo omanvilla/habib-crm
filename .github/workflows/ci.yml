@@ -1,0 +1,27 @@
+name: CI
+# Runs the repository's unit and security tests for every pull request into
+# main and every push to main. The older workflows only run on their own
+# codex/* branches, so changes merged through pull requests had no checks.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/*.test.cjs
+      - run: node tests/security-regressions.cjs
