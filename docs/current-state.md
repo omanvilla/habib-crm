@@ -2,7 +2,20 @@
 
 Updated 2026-10-21. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
-## 25 October 2026 — interface simplification, phase 3
+## 25 October 2026 — full-review fixes
+
+The owner reported raw markup in deposit rows and an unreadable sold-value chart. I then reviewed every page as the Barka account, with owner-only pages shown in client-side owner mode on that browser only, at desktop width and at 375px. The review used an automatic scan for raw markup, undefined/NaN and horizontal overflow.
+
+- **Deposits.** `fmtMoney` and `fmtDate` return markup. Cells now keep only their text before escaping. A missing payment method shows "—".
+- **Sold-value chart.** The canvas was 100 units wide inside a 280px-tall box, so it rendered about 150px wide. It now uses a 600×200 canvas with 10–11px labels and plain-text tooltips.
+- **Task and event forms.** Options are built in one pass, so the new-task form opens in about 2s instead of 6–11s, which had caused statement timeouts.
+- **Staff labels.** The task assignee list, activity log, client timeline, expenses ("سُجّل بواسطة") and duplicate-client alert show the branch via `crmMemberChoiceLabel` / `crmRecordBranchLabel`. The Team page still lists accounts for management. The `{agent}` placeholder in message templates is unchanged.
+- **Layout.**
+  - Compact WhatsApp chat header, and a 300px conversation list at 901–1280px.
+  - The grid actions column is sticky, with tighter cells at ≤1280px.
+  - Dashboard attention rows are constrained on phones.
+  - The initial top bar and quick-search names match the menu. "instagram" in the top bar is now "أداء العقارات".
+- **Verification.** Each candidate commit's full build was loaded from jsDelivr in the live app. Owner-only report data cannot load for a staff account, so those reports were checked for layout only.
 
 - **Names.** The menu, top bar and page title now use the same short name: لوحة العمل، المهام، واتساب، العملاء، العقارات، التقويم، الزيارات، العربون، الملاك، التقارير، الفروع، النسخ الاحتياطي. The "إدارة …" prefixes, the English "Backup" and the mismatch between "الفريق" in the menu and "الفروع" on the page are gone. The Deals page title is unchanged.
 - **Quick guide (`crm-simple-ui.js`).** Four short steps in a dialog, with the matching menu item outlined:
