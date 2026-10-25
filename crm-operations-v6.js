@@ -6,27 +6,6 @@
   const omanDate=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'});
   const dateText=d=>d?new Date(d).toLocaleDateString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat'}):'—';
   const branchLabel=branch=>({muscat:'مسقط',barka:'بركاء'}[branch]||'الفرع');
-  // Same completeness checks as the base crmReadAll, but once the first page gives
-  // the exact count the remaining pages are read in parallel (clients: 3 pages).
-  if(typeof window.crmReadAll==='function')window.crmReadAll=async function(buildQuery){
-    const PAGE=500,first=await buildQuery().range(0,PAGE-1);
-    if(first.error)throw first.error;
-    const rows=(first.data||[]).slice(),expected=typeof first.count==='number'?first.count:null;
-    const sequential=async offset=>{for(;;){const r=await buildQuery().range(offset,offset+PAGE-1);if(r.error)throw r.error;
-      if(expected!==null&&typeof r.count==='number'&&r.count!==expected)throw new Error('تغيّرت البيانات أثناء القراءة. أعد المحاولة.');
-      const page=r.data||[];if(!page.length)break;rows.push(...page);offset+=page.length;if(expected!==null&&rows.length>=expected)break;}};
-    if(expected===null){if(rows.length===PAGE)await sequential(rows.length);return rows;}
-    if(rows.length<expected){
-      if(rows.length<PAGE)await sequential(rows.length);
-      else{
-        const offsets=[];for(let offset=PAGE;offset<expected;offset+=PAGE)offsets.push(offset);
-        const pages=await Promise.all(offsets.map(offset=>buildQuery().range(offset,offset+PAGE-1)));
-        for(const r of pages){if(r.error)throw r.error;if(typeof r.count==='number'&&r.count!==expected)throw new Error('تغيّرت البيانات أثناء القراءة. أعد المحاولة.');rows.push(...(r.data||[]));}
-      }
-    }
-    if(rows.length!==expected)throw new Error(rows.length>expected?'عدد السجلات غير متطابق':'تعذّر التحقق من اكتمال البيانات');
-    return rows;
-  };
   function branchRows(data){
     const rows=data?.branches??data?.employees;
     if(!Array.isArray(rows))throw new Error('لم تصل بيانات الفروع. أعد المحاولة.');
@@ -403,6 +382,27 @@
   };
   const oldSetPropView=window.setPropView;
   if(typeof oldSetPropView==='function')window.setPropView=function(){if(propertyTargetScope)clearPropertyTarget();return oldSetPropView.apply(this,arguments);};
+  // Same completeness checks as the base crmReadAll, but once the first page gives
+  // the exact count the remaining pages are read in parallel (clients: 3 pages).
+  if(typeof window.crmReadAll==='function')window.crmReadAll=async function(buildQuery){
+    const PAGE=500,first=await buildQuery().range(0,PAGE-1);
+    if(first.error)throw first.error;
+    const rows=(first.data||[]).slice(),expected=typeof first.count==='number'?first.count:null;
+    const sequential=async offset=>{for(;;){const r=await buildQuery().range(offset,offset+PAGE-1);if(r.error)throw r.error;
+      if(expected!==null&&typeof r.count==='number'&&r.count!==expected)throw new Error('تغيّرت البيانات أثناء القراءة. أعد المحاولة.');
+      const page=r.data||[];if(!page.length)break;rows.push(...page);offset+=page.length;if(expected!==null&&rows.length>=expected)break;}};
+    if(expected===null){if(rows.length===PAGE)await sequential(rows.length);return rows;}
+    if(rows.length<expected){
+      if(rows.length<PAGE)await sequential(rows.length);
+      else{
+        const offsets=[];for(let offset=PAGE;offset<expected;offset+=PAGE)offsets.push(offset);
+        const pages=await Promise.all(offsets.map(offset=>buildQuery().range(offset,offset+PAGE-1)));
+        for(const r of pages){if(r.error)throw r.error;if(typeof r.count==='number'&&r.count!==expected)throw new Error('تغيّرت البيانات أثناء القراءة. أعد المحاولة.');rows.push(...(r.data||[]));}
+      }
+    }
+    if(rows.length!==expected)throw new Error(rows.length>expected?'عدد السجلات غير متطابق':'تعذّر التحقق من اكتمال البيانات');
+    return rows;
+  };
   // The 30-second unread badge asks only for totals unless the WhatsApp page is
   // open; the full 100-conversation list was the heaviest repeated database load.
   const fullBadge=window.refreshWhatsAppBadge;
@@ -418,7 +418,7 @@
   // read. A return visit in the same session draws the last list immediately and
   // refreshes it quietly.
   let clientsCache=null;
-  if(typeof window.loadClients==='function')window.loadClients=async function(){
+  if(typeof window.loadClients==='function'&&String(window.loadClients).includes('clients_assigned_to_fkey'))window.loadClients=async function(){
     const list=$id('clientsList'),generation=crmSessionGeneration,userId=currentUser&&currentUser.id,archived=showArchivedClients,token={};
     const key=generation+':'+userId+':'+archived;
     list.crmReadToken=token;
