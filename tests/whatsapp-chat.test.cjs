@@ -31,3 +31,9 @@ test('voice recording uses only formats WhatsApp accepts',()=>{
   assert.match(ui,/\['audio\/ogg;codecs=opus','audio\/mp4;codecs=mp4a\.40\.2','audio\/mp4'\]/);
   assert(!/audio\/webm/.test(ui));
 });
+test('voice notes, videos and files stream as bytes so files above 16 MB open',()=>{
+  assert.match(ui,/action:'media_stream'/);
+  assert.match(inbox,/if \(action === "media_stream"\)/);
+  assert.match(inbox,/STREAM_LIMIT = 100 \* 1024 \* 1024/);
+  assert.match(inbox,/"Access-Control-Expose-Headers": "x-media-type"/);
+});

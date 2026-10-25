@@ -178,6 +178,47 @@ Deno.serve(async (req) => {
     }
     const pageSize = Math.min(300, Math.max(1, Math.floor(Number(payload?.limit) || 100)));
 
+    // Voice notes, videos and files are streamed as bytes (no base64), so large
+    // videos customers send (over 16 MB) still open. Same access checks as "media".
+    if (action === "media_stream") {
+      const conversationId=String(payload?.conversation_id||"").trim(), messageId=String(payload?.message_id||"").trim();
+      if (!conversationId || !messageId) return json({ok:false,error:"conversation_message_required"},400);
+      const conversation=await getConversation(conversationId);
+      if (!conversation) return json({ok:false,error:"conversation_not_found"},404);
+      const message=await userClient.from("whatsapp_messages").select("id,media_id,direction,message_type")
+        .eq("company_id",companyId).eq("conversation_id",conversationId).eq("id",messageId).maybeSingle();
+      if (message.error || !message.data) return json({ok:false,error:"message_not_found"},404);
+      const kind=String(message.data.message_type||"");
+      if (!["audio","video","document","image","sticker"].includes(kind) || !/^\d{1,40}$/.test(String(message.data.media_id||"")))
+        return json({ok:false,error:"media_message_required"},400);
+      const physical=await admin.rpc("resolve_whatsapp_route",{p_company_id:companyId,p_meta_phone_number_id:String(conversation.meta_phone_number_id||"")});
+      const physicalRoute=Array.isArray(physical.data)?physical.data[0]:physical.data;
+      const credentialRoute=String(physicalRoute?.route_key||"");
+      if(physical.error||!physicalRoute?.whatsapp_number||!["muscat","barka"].includes(credentialRoute)) return json({ok:false,error:"media_credentials_unavailable"},502);
+      const tokens:string[]=[];
+      const credential=await admin.from("whatsapp_route_credentials").select("token_ciphertext,token_iv,expires_at").eq("company_id",companyId).eq("route_key",credentialRoute).maybeSingle();
+      if (credential.data && META_APP_SECRET && (!credential.data.expires_at || Date.parse(credential.data.expires_at)>Date.now()+60000)) {
+        try { tokens.push(await decryptMediaToken(credential.data.token_ciphertext,credential.data.token_iv,companyId,credentialRoute)); } catch { /* fall back */ }
+      }
+      if (WHATSAPP_ACCESS_TOKEN && !tokens.includes(WHATSAPP_ACCESS_TOKEN)) tokens.push(WHATSAPP_ACCESS_TOKEN);
+      const STREAM_LIMIT = 100 * 1024 * 1024;
+      for (const token of tokens) {
+        const options = { headers: { Authorization: `Bearer ${token}` }, redirect: "error" as const };
+        const mr = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/${encodeURIComponent(String(message.data.media_id))}`,{...options,signal:AbortSignal.timeout(10000)});
+        if (!mr.ok) { await mr.body?.cancel(); continue; }
+        const metadata = JSON.parse(new TextDecoder().decode(await boundedBytes(mr,65536)));
+        const mime = String(metadata?.mime_type || "").toLowerCase().split(";")[0].trim();
+        if (!MEDIA_TYPES[kind]?.test(mime)) return json({ok:false,error:"unsupported_media_type"},415);
+        if (Number(metadata?.file_size || 0) > STREAM_LIMIT) return json({ok:false,error:"media_size_limit",message:"الملف أكبر من 100 ميجابايت؛ افتحه من واتساب."},413);
+        if (!allowedMediaUrl(String(metadata?.url || ""))) return json({ok:false,error:"untrusted_media_host"},502);
+        const br = await fetch(String(metadata.url),{...options,signal:AbortSignal.timeout(120000)});
+        if (!br.ok || !br.body) { await br.body?.cancel(); continue; }
+        if (Number(br.headers.get("content-length")||0) > STREAM_LIMIT) { await br.body.cancel(); return json({ok:false,error:"media_size_limit"},413); }
+        return new Response(br.body, { status: 200, headers: { ...corsHeaders, "Access-Control-Expose-Headers": "x-media-type", "content-type": "application/octet-stream", "x-media-type": mime, "cache-control": "private, no-store", ...(br.headers.get("content-length") ? { "content-length": String(br.headers.get("content-length")) } : {}) } });
+      }
+      return json({ok:false,error:"media_unavailable",message:"تعذر فتح المرفق من واتساب؛ الملفات الأقدم من 30 يومًا قد لا تكون متاحة."},502);
+    }
+
     if (action === "media") {
       const conversationId=String(payload?.conversation_id||"").trim(), messageId=String(payload?.message_id||"").trim();
       if (!conversationId || !messageId) return json({ok:false,error:"conversation_message_required"},400);
