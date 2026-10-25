@@ -2,6 +2,36 @@
 
 Updated 2026-10-21. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 25 October 2026 — WhatsApp-style CRM chat
+
+The owner asked for the CRM inbox to work like WhatsApp Business, so they can answer customers when the branch phone is not available.
+
+- **Viewing (`crm-whatsapp-chat.js/.css`).**
+  - Date separators, delivery ticks, and quoted replies that jump to the original message.
+  - Reactions, edits and deletions appear on the message they refer to; forwarded messages are labelled.
+  - Voice notes play with the transcript underneath. Photos and stickers load as they scroll into view and open full size. Videos play in place. Documents open (PDF in a new tab) or download.
+  - Locations open in Maps; contacts show name and number.
+  - The open conversation refreshes every 12 s. The request/alert strip folds to one line.
+- **Composer.**
+  - Emoji panel; Enter sends, Shift+Enter adds a line.
+  - Attach, paste or drop a photo, video or file. Images are converted to JPEG when needed.
+  - Voice recording in OGG/Opus or MP4/AAC; WebM is never sent because WhatsApp rejects it.
+  - Reply to a specific message.
+  - Plain text still goes through `whatsapp-send`.
+- **`whatsapp-inbox` v17.**
+  - The `media` action now serves image, sticker, audio, video and document, for both directions, with MIME allowlists and size limits.
+  - `messages` adds: filename, location, contacts, reaction, forwarded flag, context id, CRM media metadata, edit text and target, revoke target, voice flag.
+- **New `whatsapp-send-media` v1.**
+  - Sends media and quoted replies into the open conversation from that conversation's own number.
+  - Same guards: caller RLS, owner-only investment, the 24 h window, and the idempotent `whatsapp_send_operations` journal.
+- **Verified.**
+  - Real conversation, read only: voice note and video played; photos lazy-load.
+  - Guards: outside 24 h, unsupported type, reply target from another conversation, and Barka on a Muscat conversation were all refused.
+  - Not verified: an actual media send to a customer, which needs a real recipient.
+- **Rollback.** Revert the PR and redeploy `whatsapp-inbox` from `3934b84`. The new function can stay unused or be deleted.
+
+**Pending, approved by the owner for later:** create Facebook Pages "عمان فيلا مسقط" and "عمان فيلا بركاء", then link @omanvilla1 and @omanvilla2 with the owner entering each Instagram password.
+
 ## 25 October 2026 — clients/properties as compact tables, faster clients page
 
 The owner asked for a faster clients page and for clients and properties as spreadsheet-style rows instead of stacked cards. This intentionally overrides the earlier "stacked lists" guardrail. Deals are untouched.
