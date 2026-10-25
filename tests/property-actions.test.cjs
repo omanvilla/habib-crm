@@ -60,12 +60,12 @@ test('editable roles retain useful archive controls in active/sold views and res
     for(const mode of ['active','sold']){
       h.c.propViewMode=mode;await h.c.loadProperties();
       assert.match(h.html(),/data-work-action="edit-property"/);
-      assert.match(h.html(),/data-work-action="archive-property"[^>]*>أرشفة العقار/);
+      assert.match(h.html(),/data-work-action="archive-property"[^>]*>أرشفة(?: العقار)?</);
       assert.doesNotMatch(h.html(),/data-work-action="restore-property"/);
     }
     h.c.propViewMode='archived';await h.c.loadProperties();
     assert.match(h.html(),/مؤرشف · مباع/);
-    assert.match(h.html(),/data-work-action="restore-property"[^>]*>استعادة من الأرشيف/);
+    assert.match(h.html(),/data-work-action="restore-property"[^>]*>استعادة(?: من الأرشيف)?</);
     assert.doesNotMatch(h.html(),/data-work-action="(?:edit|archive)-property"/);
     assert.doesNotMatch(h.html(),/permanentDelete|حذف نهائي/);
   }
