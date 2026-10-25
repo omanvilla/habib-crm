@@ -233,7 +233,7 @@
           return '<tr><td class="crm-grid-name crm-grid-num">'+esc(typeof fmtMoney==='function'?plain(fmtMoney(d.amount)):d.amount)+'</td>'
             +'<td>'+esc(d.deal&&d.deal.client?d.deal.client.name:'—')+'</td><td class="crm-grid-wide">'+esc(d.deal&&d.deal.property?d.deal.property.title:'—')+'</td>'
             +'<td>'+esc(date(d.payment_date))+'</td><td>'+esc(d.expiry_date?date(d.expiry_date):'—')+'</td><td>'+statusCell(d,s)+'</td>'
-            +'<td>'+esc((methods[d.payment_method]||'—')+' · '+(receivers[d.received_by]||'—'))+'</td>'
+            +'<td>'+esc([methods[d.payment_method],receivers[d.received_by]].filter(Boolean).join(' · ')||'—')+'</td>'
             +'<td class="crm-grid-actions"><button type="button" class="ops-action" onclick="editDeposit(\''+id+'\')">تعديل</button><button type="button" class="ops-action crm-grid-danger" onclick="deleteDeposit(\''+id+'\')">حذف</button></td></tr>';}).join('')
         +'</tbody></table></div>';
     };
