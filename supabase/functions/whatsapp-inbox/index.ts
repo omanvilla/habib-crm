@@ -73,6 +73,35 @@ async function decryptMediaToken(ciphertext: string, iv: string, companyId: stri
   const key = await crypto.subtle.importKey("raw",digest,{name:"AES-GCM"},false,["decrypt"]);
   return new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:decode(iv)},key,decode(ciphertext)));
 }
+// Media types the chat can show or play, per WhatsApp message type.
+const MEDIA_TYPES: Record<string, RegExp> = {
+  image: /^image\/(jpeg|png|webp)$/,
+  sticker: /^image\/webp$/,
+  audio: /^audio\/(ogg|mpeg|mp4|aac|amr|opus|x-m4a|mp3)$/,
+  video: /^video\/(mp4|3gpp)$/,
+  document: /^(application\/(pdf|msword|vnd\.openxmlformats-officedocument\.[a-z.]+|vnd\.ms-excel|vnd\.ms-powerpoint|zip|x-zip-compressed)|text\/plain|image\/(jpeg|png|webp)|audio\/[a-z0-9.+-]+|video\/(mp4|3gpp))$/,
+};
+const MEDIA_LIMIT: Record<string, number> = { image: 10 * 1024 * 1024, sticker: 2 * 1024 * 1024, audio: 16 * 1024 * 1024, video: 16 * 1024 * 1024, document: 16 * 1024 * 1024 };
+async function fetchMedia(mediaId: string, tokens: string[], kind: string) {
+  for (const token of tokens) {
+    const options = { headers: { Authorization: `Bearer ${token}` }, redirect: "error" as const };
+    const mr = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/${encodeURIComponent(mediaId)}`,{...options,signal:AbortSignal.timeout(10000)});
+    if (!mr.ok) { await mr.body?.cancel(); continue; }
+    const metadata = JSON.parse(new TextDecoder().decode(await boundedBytes(mr,65536)));
+    const mime = String(metadata?.mime_type || "").toLowerCase().split(";")[0].trim();
+    const limit = MEDIA_LIMIT[kind] || MEDIA_MAX_BYTES;
+    if (!MEDIA_TYPES[kind]?.test(mime)) throw new Error("unsupported_media_type");
+    if (Number(metadata?.file_size || 0) > limit) throw new Error("media_size_limit");
+    if (metadata?.id && String(metadata.id)!==mediaId) throw new Error("media_unavailable");
+    if (!allowedMediaUrl(String(metadata?.url || ""))) throw new Error("untrusted_media_host");
+    const br = await fetch(String(metadata.url),{...options,signal:AbortSignal.timeout(30000)});
+    if (!br.ok) { await br.body?.cancel(); continue; }
+    const bytes = await boundedBytes(br,limit);
+    if (["image","sticker"].includes(kind) && !validImageBytes(bytes,mime)) throw new Error("unsupported_media_type");
+    return {media_type:mime,data_url:imageDataUrl(bytes,mime),size_bytes:bytes.length};
+  }
+  throw new Error("media_unavailable");
+}
 async function fetchImagePreview(mediaId: string, tokens: string[]) {
   for (const token of tokens) {
     const options = { headers: { Authorization: `Bearer ${token}` }, redirect: "error" as const };
@@ -155,11 +184,13 @@ Deno.serve(async (req) => {
       // Caller RLS and owner-only authorization precede all credential reads/Meta access.
       const conversation=await getConversation(conversationId);
       if (!conversation) return json({ok:false,error:"conversation_not_found"},404);
-      const message=await userClient.from("whatsapp_messages").select("id,media_id,direction,message_type")
+      const message=await userClient.from("whatsapp_messages").select("id,media_id,direction,message_type,doc_name:raw_payload->document->>filename")
         .eq("company_id",companyId).eq("conversation_id",conversationId).eq("id",messageId).maybeSingle();
       if (message.error || !message.data) return json({ok:false,error:"message_not_found"},404);
-      if (message.data.direction!=="inbound" || message.data.message_type!=="image" || !/^\d{1,40}$/.test(String(message.data.media_id||"")))
-        return json({ok:false,error:"inbound_image_required"},400);
+      // Images, stickers, voice notes, videos and files, sent or received, as in WhatsApp.
+      const kind=String(message.data.message_type||"");
+      if (!MEDIA_TYPES[kind] || !["inbound","outbound"].includes(String(message.data.direction)) || !/^\d{1,40}$/.test(String(message.data.media_id||"")))
+        return json({ok:false,error:"media_message_required"},400);
       try {
         const tokens:string[]=[];
         const physical=await admin.rpc("resolve_whatsapp_route",{p_company_id:companyId,p_meta_phone_number_id:String(conversation.meta_phone_number_id||"")});
@@ -175,10 +206,10 @@ Deno.serve(async (req) => {
         }
         if (WHATSAPP_ACCESS_TOKEN && !tokens.includes(WHATSAPP_ACCESS_TOKEN)) tokens.push(WHATSAPP_ACCESS_TOKEN);
         if (!tokens.length) throw new Error("media_credentials_unavailable");
-        const preview=await fetchImagePreview(String(message.data.media_id),tokens);
+        const preview=kind==="image"&&message.data.direction==="inbound"?await fetchImagePreview(String(message.data.media_id),tokens):await fetchMedia(String(message.data.media_id),tokens,kind);
         // A permission revoked during download must not release the media afterwards.
         if (!await getConversation(conversationId)) return json({ok:false,error:"conversation_not_found"},404);
-        return json({ok:true,message_id:message.data.id,...preview});
+        return json({ok:true,message_id:message.data.id,kind,filename:message.data.doc_name?String(message.data.doc_name).slice(0,200):null,...preview});
       } catch (error) {
         const code=String((error as Error)?.message||"");
         const allowed=["media_size_limit","unsupported_media_type","untrusted_media_host","media_credentials_unavailable","media_unavailable"];
@@ -261,7 +292,7 @@ Deno.serve(async (req) => {
       const conversation = await getConversation(conversationId);
       if (!conversation) return json({ ok:false,error:"conversation_not_found" },404);
       let mq = userClient.from("whatsapp_messages")
-        .select("id,conversation_id,client_id,request_id,sent_by_user_id,actor_type,channel_source,whatsapp_message_id,direction,message_type,sender_wa_id,recipient_wa_id,body,transcript,transcription_status,automation_result,media_id,reply_to_message_id,message_timestamp,created_at,ingestion_seq,delivery_status,processing_error,ai_processed_at,matched_property_id,property_match_status")
+        .select("id,conversation_id,client_id,request_id,sent_by_user_id,actor_type,channel_source,whatsapp_message_id,direction,message_type,sender_wa_id,recipient_wa_id,body,transcript,transcription_status,automation_result,media_id,reply_to_message_id,message_timestamp,created_at,ingestion_seq,delivery_status,processing_error,ai_processed_at,matched_property_id,property_match_status,doc_name:raw_payload->document->>filename,location:raw_payload->location,contacts:raw_payload->contacts,reaction:raw_payload->reaction,forwarded:raw_payload->context->>forwarded,context_id:raw_payload->context->>id,crm_media:raw_payload->media,edit_text:raw_payload->edit->message->text->>body,edit_of:raw_payload->edit->>original_message_id,revoke_of:raw_payload->revoke->>original_message_id,voice:raw_payload->audio->>voice")
         .eq("company_id",companyId).eq("conversation_id",conversationId);
       const beforeId = String(payload?.before_message_id || "").trim();
       if (beforeId) {
