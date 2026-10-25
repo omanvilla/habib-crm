@@ -335,7 +335,7 @@
         '<td>'+safe(g.branch)+'</td><td>'+safe(p.area||'غير محددة')+'</td>'+
         '<td>'+safe(typeof propTypeAr==='function'?propTypeAr(p.type):p.type||'—')+'</td><td>'+cellNum(p.bedrooms)+'</td><td>'+cellNum(p.land_size)+'</td><td>'+cellNum(p.built_size)+'</td>'+
         '<td class="crm-grid-num">'+cellNum(p.price)+'</td><td><span class="ops-status '+(!p.archived&&p.status==='available'?'ops-available':'')+'">'+safe((p.archived?'مؤرشف · ':'')+propertyStatusLabel(p.status))+'</span></td>'+
-        '<td><bdi dir="ltr">'+safe(gridDate(p.created_at))+'</bdi></td><td class="crm-grid-actions">'+propertyActions(p).replace('<div class="ops-property-actions">','').replace(/<\/div>$/,'')+'<button type="button" class="ops-action" data-workspace-action="property-marketing" data-id="'+safe(p.id)+'">التسويق</button></td></tr>')).join('')+
+        '<td><bdi dir="ltr">'+safe(gridDate(p.created_at))+'</bdi></td><td class="crm-grid-actions">'+propertyActions(p).replace('<div class="ops-property-actions">','').replace(/<\/div>$/,'').replace('>أرشفة العقار<','>أرشفة<').replace('>استعادة من الأرشيف<','>استعادة<')+'<button type="button" class="ops-action" data-workspace-action="property-marketing" data-id="'+safe(p.id)+'">التسويق</button></td></tr>')).join('')+
       '</tbody></table></div>';
   }
   const oldProperties=window.loadProperties;
