@@ -2,7 +2,24 @@
 
 Updated 2026-10-21. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
-## 25 October 2026 — interface simplification, phase 1
+## 25 October 2026 — interface simplification, phase 2
+
+All in `crm-simple-ui.js/.css`. Deals were not touched, and the calendar month and week views are kept.
+
+- **Sidebar.** Grouped as:
+  - اليوم: dashboard, tasks, WhatsApp, calendar, visits.
+  - العملاء والعقارات: clients, properties, owners, property performance.
+  - المبيعات: deals, deposits.
+  - التقارير: reports, expenses, activity log.
+  - الإدارة: team, backup, settings.
+
+  Existing links are moved, not rebuilt, so role visibility still applies. Groups with no visible link are hidden. Each link has a hover name for the collapsed icon sidebar. The backup link is hidden for staff, because that page is owner-only.
+- **Calendar.** Opens on a list grouped into: overdue open tasks, today, tomorrow, the next 7 days, and later (first 20). Finished items and past non-task events are left out. Tasks open their details. Other items open the day view. The month and week buttons remain.
+- **Owners and deposits.** One row per record in the `crm-grid` style, with the same filters, counts and actions:
+  - Owners: edit, WhatsApp, and archive (archive only with delete permission).
+  - Deposits: edit and delete.
+  - Phone numbers are shown as escaped plain text.
+- **Empty pages.** Owners, deposits, tasks and the calendar explain what the page is for and offer the main action where the account can edit. Filtered views say to choose «الكل».
 
 The owner wants screens that a new employee can use without training. Phase 1 covers the daily screens. Deals were not touched.
 
