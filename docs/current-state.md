@@ -2,6 +2,26 @@
 
 Updated 2026-10-21. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 25 October 2026 — clients/properties as compact tables, faster clients page
+
+The owner asked for a faster clients page and for clients and properties as spreadsheet-style rows instead of stacked cards. This intentionally overrides the earlier "stacked lists" guardrail. Deals are untouched.
+
+- **Clients (`crm-operations-v6.js`).**
+  - One line per client: name with role tags, phone, branch, current request (opens the request), stage, follow-up (overdue in red), first contact, and actions.
+  - Drawn 100 rows at a time, with "عرض 100 أخرى" and "عرض الكل".
+  - Filtering, sorting and the export snapshot still cover the whole list.
+- **Properties.** One line per property: name and code, branch, area, type, rooms, land, built area, price, status, added date, and actions. Ordered branch → area → newest.
+- **Speed (measured from Oman, owner, 1,486 clients).** First open 17 s → about 3 s. A return visit draws the cached list at once and refreshes it quietly. Changes:
+  - Paged reads run in parallel after the first page gives the exact count; the same completeness checks apply.
+  - The unused per-client agent-name join was removed from the clients query.
+  - First-contact batches run in parallel.
+  - SQL45–47 rewrote `crm_client_first_contacts`. Messages are now checked with the same two access rules, but only on the id columns those rules read; the per-row JSON of whole messages, including raw_payload, is gone. The lookup runs in two steps. Output is identical for owner and Barka; four parallel calls went from about 3.4 s to 0.5 s.
+- **Database load.** The 30-second unread badge now calls `whatsapp-inbox` v16 `counts` unless the WhatsApp page is open. The full list (100 conversations, latest messages, clients) had been the largest repeated database load.
+- **Rollback.**
+  - Database: apply `db/changes/45-…forward.sql`, then the 46 rollback.
+  - Inbox: redeploy `whatsapp-inbox` from `a4615b3`.
+  - Front end: revert the PR.
+
 ## 24 October 2026 — Instagram metrics refresh (instagram-discovery v3)
 
 - **Problem.** Marketing showed "قياسات غير متاحة" for links saved after 23 September (catalog or staff), for example the Al Khoudh 7 villa at 135,000. The page reported views for only 10 of 33 posts.
