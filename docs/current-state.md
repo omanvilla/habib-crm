@@ -2,7 +2,16 @@
 
 Updated 2026-10-21. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
-## 25 October 2026 — interface simplification, phase 2
+## 25 October 2026 — interface simplification, phase 3
+
+- **Names.** The menu, top bar and page title now use the same short name: لوحة العمل، المهام، واتساب، العملاء، العقارات، التقويم، الزيارات، العربون، الملاك، التقارير، الفروع، النسخ الاحتياطي. The "إدارة …" prefixes, the English "Backup" and the mismatch between "الفريق" in the menu and "الفروع" on the page are gone. The Deals page title is unchanged.
+- **Quick guide (`crm-simple-ui.js`).** Four short steps in a dialog, with the matching menu item outlined:
+  1. Start from لوحة العمل.
+  2. Reply in واتساب.
+  3. Finish المهام and record visit results.
+  4. Add a client or property, searching by phone first.
+
+  It opens once per account on each browser after the dashboard loads. The "؟" button next to the notification bell reopens it. It stores only a per-browser "seen" flag and works if browser storage is blocked.
 
 All in `crm-simple-ui.js/.css`. Deals were not touched, and the calendar month and week views are kept.
 
