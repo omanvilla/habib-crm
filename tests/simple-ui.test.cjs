@@ -58,7 +58,7 @@ test('read-only accounts get no edit or delete actions on task rows',()=>{
 
 test('visits render as rows that reuse the existing edit and delete flows',()=>{
   const nodes={};const node=id=>nodes[id]||(nodes[id]={innerHTML:'',dataset:{},classList:{add(){},toggle(){},contains(){return false}},addEventListener(){},after(){},querySelectorAll:()=>[]});
-  const ctx={document:{getElementById:id=>id==='viewingsList'?node(id):null,createElement:()=>node('btn'),querySelectorAll:()=>[]},
+  const ctx={document:{getElementById:id=>id==='viewingsList'?node(id):null,createElement:()=>node('btn'),querySelectorAll:()=>[],querySelector:()=>null},
     MutationObserver:class{observe(){}},requestAnimationFrame:f=>f(),setTimeout:()=>0,
     renderViewings(){},navigate(){},escapeHtml:s=>String(s).replace(/</g,'&lt;'),toLocalDateStr:()=>'2026-10-25',viewingTab:'all',
     crmRecordBranchLabel:()=>'بركاء',
@@ -78,4 +78,56 @@ test('dashboard queue stays collapsed to a short preview and keeps the owner-onl
   assert.match(attention,/items\.slice\(0,PREVIEW\)/);
   assert.match(attention,/catch\(e\)\{return false;\}/);
   assert(attention.includes("currentProfile.role==='owner'?'<button type=\"button\" class=\"btn-secondary crm-attention-batch\""));
+});
+
+// Phase 2 renderers run against a minimal DOM: only the target list node exists.
+function phase2(extra){
+  const nodes={};const node=id=>nodes[id]||(nodes[id]={id,innerHTML:'',textContent:'',value:'',dataset:{},querySelectorAll:()=>[],classList:{add(){},toggle(){},contains(){return false}}});
+  const ctx={document:{getElementById:id=>['ownersList','depositsList','calContent','calTitle','ownerSearchQ'].includes(id)?node(id):null,querySelector:()=>null,querySelectorAll:()=>[],createElement:()=>node('x')},
+    MutationObserver:class{observe(){}},requestAnimationFrame:f=>f(),setTimeout:()=>0,navigate(){},
+    renderViewings(){},renderCalList(){},renderOwners(){},renderDeposits(){},setCalView(){},
+    escapeHtml:s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'),canEdit:()=>true,canDelete:()=>false,...extra};
+  ctx.window=ctx;vm.createContext(ctx);vm.runInContext(simple,ctx);return {ctx,node};
+}
+
+test('owners render as escaped rows with property counts and no raw phone markup',async()=>{
+  const {ctx,node}=phase2({allOwners:[{id:'o1',name:'<b>مالك</b>',phone:'96891234567',owner_type:'broker',exclusive:true}],ownerTypeFilter:'all',
+    formatPhoneDisplay:p=>'<span style="x">+968 9123 4567</span>',
+    crmDataFrom:()=>({select:()=>({eq:async()=>({data:[{owner_id:'o1',status:'available'},{owner_id:'o1',status:'sold'}]})})})});
+  await ctx.renderOwners();
+  const html=node('ownersList').innerHTML;
+  assert.match(html,/aria-label="قائمة الملاك"/);assert(!html.includes('<b>'));assert(!html.includes('<span style'));
+  assert.match(html,/\+968 9123 4567/);assert.match(html,/<td>وسيط<\/td>/);
+  assert.match(html,/crm-grid-num">2<\/td><td class="crm-grid-num">1<\/td><td class="crm-grid-num">1</);
+  assert(!html.includes('archive-owner'),'archive needs delete permission');
+});
+
+test('empty owners and deposits pages explain what to do next',async()=>{
+  const {ctx,node}=phase2({allOwners:[],ownerTypeFilter:'all',allDeposits:[],depositTab:'all',getDepositStatus:()=>'active'});
+  await ctx.renderOwners();ctx.renderDeposits();
+  assert.match(node('ownersList').innerHTML,/لا يوجد ملاك بعد[\s\S]*openModal\('mOwner'\)/);
+  assert.match(node('depositsList').innerHTML,/لا توجد عرابين بعد[\s\S]*openModal\('mDeposit'\)/);
+});
+
+test('deposits render one row each with the remaining-time status',()=>{
+  const soon=new Date(Date.now()+3*864e5).toISOString().slice(0,10);
+  const {ctx,node}=phase2({depositTab:'all',getDepositStatus:d=>d.status,fmtMoney:v=>v+' ر.ع',fmtDate:v=>v,
+    allDeposits:[{id:'d1',amount:500,status:'active',expiry_date:soon,payment_method:'cash',received_by:'company',deal:{client:{name:'<i>'},property:{title:'فيلا'}}},
+                 {id:'d2',amount:900,status:'applied'}]});
+  ctx.renderDeposits();
+  const html=node('depositsList').innerHTML;
+  assert.match(html,/aria-label="قائمة العرابين"/);assert(!html.includes('<i>'));
+  assert.match(html,/crm-grid-soon">باقي [34] أيام/);assert.match(html,/طُبّق في الصفقة/);
+  assert.match(html,/كاش · الشركة/);assert.match(html,/editDeposit\('d1'\)/);
+});
+
+test('calendar list groups open items into overdue, today and later, and skips finished ones',()=>{
+  const day=n=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
+  const {ctx,node}=phase2({toLocalDateStr:d=>new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10),
+    allEvents:[{type:'task',title:'متأخرة',date:day(-2),raw:{id:'t1'}},{type:'event',title:'اليوم <x>',date:day(0),evtType:'visit'},
+               {type:'task',title:'منتهية',date:day(0),done:true,raw:{id:'t2'}},{type:'event',title:'حدث قديم',date:day(-3)}]});
+  ctx.renderCalList();
+  const html=node('calContent').innerHTML;
+  assert(html.indexOf('>متأخرة <span>1')<html.indexOf('>اليوم <span>1'));
+  assert.match(html,/openTaskDetails\('t1'\)/);assert(!html.includes('منتهية'));assert(!html.includes('حدث قديم'));assert(!html.includes('<x>'));
 });
