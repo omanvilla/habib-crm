@@ -147,3 +147,6 @@
 .crm-grid .crm-grid-actions .ops-action{border:0!important;background:transparent!important;color:#27624a;padding:2px 6px!important;text-decoration:underline;text-underline-offset:3px}
 .crm-grid .crm-grid-actions .ops-action:hover{background:#e7f2ec!important}
 .crm-grid .crm-grid-actions [data-workspace-action="archive-client"],.crm-grid .crm-grid-actions [data-work-action="archive-property"]{color:#8a6d4b}
+.crm-grid td,.crm-grid thead th{padding-inline:8px}
+.crm-grid-wide{max-width:190px}
+.crm-grid-name{max-width:210px}
