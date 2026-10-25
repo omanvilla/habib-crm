@@ -45,3 +45,36 @@
   .crm-grid tbody tr.crm-grid-late{border-color:#f5c2bc;background:#fffaf9}
   .crm-grid-task small{max-width:none;white-space:normal}
 }
+
+/* Phase 2 */
+.crm-nav-group[hidden]{display:none!important}
+.crm-empty{padding:40px 16px}
+.crm-empty .empty-desc{max-width:380px;margin:6px auto 0;line-height:1.8}
+.crm-empty .crm-empty-action{margin-top:14px;width:auto!important;padding:9px 20px!important}
+.crm-grid-soon{color:#a15c07;font-weight:600}
+#ownersList .crm-grid-wrap,#depositsList .crm-grid-wrap{border:0;border-radius:0}
+
+/* Calendar agenda */
+#page-calendar.crm-cal-list .cal-nav{visibility:hidden}
+.crm-agenda{display:grid;gap:14px;padding:4px 0}
+.crm-agenda-group h4{margin:0 0 6px;font-size:13px;color:#2f4a3e;display:flex;gap:6px;align-items:center}
+.crm-agenda-group h4 span{background:#eef4f0;color:#3f6150;border-radius:999px;padding:0 8px;font-size:11px}
+.crm-agenda-group.late h4{color:#b42318}
+.crm-agenda-group.late h4 span{background:#fde8e6;color:#b42318}
+.crm-agenda-group ul{list-style:none;margin:0;padding:0;border:1px solid #e3ebe7;border-radius:10px;overflow:hidden;background:#fff}
+.crm-agenda-group li+li{border-top:1px solid #edf1ee}
+.crm-agenda-item{all:unset;box-sizing:border-box;cursor:pointer;display:flex;gap:10px;align-items:center;width:100%;padding:9px 12px;font-size:12.5px}
+.crm-agenda-item:hover{background:#eef6f1}
+.crm-agenda-item:focus-visible{outline:2px solid #27624a;outline-offset:-2px}
+.crm-agenda-when{color:#62756b;min-width:120px;white-space:nowrap}
+.crm-agenda-kind{font-size:10.5px;border-radius:6px;padding:1px 7px;background:#eef4f0;color:#3f6150;white-space:nowrap}
+.crm-agenda-kind.k-task{background:#fdf3e1;color:#8b6514}
+.crm-agenda-title{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crm-agenda-client{color:#62756b;white-space:nowrap}
+.crm-agenda-more{font-size:11px;color:#7b8d80;margin:6px 2px 0}
+@media (max-width:640px){
+  .crm-agenda-item{flex-wrap:wrap;gap:4px 8px}
+  .crm-agenda-when{min-width:0}
+  .crm-agenda-title{flex-basis:100%;white-space:normal;order:3}
+  .crm-agenda-client{order:4}
+}

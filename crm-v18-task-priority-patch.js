@@ -144,7 +144,7 @@
     else rows=rows.filter(function(t){return !t.done});
     rows=sortTasks(rows);
     if(byId('dailySub'))byId('dailySub').textContent=rows.length+' مهمة · العاجلة أولاً';
-    if(!rows.length){list.innerHTML='<div class="empty"><div class="empty-ico">⏰</div><div class="empty-title">لا توجد مهام</div>'+(typeof canEdit==='function'&&canEdit()?'<button class="btn-primary" style="margin-top:14px;width:auto;padding:10px 22px" onclick="openModal(\'mTask\')">+ مهمة جديدة</button>':'')+'</div>';return}
+    if(!rows.length){list.innerHTML='<div class="empty"><div class="empty-ico">⏰</div><div class="empty-title">'+(taskFilter==='all'?'لا توجد مهام مفتوحة':'لا توجد مهام في هذا التصنيف')+'</div><div class="empty-desc">'+(taskFilter==='all'?'المهام تُنشأ من متابعات العملاء والزيارات، أو يدويًا من زر «مهمة جديدة».':'اختر «الكل» لعرض جميع المهام المفتوحة.')+'</div>'+(typeof canEdit==='function'&&canEdit()?'<button class="btn-primary" style="margin-top:14px;width:auto;padding:10px 22px" onclick="openModal(\'mTask\')">+ مهمة جديدة</button>':'')+'</div>';return}
     list.innerHTML=renderTable(rows)
   };
 
