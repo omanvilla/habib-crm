@@ -111,7 +111,19 @@
   // Media are read through the inbox function (caller access is checked there).
   async function loadMedia(id){
     if(media.has(id))return media.get(id);
-    const conversationId=waInboxActiveId;
+    const conversationId=waInboxActiveId,message=waInboxMessages.find(m=>m.id===id);
+    // Voice notes, videos and files arrive as a byte stream (works above 16 MB).
+    if(message&&['audio','video','document'].includes(message.message_type)){
+      const r=await supa.functions.invoke('whatsapp-inbox',{body:{action:'media_stream',conversation_id:conversationId,message_id:id}});
+      if(r.error){let detail='';try{const p=await r.error.context.json();detail=p.message||p.error||'';}catch(_){}
+        throw new Error(detail==='media_size_limit'?'الملف كبير جدًا':detail||'تعذر فتح المرفق من واتساب');}
+      if(!(r.data instanceof Blob))throw new Error('تعذر قراءة المرفق');
+      const fallback={video:'video/mp4',audio:'audio/ogg',document:'application/octet-stream'}[message.message_type];
+      const type=(r.response&&r.response.headers&&r.response.headers.get('x-media-type'))||(message.crm_media&&message.crm_media.mime_type)||fallback;
+      const item={url:URL.createObjectURL(new Blob([r.data],{type})),type,filename:message.doc_name||(message.crm_media&&message.crm_media.filename)||null};
+      if(conversationId===waInboxActiveId)media.set(id,item);
+      return item;
+    }
     const data=await waInboxInvoke({action:'media',conversation_id:conversationId,message_id:id});
     const url=String(data.data_url||''),type=String(data.media_type||'');
     if(!url.startsWith('data:'+type+';base64,'))throw new Error('صيغة غير مدعومة');
@@ -141,7 +153,7 @@
       }
       attachMedia(id,item);
       const player=box.querySelector('audio,video');if(player)player.play().catch(()=>{});
-    }catch(e){if(button){button.disabled=false;button.textContent='↻';}showToast('تعذر فتح المرفق: '+(e.message||e)+' — الملفات الأقدم من 30 يومًا قد لا تكون متاحة من واتساب.','error');}
+    }catch(e){if(button){button.disabled=false;button.textContent='↻';}showToast('تعذر فتح المرفق: '+(e.message||e),'error');}
   }
   // Photos and stickers load when they scroll into view, like WhatsApp.
   function observeImages(){
