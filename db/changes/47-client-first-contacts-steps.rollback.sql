@@ -1,0 +1,1 @@
+-- Rollback for SQL47: re-run 45-client-first-contacts-index-order.forward.sql (then the SQL46 rollback drops the helper).

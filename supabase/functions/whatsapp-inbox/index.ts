@@ -186,6 +186,25 @@ Deno.serve(async (req) => {
       }
     }
 
+    // The 30-second unread badge only needs the totals; reading 100 conversations,
+    // their clients and latest messages for it was the largest database load.
+    if (action === "counts") {
+      const [counters, hidden] = await Promise.all([
+        userClient.rpc("crm_whatsapp_inbox_counts"),
+        internalWaIds.size
+          ? userClient.from("whatsapp_conversations").select("unread_count,human_handoff_required").eq("company_id",companyId).in("customer_wa_id",[...internalWaIds])
+          : Promise.resolve(null),
+      ]);
+      if (counters.error) throw new Error(`inbox_counts_failed: ${counters.error.message}`);
+      const counts = (Array.isArray(counters.data) ? counters.data[0] : counters.data) || {};
+      if (hidden) {
+        if (hidden.error) throw new Error("internal_counts_failed");
+        counts.unread_total=Math.max(0,Number(counts.unread_total||0)-(hidden.data||[]).reduce((n:any,c:any)=>n+Number(c.unread_count||0),0));
+        counts.handoff_total=Math.max(0,Number(counts.handoff_total||0)-(hidden.data||[]).filter((c:any)=>c.human_handoff_required).length);
+      }
+      return json({ ok:true, unread_total:Number(counts.unread_total||0), handoff_total:Number(counts.handoff_total||0) });
+    }
+
     if (action === "list") {
       const offset = Math.max(0, Math.min(100000, Math.floor(Number(payload?.offset) || 0)));
       // RLS filters the user's accessible rows BEFORE pagination.

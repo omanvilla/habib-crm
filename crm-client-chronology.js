@@ -18,12 +18,14 @@
     return new Intl.DateTimeFormat('en-GB',{...options,day:'2-digit',month:'2-digit',year:'numeric'}).format(d)+' · '+new Intl.DateTimeFormat('en-GB',{...options,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(d);
   }
   async function enrich(clients,isCurrent=()=>true) {
-    const known=new Map();
-    for(let start=0;start<clients.length;start+=400){
-      if(!isCurrent())return [];
-      const ids=clients.slice(start,start+400).map(c=>c.id),allowed=new Set(ids);
-      const result=await supa.rpc('crm_client_first_contacts',{p_client_ids:ids});
-      if(!isCurrent())return [];
+    const known=new Map(),chunks=[];
+    for(let start=0;start<clients.length;start+=400)chunks.push(clients.slice(start,start+400).map(c=>c.id));
+    if(!isCurrent())return [];
+    // Chunks are independent reads; run them together instead of one after another.
+    const results=await Promise.all(chunks.map(ids=>supa.rpc('crm_client_first_contacts',{p_client_ids:ids})));
+    if(!isCurrent())return [];
+    for(let index=0;index<chunks.length;index++){
+      const ids=chunks[index],allowed=new Set(ids),result=results[index];
       if(result.error||!Array.isArray(result.data)||result.data.length!==allowed.size)throw new Error('client_first_contact_read_failed');
       for(const row of result.data){
         if(!allowed.has(row.client_id)||known.has(row.client_id)||row.first_contact_at!==null&&!validTime(row.first_contact_at)||row.first_contact_at!==null&&!['whatsapp','instagram'].includes(row.first_contact_source))throw new Error('client_first_contact_result_invalid');
