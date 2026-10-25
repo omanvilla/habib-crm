@@ -57,21 +57,31 @@
     if(row.ai_suggestion&&Array.isArray(row.ai_suggestion.property_ids)&&row.ai_suggestion.property_ids.length)out.push('<span class="crm-attention-chip ai">اقتراح الذكاء الاصطناعي</span>');
     return out.join('');
   }
+  const PREVIEW=3,EXPANDED_KEY='crmAttentionExpanded';
+  function expanded(){try{return localStorage.getItem(EXPANDED_KEY)==='1';}catch(e){return false;}}
+  function setExpanded(value){try{localStorage.setItem(EXPANDED_KEY,value?'1':'0');}catch(e){}}
   function render(){
     const box=host(),d=state.data;if(!box||!d)return;
     const total=Number(d.total_conversations||0),items=Array.isArray(d.items)?d.items:[];
     if(!total){box.innerHTML='<div class="crm-attention-head"><h3>يحتاج تدخل بشري</h3></div><div class="crm-attention-ok">✓ لا توجد محادثات تحتاج تدخلًا الآن.</div>';return;}
-    let h='<div class="crm-attention-head"><h3>يحتاج تدخل بشري <b dir="ltr">'+total.toLocaleString('en-US')+'</b></h3><p>محادثات لم يحدد النظام موضوعها أو طلبت موظفًا. افتح المحادثة ثم حدّد: عقار محدد، طلب عام، أو خارج العقارات.</p>'
-      +'<div class="crm-attention-summary"><span>'+Number(d.images||0)+' صورة</span><span>'+Number(d.links||0)+' رابط</span><span>'+Number(d.texts||0)+' نص</span><span>'+Number(d.handoff_conversations||0)+' طلب تدخل</span>'
-      +(currentProfile.role==='owner'?'<button type="button" class="btn-secondary crm-attention-batch" data-attention="ai-batch">تحليل 5 محادثات بالذكاء الاصطناعي</button>':'')+'</div></div><ul class="crm-attention-list">';
-    for(const row of items){
+    // Collapsed by default to the newest few rows so the day's work stays visible below.
+    const open=expanded(),shown=open?items:items.slice(0,PREVIEW);
+    let h='<div class="crm-attention-head"><h3>يحتاج تدخل بشري <b dir="ltr">'+total.toLocaleString('en-US')+'</b>'
+      +'<span class="crm-attention-help" title="محادثات لم يحدد النظام موضوعها أو طلبت موظفًا. افتح المحادثة ثم حدّد: عقار محدد، طلب عام، أو خارج العقارات." aria-label="شرح">؟</span>'
+      +'<button type="button" class="crm-attention-toggle" data-attention="toggle" aria-expanded="'+open+'">'+(open?'إخفاء':'عرض الكل')+'</button></h3>'
+      +(open?'<div class="crm-attention-summary"><span>'+Number(d.images||0)+' صورة</span><span>'+Number(d.links||0)+' رابط</span><span>'+Number(d.texts||0)+' نص</span><span>'+Number(d.handoff_conversations||0)+' طلب تدخل</span>'
+      +(currentProfile.role==='owner'?'<button type="button" class="btn-secondary crm-attention-batch" data-attention="ai-batch">تحليل 5 محادثات بالذكاء الاصطناعي</button>':'')+'</div>':'')+'</div><ul class="crm-attention-list">';
+    for(const row of shown){
       h+='<li class="crm-attention-row"><button type="button" class="crm-attention-main" data-attention="open" data-conversation="'+esc(row.conversation_id)+'">'
-        +'<strong>'+esc(row.name)+'</strong><span class="crm-attention-route">'+esc(routes[row.route_key]||row.route_key||'')+'</span><span class="crm-attention-time">'+esc(ago(row.latest_at))+'</span>'
-        +'<span class="crm-attention-chips">'+chips(row)+'</span>'+(row.sample?'<span class="crm-attention-sample" dir="auto">'+esc(row.sample)+'</span>':'')+'</button>'
-        +'<div class="crm-attention-actions"><button type="button" class="btn-secondary" data-attention="open" data-conversation="'+esc(row.conversation_id)+'">فتح المحادثة</button>'
-        +'<button type="button" class="btn-primary" data-attention="classify" data-conversation="'+esc(row.conversation_id)+'">تحديد الاستفسار</button></div></li>';
+        +'<strong>'+esc(row.name)+'</strong><span class="crm-attention-route">'+esc(routes[row.route_key]||row.route_key||'')+'</span>'
+        +'<span class="crm-attention-chips">'+chips(row)+'</span><span class="crm-attention-sample" dir="auto">'+esc(row.sample||'')+'</span>'
+        +'<span class="crm-attention-time">'+esc(ago(row.latest_at))+'</span></button>'
+        +'<div class="crm-attention-actions"><button type="button" class="crm-attention-link" data-attention="open" data-conversation="'+esc(row.conversation_id)+'">فتح المحادثة</button>'
+        +'<button type="button" class="crm-attention-link primary" data-attention="classify" data-conversation="'+esc(row.conversation_id)+'">تحديد الاستفسار</button></div></li>';
     }
-    h+='</ul><div class="crm-attention-pager"><button type="button" class="btn-secondary" data-attention="prev"'+(state.page?'':' disabled')+'>السابق</button><span>'+(state.page*PAGE+1)+'–'+Math.min(total,(state.page+1)*PAGE)+' من '+total+'</span><button type="button" class="btn-secondary" data-attention="next"'+((state.page+1)*PAGE>=total?' disabled':'')+'>التالي</button></div>';
+    h+='</ul>';
+    if(open)h+='<div class="crm-attention-pager"><button type="button" class="btn-secondary" data-attention="prev"'+(state.page?'':' disabled')+'>السابق</button><span>'+(state.page*PAGE+1)+'–'+Math.min(total,(state.page+1)*PAGE)+' من '+total+'</span><button type="button" class="btn-secondary" data-attention="next"'+((state.page+1)*PAGE>=total?' disabled':'')+'>التالي</button></div>';
+    else if(total>shown.length)h+='<button type="button" class="crm-attention-more" data-attention="toggle">عرض '+(total-shown.length).toLocaleString('en-US')+' محادثة أخرى</button>';
     box.innerHTML=h;
   }
   function openConversation(id){
@@ -183,6 +193,7 @@
     else if(action==='ai-batch')suggestBatch(el);
     else if(action==='close'&&dialog)dialog.close();
     else if(action==='retry'){state.data=null;load();}
+    else if(action==='toggle'){const open=!expanded();setExpanded(open);if(!open&&state.page){state.page=0;load();}else render();}
     else if(action==='prev'&&state.page>0){state.page--;load();}
     else if(action==='next'){state.page++;load();}
   });

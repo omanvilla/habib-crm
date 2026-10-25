@@ -116,6 +116,24 @@
 
   window.renderTaskCard=renderCard;
 
+  // Tasks page: one row per task, like the client and property grids.
+  function renderRow(task){
+    var d=task.due_date&&typeof daysUntil==='function'?daysUntil(task.due_date):null;
+    var overdue=!task.done&&d!==null&&d<0,id=esc(task.id),edit=typeof canEdit==='function'&&canEdit();
+    var notes=taskNotes(task),client=task.client&&task.client.name?task.client.name:'';
+    return '<tr class="'+(task.done?'crm-grid-done':'')+'" data-task-row="'+id+'">'
+      +'<td class="crm-grid-check"><button type="button" class="crm-task-check'+(task.done?' done':'')+'" title="'+(task.done?'إرجاع كغير مكتملة':'تمت')+'" aria-label="'+(task.done?'إرجاع كغير مكتملة':'تمت')+'"'+(edit?' onclick="toggleTask(\''+id+'\','+(!task.done)+')"':' disabled')+'>'+(task.done?'✓':'')+'</button></td>'
+      +'<td class="crm-grid-name crm-grid-task"><button type="button" class="ops-title" onclick="openTaskDetails(\''+id+'\')">'+esc(task.title)+'</button>'+(notes?'<small title="'+esc(notes)+'">'+esc(notes)+'</small>':'')+'</td>'
+      +'<td>'+(client?'<button type="button" class="crm-grid-link" onclick="viewClient(\''+esc(task.client_id)+'\')">'+esc(client)+'</button>':'<span class="crm-grid-muted">—</span>')+'</td>'
+      +'<td class="'+(overdue?'crm-grid-overdue':'')+'">'+esc(task.due_date?dueText(task):'—')+'</td>'
+      +'<td><span class="crm-task-priority tp-'+(task.priority==='high'?'high':task.priority==='low'?'low':'med')+'">'+(task.priority==='high'?'عاجلة':task.priority==='low'?'منخفضة':'متوسطة')+'</span></td>'
+      +'<td>'+esc(assigneeName(task)||'—')+'</td>'
+      +'<td class="crm-grid-actions"><button type="button" class="ops-action" onclick="openTaskDetails(\''+id+'\')">التفاصيل</button>'+(edit?'<button type="button" class="ops-action" onclick="editTask(\''+id+'\')">تعديل</button><button type="button" class="ops-action crm-grid-danger" onclick="deleteTask(\''+id+'\')">حذف</button>':'')+'</td></tr>'
+  }
+  function renderTable(rows){
+    return '<div class="crm-grid-wrap"><table class="crm-grid" aria-label="قائمة المهام"><thead><tr><th aria-label="تمت"></th><th>المهمة</th><th>العميل</th><th>الموعد</th><th>الأولوية</th><th>الفرع</th><th>إجراءات</th></tr></thead><tbody>'+rows.map(renderRow).join('')+'</tbody></table></div>'
+  }
+
   window.renderTasks=function(){
     var list=byId('tasksList');if(!list)return;
     var rows=(typeof allTasks!=='undefined'?allTasks:[]);
@@ -127,7 +145,7 @@
     rows=sortTasks(rows);
     if(byId('dailySub'))byId('dailySub').textContent=rows.length+' مهمة · العاجلة أولاً';
     if(!rows.length){list.innerHTML='<div class="empty"><div class="empty-ico">⏰</div><div class="empty-title">لا توجد مهام</div>'+(typeof canEdit==='function'&&canEdit()?'<button class="btn-primary" style="margin-top:14px;width:auto;padding:10px 22px" onclick="openModal(\'mTask\')">+ مهمة جديدة</button>':'')+'</div>';return}
-    list.innerHTML=rows.map(function(t){return renderCard(t,false)}).join('')
+    list.innerHTML=renderTable(rows)
   };
 
   window.loadTasks=async function(){

@@ -1,0 +1,47 @@
+/* Interface simplification, phase 1 (crm-simple-ui.js). */
+
+/* Tasks and visits grids */
+.crm-grid-check{width:34px}
+.crm-task-check{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border:1.5px solid #9fb8ab;border-radius:6px;cursor:pointer;color:#fff;font-size:12px;background:#fff}
+.crm-task-check:hover{border-color:#27624a;background:#eef6f1}
+.crm-task-check.done{background:#27624a;border-color:#27624a}
+.crm-task-check:disabled{cursor:default;opacity:.6}
+.crm-task-check:focus-visible{outline:2px solid #27624a;outline-offset:2px}
+.crm-grid-task small{display:block;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+.crm-grid-done td{color:#93a39a}
+.crm-grid-done .ops-title{text-decoration:line-through;color:#7b8d80}
+.crm-task-priority{display:inline-block;border-radius:6px;font-size:10.5px;font-weight:700;padding:2px 8px}
+.crm-grid .crm-grid-actions .crm-grid-danger{color:#b42318}
+.crm-grid-late td{background:#fff7f6!important}
+.crm-grid-chip-late{background:#fde8e6;color:#b42318}
+.crm-grid-group td{background:#f2f6f4!important;color:#4f665a;font-size:11px;font-weight:700;padding:6px 10px}
+.crm-grid .viewing-status{padding:2px 8px;font-size:10.5px;letter-spacing:0;text-transform:none}
+#tasksList .crm-grid-wrap,#viewingsList .crm-grid-wrap{border:0;border-radius:0}
+
+/* Phone filter toggle (hidden on wider screens) */
+.crm-filter-toggle{display:none!important}
+
+@media (max-width:640px){
+  .crm-filter-toggle{display:inline-flex!important;align-items:center;justify-content:center;width:100%;margin-top:8px;padding:9px 12px!important;font-size:13px!important}
+  .crm-filter-target{grid-template-columns:1fr!important}
+  .crm-filter-target:not(.crm-filters-open)>label:not(:first-child){display:none!important}
+  #wsClientFilters:not(.crm-filters-open) .ui-advanced{display:none!important}
+  #wsClientFilters,#opsPropertyFilters{padding:10px!important}
+
+  /* Grids become compact cards: name on top, details labelled, actions underneath. */
+  .crm-grid-wrap{max-height:none;overflow:visible;border:0;background:transparent}
+  .crm-grid,.crm-grid tbody{display:block;width:100%}
+  .crm-grid thead{display:none}
+  .crm-grid tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:3px 12px;padding:10px 12px;margin-bottom:8px;background:#fff;border:1px solid #e3ebe7;border-radius:12px}
+  .crm-grid tbody tr:nth-child(even) td,.crm-grid tbody tr:hover td,.crm-grid td{background:transparent!important}
+  .crm-grid td{display:block;border:0;padding:0!important;white-space:normal;font-size:12px;max-width:none!important}
+  .crm-grid td[data-label]::before{content:attr(data-label) ": ";color:#93a39a;font-size:10.5px}
+  .crm-grid td.crm-grid-name{order:-1;flex:1 1 calc(100% - 40px);font-size:14px}
+  .crm-grid td.crm-grid-check{order:-2;width:auto}
+  .crm-grid td.crm-grid-name::before,.crm-grid td.crm-grid-actions::before,.crm-grid td.crm-grid-check::before{content:none}
+  .crm-grid td.crm-grid-actions{flex-basis:100%;display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;padding-top:6px!important;border-top:1px solid #f0f3f1}
+  .crm-grid .crm-grid-actions .ops-action{min-height:32px!important;padding:4px 10px!important;font-size:12px!important}
+  .crm-grid tbody tr.crm-grid-group{background:transparent;border:0;padding:6px 2px 0;margin:0}
+  .crm-grid tbody tr.crm-grid-late{border-color:#f5c2bc;background:#fffaf9}
+  .crm-grid-task small{max-width:none;white-space:normal}
+}
