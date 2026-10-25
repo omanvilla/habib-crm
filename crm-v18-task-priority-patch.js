@@ -34,7 +34,7 @@
   function dueText(task){
     if(!task.due_date)return 'غير محدد';
     var d=typeof daysUntil==='function'?daysUntil(task.due_date):null;
-    if(d===null)return typeof fmtDate==='function'?fmtDate(task.due_date):task.due_date;
+    if(d===null)return typeof fmtDate==='function'?String(fmtDate(task.due_date)).replace(/<[^>]*>/g,''):task.due_date;
     if(d<0)return 'متأخرة '+(-d)+' يوم';
     if(d===0)return 'اليوم';
     return 'بعد '+d+' يوم'

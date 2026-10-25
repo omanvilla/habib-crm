@@ -8,6 +8,7 @@
   'use strict';
   const esc=v=>typeof escapeHtml==='function'?escapeHtml(String(v==null?'':v)):String(v==null?'':v).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
   const byId=id=>document.getElementById(id);
+  const plain=v=>String(v==null?'':v).replace(/<[^>]*>/g,'');
 
   // ---- Visits as rows -------------------------------------------------------
   const statusLabels={scheduled:'مجدولة',done:'تمت',no_show:'لم يحضر',cancelled:'ألغيت',postponed:'تأجلت'};
@@ -192,7 +193,7 @@
       const counts={};
       try{const r=await crmDataFrom('properties').select('owner_id, status').eq('archived',false);(r.data||[]).forEach(p=>{const c=counts[p.owner_id]||(counts[p.owner_id]={total:0,available:0,sold:0});c.total++;if(p.status==='available')c.available++;if(p.status==='sold')c.sold++;});}catch(e){}
       // formatPhoneDisplay returns markup; keep only its text and escape it below.
-      const phoneText=p=>typeof formatPhoneDisplay==='function'?String(formatPhoneDisplay(p)).replace(/<[^>]*>/g,''):p;
+      const phoneText=p=>typeof formatPhoneDisplay==='function'?plain(formatPhoneDisplay(p)):p;
       list.innerHTML='<div class="crm-grid-wrap"><table class="crm-grid" aria-label="قائمة الملاك"><thead><tr><th>الاسم</th><th>النوع</th><th>الهاتف</th><th>العقارات</th><th>متاح</th><th>مباع</th><th>إجراءات</th></tr></thead><tbody>'
         +rows.map(o=>{const s=counts[o.id]||{total:0,available:0,sold:0},id=esc(o.id),wa=o.phone?String(o.phone).replace(/[^0-9+]/g,'').replace(/^\+/,''):'';
           return '<tr><td class="crm-grid-name">'+(canEditNow()?'<button type="button" class="ops-title" onclick="editOwner(\''+id+'\')">'+esc(o.name||'—')+'</button>':esc(o.name||'—'))+(o.exclusive?'<span class="crm-grid-chip">حصري</span>':'')+'</td>'
@@ -225,10 +226,11 @@
         const left=Math.ceil((new Date(d.expiry_date)-today)/864e5);
         return left<0?'<span class="crm-grid-overdue">انتهى منذ '+(-left)+' يوم</span>':left<=7?'<span class="crm-grid-soon">باقي '+left+' أيام</span>':'<span class="ops-status ops-available">باقي '+left+' يوم</span>';
       };
-      const date=v=>v&&typeof fmtDate==='function'?fmtDate(v):(v||'—');
+      // fmtDate and fmtMoney return markup; keep their text only, escaped below.
+      const date=v=>v&&typeof fmtDate==='function'?plain(fmtDate(v)):(v||'—');
       list.innerHTML='<div class="crm-grid-wrap"><table class="crm-grid" aria-label="قائمة العرابين"><thead><tr><th>المبلغ</th><th>العميل</th><th>العقار</th><th>تاريخ الدفع</th><th>انتهاء المهلة</th><th>الحالة</th><th>الدفع</th><th>إجراءات</th></tr></thead><tbody>'
         +rows.map(d=>{const s=getDepositStatus(d),id=esc(d.id);
-          return '<tr><td class="crm-grid-name crm-grid-num">'+esc(typeof fmtMoney==='function'?fmtMoney(d.amount):d.amount)+'</td>'
+          return '<tr><td class="crm-grid-name crm-grid-num">'+esc(typeof fmtMoney==='function'?plain(fmtMoney(d.amount)):d.amount)+'</td>'
             +'<td>'+esc(d.deal&&d.deal.client?d.deal.client.name:'—')+'</td><td class="crm-grid-wide">'+esc(d.deal&&d.deal.property?d.deal.property.title:'—')+'</td>'
             +'<td>'+esc(date(d.payment_date))+'</td><td>'+esc(d.expiry_date?date(d.expiry_date):'—')+'</td><td>'+statusCell(d,s)+'</td>'
             +'<td>'+esc((methods[d.payment_method]||'—')+' · '+(receivers[d.received_by]||'—'))+'</td>'
@@ -271,7 +273,7 @@
       document.body.append(guideDialog);
       guideDialog.addEventListener('click',e=>{const b=e.target.closest('[data-guide]');if(!b)return;const a=b.dataset.guide;
         if(a==='next'){guideStep++;drawGuide();}else if(a==='prev'){guideStep--;drawGuide();}else closeGuide();});
-      guideDialog.addEventListener('cancel',()=>closeGuide());
+      guideDialog.addEventListener('close',()=>{if(guideDialog.dataset.closing)return;guideDialog.dataset.closing='1';closeGuide();delete guideDialog.dataset.closing;});
     }
     guideStep=0;drawGuide();if(!guideDialog.open)guideDialog.showModal();
   }
