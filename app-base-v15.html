@@ -3756,7 +3756,7 @@ async function populateTaskSelects(){
   // Build each list in one pass; appending to innerHTML per row re-parses the whole select.
   cs.insertAdjacentHTML('beforeend',(c.data||[]).map(function(i){return '<option value="'+i.id+'">'+escapeHtml(i.name)+'</option>'}).join(''));
   const ds=$('tDeal');ds.innerHTML='<option value="">— لا شيء —</option>';ds.insertAdjacentHTML('beforeend',(d.data||[]).map(function(i){return '<option value="'+i.id+'">صفقة: '+escapeHtml(i.client&&i.client.name||'—')+'</option>'}).join(''));
-  if(canManage()){$('tAssigneeFG').style.display='';const sel=$('tAssignedTo');sel.innerHTML='<option value="">— أنا ('+escapeHtml(currentProfile.full_name)+') —</option>';sel.insertAdjacentHTML('beforeend',(allMembers||[]).filter(function(m){return m.is_active!==false&&m.id!==currentUser.id}).map(function(m){return '<option value="'+m.id+'">'+escapeHtml(crmMemberChoiceLabel(m))+'</option>'}).join(''))}else{$('tAssigneeFG').style.display='none'}
+  if(canManage()){$('tAssigneeFG').style.display='';const sel=$('tAssignedTo');sel.innerHTML='<option value="">— أنا —</option>';sel.insertAdjacentHTML('beforeend',(allMembers||[]).filter(function(m){return m.is_active!==false&&m.id!==currentUser.id}).map(function(m){return '<option value="'+m.id+'">'+escapeHtml(crmMemberChoiceLabel(m))+'</option>'}).join(''))}else{$('tAssigneeFG').style.display='none'}
   return true;
  }catch(err){if(!current())return false;showToast('تعذر تحميل خيارات المهمة: '+(err.message||err),'error');throw err}
 }
