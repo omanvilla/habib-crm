@@ -139,3 +139,11 @@
 .crm-grid-more{display:flex;gap:8px;align-items:center;justify-content:center;padding:10px 0;font-size:12px;color:#62756b}
 .crm-grid-more button{padding:6px 12px;font-size:12px}
 @media(max-width:900px){.crm-grid-wrap{max-height:none}.crm-grid td,.crm-grid thead th{padding:7px 8px}}
+.crm-grid .ops-title{display:inline;line-height:1.4}
+.crm-grid-name{white-space:nowrap}
+.crm-grid-link{all:unset;cursor:pointer;color:#1f4d3a}
+.crm-grid-link:hover{text-decoration:underline}
+.crm-grid-actions{gap:2px}
+.crm-grid .crm-grid-actions .ops-action{border:0!important;background:transparent!important;color:#27624a;padding:2px 6px!important;text-decoration:underline;text-underline-offset:3px}
+.crm-grid .crm-grid-actions .ops-action:hover{background:#e7f2ec!important}
+.crm-grid .crm-grid-actions [data-workspace-action="archive-client"],.crm-grid .crm-grid-actions [data-work-action="archive-property"]{color:#8a6d4b}

@@ -493,11 +493,11 @@
     return '<tr data-client-row="'+safe(c.id)+'"><td class="crm-grid-name"><button class="ops-title" data-work-action="client" data-client-id="'+safe(c.id)+'">'+safe(c.name||'عميل')+'</button>'+(c.archived?'<span class="crm-grid-chip muted">مؤرشف</span>':'')+roles.map(r=>'<span class="crm-grid-chip">'+roleNames[r]+'</span>').join('')+'</td>'+
       '<td><bdi dir="ltr">'+safe(typeof crmPhoneText==='function'?crmPhoneText(c.phone):c.phone||'')+'</bdi></td>'+
       '<td>'+safe(branch)+'</td>'+
-      '<td class="crm-grid-wide">'+(first?safe(requestLabel(first))+(requests.length>1?' <small>+'+(requests.length-1)+'</small>':''):'<span class="crm-grid-muted">لا طلب نشط</span>')+'</td>'+
+      '<td class="crm-grid-wide">'+(first?'<button type="button" class="crm-grid-link" data-work-action="request" data-client-id="'+safe(c.id)+'" data-request-id="'+safe(first.id)+'" data-work-id="">'+safe(requestLabel(first))+'</button>'+(requests.length>1?' <small>+'+(requests.length-1)+'</small>':''):'<span class="crm-grid-muted">لا طلب نشط</span>')+'</td>'+
       '<td>'+(first?safe(stageLabel(first)):'—')+'</td>'+
       '<td class="'+(overdue?'crm-grid-overdue':'')+'">'+(first?safe(dueLabel(first.next_followup)):'—')+'</td>'+
       '<td title="'+safe(source)+'"><bdi dir="ltr">'+safe(when)+'</bdi> <small>'+safe(source)+'</small></td>'+
-      '<td class="crm-grid-actions">'+workButton('client','الملف',c.id)+(first?workButton('request',canEdit()?'الطلب':'التفاصيل',c.id,first.id):'')+(canEdit()?workButton(c.archived?'restore-client':'edit-client',c.archived?'استرجاع':'تعديل',c.id):'')+(canEdit()&&!c.archived?'<button type="button" class="ops-action" data-workspace-action="archive-client" data-id="'+safe(c.id)+'">أرشفة</button>':'')+'</td></tr>';
+      '<td class="crm-grid-actions">'+workButton('client','الملف',c.id)+(canEdit()?workButton(c.archived?'restore-client':'edit-client',c.archived?'استرجاع':'تعديل',c.id):'')+(canEdit()&&!c.archived?'<button type="button" class="ops-action" data-workspace-action="archive-client" data-id="'+safe(c.id)+'">أرشفة</button>':'')+'</td></tr>';
   }
   function clientGridHtml(){
     const {sorted,byClient,today}=clientRows,shown=Math.min(clientRowsShown,sorted.length);
