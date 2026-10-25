@@ -1,0 +1,92 @@
+/* WhatsApp-style chat (crm-whatsapp-chat.js). */
+#page-whatsapp .wa-chat-panel{background:#f0f2f5}
+#page-whatsapp .wa-chat-head{background:#f0f2f5;border-bottom:1px solid #e1e5e8}
+.wa2-avatar{width:40px;height:40px;border-radius:50%;background:#dfe5e7;color:#54656f;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex:none}
+#page-whatsapp .wa-chat-body{background:#efeae2;padding:14px 6%;gap:2px}
+.wa2-day{display:flex;justify-content:center;margin:10px 0 6px}
+.wa2-day span{background:#fff;color:#54656f;font-size:11.5px;padding:5px 12px;border-radius:8px;box-shadow:0 1px .5px rgba(11,20,26,.13)}
+.wa2-system{align-self:center;background:#fff5c4;color:#54656f;font-size:11.5px;padding:5px 10px;border-radius:8px;margin:4px 0;max-width:80%;text-align:center}
+.wa2-older{align-self:center;background:#fff;border:0;border-radius:8px;padding:6px 14px;font:inherit;font-size:12px;color:#008069;box-shadow:0 1px .5px rgba(11,20,26,.13);cursor:pointer;margin-bottom:8px}
+.wa2-row{display:flex;margin:1px 0}
+.wa2-row.out{justify-content:flex-start}
+.wa2-row.in{justify-content:flex-end}
+.wa2-bubble{position:relative;max-width:min(65%,520px);padding:6px 8px 4px;border-radius:8px;font-size:14px;line-height:1.45;color:#111b21;box-shadow:0 1px .5px rgba(11,20,26,.13);word-break:break-word}
+.wa2-bubble.in{background:#fff;border-top-left-radius:0}
+.wa2-bubble.out{background:#d9fdd3;border-top-right-radius:0}
+.wa2-bubble.bare{background:transparent;box-shadow:none}
+.wa2-text{white-space:pre-wrap}
+.wa2-text a{color:#027eb5;text-decoration:underline}
+.wa2-meta{display:flex;gap:5px;justify-content:flex-end;align-items:center;font-size:11px;color:#667781;margin-top:2px;direction:ltr}
+.wa2-who{color:#008069;font-weight:600}
+.wa2-tick{color:#8696a0;letter-spacing:-3px;font-size:12px}
+.wa2-tick.read{color:#53bdeb}
+.wa2-tick.fail{color:#ea0038;letter-spacing:0}
+.wa2-forwarded{font-size:11.5px;color:#667781;font-style:italic;margin-bottom:2px}
+.wa2-quote{all:unset;display:block;cursor:pointer;background:rgba(11,20,26,.05);border-inline-start:4px solid #06cf9c;border-radius:6px;padding:4px 8px;margin-bottom:4px;font-size:12.5px;max-width:100%;box-sizing:border-box}
+.wa2-quote.in{border-inline-start-color:#53bdeb}
+.wa2-quote strong{display:block;color:#06cf9c;font-size:12px}
+.wa2-quote.in strong{color:#53bdeb}
+.wa2-quote span{display:block;color:#667781;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wa2-quote.missing{color:#667781;cursor:default}
+.wa2-deleted{color:#8696a0;font-style:italic;font-size:13px}
+.wa2-reactions{position:absolute;bottom:-14px;inset-inline-end:8px;background:#fff;border-radius:12px;padding:0 6px;font-size:13px;box-shadow:0 1px 3px rgba(11,20,26,.2)}
+.wa2-row:has(.wa2-reactions){margin-bottom:14px}
+.wa2-actions{position:absolute;top:2px;inset-inline-start:-58px;display:none;gap:2px}
+.wa2-row.in .wa2-actions{inset-inline-start:auto;inset-inline-end:-58px}
+.wa2-bubble:hover .wa2-actions,.wa2-bubble:focus-within .wa2-actions{display:flex}
+.wa2-actions button{width:26px;height:26px;border-radius:50%;border:0;background:#fff;color:#54656f;cursor:pointer;box-shadow:0 1px 2px rgba(11,20,26,.2);font-size:13px}
+.wa2-flash .wa2-bubble{animation:wa2flash 1.6s}
+@keyframes wa2flash{0%,60%{box-shadow:0 0 0 3px #25d366}100%{box-shadow:0 1px .5px rgba(11,20,26,.13)}}
+.wa2-media{min-width:220px;min-height:120px;border-radius:6px;background:#dfe5e7;display:flex;align-items:center;justify-content:center;color:#54656f;font-size:13px;overflow:hidden;margin-bottom:2px}
+.wa2-media img{display:block;max-width:100%;max-height:340px;cursor:zoom-in}
+.wa2-media.sticker{background:transparent;min-width:0;min-height:0}
+.wa2-media.sticker img{max-width:150px;max-height:150px;cursor:default}
+.wa2-media video{display:block;max-width:100%;max-height:360px}
+.wa2-video{flex-direction:column;gap:6px}
+.wa2-audio{display:flex;align-items:center;gap:8px;min-width:240px;padding:4px 0}
+.wa2-audio audio{width:260px;max-width:100%;height:36px}
+.wa2-play{width:34px;height:34px;border-radius:50%;border:0;background:#00a884;color:#fff;font-size:14px;cursor:pointer;flex:none}
+.wa2-play.big{width:52px;height:52px;font-size:20px}
+.wa2-wave{flex:1;height:4px;border-radius:2px;background:linear-gradient(90deg,#8696a0 0 20%,transparent 20% 25%,#8696a0 25% 55%,transparent 55% 60%,#8696a0 60%)}
+.wa2-audio-label{font-size:16px}
+.wa2-transcript{font-size:12.5px;color:#3b4a54;background:rgba(11,20,26,.04);border-radius:6px;padding:4px 6px;margin-top:3px;white-space:pre-wrap}
+.wa2-transcript.muted{color:#8696a0}
+.wa2-doc{display:flex;align-items:center;gap:8px;background:rgba(11,20,26,.05);border-radius:6px;padding:8px;min-width:220px}
+.wa2-doc-ico{font-size:24px}
+.wa2-doc-name{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px}
+.wa2-doc-open,.wa2-retry{border:0;background:#fff;color:#008069;border-radius:6px;padding:4px 10px;font:inherit;font-size:12px;cursor:pointer}
+.wa2-location{display:block;color:#027eb5;padding:6px 0}
+.wa2-contact{padding:4px 0}
+.wa2-media-missing{color:#667781;font-size:13px}
+/* Composer */
+#page-whatsapp .wa-chat-compose.wa2-compose{background:#f0f2f5;border-top:0;padding:8px 12px;align-items:flex-end;gap:6px;flex-wrap:wrap;position:relative}
+.wa2-compose-top{flex-basis:100%;display:flex;flex-direction:column;gap:6px}
+.wa2-compose textarea#waInboxMessage{flex:1;min-height:42px;max-height:140px;border:0;border-radius:8px;background:#fff;padding:10px 12px;font-size:14px;line-height:1.4;resize:none;box-shadow:none;outline:none}
+.wa2-icon{width:40px;height:40px;border:0;background:transparent;font-size:21px;cursor:pointer;border-radius:50%;flex:none}
+.wa2-icon:hover{background:#e3e6e8}
+.wa2-send{width:42px;height:42px;border-radius:50%;border:0;background:#00a884;color:#fff;font-size:17px;cursor:pointer;flex:none;display:inline-flex;align-items:center;justify-content:center}
+.wa2-send[hidden]{display:none}
+.wa2-send:disabled{opacity:.6;cursor:wait}
+.wa2-send.rec{width:auto;padding:0 12px;border-radius:21px;background:#ea0038;font-size:13px}
+.wa2-reply-bar{display:flex;align-items:center;gap:8px;background:#fff;border-radius:8px;padding:6px 10px;border-inline-start:4px solid #06cf9c;font-size:12.5px}
+.wa2-reply-bar div{flex:1;min-width:0}
+.wa2-reply-bar strong{display:block;color:#06cf9c}
+.wa2-reply-bar span{display:block;color:#667781;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wa2-reply-bar button,.wa2-attach-preview button{border:0;background:transparent;font-size:16px;cursor:pointer;color:#54656f}
+.wa2-attach-preview{display:flex;align-items:center;gap:10px;background:#fff;border-radius:8px;padding:8px 10px}
+.wa2-attach-preview img,.wa2-attach-preview video{width:64px;height:64px;object-fit:cover;border-radius:6px}
+.wa2-attach-preview audio{height:34px;max-width:240px}
+.wa2-attach-info{flex:1;min-width:0;display:flex;flex-direction:column;font-size:12.5px}
+.wa2-attach-info strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wa2-attach-info small{color:#667781}
+.wa2-emoji-panel{display:grid;grid-template-columns:repeat(auto-fill,minmax(36px,1fr));gap:2px;background:#fff;border-radius:8px;padding:8px;max-height:180px;overflow:auto}
+.wa2-emoji-panel[hidden],.wa2-reply-bar[hidden],.wa2-attach-preview[hidden]{display:none}
+.wa2-emoji-panel button{border:0;background:transparent;font-size:22px;cursor:pointer;border-radius:6px;height:36px}
+.wa2-emoji-panel button:hover{background:#f0f2f5}
+.wa2-lightbox{position:fixed;inset:0;background:rgba(11,20,26,.9);z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px}
+.wa2-lightbox img{max-width:100%;max-height:100%;object-fit:contain}
+.wa2-lightbox button{position:absolute;top:16px;inset-inline-end:16px;border:0;background:transparent;color:#fff;font-size:26px;cursor:pointer}
+@media(max-width:900px){#page-whatsapp .wa-chat-body{padding:10px 8px}.wa2-bubble{max-width:85%}.wa2-actions{display:flex;position:static;margin-top:2px;justify-content:flex-end}.wa2-actions button{width:24px;height:24px;box-shadow:none;background:transparent}}
+#page-whatsapp .wa-client-strip.wa2-strip{position:relative;padding-bottom:26px}
+#page-whatsapp .wa-client-strip.wa2-strip.collapsed{max-height:58px;overflow:hidden}
+.wa2-strip-toggle{position:absolute;bottom:0;inset-inline:0;height:24px;border:0;background:linear-gradient(transparent,#fffdf8 40%);color:#008069;font:inherit;font-size:11px;cursor:pointer}
