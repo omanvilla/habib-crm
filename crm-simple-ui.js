@@ -191,7 +191,8 @@
       if(!rows.length){list.innerHTML=q||filter!=='all'?emptyState('🔍','لا توجد نتائج','جرّب كلمة بحث أخرى أو اختر «الكل».'):emptyState('🏛','لا يوجد ملاك بعد','المالك هو صاحب العقار أو الوسيط الذي جاء منه. أضفه مرة واحدة ثم اربطه بعقاراته.',canEditNow()?{label:'+ مالك جديد',action:"openModal('mOwner')"}:null);return;}
       const counts={};
       try{const r=await crmDataFrom('properties').select('owner_id, status').eq('archived',false);(r.data||[]).forEach(p=>{const c=counts[p.owner_id]||(counts[p.owner_id]={total:0,available:0,sold:0});c.total++;if(p.status==='available')c.available++;if(p.status==='sold')c.sold++;});}catch(e){}
-      const phoneText=p=>typeof formatPhoneDisplay==='function'?formatPhoneDisplay(p):p;
+      // formatPhoneDisplay returns markup; keep only its text and escape it below.
+      const phoneText=p=>typeof formatPhoneDisplay==='function'?String(formatPhoneDisplay(p)).replace(/<[^>]*>/g,''):p;
       list.innerHTML='<div class="crm-grid-wrap"><table class="crm-grid" aria-label="قائمة الملاك"><thead><tr><th>الاسم</th><th>النوع</th><th>الهاتف</th><th>العقارات</th><th>متاح</th><th>مباع</th><th>إجراءات</th></tr></thead><tbody>'
         +rows.map(o=>{const s=counts[o.id]||{total:0,available:0,sold:0},id=esc(o.id),wa=o.phone?String(o.phone).replace(/[^0-9+]/g,'').replace(/^\+/,''):'';
           return '<tr><td class="crm-grid-name">'+(canEditNow()?'<button type="button" class="ops-title" onclick="editOwner(\''+id+'\')">'+esc(o.name||'—')+'</button>':esc(o.name||'—'))+(o.exclusive?'<span class="crm-grid-chip">حصري</span>':'')+'</td>'
