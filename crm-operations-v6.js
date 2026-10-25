@@ -403,6 +403,15 @@
   };
   const oldSetPropView=window.setPropView;
   if(typeof oldSetPropView==='function')window.setPropView=function(){if(propertyTargetScope)clearPropertyTarget();return oldSetPropView.apply(this,arguments);};
+  // The 30-second unread badge asks only for totals unless the WhatsApp page is
+  // open; the full 100-conversation list was the heaviest repeated database load.
+  const fullBadge=window.refreshWhatsAppBadge;
+  if(typeof fullBadge==='function')window.refreshWhatsAppBadge=async function(){
+    if(!currentProfile||!currentProfile.company_id)return;
+    if($id('page-whatsapp')?.classList.contains('active'))return fullBadge.apply(this,arguments);
+    try{const d=await waInboxInvoke({action:'counts'});updateWhatsAppBadge(d.unread_total||0);}
+    catch(e){console.warn('[WA badge]',e);}
+  };
   // Same loader as the base, without the per-client agent-name join (nothing on
   // the clients page or its export reads it; ~1.8 s for 1,500 clients). The list
   // is drawn as soon as clients arrive and redrawn once first-contact times are
