@@ -149,3 +149,29 @@ test('quick guide opens once per account and the top-bar button reopens it',()=>
   assert.match(simple,/onclick="crmOpenGuide\(\)" title="دليل سريع"/);
   assert.equal((simple.match(/\{nav:'/g)||[]).length,4);
 });
+
+test('deposit cells show amounts and dates as text, never as raw markup',()=>{
+  const {ctx,node}=phase2({depositTab:'all',getDepositStatus:d=>d.status,
+    fmtMoney:v=>'<span dir="ltr" style="display:inline-block">'+v+'</span> ر.ع',fmtDate:v=>'<span dir="ltr">8</span> يونيو <span dir="ltr">2026</span>',
+    allDeposits:[{id:'d1',amount:'1,000',status:'active',payment_date:'2026-06-08',deal:{client:{name:'ع'},property:{title:'ف'}}}]});
+  ctx.renderDeposits();
+  const html=node('depositsList').innerHTML;
+  assert(!html.includes('&lt;span'),'escaped markup would show as text');
+  assert.match(html,/1,000 ر\.ع/);assert.match(html,/8 يونيو 2026/);
+  assert.match(html,/<td>—<\/td><td class="crm-grid-actions">/,'missing payment details show a single dash');
+});
+
+test('sold-value chart uses a wide canvas with readable labels and plain-text tooltips',()=>{
+  const start=base.indexOf('function renderRevenueLineChart('),body=base.slice(start,base.indexOf('\nfunction renderRevenueDetails(',start));
+  assert.match(body,/const w=600,h=200/);
+  assert.match(body,/font-size:11px/);assert(!body.includes('font-size:5px'));
+  assert.match(body,/String\(fmtMoney\(m\.value\)\)\.replace\(\/<\[\^>\]\*>\/g,''\)/);
+});
+
+test('activity, expense and duplicate-client notes name the branch, not the employee',()=>{
+  assert(!/escapeHtml\(a\.user\.full_name/.test(base));
+  assert(!/escapeHtml\(e\.user\.full_name/.test(base));
+  assert(!/escapeHtml\(c\.agent\.full_name\)/.test(base));
+  assert.equal((base.match(/crmMemberChoiceLabel\(a\.user\)/g)||[]).length,2);
+  assert(base.includes("sel.innerHTML='<option value=\"\">— أنا —</option>'"));
+});
