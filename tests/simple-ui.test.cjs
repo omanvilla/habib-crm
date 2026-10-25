@@ -131,3 +131,21 @@ test('calendar list groups open items into overdue, today and later, and skips f
   assert(html.indexOf('>متأخرة <span>1')<html.indexOf('>اليوم <span>1'));
   assert.match(html,/openTaskDetails\('t1'\)/);assert(!html.includes('منتهية'));assert(!html.includes('حدث قديم'));assert(!html.includes('<x>'));
 });
+
+test('menu, top bar and page titles use the same short names',()=>{
+  for(const [nav,title] of [['المهام','المهام'],['النسخ الاحتياطي','النسخ الاحتياطي'],['الفروع','الفروع']]){
+    assert(base.includes('<span class="nav-text">'+nav+'</span>'),nav);
+    assert(base.includes('<div class="page-title"><span>'+title+'</span></div>'),title);
+  }
+  for(const name of ['العملاء','العقارات','الملاك','الزيارات','العربون','التقويم','واتساب'])assert(base.includes('<div class="page-title"><span>'+name+'</span></div>'),name);
+  assert(!base.includes('Backup</span>'));assert(!/'إدارة <em>/.test(base.match(/const t=\{[^}]*\}/)[0].replace("deals:'إدارة <em>الصفقات</em>'",'')));
+  assert(base.includes('<div class="page-title">إدارة <span>الصفقات والزيارات</span></div>'),'Deals page is left as it was');
+});
+
+test('quick guide opens once per account and the top-bar button reopens it',()=>{
+  assert.match(simple,/'crmGuideSeen:'\+/);
+  assert.match(simple,/localStorage\.setItem\(guideKey\(\),'1'\)/);
+  assert.match(simple,/!seen&&!guideOffered/);
+  assert.match(simple,/onclick="crmOpenGuide\(\)" title="دليل سريع"/);
+  assert.equal((simple.match(/\{nav:'/g)||[]).length,4);
+});

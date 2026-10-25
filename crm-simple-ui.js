@@ -237,9 +237,58 @@
     };
   }
 
-  function refresh(){enhanceFilters();watchLists();groupNav();calNavState();}
+  // ---- Phase 3: quick guide for new staff ----------------------------------
+  // Shown once per account on each browser; the "؟" button in the top bar reopens it.
+  const GUIDE=[
+    {nav:'dash',title:'ابدأ يومك من «لوحة العمل»',text:'في الأعلى المحادثات التي تحتاج تدخلك، وتحتها أعمال اليوم: المتابعات والزيارات والمهام وأرقام فرعك.'},
+    {nav:'whatsapp',title:'ردّ على العملاء من «واتساب»',text:'كل رسائل العملاء في مكان واحد. افتح المحادثة وردّ مباشرة، ويمكنك إرسال الصور والفيديو والرسائل الصوتية.'},
+    {nav:'daily',title:'أنجز «المهام» و«الزيارات»',text:'كل صف مهمة مطلوبة منك. اضغط المربع عند الإنجاز. وبعد كل زيارة افتح «الزيارات» واضغط «تسجيل النتيجة».'},
+    {nav:'clients',title:'أضف عميلًا أو عقارًا',text:'من زر «عميل جديد» أو «عقار جديد» في لوحة العمل. ابحث برقم الهاتف أولًا في «العملاء» حتى لا يتكرر العميل.'}
+  ];
+  const guideKey=()=>'crmGuideSeen:'+(typeof currentUser!=='undefined'&&currentUser?currentUser.id:'');
+  let guideDialog=null,guideStep=0,guideOffered=false;
+  function focusNav(key){
+    document.querySelectorAll('#sidebar .crm-guide-focus').forEach(n=>n.classList.remove('crm-guide-focus'));
+    const link=[...document.querySelectorAll('#sidebar .nav-link')].find(l=>navKey(l)===key);if(link)link.classList.add('crm-guide-focus');
+  }
+  function drawGuide(){
+    const s=GUIDE[guideStep],last=guideStep===GUIDE.length-1;
+    guideDialog.innerHTML='<div class="crm-guide-step">'+(guideStep+1)+' من '+GUIDE.length+'</div><h3>'+esc(s.title)+'</h3><p>'+esc(s.text)+'</p>'
+      +'<div class="crm-guide-dots">'+GUIDE.map((_,i)=>'<span'+(i===guideStep?' class="on"':'')+'></span>').join('')+'</div>'
+      +'<div class="crm-guide-actions"><button type="button" class="btn-secondary" data-guide="close">إغلاق</button>'
+      +(guideStep?'<button type="button" class="btn-secondary" data-guide="prev">السابق</button>':'')
+      +'<button type="button" class="btn-primary" data-guide="'+(last?'done':'next')+'">'+(last?'ابدأ العمل':'التالي')+'</button></div>';
+    focusNav(s.nav);
+  }
+  function closeGuide(){
+    try{localStorage.setItem(guideKey(),'1');}catch(e){}
+    document.querySelectorAll('#sidebar .crm-guide-focus').forEach(n=>n.classList.remove('crm-guide-focus'));
+    if(guideDialog&&guideDialog.open)guideDialog.close();
+  }
+  function openGuide(){
+    if(!guideDialog){
+      guideDialog=document.createElement('dialog');guideDialog.className='crm-guide';guideDialog.setAttribute('dir','rtl');guideDialog.setAttribute('aria-label','دليل سريع');
+      document.body.append(guideDialog);
+      guideDialog.addEventListener('click',e=>{const b=e.target.closest('[data-guide]');if(!b)return;const a=b.dataset.guide;
+        if(a==='next'){guideStep++;drawGuide();}else if(a==='prev'){guideStep--;drawGuide();}else closeGuide();});
+      guideDialog.addEventListener('cancel',()=>closeGuide());
+    }
+    guideStep=0;drawGuide();if(!guideDialog.open)guideDialog.showModal();
+  }
+  window.crmOpenGuide=openGuide;
+  function guideButton(){
+    const bell=document.querySelector('.topbar .bell-wrapper');
+    if(!bell||document.querySelector('.crm-guide-btn'))return;
+    bell.parentElement.insertAdjacentHTML('beforebegin','<button type="button" class="crm-guide-btn" onclick="crmOpenGuide()" title="دليل سريع" aria-label="دليل سريع">؟</button>');
+  }
+  function maybeGuide(){
+    let seen=true;try{seen=localStorage.getItem(guideKey())==='1';}catch(e){}
+    if(!seen&&!guideOffered&&typeof currentUser!=='undefined'&&currentUser&&!document.querySelector('dialog[open]')){guideOffered=true;openGuide();}
+  }
+
+  function refresh(){enhanceFilters();watchLists();groupNav();calNavState();guideButton();}
   const loadApp=window.loadDashboard;
-  if(typeof loadApp==='function')window.loadDashboard=function(){const r=loadApp.apply(this,arguments);setTimeout(groupNav,0);return r;};
+  if(typeof loadApp==='function')window.loadDashboard=function(){const r=loadApp.apply(this,arguments);setTimeout(groupNav,0);setTimeout(maybeGuide,1500);return r;};
   const nav=window.navigate;
   if(typeof nav==='function')window.navigate=function(){const result=nav.apply(this,arguments);setTimeout(refresh,0);return result;};
   refresh();setTimeout(refresh,1500);
