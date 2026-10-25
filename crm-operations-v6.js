@@ -403,24 +403,33 @@
   };
   const oldSetPropView=window.setPropView;
   if(typeof oldSetPropView==='function')window.setPropView=function(){if(propertyTargetScope)clearPropertyTarget();return oldSetPropView.apply(this,arguments);};
-  // Same loader as the base, without the per-client agent-name join: nothing on
-  // the clients page or its export reads it, and it cost ~1.8 s for 1,500 clients.
+  // Same loader as the base, without the per-client agent-name join (nothing on
+  // the clients page or its export reads it; ~1.8 s for 1,500 clients). The list
+  // is drawn as soon as clients arrive and redrawn once first-contact times are
+  // read. A return visit in the same session draws the last list immediately and
+  // refreshes it quietly.
+  let clientsCache=null;
   if(typeof window.loadClients==='function')window.loadClients=async function(){
     const list=$id('clientsList'),generation=crmSessionGeneration,userId=currentUser&&currentUser.id,archived=showArchivedClients,token={};
+    const key=generation+':'+userId+':'+archived;
     list.crmReadToken=token;
     const current=()=>list.crmReadToken===token&&showArchivedClients===archived&&crmSessionCurrent(generation,userId);
-    list.innerHTML='<div class="empty" role="status">جاري تحميل العملاء والطلبات…</div>';
+    const show=(clients,requests,keep)=>{clientWorkRequests=requests;allClients=clients.filter(c=>archived?c.archived===true:c.archived!==true);clientRowsKeep=keep;updateRoleCounts();renderClients();};
+    const cached=clientsCache&&clientsCache.key===key?clientsCache:null;
+    if(cached)show(cached.clients,cached.requests,false);
+    else list.innerHTML='<div class="empty" role="status">جاري تحميل العملاء والطلبات…</div>';
     try{
       const [clients,requests]=await Promise.all([
         crmReadAll(()=>supa.from('clients').select('*',{count:'exact'}).order('created_at',{ascending:false}).order('id')),
         crmReadAll(()=>supa.from('client_requests').select('id,client_id,request_type,status,pipeline_stage,qualified_at,preferred_area,property_type,subject_property_id,route_key,budget_min,budget_max,next_followup,next_action,branch_key',{count:'exact'}).in('status',['active','paused']).order('id'))
       ]);
       if(!current())return false;
+      if(!cached&&window.CRMClientChronology)show(clients,requests,false);
       const datedClients=window.CRMClientChronology?await window.CRMClientChronology.enrich(clients,current):clients;
       if(!current())return false;
-      clientWorkRequests=requests;allClients=datedClients.filter(c=>archived?c.archived===true:c.archived!==true);
-      updateRoleCounts();renderClients();return true;
-    }catch(err){if(!current())return false;allClients=[];clientWorkRequests=[];console.error('[Clients]',err);list.innerHTML='<div class="empty" role="alert"><p>تعذر تحميل العملاء وطلباتهم. أعد المحاولة.</p><button class="btn-secondary" onclick="loadClients()">إعادة المحاولة</button></div>';return false;}
+      clientsCache={key,clients:datedClients,requests};
+      show(datedClients,requests,true);return true;
+    }catch(err){if(!current())return false;allClients=[];clientWorkRequests=[];clientsCache=null;console.error('[Clients]',err);list.innerHTML='<div class="empty" role="alert"><p>تعذر تحميل العملاء وطلباتهم. أعد المحاولة.</p><button class="btn-secondary" onclick="loadClients()">إعادة المحاولة</button></div>';return false;}
   };
   const oldLoadClients=window.loadClients;
   let clientLoadSeq=0;
@@ -498,7 +507,7 @@
     teamPerformancePeriod='month';dashboardPerformancePeriod='month';clientLoadSeq++;dashboardScopes.clear();dashboardSession='';dashboardScope='branches';dashboardCategory='all';
     window.client360Data=null;
     ['cdTabJourney','cdActivities','cdTabRequests','cdTabInterests','cdTabListings','cdTabTasks','cdTabDeals','cdTabInfo','cdSmartMatches','cdClientAI','propertyDetailContent','opsDashboardPerformanceResults','employeePerformanceResults','teamLeaderboard','conversionFunnel'].forEach(id=>{if($id(id))$id(id).textContent='';});
-    clientRows=null;clientBranch='all';clientWorkFilter='all';propertySearch='';propertyBranch='';propertyArea='';propertyStatus='';
+    clientRows=null;clientsCache=null;clientBranch='all';clientWorkFilter='all';propertySearch='';propertyBranch='';propertyArea='';propertyStatus='';
     ['opsPropertySearch','opsPropertyBranch','opsPropertyArea','opsPropertyStatus'].forEach(id=>{if($id(id))$id(id).value='';});
   };
   document.addEventListener('input',e=>{if(e.target.id==='opsPropertySearch'){propertySearch=e.target.value.trim().toLowerCase();if(!propertyTargetScope||listExports.properties.ready)renderOrganizedProperties();}});
