@@ -403,6 +403,25 @@
   };
   const oldSetPropView=window.setPropView;
   if(typeof oldSetPropView==='function')window.setPropView=function(){if(propertyTargetScope)clearPropertyTarget();return oldSetPropView.apply(this,arguments);};
+  // Same loader as the base, without the per-client agent-name join: nothing on
+  // the clients page or its export reads it, and it cost ~1.8 s for 1,500 clients.
+  if(typeof window.loadClients==='function')window.loadClients=async function(){
+    const list=$id('clientsList'),generation=crmSessionGeneration,userId=currentUser&&currentUser.id,archived=showArchivedClients,token={};
+    list.crmReadToken=token;
+    const current=()=>list.crmReadToken===token&&showArchivedClients===archived&&crmSessionCurrent(generation,userId);
+    list.innerHTML='<div class="empty" role="status">جاري تحميل العملاء والطلبات…</div>';
+    try{
+      const [clients,requests]=await Promise.all([
+        crmReadAll(()=>supa.from('clients').select('*',{count:'exact'}).order('created_at',{ascending:false}).order('id')),
+        crmReadAll(()=>supa.from('client_requests').select('id,client_id,request_type,status,pipeline_stage,qualified_at,preferred_area,property_type,subject_property_id,route_key,budget_min,budget_max,next_followup,next_action,branch_key',{count:'exact'}).in('status',['active','paused']).order('id'))
+      ]);
+      if(!current())return false;
+      const datedClients=window.CRMClientChronology?await window.CRMClientChronology.enrich(clients,current):clients;
+      if(!current())return false;
+      clientWorkRequests=requests;allClients=datedClients.filter(c=>archived?c.archived===true:c.archived!==true);
+      updateRoleCounts();renderClients();return true;
+    }catch(err){if(!current())return false;allClients=[];clientWorkRequests=[];console.error('[Clients]',err);list.innerHTML='<div class="empty" role="alert"><p>تعذر تحميل العملاء وطلباتهم. أعد المحاولة.</p><button class="btn-secondary" onclick="loadClients()">إعادة المحاولة</button></div>';return false;}
+  };
   const oldLoadClients=window.loadClients;
   let clientLoadSeq=0;
   if(typeof oldLoadClients==='function')window.loadClients=async function(){
