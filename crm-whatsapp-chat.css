@@ -87,3 +87,6 @@
 .wa2-lightbox img{max-width:100%;max-height:100%;object-fit:contain}
 .wa2-lightbox button{position:absolute;top:16px;inset-inline-end:16px;border:0;background:transparent;color:#fff;font-size:26px;cursor:pointer}
 @media(max-width:900px){#page-whatsapp .wa-chat-body{padding:10px 8px}.wa2-bubble{max-width:85%}.wa2-actions{display:flex;position:static;margin-top:2px;justify-content:flex-end}.wa2-actions button{width:24px;height:24px;box-shadow:none;background:transparent}}
+#page-whatsapp .wa-client-strip.wa2-strip{position:relative;padding-bottom:26px}
+#page-whatsapp .wa-client-strip.wa2-strip.collapsed{max-height:58px;overflow:hidden}
+.wa2-strip-toggle{position:absolute;bottom:0;inset-inline:0;height:24px;border:0;background:linear-gradient(transparent,#fffdf8 40%);color:#008069;font:inherit;font-size:11px;cursor:pointer}

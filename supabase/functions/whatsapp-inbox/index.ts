@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
       } catch (error) {
         const code=String((error as Error)?.message||"");
         const allowed=["media_size_limit","unsupported_media_type","untrusted_media_host","media_credentials_unavailable","media_unavailable"];
-        return json({ok:false,error:allowed.includes(code)?code:"media_unavailable",message:"تعذر عرض الصورة بأمان. راجع الصورة في واتساب الأصلي قبل تحديد العقار."},code==="media_size_limit"?413:502);
+        return json({ok:false,error:allowed.includes(code)?code:"media_unavailable",message:kind==="image"?"تعذر عرض الصورة بأمان. راجع الصورة في واتساب الأصلي قبل تحديد العقار.":"تعذر فتح المرفق من واتساب؛ الملفات الأقدم من 30 يومًا قد لا تكون متاحة."},code==="media_size_limit"?413:502);
       }
     }
 

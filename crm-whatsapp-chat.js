@@ -10,7 +10,7 @@
   const esc=v=>escapeHtml(String(v==null?'':v));
   const TZ={timeZone:'Asia/Muscat'};
   const media=new Map();            // message id → {url,type,filename} (object URLs)
-  let reply=null,pending=null,recorder=null,recChunks=[],recStart=0,recTimer=null,pollTimer=null,polling=false,observer=null;
+  let stripOpen=false,reply=null,pending=null,recorder=null,recChunks=[],recStart=0,recTimer=null,pollTimer=null,polling=false,observer=null;
   const EMOJI='😀 😁 😂 🤣 😊 😍 😘 😎 🤔 😅 😉 🙏 👍 👌 👏 🤝 💪 🙌 ❤️ 💚 🌹 🎉 ✅ ❌ ⭐ 🔥 💯 🏠 🏡 🏢 🏗️ 🔑 📍 📞 📅 ⏰ 💰 💵 📄 📷 🎥 🚗 ☀️ 🌙 👋 🤲 😢 😔 🙂 😃 🥰 😇 🤗 🤩 😴 🤷 👀 💡 📌 ✍️ 🕌 🎁'.split(' ');
 
   const dayKey=ts=>ts?new Intl.DateTimeFormat('en-CA',TZ).format(new Date(ts)):'';
@@ -314,7 +314,11 @@
   const baseRender=window.renderWhatsAppChat;
   if(typeof baseRender==='function')window.renderWhatsAppChat=function(preserveScroll){
     const result=baseRender.apply(this,arguments);
-    try{installComposer();renderBody(preserveScroll);const head=$('waChatHeader'),c=waInboxActiveConversation;
+    try{installComposer();renderBody(preserveScroll);
+      // The request/alert strip folds to one line so the messages keep the space.
+      const strip=$('waClientStrip');if(strip&&strip.style.display!=='none'){strip.classList.add('wa2-strip');strip.classList.toggle('collapsed',!stripOpen);
+        if(!strip.querySelector('[data-wa2-strip]'))strip.insertAdjacentHTML('beforeend','<button type="button" class="wa2-strip-toggle" data-wa2-strip>'+(stripOpen?'إخفاء التفاصيل ▴':'تفاصيل الطلب والتنبيهات ▾')+'</button>');}
+      const head=$('waChatHeader'),c=waInboxActiveConversation;
       if(head&&c&&!head.querySelector('.wa2-avatar')){const name=(c.client&&c.client.name)||c.customer_name||c.customer_phone||'؟';head.insertAdjacentHTML('afterbegin','<span class="wa2-avatar" aria-hidden="true">'+esc(String(name).trim().charAt(0)||'؟')+'</span>');}
     }catch(e){console.warn('[wa2]',e);}
     return result;
@@ -330,6 +334,7 @@
     const r=t.closest('[data-wa2-reply]');if(r){setReply(waInboxMessages.find(m=>m.id===r.dataset.wa2Reply));return;}
     const c=t.closest('[data-wa2-copy]');if(c){const m=waInboxMessages.find(x=>x.id===c.dataset.wa2Copy);navigator.clipboard?.writeText(String(m?.body||m?.transcript||'')).then(()=>showToast('تم النسخ','success'));return;}
     const g=t.closest('[data-wa2-goto]');if(g){const row=document.querySelector('[data-wa2-row="'+CSS.escape(g.dataset.wa2Goto)+'"]');if(row){row.scrollIntoView({block:'center',behavior:'smooth'});row.classList.add('wa2-flash');setTimeout(()=>row.classList.remove('wa2-flash'),1600);}return;}
+    const sb=t.closest('[data-wa2-strip]');if(sb){stripOpen=!stripOpen;const strip=$('waClientStrip');strip?.classList.toggle('collapsed',!stripOpen);sb.textContent=stripOpen?'إخفاء التفاصيل ▴':'تفاصيل الطلب والتنبيهات ▾';return;}
     if(t.closest('[data-wa2-cancel-reply]')){setReply(null);return;}
     if(t.closest('[data-wa2-cancel-file]')){clearPending();return;}
     const em=t.closest('[data-wa2-emoji]');if(em){const ta=$('waInboxMessage');if(ta){const s=ta.selectionStart??ta.value.length,en=ta.selectionEnd??s;ta.value=ta.value.slice(0,s)+em.dataset.wa2Emoji+ta.value.slice(en);ta.focus();ta.selectionStart=ta.selectionEnd=s+em.dataset.wa2Emoji.length;autoGrow();syncButtons();}return;}
