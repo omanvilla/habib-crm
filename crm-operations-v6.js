@@ -328,13 +328,14 @@
     const ordered=[...groups.values()].sort((a,b)=>['مسقط','بركاء','غير محدد'].indexOf(a.branch)-['مسقط','بركاء','غير محدد'].indexOf(b.branch)||a.area.localeCompare(b.area,'ar'));
     captureListExport('properties',ordered.flatMap(g=>g.items));
     // One spreadsheet-style row per property, still ordered branch → area → newest.
+    const gridDate=d=>d?new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Muscat',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(d)):'—';
     const cellNum=v=>Number(v)>0?n(v):'—';
-    list.innerHTML='<div class="crm-grid-wrap"><table class="crm-grid" aria-label="قائمة العقارات"><thead><tr><th>العقار</th><th>الرمز</th><th>الفرع</th><th>المنطقة</th><th>النوع</th><th>غرف</th><th>أرض م²</th><th>بناء م²</th><th>السعر ر.ع</th><th>الحالة</th><th>أُضيف</th><th>إجراءات</th></tr></thead><tbody>'+
-      ordered.flatMap(g=>g.items.map(p=>'<tr data-property-row="'+safe(p.id)+'"><td class="crm-grid-name"><button type="button" class="ops-title" data-work-action="property" data-work-id="'+safe(p.id)+'">'+safe(p.title||'عقار')+'</button></td>'+
-        '<td><bdi dir="ltr">'+safe(p.property_code||'—')+'</bdi></td><td>'+safe(g.branch)+'</td><td>'+safe(p.area||'غير محددة')+'</td>'+
+    list.innerHTML='<div class="crm-grid-wrap"><table class="crm-grid" aria-label="قائمة العقارات"><thead><tr><th>العقار</th><th>الفرع</th><th>المنطقة</th><th>النوع</th><th>غرف</th><th>أرض م²</th><th>بناء م²</th><th>السعر ر.ع</th><th>الحالة</th><th>أُضيف</th><th>إجراءات</th></tr></thead><tbody>'+
+      ordered.flatMap(g=>g.items.map(p=>'<tr data-property-row="'+safe(p.id)+'"><td class="crm-grid-name"><button type="button" class="ops-title" data-work-action="property" data-work-id="'+safe(p.id)+'">'+safe(p.title||'عقار')+'</button>'+(p.property_code?' <small dir="ltr">'+safe(p.property_code)+'</small>':'')+'</td>'+
+        '<td>'+safe(g.branch)+'</td><td>'+safe(p.area||'غير محددة')+'</td>'+
         '<td>'+safe(typeof propTypeAr==='function'?propTypeAr(p.type):p.type||'—')+'</td><td>'+cellNum(p.bedrooms)+'</td><td>'+cellNum(p.land_size)+'</td><td>'+cellNum(p.built_size)+'</td>'+
         '<td class="crm-grid-num">'+cellNum(p.price)+'</td><td><span class="ops-status '+(!p.archived&&p.status==='available'?'ops-available':'')+'">'+safe((p.archived?'مؤرشف · ':'')+propertyStatusLabel(p.status))+'</span></td>'+
-        '<td><bdi dir="ltr">'+safe(dateText(p.created_at))+'</bdi></td><td class="crm-grid-actions">'+propertyActions(p).replace('<div class="ops-property-actions">','').replace(/<\/div>$/,'')+'<button type="button" class="ops-action" data-workspace-action="property-marketing" data-id="'+safe(p.id)+'">التسويق</button></td></tr>')).join('')+
+        '<td><bdi dir="ltr">'+safe(gridDate(p.created_at))+'</bdi></td><td class="crm-grid-actions">'+propertyActions(p).replace('<div class="ops-property-actions">','').replace(/<\/div>$/,'')+'<button type="button" class="ops-action" data-workspace-action="property-marketing" data-id="'+safe(p.id)+'">التسويق</button></td></tr>')).join('')+
       '</tbody></table></div>';
   }
   const oldProperties=window.loadProperties;
