@@ -2264,7 +2264,8 @@ function crmMemberChoiceLabel(member){
  if(member.role==='owner')return 'صاحب الشركة';
  const route=Object.values(typeof leadRouteData==='undefined'?{}:leadRouteData).find(row=>['muscat','barka'].includes(row.route_key)&&row.assigned_to===member.id);
  const branch=route?.route_key||(member.id===currentUser?.id?window.crmCurrentBranchKey:null);
- return (branch?crmBranchName(branch):'حساب فريق')+(member.email?' · '+member.email:'');
+ // Staff are shown by branch only; e-mail addresses stay out of lists and selectors.
+ return branch?crmBranchName(branch):'حساب فريق';
 }
 function updateUserUI(){if(!currentProfile)return;const label=currentProfile.role==='agent'?crmBranchName(window.crmCurrentBranchKey):currentProfile.full_name||currentProfile.email;$('userAv').textContent=roleIcon(currentProfile.role);$('userName').textContent=label;$('userRole').textContent=roleAr(currentProfile.role);$('welcomeName').textContent=currentProfile.role==='agent'?label:(currentProfile.full_name||'').split(' ')[0]||'بك';$('setName').value=currentProfile.full_name||'';$('setEmail').value=currentProfile.email||'';$('setPhone').value=currentProfile.phone||'';$('setRole').value=roleAr(currentProfile.role);if(currentCompany){$('setCompanyName').value=currentCompany.name||'';$('setCompanyCR').value=currentCompany.cr_number||'';$('setCompanyPhone').value=currentCompany.phone||'';$('setCompanyEmail').value=currentCompany.email||'';$('setCompanyAddress').value=currentCompany.address||''}}
 
