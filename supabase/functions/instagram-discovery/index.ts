@@ -63,20 +63,52 @@ async function mediaInsights(mediaId:string,token:string){
  if(!Number.isFinite(metrics.total_interactions)&&['likes','comments','shares','saved'].every(k=>Number.isFinite(metrics[k])))metrics.total_interactions=metrics.likes+metrics.comments+metrics.shares+metrics.saved;
  return metrics;
 }
-async function refreshMetrics(a:any,token:string,deadline:number){
+const digits=(v:unknown)=>/^\d{5,40}$/.test(String(v||''))?String(v):'';
+// Runs once per invocation for the company. A link is measured with the token of
+// the connected account that owns it (full insights). A post of a registered
+// partner account that is not connected (e.g. a collab by @omanvilla1) gets
+// likes/comments through business discovery; Meta gives no views for it.
+async function refreshMetrics(companyId:string,connected:{a:any,token:string}[],deadline:number){
+ if(!connected.length)return {};
  const before=new Date(Date.now()-METRIC_AGE_MS).toISOString();
- const due=await db('property_marketing_events?select=id,link_key,instagram_media_id&company_id=eq.'+a.company_id+'&channel=eq.instagram&link_key=like.instagram:*'
+ const due=await db('property_marketing_events?select=id,link_key,instagram_media_id&company_id=eq.'+companyId+'&channel=eq.instagram&link_key=like.instagram:*'
   +'&or=(last_synced_at.is.null,last_synced_at.lt."'+before+'")&order=last_synced_at.asc.nullsfirst,id&limit='+METRICS_PER_RUN);
+ if(!due.length)return {metrics_synced:0,metrics_failed:0};
+ const partners=(await db('instagram_partner_accounts?select=username&company_id=eq.'+companyId+'&order=username')).map((r:any)=>String(r.username).toLowerCase()).filter((u:string)=>/^[a-z0-9._]{1,30}$/.test(u));
+ const byUsername=new Map(connected.map(c=>[String(c.a.instagram_username||'').toLowerCase(),c]));
+ const partnerMedia=new Map<string,any[]>();
+ async function mediaOf(username:string){
+  if(!partnerMedia.has(username)){
+   let list:any[]=[];
+   try{const d=await graphGet(connected[0].a.instagram_user_id+'?fields='+encodeURIComponent('business_discovery.username('+username+'){media.limit(100){id,permalink,like_count,comments_count}}'),connected[0].token);list=Array.isArray(d?.business_discovery?.media?.data)?d.business_discovery.media.data:[];}
+   catch(error){if(error instanceof SafeError&&['meta_reconnect_required','meta_rate_limited'].includes(error.code))throw error;}
+   partnerMedia.set(username,list);
+  }
+  return partnerMedia.get(username)!;
+ }
  let synced=0,failed=0;
  for(const e of due){
   if(Date.now()>deadline)break;
-  const now=new Date().toISOString(),where='property_marketing_events?id=eq.'+e.id+'&company_id=eq.'+a.company_id;
-  let mediaId=/^\d{5,40}$/.test(String(e.instagram_media_id||''))?String(e.instagram_media_id):'';
-  if(!mediaId){
-   const found=await db('instagram_media_catalog?select=instagram_media_id&account_id=eq.'+a.id+'&link_key=eq.'+encodeURIComponent(e.link_key)+'&limit=1');
-   mediaId=/^\d{5,40}$/.test(String(found?.[0]?.instagram_media_id||''))?String(found[0].instagram_media_id):'';
+  const now=new Date().toISOString(),where='property_marketing_events?id=eq.'+e.id+'&company_id=eq.'+companyId,code=String(e.link_key).slice(10);
+  let owner:{a:any,token:string}|undefined,mediaId='',partner='',pm:any=null;
+  const found=await db('instagram_media_catalog?select=account_id,instagram_media_id&company_id=eq.'+companyId+'&link_key=eq.'+encodeURIComponent(e.link_key)+'&limit=1');
+  if(found?.[0]){owner=connected.find(c=>c.a.id===found[0].account_id);mediaId=digits(found[0].instagram_media_id);}
+  if(!owner||!mediaId){
+   for(const username of partners){
+    pm=(await mediaOf(username)).find((m:any)=>new RegExp('/(?:p|reels?|tv)/'+code.replace(/[^A-Za-z0-9_-]/g,'')+'/?$').test(String(m.permalink||'').split('?')[0]));
+    if(pm){partner=username;break;}
+   }
+   if(pm&&byUsername.has(partner)){owner=byUsername.get(partner);mediaId=digits(pm.id);}
+   else if(!pm&&!found?.[0]&&digits(e.instagram_media_id)){owner=connected[0];mediaId=digits(e.instagram_media_id);}
   }
-  if(!mediaId){await db(where,'PATCH',{sync_status:'error',sync_error:'instagram_media_not_found_or_not_owned_by_omanvilla',last_synced_at:now});failed++;continue;}
+  if(!(owner&&mediaId)&&pm){
+   const likes=Number.isFinite(Number(pm.like_count))?Number(pm.like_count):null,comments=Number.isFinite(Number(pm.comments_count))?Number(pm.comments_count):null;
+   await db(where,'PATCH',{sync_status:'synced',sync_error:'partner_account_engagement_only:'+partner,last_synced_at:now,instagram_media_id:digits(pm.id)||null,auto_sync:true,
+    likes,comments,total_interactions:likes==null||comments==null?null:likes+comments,insights_payload:{partner,likes,comments,synced_at:now,source:VERSION,views_available:false}});
+   synced++;continue;
+  }
+  if(!(owner&&mediaId)){await db(where,'PATCH',{sync_status:'error',sync_error:'instagram_media_not_found_or_not_owned_by_omanvilla',last_synced_at:now});failed++;continue;}
+  const token=owner.token;
   const m=await mediaInsights(mediaId,token);
   if(!Number.isFinite(m.views)){await db(where,'PATCH',{sync_status:'error',sync_error:'instagram_views_unavailable_previous_values_preserved',last_synced_at:now,instagram_media_id:mediaId});failed++;continue;}
   await db(where,'PATCH',{instagram_media_id:mediaId,auto_sync:true,sync_status:'synced',sync_error:null,last_synced_at:now,
@@ -119,10 +151,6 @@ async function runAccount(a:any,deadline:number){
    }
    await rpc('crm_instagram_notify',{p_account:a.id});
   }
-  let metrics={};
-  try{metrics=await refreshMetrics(a,token,deadline);}
-  catch(error){if(error instanceof SafeError&&['meta_reconnect_required','meta_rate_limited'].includes(error.code))throw error;metrics={metrics_error:error instanceof SafeError?error.code:'metrics_failed'};}
-  Object.assign(counts,metrics);
   await db(where,'PATCH',{last_success_at:new Date().toISOString(),last_error_code:null,error_count:0,next_retry_at:null,lease_id:null,lease_until:null,updated_at:new Date().toISOString()});
   return {account_id:a.id,ok:true,...counts};
  }catch(error){
@@ -146,6 +174,17 @@ Deno.serve(async req=>{
   const accounts=await db('instagram_accounts?select=id,company_id,instagram_user_id,instagram_username&connection_status=eq.connected'+(COMPANY?'&company_id=eq.'+COMPANY:''));
   const enabled=new Set(states.map((s:any)=>s.account_id)),deadline=Date.now()+100000,results=[];
   for(const a of accounts){if(enabled.has(a.id)&&Date.now()<deadline)results.push(await runAccount(a,deadline));}
-  return json({ok:results.every((r:any)=>r.ok!==false),version:VERSION,results});
+  // Metrics use every connected account's token, discovery-enabled or not. The
+  // discovery account comes first: its token performs partner lookups.
+  let metrics:Record<string,unknown>={};
+  for(const companyId of [...new Set(accounts.map((a:any)=>String(a.company_id)))]){
+   const connected:{a:any,token:string}[]=[];
+   for(const a of [...accounts].filter((x:any)=>String(x.company_id)===companyId).sort((x:any,y:any)=>Number(enabled.has(y.id))-Number(enabled.has(x.id)))){
+    try{connected.push({a,token:await tokenFor(a)});}catch{/* unreadable credential: skip this account */}
+   }
+   try{metrics=await refreshMetrics(companyId,connected,deadline+40000);}
+   catch(error){metrics={metrics_error:error instanceof SafeError?error.code:'metrics_failed'};}
+  }
+  return json({ok:results.every((r:any)=>r.ok!==false),version:VERSION,results,metrics});
  }catch(error){return json({ok:false,error:error instanceof SafeError?error.code:'worker_failed'},500);}
 });

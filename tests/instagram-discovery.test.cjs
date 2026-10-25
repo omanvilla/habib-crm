@@ -26,3 +26,14 @@ test('scheduled worker refreshes saved-link metrics in small batches without era
  assert.match(src,/if\(!Number\.isFinite\(m\.views\)\)\{await db\(where,'PATCH',\{sync_status:'error',sync_error:'instagram_views_unavailable_previous_values_preserved'/);
  assert(src.includes("new URL('https://graph.facebook.com/v25.0/'+path)"),'fixed provider host');
 });
+test('partner accounts: engagement-only lookup, owner-only connect, manual sync never overwrites partner results',()=>{
+ const w=fs.readFileSync('supabase/functions/instagram-discovery/index.ts','utf8'),api=fs.readFileSync('supabase/functions/instagram-api/index.ts','utf8'),ui=fs.readFileSync('crm-instagram-performance.js','utf8'),sql=fs.readFileSync('db/changes/44-instagram-partner-accounts.forward.sql','utf8');
+ assert.match(w,/business_discovery\.username\('\+username\+'\)/);
+ assert.match(w,/sync_error:'partner_account_engagement_only:'\+partner/);
+ assert.match(api,/if \(profile\.role !== "owner" \|\| !\/\^\[a-z0-9\._\]\{1,30\}\$\/\.test\(partnerUsername\)\)/);
+ assert.match(api,/partnerUsername \? \[\] : \[String\(ig\.id\), String\(page\.id\)\]/,'no message subscription for partners');
+ assert.match(api,/handled_by_scheduled_sync: true/);
+ assert.match(api,/find\(\(a: any\) => String\(a\.instagram_user_id\) === TARGET_IG_ID\)/,'main account stays primary');
+ assert.match(ui,/if\(!isOwner\(\)\|\|!Array\.isArray\(partners\)/);
+ assert.match(sql,/\(SELECT public\.my_role\(\)\) = 'owner'/);
+});

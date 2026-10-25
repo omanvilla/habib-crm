@@ -242,6 +242,7 @@
       var state = item.sync_status === 'synced' ? 'متزامن' : item.sync_status === 'error' ? 'تعذر التحديث' : item.sync_status === 'manual' ? 'قياسات يدوية / لم تتزامن' : 'بانتظار المزامنة';
       if(item.last_synced_at&&String(item.last_synced_at).slice(0,10)!==new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'}))state+=' · محفوظ من تحديث سابق';
       if(item.sync_status==='error'&&item.views!=null)state+=' · قيمة سابقة وليست مزامنة ناجحة';
+      if(item.sync_status==='synced'&&item.views==null)state+=' · إعجابات وتعليقات فقط (منشور حساب شريك؛ المشاهدات تحتاج ربط الحساب)';
       h += '<tr><td>' + (url ? '<a href="' + escape(url) + '" target="_blank" rel="noopener noreferrer">منشور ' + number(index + 1) + ' ↗</a>' : 'الرابط غير صالح') + '</td><td>' + number(item.views) + '</td><td>' + number(item.reach) + '</td><td>' + number(item.total_interactions) + '</td><td>' + escape(state) + '</td><td>' + escape(stamp(item.last_synced_at)) + '</td></tr>';
     });
     return h + '</tbody></table></div></details>';

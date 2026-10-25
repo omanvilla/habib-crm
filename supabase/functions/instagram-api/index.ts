@@ -142,18 +142,33 @@ Deno.serve(async (req) => {
 
       const fields = "id,name,access_token,tasks,instagram_business_account{id,username,name,profile_picture_url,followers_count,media_count}";
       const pages = await graph(`me/accounts?fields=${encodeURIComponent(fields)}&limit=100`, longToken);
+      // A partner account (e.g. @omanvilla1) is connected for metrics only; it must
+      // already be registered by the owner in instagram_partner_accounts.
+      const partnerUsername = String(body?.instagram_username || "").trim().toLowerCase().replace(/^@/, "");
+      if (partnerUsername) {
+        if (profile.role !== "owner" || !/^[a-z0-9._]{1,30}$/.test(partnerUsername)) return json({ ok: false, error: "partner_not_allowed" }, 403);
+        const registered = await admin.from("instagram_partner_accounts").select("id").eq("company_id", profile.company_id).eq("username", partnerUsername).maybeSingle();
+        if (registered.error || !registered.data) return json({ ok: false, error: "partner_not_registered" }, 403);
+      }
       const expectedIgId = String(body?.instagram_user_id || TARGET_IG_ID);
-      const page = (Array.isArray(pages?.data) ? pages.data : []).find((candidate: any) => {
+      const visible = (Array.isArray(pages?.data) ? pages.data : []);
+      const page = visible.find((candidate: any) => {
         const ig = candidate?.instagram_business_account;
-        return ig && (String(ig.id) === expectedIgId || String(ig.username || "").toLowerCase() === "omanvilla");
+        if (!ig) return false;
+        if (partnerUsername) return String(ig.username || "").toLowerCase() === partnerUsername;
+        return String(ig.id) === expectedIgId || String(ig.username || "").toLowerCase() === "omanvilla";
       });
-      if (!page?.instagram_business_account?.id || !page?.access_token) throw new Error("Omanvilla Instagram account was not found among the Facebook Pages available to this login");
+      if (!page?.instagram_business_account?.id || !page?.access_token) {
+        const seen = visible.map((candidate: any) => candidate?.instagram_business_account?.username ? "@" + candidate.instagram_business_account.username : `صفحة ${candidate?.name || candidate?.id} بدون حساب إنستغرام`).join("، ");
+        throw new Error(`لم يظهر @${partnerUsername || "omanvilla"} ضمن صفحات فيسبوك المتاحة لهذا الدخول. الصفحات الظاهرة: ${seen || "لا شيء"}`);
+      }
       const ig = page.instagram_business_account;
       const pageToken = String(page.access_token);
 
       let webhookSubscribed = false;
       let subscriptionError = "";
-      for (const targetId of [String(ig.id), String(page.id)]) {
+      // A partner account is for metrics only: no message subscription.
+      for (const targetId of partnerUsername ? [] : [String(ig.id), String(page.id)]) {
         for (const fieldsValue of ["messages,messaging_postbacks,message_reactions,messaging_seen", "messages"]) {
           try {
             const params = new URLSearchParams({ subscribed_fields: fieldsValue });
@@ -197,11 +212,16 @@ Deno.serve(async (req) => {
       return json({ ok: true, instagram_user_id: String(ig.id), username: ig.username || null, page_id: String(page.id), webhook_subscribed: webhookSubscribed, permissions: grantedScopes, token_expires_at: tokenExpiresAt, warning: subscriptionError || null });
     }
 
-    const { data: account, error: accountError } = await admin.from("instagram_accounts").select("*").eq("company_id", profile.company_id).eq("connection_status", "connected").order("connected_at", { ascending: false }).limit(1).maybeSingle();
+    // The main @omanvilla account stays the working account even after a partner
+    // account is connected for metrics.
+    const { data: accounts, error: accountError } = await admin.from("instagram_accounts").select("*").eq("company_id", profile.company_id).eq("connection_status", "connected").order("connected_at", { ascending: false });
+    const account = (accounts || []).find((a: any) => String(a.instagram_user_id) === TARGET_IG_ID) || (accounts || [])[0] || null;
     if (action === "status") {
       if (accountError) throw accountError;
       if (!account) return json({ ok: true, connected: false });
-      return json({ ok: true, connected: true, account: { id: account.id, instagram_user_id: account.instagram_user_id, username: account.instagram_username, name: account.instagram_name, profile_picture_url: account.profile_picture_url, followers_count: account.followers_count, media_count: account.media_count, webhook_subscribed: account.webhook_subscribed, permissions: account.permissions, token_expires_at: account.token_expires_at, last_checked_at: account.last_checked_at, last_error: account.last_error } });
+      const partners = profile.role === "owner" ? (await admin.from("instagram_partner_accounts").select("username").eq("company_id", profile.company_id).order("username")).data || [] : [];
+      const connectedUsernames = new Set((accounts || []).map((a: any) => String(a.instagram_username || "").toLowerCase()));
+      return json({ ok: true, connected: true, partners: partners.map((p: any) => ({ username: p.username, connected: connectedUsernames.has(String(p.username)) })), account: { id: account.id, instagram_user_id: account.instagram_user_id, username: account.instagram_username, name: account.instagram_name, profile_picture_url: account.profile_picture_url, followers_count: account.followers_count, media_count: account.media_count, webhook_subscribed: account.webhook_subscribed, permissions: account.permissions, token_expires_at: account.token_expires_at, last_checked_at: account.last_checked_at, last_error: account.last_error } });
     }
     if (!account) return json({ ok: false, error: "instagram_not_connected" }, 409);
 
@@ -297,9 +317,10 @@ Deno.serve(async (req) => {
         const shortcode = eventShortcodes.get(event.id) || "";
         const media = mediaIndex.get(shortcode);
         if (!media?.id) {
+          // Not an @omanvilla post (e.g. a partner collab). The scheduled worker
+          // measures partner posts; do not overwrite its result with an error.
           const message = "instagram_media_not_found_or_not_owned_by_omanvilla";
-          await admin.from("property_marketing_events").update({ link_key: shortcode ? `instagram:${shortcode}` : null, link_provider: "instagram", auto_sync: true, sync_status: "error", last_synced_at: new Date().toISOString(), sync_error: message }).eq("id", event.id).eq("company_id", profile.company_id);
-          results.push({ event_id: event.id, shortcode, ok: false, error: message });
+          results.push({ event_id: event.id, shortcode, ok: false, error: message, handled_by_scheduled_sync: true });
           continue;
         }
         try {
