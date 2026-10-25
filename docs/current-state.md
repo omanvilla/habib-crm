@@ -2,7 +2,24 @@
 
 Updated 2026-10-21. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
-## 25 October 2026 — WhatsApp-style CRM chat
+## 25 October 2026 — interface simplification, phase 1
+
+The owner wants screens that a new employee can use without training. Phase 1 covers the daily screens. Deals were not touched.
+
+- **Dashboard (`crm-attention.js/.css`).** The "يحتاج تدخل بشري" card is collapsed by default to the newest 3 conversations, one line each. Its actions are text links. "عرض الكل" restores paging, the summary counts and the owner's AI batch button. The choice is kept per browser. The day's work is visible above the fold again.
+- **Tasks (`crm-v18-task-priority-patch.js`).** One row per task, in the shared `crm-grid` style:
+  - Columns: done checkbox, task (with notes), client, due date, priority, branch, actions.
+  - Sorting, filters, task details and permission checks are unchanged.
+  - The dashboard's compact task card is unchanged.
+- **Visits (`crm-simple-ui.js`).** One row per visit, with group separators in "الكل". Overdue visits are tinted and their main action reads "تسجيل النتيجة". Rows call the existing `editViewing`, `deleteViewing` and `viewClient`; loading and counts are unchanged.
+- **Staff names.** `crmMemberChoiceLabel` returns the branch only: "مسقط" or "بركاء", "صاحب الشركة" for the owner, and "حساب فريق" otherwise. E-mail addresses no longer appear in task rows or account selectors. Retired records keep their "سجل سابق" label.
+- **Phones (≤640px).**
+  - Clients and properties show the search box only. The other filters open from a "الفلاتر" button, which shows how many filters are active.
+  - Every `crm-grid` table (clients, properties, tasks, visits) becomes compact cards labelled from the column headers.
+- **Checks.**
+  - `tests/simple-ui.test.cjs`.
+  - Checked in the live app as the Barka account by loading the branch files in the browser pane, at desktop width and 375px.
+  - No horizontal page scroll at 375px.
 
 The owner asked for the CRM inbox to work like WhatsApp Business, so they can answer customers when the branch phone is not available.
 
