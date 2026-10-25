@@ -6,6 +6,27 @@
   const omanDate=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'});
   const dateText=d=>d?new Date(d).toLocaleDateString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat'}):'—';
   const branchLabel=branch=>({muscat:'مسقط',barka:'بركاء'}[branch]||'الفرع');
+  // Same completeness checks as the base crmReadAll, but once the first page gives
+  // the exact count the remaining pages are read in parallel (clients: 3 pages).
+  if(typeof window.crmReadAll==='function')window.crmReadAll=async function(buildQuery){
+    const PAGE=500,first=await buildQuery().range(0,PAGE-1);
+    if(first.error)throw first.error;
+    const rows=(first.data||[]).slice(),expected=typeof first.count==='number'?first.count:null;
+    const sequential=async offset=>{for(;;){const r=await buildQuery().range(offset,offset+PAGE-1);if(r.error)throw r.error;
+      if(expected!==null&&typeof r.count==='number'&&r.count!==expected)throw new Error('تغيّرت البيانات أثناء القراءة. أعد المحاولة.');
+      const page=r.data||[];if(!page.length)break;rows.push(...page);offset+=page.length;if(expected!==null&&rows.length>=expected)break;}};
+    if(expected===null){if(rows.length===PAGE)await sequential(rows.length);return rows;}
+    if(rows.length<expected){
+      if(rows.length<PAGE)await sequential(rows.length);
+      else{
+        const offsets=[];for(let offset=PAGE;offset<expected;offset+=PAGE)offsets.push(offset);
+        const pages=await Promise.all(offsets.map(offset=>buildQuery().range(offset,offset+PAGE-1)));
+        for(const r of pages){if(r.error)throw r.error;if(typeof r.count==='number'&&r.count!==expected)throw new Error('تغيّرت البيانات أثناء القراءة. أعد المحاولة.');rows.push(...(r.data||[]));}
+      }
+    }
+    if(rows.length!==expected)throw new Error(rows.length>expected?'عدد السجلات غير متطابق':'تعذّر التحقق من اكتمال البيانات');
+    return rows;
+  };
   function branchRows(data){
     const rows=data?.branches??data?.employees;
     if(!Array.isArray(rows))throw new Error('لم تصل بيانات الفروع. أعد المحاولة.');
@@ -327,10 +348,15 @@
       if(!groups.has(key))groups.set(key,{branch,area,items:[]});groups.get(key).items.push(p);});
     const ordered=[...groups.values()].sort((a,b)=>['مسقط','بركاء','غير محدد'].indexOf(a.branch)-['مسقط','بركاء','غير محدد'].indexOf(b.branch)||a.area.localeCompare(b.area,'ar'));
     captureListExport('properties',ordered.flatMap(g=>g.items));
-    let last='';list.innerHTML=ordered.map(g=>{
-      const heading=g.branch===last?'':'<h3 class="ops-branch">'+safe(g.branch)+'</h3>';last=g.branch;
-      return heading+'<section class="ops-area"><h4>'+safe(g.area)+' <small>'+g.items.length+' عقارات</small></h4><div class="ops-property-grid">'+g.items.map(p=>'<article class="ops-property"><div class="ops-property-top"><span class="ops-status '+(!p.archived&&p.status==='available'?'ops-available':'')+'">'+safe((p.archived?'مؤرشف · ':'')+propertyStatusLabel(p.status))+'</span><bdi dir="ltr" class="ops-code">'+safe(p.property_code||'')+'</bdi></div><button type="button" class="ops-title" data-work-action="property" data-work-id="'+safe(p.id)+'">'+safe(p.title||'عقار')+'</button><div class="ops-property-price">'+n(p.price)+' <small>ر.ع</small></div><p>'+safe(typeof propTypeAr==='function'?propTypeAr(p.type):p.type||'')+(p.bedrooms?' · '+n(p.bedrooms)+' غرف':'')+(p.land_size?' · '+n(p.land_size)+' م²':'')+'</p><div class="ops-property-foot"><small>أضيف '+safe(dateText(p.created_at))+'</small>'+propertyActions(p)+'</div></article>').join('')+'</div></section>';
-    }).join('');
+    // One spreadsheet-style row per property, still ordered branch → area → newest.
+    const cellNum=v=>Number(v)>0?n(v):'—';
+    list.innerHTML='<div class="crm-grid-wrap"><table class="crm-grid" aria-label="قائمة العقارات"><thead><tr><th>العقار</th><th>الرمز</th><th>الفرع</th><th>المنطقة</th><th>النوع</th><th>غرف</th><th>أرض م²</th><th>بناء م²</th><th>السعر ر.ع</th><th>الحالة</th><th>أُضيف</th><th>إجراءات</th></tr></thead><tbody>'+
+      ordered.flatMap(g=>g.items.map(p=>'<tr data-property-row="'+safe(p.id)+'"><td class="crm-grid-name"><button type="button" class="ops-title" data-work-action="property" data-work-id="'+safe(p.id)+'">'+safe(p.title||'عقار')+'</button></td>'+
+        '<td><bdi dir="ltr">'+safe(p.property_code||'—')+'</bdi></td><td>'+safe(g.branch)+'</td><td>'+safe(p.area||'غير محددة')+'</td>'+
+        '<td>'+safe(typeof propTypeAr==='function'?propTypeAr(p.type):p.type||'—')+'</td><td>'+cellNum(p.bedrooms)+'</td><td>'+cellNum(p.land_size)+'</td><td>'+cellNum(p.built_size)+'</td>'+
+        '<td class="crm-grid-num">'+cellNum(p.price)+'</td><td><span class="ops-status '+(!p.archived&&p.status==='available'?'ops-available':'')+'">'+safe((p.archived?'مؤرشف · ':'')+propertyStatusLabel(p.status))+'</span></td>'+
+        '<td><bdi dir="ltr">'+safe(dateText(p.created_at))+'</bdi></td><td class="crm-grid-actions">'+propertyActions(p).replace('<div class="ops-property-actions">','').replace(/<\/div>$/,'')+'<button type="button" class="ops-action" data-workspace-action="property-marketing" data-id="'+safe(p.id)+'">التسويق</button></td></tr>')).join('')+
+      '</tbody></table></div>';
   }
   const oldProperties=window.loadProperties;
   if(typeof oldProperties==='function')window.loadProperties=async function(){
@@ -409,16 +435,41 @@
       return window.CRMClientChronology?window.CRMClientChronology.compare(a,b):String(b.created_at).localeCompare(String(a.created_at))||String(a.id).localeCompare(String(b.id));});
     captureListExport('clients',sorted);
     if(!sorted.length){list.innerHTML='<div class="ops-state">لا يوجد عملاء يطابقون هذا العرض. '+workButton('clear-clients','عرض الكل')+'</div>';return;}
-    list.innerHTML=sorted.map(c=>{
-      const requests=(byClient.get(c.id)||[]).slice().sort((a,b)=>String(a.next_followup||'9999').localeCompare(String(b.next_followup||'9999')));
-      const grouped=new Map();
-      requests.forEach(r=>{const identity=[r.request_type,r.route_key||r.branch_key,r.subject_property_id||'',r.property_type||'',String(r.preferred_area||'').trim().replace(/\\s+/g,' ').toLowerCase(),r.status].join('|');if(!grouped.has(identity))grouped.set(identity,[]);grouped.get(identity).push(r);});
-      const visibleRequests=[...grouped.values()].map(rows=>({record:rows[0],count:rows.length}));
-      return '<article class="ops-client"><div class="ops-client-head"><div><button class="ops-title" data-work-action="client" data-client-id="'+safe(c.id)+'">'+safe(c.name||'عميل')+'</button><div class="ops-client-contact"><bdi dir="ltr">'+safe(typeof crmPhoneText==='function'?crmPhoneText(c.phone):c.phone||'')+'</bdi><span>'+safe(c.lead_route==='barka'?'بركاء':c.lead_route==='muscat'?'مسقط':c.lead_route==='investment'?'المستثمرين · خاص بالمالك':'فرع غير مصنف')+'</span></div></div><span class="ops-status">'+safe(c.archived?'مؤرشف':(requests.length?visibleRequests.length+' نوع طلب'+(requests.length>visibleRequests.length?' · '+(requests.length-visibleRequests.length)+' مكرر':''):'لا طلب نشط'))+'</span></div>'+
-      (visibleRequests.map(({record:r,count})=>'<div class="ops-request"><div><strong>'+safe(requestLabel(r))+(count>1?' · '+count+' سجلات متشابهة':'')+'</strong><small class="'+(r.next_followup&&workDate(r.next_followup)<today?'ops-overdue':'')+'">'+safe(dueLabel(r.next_followup))+' · '+safe(r.status==='paused'?'متوقف مؤقتاً':({new:'جديد',contacted:'تم التواصل',qualified:'مؤهل',viewing_scheduled:'زيارة محجوزة',viewed:'زيارة تمت',negotiation:'تفاوض'}[r.pipeline_stage]||'نشط'))+'</small>'+(r.next_action?'<small class="ops-next-action">التالي: '+safe(r.next_action)+'</small>':'')+'</div>'+workButton('request',canEdit()?'فتح الطلب':'تفاصيل العميل',c.id,r.id)+'</div>').join('')||'<p class="ops-note">لا يوجد طلب نشط مسجل. افتح الملف لمراجعة السياق أو إضافة طلب مستقل.</p>')+
-      '<div class="ops-client-foot">'+workButton('client','ملف العميل',c.id)+(canEdit()?workButton(c.archived?'restore-client':'edit-client',c.archived?'استرجاع':'تعديل بيانات التواصل',c.id):'')+'</div></article>';
-    }).join('');
+    clientRows={sorted,byClient,today};
+    if(!clientRowsKeep)clientRowsShown=CLIENT_PAGE;clientRowsKeep=false;
+    list.innerHTML=clientGridHtml();
+    const sub=$id('clientsSub');if(sub)sub.textContent=n(sorted.length)+' عميل في العرض الحالي';
   };
+  // Compact spreadsheet-style rows (one line per client), drawn in pages of 100
+  // so a full list of ~1,500 clients opens immediately. Filtering, sorting and
+  // the export snapshot above still cover the whole list.
+  const CLIENT_PAGE=100;let clientRows=null,clientRowsShown=CLIENT_PAGE,clientRowsKeep=false;
+  const stageLabel=r=>r.status==='paused'?'متوقف مؤقتاً':({new:'جديد',contacted:'تم التواصل',qualified:'مؤهل',viewing_scheduled:'زيارة محجوزة',viewed:'زيارة تمت',negotiation:'تفاوض'}[r.pipeline_stage]||'نشط');
+  const roleNames={buyer:'مشتري',seller:'بائع',investor:'مستثمر',tenant:'مستأجر',landlord:'مؤجر',consultation:'استشارة'};
+  function clientRowHtml(c,byClient,today){
+    const requests=(byClient.get(c.id)||[]).slice().sort((a,b)=>String(a.next_followup||'9999').localeCompare(String(b.next_followup||'9999')));
+    const first=requests[0],roles=[...new Set(typeof getRoles==='function'?getRoles(c):[c.client_type])].filter(x=>roleNames[x]);
+    const arrival=window.CRMClientChronology?.arrival(c),when=arrival&&arrival.at?window.CRMClientChronology.format(arrival.at).split(' · ')[0]:'—';
+    const source=arrival?.source==='whatsapp'?'واتساب':arrival?.source==='instagram'?'إنستغرام':'تسجيل يدوي';
+    const branch=c.lead_route==='barka'?'بركاء':c.lead_route==='muscat'?'مسقط':c.lead_route==='investment'?'المستثمرين':'غير مصنف';
+    const due=first?workDate(first.next_followup):'',overdue=due&&due<today;
+    return '<tr data-client-row="'+safe(c.id)+'"><td class="crm-grid-name"><button class="ops-title" data-work-action="client" data-client-id="'+safe(c.id)+'">'+safe(c.name||'عميل')+'</button>'+(c.archived?'<span class="crm-grid-chip muted">مؤرشف</span>':'')+roles.map(r=>'<span class="crm-grid-chip">'+roleNames[r]+'</span>').join('')+'</td>'+
+      '<td><bdi dir="ltr">'+safe(typeof crmPhoneText==='function'?crmPhoneText(c.phone):c.phone||'')+'</bdi></td>'+
+      '<td>'+safe(branch)+'</td>'+
+      '<td class="crm-grid-wide">'+(first?safe(requestLabel(first))+(requests.length>1?' <small>+'+(requests.length-1)+'</small>':''):'<span class="crm-grid-muted">لا طلب نشط</span>')+'</td>'+
+      '<td>'+(first?safe(stageLabel(first)):'—')+'</td>'+
+      '<td class="'+(overdue?'crm-grid-overdue':'')+'">'+(first?safe(dueLabel(first.next_followup)):'—')+'</td>'+
+      '<td title="'+safe(source)+'"><bdi dir="ltr">'+safe(when)+'</bdi> <small>'+safe(source)+'</small></td>'+
+      '<td class="crm-grid-actions">'+workButton('client','الملف',c.id)+(first?workButton('request',canEdit()?'الطلب':'التفاصيل',c.id,first.id):'')+(canEdit()?workButton(c.archived?'restore-client':'edit-client',c.archived?'استرجاع':'تعديل',c.id):'')+(canEdit()&&!c.archived?'<button type="button" class="ops-action" data-workspace-action="archive-client" data-id="'+safe(c.id)+'">أرشفة</button>':'')+'</td></tr>';
+  }
+  function clientGridHtml(){
+    const {sorted,byClient,today}=clientRows,shown=Math.min(clientRowsShown,sorted.length);
+    return '<div class="crm-grid-wrap"><table class="crm-grid" aria-label="قائمة العملاء"><thead><tr><th>العميل</th><th>الهاتف</th><th>الفرع</th><th>الطلب الحالي</th><th>المرحلة</th><th>المتابعة</th><th>أول تواصل</th><th>إجراءات</th></tr></thead><tbody>'+
+      sorted.slice(0,shown).map(c=>clientRowHtml(c,byClient,today)).join('')+'</tbody></table></div>'+
+      '<div class="crm-grid-more"><span>عرض '+n(shown)+' من '+n(sorted.length)+'</span>'+(shown<sorted.length?'<button type="button" class="btn-secondary" data-client-more>عرض '+n(Math.min(CLIENT_PAGE,sorted.length-shown))+' أخرى</button><button type="button" class="btn-secondary" data-client-more="all">عرض الكل</button>':'')+'</div>';
+  }
+  document.addEventListener('click',e=>{const b=e.target.closest('[data-client-more]');if(!b||!clientRows)return;const list=$id('clientsList');if(!list)return;
+    clientRowsShown=b.dataset.clientMore==='all'?clientRows.sorted.length:clientRowsShown+CLIENT_PAGE;list.innerHTML=clientGridHtml();});
   window.crmResetOperations=function(){
     targetLoadSeq++;targetPropertyScopes.clear();propertyTargetScope=null;propertyLoadSeq++;showPropertyTargetScope();
     Object.values(listExports).forEach(state=>{state.ready=false;state.snapshot=null;});
@@ -428,7 +479,7 @@
     teamPerformancePeriod='month';dashboardPerformancePeriod='month';clientLoadSeq++;dashboardScopes.clear();dashboardSession='';dashboardScope='branches';dashboardCategory='all';
     window.client360Data=null;
     ['cdTabJourney','cdActivities','cdTabRequests','cdTabInterests','cdTabListings','cdTabTasks','cdTabDeals','cdTabInfo','cdSmartMatches','cdClientAI','propertyDetailContent','opsDashboardPerformanceResults','employeePerformanceResults','teamLeaderboard','conversionFunnel'].forEach(id=>{if($id(id))$id(id).textContent='';});
-    clientBranch='all';clientWorkFilter='all';propertySearch='';propertyBranch='';propertyArea='';propertyStatus='';
+    clientRows=null;clientBranch='all';clientWorkFilter='all';propertySearch='';propertyBranch='';propertyArea='';propertyStatus='';
     ['opsPropertySearch','opsPropertyBranch','opsPropertyArea','opsPropertyStatus'].forEach(id=>{if($id(id))$id(id).value='';});
   };
   document.addEventListener('input',e=>{if(e.target.id==='opsPropertySearch'){propertySearch=e.target.value.trim().toLowerCase();if(!propertyTargetScope||listExports.properties.ready)renderOrganizedProperties();}});
