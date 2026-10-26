@@ -94,3 +94,16 @@
 .crm-guide-actions{display:flex;gap:8px;justify-content:flex-start;flex-direction:row-reverse}
 .crm-guide-actions button{width:auto!important;padding:8px 16px!important}
 #sidebar .nav-link.crm-guide-focus{box-shadow:0 0 0 2px #d8b15b inset;border-radius:10px}
+
+/* Review fixes: keep grid actions visible on medium screens */
+@media (min-width:641px){
+  .crm-grid td.crm-grid-actions,.crm-grid thead th:last-child{position:sticky;left:0;z-index:1;box-shadow:6px 0 8px -8px rgba(20,50,40,.25)}
+  .crm-grid thead th:last-child{z-index:2}
+  .crm-grid tbody tr td.crm-grid-actions{background:#fff!important}
+  .crm-grid tbody tr:nth-child(even) td.crm-grid-actions{background:#fafcfb!important}
+}
+@media (min-width:641px) and (max-width:1280px){
+  .crm-grid td,.crm-grid thead th{padding-inline:6px!important}
+  .crm-grid-name{max-width:160px!important}
+  .crm-grid-wide{max-width:130px!important}
+}
