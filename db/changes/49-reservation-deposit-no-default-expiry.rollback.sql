@@ -1,0 +1,2 @@
+-- Rollback for SQL49: re-run the sync function from 48-deposits-from-reservations.forward.sql.
+-- Mirrored rows keep their NULL deadline (it was never an agreed date).

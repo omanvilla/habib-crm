@@ -208,3 +208,12 @@ test('reservation deposits open their deal instead of offering delete, and cance
   assert.match(html,/deleteDeposit\('m1'\)/);
   assert.match(html,/الحجز ملغى/);assert.match(html,/من الصفقة<\/span>/);
 });
+
+test('SQL49: reservation deposits get no invented deadline; an empty duration keeps it that way',()=>{
+  const sql=fs.readFileSync('db/changes/49-reservation-deposit-no-default-expiry.forward.sql','utf8');
+  assert.match(sql,/NEW\.deposit_amount,v_paid,NULL,NULL,/);
+  assert.match(sql,/expiry_date=CASE WHEN duration_days IS NULL THEN NULL ELSE/);
+  assert.match(sql,/WHERE from_reservation AND notes='سُجّل تلقائيًا من حجز الصفقة' AND duration_days=30/);
+  assert.match(base,/existingDeposit\.from_reservation&&!document\.getElementById\('dpDuration'\)\.value\.trim\(\)\?null:duration/);
+  assert(base.includes("d.duration_days||(d.from_reservation?'':30)"));
+});
