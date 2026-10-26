@@ -175,3 +175,36 @@ test('activity, expense and duplicate-client notes name the branch, not the empl
   assert.equal((base.match(/crmMemberChoiceLabel\(a\.user\)/g)||[]).length,2);
   assert(base.includes("sel.innerHTML='<option value=\"\">— أنا —</option>'"));
 });
+
+test('a new deposit confirms the deal reservation through one RPC instead of writing two tables',()=>{
+  const start=base.indexOf('async function saveDeposit('),body=base.slice(start,base.indexOf('\nfunction depositErrorText(',start));
+  assert.match(body,/supa\.rpc\('crm_record_deposit',\{p_deal_id:deal,p_payment_date:date,p_amount:amount/);
+  assert(!body.includes("from('deposits').insert"),'deposits rows for reservations are created by the database');
+  assert(!body.includes("update({stage:'deposit'})"),'the deal stage moves only with a confirmed reservation');
+  assert.match(body,/if\(!existingDeposit\.from_reservation\)Object\.assign\(data,\{deal_id:deal,amount:amount,payment_date:date\}\)/);
+  assert(!/fmtMoney\(amount\)/.test(body),'activity text stays plain');
+});
+
+test('SQL48 mirrors every paid reservation into deposits and keeps the deal authoritative',()=>{
+  const sql=fs.readFileSync('db/changes/48-deposits-from-reservations.forward.sql','utf8');
+  const rollback=fs.readFileSync('db/changes/48-deposits-from-reservations.rollback.sql','utf8');
+  assert.match(sql,/CREATE UNIQUE INDEX IF NOT EXISTS deposits_one_reservation_per_deal ON public\.deposits\(deal_id\) WHERE from_reservation/);
+  assert.match(sql,/AFTER INSERT OR UPDATE OF reservation_confirmed_at, deposit_amount, reservation_cancelled_at, client_id, property_id, stage ON public\.deals/);
+  assert.match(sql,/v_result:=public\.crm_confirm_paid_reservation\(p_deal_id,p_payment_date,p_amount,NULL\)/,'deal access and validation stay in the existing reservation function');
+  assert.match(sql,/RAISE EXCEPTION 'reservation_deposit_managed_by_deal'/);
+  assert.match(sql,/REVOKE ALL ON FUNCTION public\.crm_record_deposit\([^)]*\) FROM PUBLIC, anon;/);
+  assert.equal((sql.match(/SECURITY DEFINER SET search_path TO ''/g)||[]).length,3);
+  assert(!/UPDATE public\.deals/.test(sql),'the backfill never rewrites deals');
+  assert.match(rollback,/DROP TRIGGER IF EXISTS crm_sync_deposit_from_reservation ON public\.deals/);
+});
+
+test('reservation deposits open their deal instead of offering delete, and cancelled bookings are labelled',()=>{
+  const {ctx,node}=phase2({depositTab:'all',getDepositStatus:d=>d.status,fmtMoney:v=>v+' ر.ع',fmtDate:v=>v,
+    allDeposits:[{id:'r1',deal_id:'deal1',amount:500,status:'cancelled',from_reservation:true,payment_date:'2026-10-20'},
+                 {id:'m1',deal_id:'deal2',amount:300,status:'active',payment_date:'2026-10-01'}]});
+  ctx.renderDeposits();
+  const html=node('depositsList').innerHTML;
+  assert.match(html,/editDeal\('deal1'\)/);assert(!html.includes("deleteDeposit('r1')"));
+  assert.match(html,/deleteDeposit\('m1'\)/);
+  assert.match(html,/الحجز ملغى/);assert.match(html,/من الصفقة<\/span>/);
+});

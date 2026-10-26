@@ -222,6 +222,7 @@
         if(s==='applied')return '<span class="ops-status ops-available">طُبّق في الصفقة</span>';
         if(s==='refunded')return '<span class="ops-status">مُسترد</span>';
         if(s==='forfeited')return '<span class="ops-status">مُصادَر</span>';
+        if(s==='cancelled')return '<span class="crm-grid-overdue" title="أُلغي الحجز في الصفقة؛ حدّد هل استُرد العربون أو صودر">الحجز ملغى</span>';
         if(!d.expiry_date)return '<span class="ops-status">نشط</span>';
         const left=Math.ceil((new Date(d.expiry_date)-today)/864e5);
         return left<0?'<span class="crm-grid-overdue">انتهى منذ '+(-left)+' يوم</span>':left<=7?'<span class="crm-grid-soon">باقي '+left+' أيام</span>':'<span class="ops-status ops-available">باقي '+left+' يوم</span>';
@@ -230,11 +231,14 @@
       const date=v=>v&&typeof fmtDate==='function'?plain(fmtDate(v)):(v||'—');
       list.innerHTML='<div class="crm-grid-wrap"><table class="crm-grid" aria-label="قائمة العرابين"><thead><tr><th>المبلغ</th><th>العميل</th><th>العقار</th><th>تاريخ الدفع</th><th>انتهاء المهلة</th><th>الحالة</th><th>الدفع</th><th>إجراءات</th></tr></thead><tbody>'
         +rows.map(d=>{const s=getDepositStatus(d),id=esc(d.id);
-          return '<tr><td class="crm-grid-name crm-grid-num">'+esc(typeof fmtMoney==='function'?plain(fmtMoney(d.amount)):d.amount)+'</td>'
+          return '<tr><td class="crm-grid-name crm-grid-num">'+esc(typeof fmtMoney==='function'?plain(fmtMoney(d.amount)):d.amount)+(d.from_reservation?'<span class="crm-grid-chip" title="المبلغ والتاريخ من حجز الصفقة">من الصفقة</span>':'')+'</td>'
             +'<td>'+esc(d.deal&&d.deal.client?d.deal.client.name:'—')+'</td><td class="crm-grid-wide">'+esc(d.deal&&d.deal.property?d.deal.property.title:'—')+'</td>'
             +'<td>'+esc(date(d.payment_date))+'</td><td>'+esc(d.expiry_date?date(d.expiry_date):'—')+'</td><td>'+statusCell(d,s)+'</td>'
             +'<td>'+esc([methods[d.payment_method],receivers[d.received_by]].filter(Boolean).join(' · ')||'—')+'</td>'
-            +'<td class="crm-grid-actions"><button type="button" class="ops-action" onclick="editDeposit(\''+id+'\')">تعديل</button><button type="button" class="ops-action crm-grid-danger" onclick="deleteDeposit(\''+id+'\')">حذف</button></td></tr>';}).join('')
+            +'<td class="crm-grid-actions"><button type="button" class="ops-action" onclick="editDeposit(\''+id+'\')">تعديل</button>'
+            // A reservation deposit is cancelled or corrected on its deal, not deleted here.
+            +(d.from_reservation&&d.deal_id?'<button type="button" class="ops-action" onclick="editDeal(\''+esc(d.deal_id)+'\')">فتح الصفقة</button>'
+              :'<button type="button" class="ops-action crm-grid-danger" onclick="deleteDeposit(\''+id+'\')">حذف</button>')+'</td></tr>';}).join('')
         +'</tbody></table></div>';
     };
   }
