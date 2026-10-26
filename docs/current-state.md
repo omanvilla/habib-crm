@@ -2,7 +2,45 @@
 
 Updated 2026-10-21. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
-## 25 October 2026 — full-review fixes
+## 26 October 2026 — deposits linked to deal reservations (SQL48)
+
+The owner asked for every record to stay connected. A link audit found:
+
+- **Visits** already update deals, client requests and property inquiries (`sync_viewing_to_crm`).
+- **Deals** update property status and requests.
+- **Owners** are a single record referenced by `properties.owner_id`, and all 44 properties have one. The property form's "new owner" writes to `owners`.
+- **Deposits were not connected.**
+  - A paid reservation confirmed on a deal lived only on `deals` (3 deals), so the Deposits page never showed it.
+  - The Deposits page's own "new deposit" inserted a row and then tried `deals.stage='deposit'` directly. The reservation guard rejects that, leaving a half-saved record.
+
+SQL48 (`db/changes/48-deposits-from-reservations.*`):
+
+- **`deposits.from_reservation`.** One mirrored row per deal, enforced by a unique partial index.
+- **Trigger `crm_sync_deposit_from_reservation` on deals.** It creates or updates that row from the deal's amount, paid date, client, property, stage and cancellation:
+  - completed deal → `applied`;
+  - cancelled or lost reservation → `cancelled`;
+  - otherwise → `active`.
+
+  It never overrides refunded or forfeited. A manual row with the same deal and amount is adopted rather than duplicated.
+- **Delete guard.** A mirrored row cannot be deleted while the deal still has the reservation.
+- **`crm_record_deposit(...)`.** The Deposits page's "new deposit" calls this. It runs `crm_confirm_paid_reservation` (same access, branch and investment checks), then stores method, receiver, refundability, duration and notes, all in one transaction.
+- **Backfill.** Inserts the 3 existing reservations (applied / active / cancelled). It does not touch the deals.
+
+UI:
+
+- The deposit form offers only deals that can still take a reservation.
+- Editing a reservation deposit locks amount, date and deal ("يُعدَّل من الصفقة").
+- Rows show "من الصفقة" and "فتح الصفقة" instead of delete, plus a "الحجز ملغى" status.
+- Errors are explained in Arabic.
+
+Evidence: a rolled-back transaction with JWT claims for the Barka account and the owner.
+
+- Barka recorded 500 on a synthetic Barka deal → deal moved to `deposit`, deposit row active/cash/21 days, visible to Barka.
+- A Muscat deal → `not_authorized`.
+- Re-recording a different amount → `reservation_already_confirmed_do_not_overwrite`.
+- Owner delete → `reservation_deposit_managed_by_deal`.
+- Owner correction to 650 → mirrored.
+- Lost deal → `cancelled`.
 
 The owner reported raw markup in deposit rows and an unreadable sold-value chart. I then reviewed every page as the Barka account, with owner-only pages shown in client-side owner mode on that browser only, at desktop width and at 375px. The review used an automatic scan for raw markup, undefined/NaN and horizontal overflow.
 

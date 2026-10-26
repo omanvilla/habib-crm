@@ -2297,7 +2297,7 @@ function closeModal(id,force){if(crmSavingForms.has(id)&&!force){showToast('ان
   ['dClientSearch','dPropertySearch'].forEach(function(i){var e=$(i);if(e){e.value='';e.placeholder=i==='dClientSearch'?'🔍 ابحث بالاسم أو الهاتف...':'🔍 ابحث بعنوان العقار...';}});
   ['dClientSelected','dPropertySelected'].forEach(function(i){var e=document.getElementById(i);if(e){e.textContent='';e.style.display='none';}});
   ['dClientDropdown','dPropertyDropdown'].forEach(function(i){var e=document.getElementById(i);if(e)e.style.display='none';});
-}if(id==='mTask'){window.editingTask=null;$('mTaskTitle').textContent='⏰ مهمة جديدة'}if(id==='mProperty'){window.editingProperty=null;discardPropertyImageDraft();}if(id==='mViewing'){editingViewing=null;clearViewingForm()}if(id==='mDeposit'){editingDeposit=null}if(id==='mOwner'){editingOwner=null;$('mOwnerTitle').textContent='إضافة مالك جديد'}if(id==='mClientRequest'){editingClientRequest=null;clientRequestFormClientId=null;}if(id==='mViewing'){viewingFormGeneration++;}crmSaveAttempts.delete(id);}
+}if(id==='mTask'){window.editingTask=null;$('mTaskTitle').textContent='⏰ مهمة جديدة'}if(id==='mProperty'){window.editingProperty=null;discardPropertyImageDraft();}if(id==='mViewing'){editingViewing=null;clearViewingForm()}if(id==='mDeposit'){editingDeposit=null;if(typeof setDepositLocked==='function')setDepositLocked(false)}if(id==='mOwner'){editingOwner=null;$('mOwnerTitle').textContent='إضافة مالك جديد'}if(id==='mClientRequest'){editingClientRequest=null;clientRequestFormClientId=null;}if(id==='mViewing'){viewingFormGeneration++;}crmSaveAttempts.delete(id);}
 document.addEventListener('click',e=>{if(e.target.classList&&e.target.classList.contains('modal-ov'))closeModal(e.target.id);});
 async function ensureCompany(){if(currentProfile&&currentProfile.company_id)return currentProfile.company_id;if(!currentProfile||currentProfile.role!=='owner')throw new Error('الحساب غير مربوط بالشركة. لا يمكن ربط الموظفين تلقائياً؛ استخدم نظام الدعوات.');const c=await supa.from('companies').insert({name:'Habib Sons Real Estate'}).select().single();if(c.error)throw c.error;const id=c.data.id;const pr=await supa.from('profiles').update({company_id:id,role:'owner',is_active:true}).eq('id',currentUser.id);if(pr.error)throw pr.error;currentProfile.company_id=id;currentProfile.role='owner';currentCompany=c.data;updateUserUI();applyRoleVisibility();return id}
 async function logActivity(type,text,clientId,dealId){
@@ -5009,7 +5009,7 @@ async function loadDeposits(){
   }
 }
 function getDepositStatus(d){
-  if(d.status==='applied'||d.status==='refunded'||d.status==='forfeited')return d.status;
+  if(d.status==='applied'||d.status==='refunded'||d.status==='forfeited'||d.status==='cancelled')return d.status;
   if(!d.expiry_date)return 'active';
   const today=new Date();today.setHours(0,0,0,0);
   const expiry=new Date(d.expiry_date);
@@ -5096,14 +5096,17 @@ function renderDeposits(){
 }
 async function populateDepositForm(){
   try{
-    const r=await crmDataFrom('deals').select('id, client:clients(name), property:properties(title)').neq('stage','lost');
+    // A new deposit confirms the paid reservation on the deal (SQL48), so only deals that can
+    // still take one are offered; an edit keeps its own deal in the list.
+    const r=await crmDataFrom('deals').select('id,stage,reservation_confirmed_at,reservation_cancelled_at, client:clients(name), property:properties(title)').not('stage','in','(lost,viewing_cancelled,viewing_no_show)');
+    if(r.error)throw r.error;
+    const current=editingDeposit&&(allDeposits.find(x=>x.id===editingDeposit)||{}).deal_id;
     const sel=document.getElementById('dpDeal');
-    sel.innerHTML='<option value="">اختر صفقة</option>';
-    (r.data||[]).forEach(d=>{
+    sel.innerHTML='<option value="">اختر صفقة</option>'+(r.data||[]).filter(d=>d.id===current||!d.reservation_confirmed_at).map(d=>{
       const label=(d.client?d.client.name:'؟')+(d.property?' · '+d.property.title:'');
-      sel.innerHTML+='<option value="'+d.id+'">'+escapeHtml(label)+'</option>';
-    });
-  }catch(e){console.error(e)}
+      return '<option value="'+d.id+'">'+escapeHtml(label)+'</option>';
+    }).join('');
+  }catch(e){console.error(e);showToast('تعذر تحميل الصفقات: '+(e.message||e),'error')}
 }
 async function saveDeposit(){
   const deal=document.getElementById('dpDeal').value;
@@ -5112,54 +5115,49 @@ async function saveDeposit(){
   const duration=parseInt(document.getElementById('dpDuration').value)||30;
   if(!deal||!amount||!date){showToast('⚠️ الصفقة والمبلغ والتاريخ مطلوبة','error');return}
   try{
-    const cid=await ensureCompany();
-    const expiry=new Date(date);
-    expiry.setDate(expiry.getDate()+duration);
-    const dealR=await crmDataFrom('deals').select('client_id,property_id,stage').eq('id',deal).single();
-    if(dealR.error)throw dealR.error;
     const existingDeposit=editingDeposit?allDeposits.find(x=>x.id===editingDeposit):null;
-    const dealCompleted=['closed','commission_collected'].includes(dealR.data?.stage);
-    const depositStatus=existingDeposit?.status||(dealCompleted?'applied':'active');
-    const data={
-      company_id:cid,
-      deal_id:deal,
-      client_id:dealR.data?.client_id,
-      property_id:dealR.data?.property_id,
-      amount:amount,
-      payment_date:date,
-      payment_method:document.getElementById('dpMethod').value,
-      received_by:document.getElementById('dpReceivedBy').value,
-      refundable:document.getElementById('dpRefundable').value,
-      duration_days:duration,
-      expiry_date:toLocalDateStr(expiry),
-      status:depositStatus,
-      legal_notes:document.getElementById('dpLegalNotes').value.trim()||null,
-      notes:document.getElementById('dpNotes').value.trim()||null
-    };
-    let r;
-    if(editingDeposit){
-      r=await supa.from('deposits').update(data).eq('id',editingDeposit);
+    const details={payment_method:document.getElementById('dpMethod').value,received_by:document.getElementById('dpReceivedBy').value,
+      refundable:document.getElementById('dpRefundable').value,legal_notes:document.getElementById('dpLegalNotes').value.trim()||null,
+      notes:document.getElementById('dpNotes').value.trim()||null};
+    let depositId=editingDeposit;
+    if(!existingDeposit){
+      // SQL48: confirming the paid reservation on the deal moves the deal (and its property) to the
+      // deposit stage and creates the deposits row in one transaction.
+      const r=await supa.rpc('crm_record_deposit',{p_deal_id:deal,p_payment_date:date,p_amount:amount,p_payment_method:details.payment_method,
+        p_received_by:details.received_by,p_refundable:details.refundable,p_duration_days:duration,p_legal_notes:details.legal_notes,p_notes:details.notes});
+      if(r.error)throw r.error;
+      depositId=r.data&&r.data.deposit_id;
     }else{
-      r=await supa.from('deposits').insert(data).select().single();
+      const expiry=new Date((existingDeposit.from_reservation?existingDeposit.payment_date:date)+'T12:00:00');
+      expiry.setDate(expiry.getDate()+duration+(existingDeposit.extension_days||0));
+      const data={...details,duration_days:duration,expiry_date:toLocalDateStr(expiry)};
+      // Amount, date and deal of a reservation deposit come from the deal and are corrected there.
+      if(!existingDeposit.from_reservation)Object.assign(data,{deal_id:deal,amount:amount,payment_date:date});
+      const r=await supa.from('deposits').update(data).eq('id',editingDeposit);
+      if(r.error)throw r.error;
     }
-    if(r.error)throw r.error;
-    // إنشاء عربون جديد يرفع الصفقة إلى مرحلة العربون فقط إذا لم تكن مكتملة.
-    // تعديل عربون قديم لا يرجّع الصفقة للخلف، والعربون المرتبط بصفقة مكتملة يبقى applied.
-    if(!editingDeposit&&!dealCompleted){
-      const dealUpdate=await crmDataFrom('deals').update({stage:'deposit'}).eq('id',deal);
-      if(dealUpdate.error)throw dealUpdate.error;
-      if(dealR.data?.property_id)await syncPropertyStatus(dealR.data.property_id,'deposit');
-    }
-    await logSystemActivity(editingDeposit?'edit':'create','deposit',editingDeposit||r.data?.id,'عربون: '+fmtMoney(amount));
+    await logSystemActivity(existingDeposit?'edit':'create','deposit',depositId,'عربون: '+Number(amount).toLocaleString('en-US')+' ر.ع');
     closeModal('mDeposit');
-    showToast('✅ تم الحفظ','success');
+    showToast('✅ تم الحفظ'+(existingDeposit?'':' وتحديث الصفقة إلى مرحلة العربون'),'success');
     editingDeposit=null;
     loadDeposits();
     loadDashboard();
   }catch(err){
     console.error(err);
-    showToast('خطأ: '+err.message,'error');
+    showToast(depositErrorText(err),'error');
   }
+}
+function depositErrorText(err){
+  const raw=String(err&&(err.message||err.details)||err||'');
+  const known={reservation_already_confirmed_do_not_overwrite:'هذه الصفقة عليها عربون مسجّل. لتغيير المبلغ أو التاريخ افتح الصفقة واستخدم التصحيح.',
+    invalid_deal_stage_for_paid_deposit:'لا يمكن تسجيل عربون لصفقة خاسرة أو زيارة ملغاة.',not_authorized:'هذه الصفقة ليست ضمن صلاحياتك.',
+    actual_paid_deposit_date_and_amount_required:'أدخل مبلغًا موجبًا وتاريخ دفع لا يتجاوز اليوم.',invalid_deposit_duration:'مدة المهلة يجب أن تكون بين 1 و365 يومًا.',
+    reservation_deposit_managed_by_deal:'هذا العربون مرتبط بحجز الصفقة. ألغِ الحجز أو صحّحه من الصفقة.',investment_owner_only:'صفقات الاستثمار خاصة بصاحب الشركة.'};
+  for(const k of Object.keys(known))if(raw.includes(k))return known[k];
+  return 'خطأ: '+raw;
+}
+function setDepositLocked(locked){
+  ['dpDeal','dpAmount','dpPaymentDate'].forEach(id=>{const e=document.getElementById(id);if(e){e.disabled=locked;e.title=locked?'يُعدَّل من الصفقة':'';}});
 }
 function editDeposit(id){
   const d=allDeposits.find(x=>x.id===id);
@@ -5176,6 +5174,7 @@ function editDeposit(id){
     document.getElementById('dpDuration').value=d.duration_days||30;
     document.getElementById('dpLegalNotes').value=d.legal_notes||'';
     document.getElementById('dpNotes').value=d.notes||'';
+    setDepositLocked(!!d.from_reservation);
   });
   document.getElementById('mDeposit').classList.add('on');
 }
@@ -5186,7 +5185,7 @@ function deleteDeposit(id){
       if(r.error)throw r.error;
       showToast('🗑 تم الحذف','success');
       loadDeposits();
-    }catch(err){showToast('خطأ: '+err.message,'error')}
+    }catch(err){showToast(depositErrorText(err),'error')}
   });
 }
 async function loadTodayPriorities(){
