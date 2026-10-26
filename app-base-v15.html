@@ -5128,9 +5128,11 @@ async function saveDeposit(){
       if(r.error)throw r.error;
       depositId=r.data&&r.data.deposit_id;
     }else{
+      // An empty duration on a reservation deposit means no agreed deadline (SQL49).
+      const days=existingDeposit.from_reservation&&!document.getElementById('dpDuration').value.trim()?null:duration;
       const expiry=new Date((existingDeposit.from_reservation?existingDeposit.payment_date:date)+'T12:00:00');
-      expiry.setDate(expiry.getDate()+duration+(existingDeposit.extension_days||0));
-      const data={...details,duration_days:duration,expiry_date:toLocalDateStr(expiry)};
+      if(days)expiry.setDate(expiry.getDate()+days+(existingDeposit.extension_days||0));
+      const data={...details,duration_days:days,expiry_date:days?toLocalDateStr(expiry):null};
       // Amount, date and deal of a reservation deposit come from the deal and are corrected there.
       if(!existingDeposit.from_reservation)Object.assign(data,{deal_id:deal,amount:amount,payment_date:date});
       const r=await supa.from('deposits').update(data).eq('id',editingDeposit);
@@ -5171,7 +5173,7 @@ function editDeposit(id){
     document.getElementById('dpMethod').value=d.payment_method||'cash';
     document.getElementById('dpReceivedBy').value=d.received_by||'company';
     document.getElementById('dpRefundable').value=d.refundable||'per_agreement';
-    document.getElementById('dpDuration').value=d.duration_days||30;
+    document.getElementById('dpDuration').value=d.duration_days||(d.from_reservation?'':30);
     document.getElementById('dpLegalNotes').value=d.legal_notes||'';
     document.getElementById('dpNotes').value=d.notes||'';
     setDepositLocked(!!d.from_reservation);
