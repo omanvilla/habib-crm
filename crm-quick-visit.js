@@ -70,7 +70,7 @@
   function pickerHtml(){
     const s=state;
     return '<p class="cqv-label">العميل</p><input id="cqvClientQ" class="fi" placeholder="الاسم أو رقم الهاتف" value="'+esc(s.clientQ||'')+'" autocomplete="off">'
-      +'<div class="cqv-results" id="cqvClients">'+(s.clients||[]).map(c=>'<button type="button" class="cqv-chip'+(s.client_id===c.id?' on':'')+'" data-pick="client" data-value="'+esc(c.id)+'">'+esc(c.name)+(c.phone?' · <bdi dir="ltr">'+esc(c.phone)+'</bdi>':'')+'</button>').join('')+'</div>'
+      +'<div class="cqv-results" id="cqvClients">'+(s.clients||[]).map(c=>'<button type="button" class="cqv-chip'+(s.client_id===c.id?' on':'')+'" data-pick="client" data-value="'+esc(c.id)+'"><bdi>'+esc(c.name)+'</bdi>'+(c.phone?' · <bdi dir="ltr">'+esc(c.phone)+'</bdi>':'')+'</button>').join('')+'</div>'
       +'<p class="cqv-label">العقار</p><input id="cqvPropertyQ" class="fi" placeholder="اسم العقار أو المنطقة" value="'+esc(s.propertyQ||'')+'" autocomplete="off">'
       +'<div class="cqv-results" id="cqvProperties">'+(s.properties||[]).map(p=>'<button type="button" class="cqv-chip'+(s.property_id===p.id?' on':'')+'" data-pick="property" data-value="'+esc(p.id)+'">'+esc(p.title)+(p.area?' · '+esc(p.area):'')+'</button>').join('')+'</div>';
   }
@@ -118,7 +118,7 @@
   }
   function refreshPicker(){
     const c=byId('cqvClients'),p=byId('cqvProperties');
-    if(c)c.innerHTML=(state.clients||[]).map(x=>'<button type="button" class="cqv-chip'+(state.client_id===x.id?' on':'')+'" data-pick="client" data-value="'+esc(x.id)+'">'+esc(x.name)+(x.phone?' · <bdi dir="ltr">'+esc(x.phone)+'</bdi>':'')+'</button>').join('');
+    if(c)c.innerHTML=(state.clients||[]).map(x=>'<button type="button" class="cqv-chip'+(state.client_id===x.id?' on':'')+'" data-pick="client" data-value="'+esc(x.id)+'"><bdi>'+esc(x.name)+'</bdi>'+(x.phone?' · <bdi dir="ltr">'+esc(x.phone)+'</bdi>':'')+'</button>').join('');
     if(p)p.innerHTML=(state.properties||[]).map(x=>'<button type="button" class="cqv-chip'+(state.property_id===x.id?' on':'')+'" data-pick="property" data-value="'+esc(x.id)+'">'+esc(x.title)+(x.area?' · '+esc(x.area):'')+'</button>').join('');
   }
   function onClick(e){
