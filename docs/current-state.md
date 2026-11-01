@@ -2,6 +2,35 @@
 
 Updated 2026-10-21. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 1 November 2026 — deals by date, quick visit result
+
+- **Deals order.** Every stage of the board, and the table, is sorted newest first by `crmDealBusinessDate`:
+  - sold, finance and commission stages: sale date;
+  - deposit: paid date;
+  - lost: loss date;
+  - visit stages: visit date;
+  - otherwise: creation time as the fallback.
+
+  An old deal entered today sits with its year. The Deals layout and workflow are unchanged.
+- **Quick visit result (`crm-quick-visit.js/.css`).** Built mainly for phones.
+  - The dashboard card "زيارات اليوم" lists today's and overdue scheduled visits with "سجّل النتيجة". The visits table offers the same button.
+  - The sheet is tap-based:
+    - **Visit:** done, no-show or postponed.
+    - **Client opinion:**
+      - liked → `followup`;
+      - wants to negotiate → `negotiation`;
+      - hesitant → `followup`;
+      - did not suit → `lost`, and a reason is required.
+    - **Follow-up:** tomorrow, in two days, in a week, or none. This creates the follow-up task.
+    - **Note:** free text; the keyboard microphone works.
+  - "زيارة ما كانت مسجّلة" picks a client (by name or phone) and a property, then records a visit done today.
+  - Everything saves through `crm_save_viewing_atomic` with the row version, so deal stage, request, inquiry and task rules are unchanged. The full form remains available.
+  - Rolled-back trial as the Barka account, all through the RPC:
+    - liked → visit done, deal stays at `visit`, follow-up task in 2 days;
+    - negotiate → deal moved to `negotiation`;
+    - an unbooked done/lost visit with a reason saved in one call;
+    - no-show with a note saved.
+
 ## 26 October 2026 — deposits linked to deal reservations (SQL48)
 
 The owner asked for every record to stay connected. A link audit found:
