@@ -3508,6 +3508,20 @@ document.addEventListener('click',function(e){
   }
 });
 let dealsLoadSequence=0;
+// Deals are ordered by their business date, newest first, so an old deal entered today sits with
+// its year instead of at the top: sale date for sold/finance stages, paid date for deposits, loss
+// date for lost journeys, visit date otherwise; the record's creation time is the last fallback.
+function crmDealBusinessDate(d){
+ const visit=d.viewing&&d.viewing.viewing_date;
+ const pick={closed:[d.closed_at,d.commission_entitled_at,d.reservation_confirmed_at],commission_collected:[d.closed_at,d.commission_entitled_at,d.commission_received_at],
+  awaiting_finance:[d.closed_at,d.reservation_confirmed_at],finance_approved:[d.closed_at,d.reservation_confirmed_at],awaiting_clearance:[d.closed_at,d.reservation_confirmed_at],
+  ownership_transfer:[d.closed_at,d.reservation_confirmed_at],deposit:[d.reservation_confirmed_at],lost:[d.lost_at,d.reservation_cancelled_at]}[d.stage]||[];
+ const found=pick.concat([visit,d.created_at]).find(Boolean);
+ return found?String(found).slice(0,10)+(String(found).length>10?String(found).slice(10):'T23:59:59'):'';
+}
+function crmCompareDealsByDate(a,b){
+ return crmDealBusinessDate(b).localeCompare(crmDealBusinessDate(a))||String(b.created_at||'').localeCompare(String(a.created_at||''));
+}
 async function loadDeals(){
   const seq=++dealsLoadSequence,generation=crmSessionGeneration,userId=currentUser&&currentUser.id;
   const current=()=>seq===dealsLoadSequence&&crmSessionCurrent(generation,userId);
@@ -3517,7 +3531,7 @@ async function loadDeals(){
       crmReadAll(()=>supa.from('property_inquiries').select('*, client:clients(id,name,phone,lead_temperature,lead_score,assigned_to), property:properties(id,title,area,price), agent:profiles!property_inquiries_assigned_to_fkey(full_name)',{count:'exact'}).order('last_inquiry_at',{ascending:false}).order('id'))
     ]);
     if(!current())return;
-    allDeals=rs[0];allPropertyInquiries=rs[1];
+    allDeals=rs[0].sort(crmCompareDealsByDate);allPropertyInquiries=rs[1];
     $('dealsSub').textContent=allDeals.length+' رحلة عقارية في الـPipeline · '+allPropertyInquiries.length+' اهتمام/استفسار';renderDeals();
   }catch(err){if(current())$('dealsContent').innerHTML='<div class="card"><div class="empty"><div class="empty-ico">⚠️</div><div class="empty-desc">تعذر تحميل الصفقات والمتابعات.</div><button class="btn-secondary" onclick="loadDeals()">إعادة المحاولة</button></div></div>';}
 }
@@ -3607,7 +3621,7 @@ function renderPipeline(){
   let h='<div style="margin-bottom:10px;background:white;border:1px solid var(--cream-deeper);border-radius:12px;padding:10px 13px;font-size:11px;color:var(--umber);display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span>🧭 <strong>المسار المختصر:</strong> زيارة ← تفاوض ← عربون ← تمويل (إن وُجد) ← تم البيع ← العمولة، أو فشلت.</span>'+(legacyLost?'<span style="background:#FFFBEB;color:#92400E;border:1px solid #FDE68A;border-radius:999px;padding:4px 9px">⚠️ '+legacyNoted+' ملاحظة قديمة تحتاج تصنيف السبب · '+(legacyLost-legacyNoted)+' بلا ملاحظة</span>':'')+'</div>';
   h+='<div class="pipeline-wrap" style="overflow-x:hidden;width:100%"><div class="pipeline pipeline-simple" style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;width:100%;min-width:0;align-items:start">';
   stageGroups.forEach(function(g){
-    const ds=groupDeals(g).sort((a,b)=>String(b.updated_at||b.created_at||'').localeCompare(String(a.updated_at||a.created_at||'')));
+    const ds=groupDeals(g).sort(crmCompareDealsByDate);
     const droppable=canEdit()&&g.droppable!==false;
     h+='<div class="p-col" data-stage="'+g.target+'" data-group="'+g.key+'"'+(droppable?' ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)"':'')+' style="border-top:3px solid '+g.color+';min-width:0;width:auto;padding:7px">';
     h+='<div class="p-head" style="gap:4px"><div class="p-head-title" style="font-size:11px;white-space:normal;line-height:1.35">'+g.label+'</div><div class="p-count">'+ds.length+'</div></div>';
