@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const source=fs.readFileSync(require('node:path').join(__dirname,'../app-base-v15.html'),'utf8');
 function fn(name){const start=source.indexOf('function '+name+'(');assert(start>=0);for(let end=source.indexOf('}',start);end>=0;end=source.indexOf('}',end+1)){const text=source.slice(start,end+1);try{new vm.Script(text);return text;}catch{}}throw Error(name);}
-function harness(){const nodes={dealsContent:{innerHTML:''}};const c={allDeals:[],canEdit:()=>true,canViewFinancials:()=>true,escapeHtml:x=>String(x),fmtDate:x=>String(x).slice(0,10),fmtMoney:x=>String(x),toLocalDateStr:()=> '2026-10-02',dealStageAr:x=>x,$:id=>nodes[id]};vm.createContext(c);vm.runInContext(fn('crmDealCalendarDate')+'\n'+fn('crmDealDatesHtml')+'\n'+fn('crmDealCustomerNotes')+'\n'+fn('renderPipeline'),c);return{c,nodes};}
+function harness(){const nodes={dealsContent:{innerHTML:''}};const c={allDeals:[],canEdit:()=>true,canViewFinancials:()=>true,escapeHtml:x=>String(x),fmtDate:x=>String(x).slice(0,10),fmtMoney:x=>String(x),toLocalDateStr:()=> '2026-10-02',dealStageAr:x=>x,$:id=>nodes[id]};vm.createContext(c);vm.runInContext(fn('crmDealBusinessDate')+'\n'+fn('crmCompareDealsByDate')+'\n'+fn('crmDealCalendarDate')+'\n'+fn('crmDealDatesHtml')+'\n'+fn('crmDealCustomerNotes')+'\n'+fn('renderPipeline'),c);return{c,nodes};}
 test('system visit origin is not a rejection reason, and mixed customer notes survive unchanged',()=>{
  const {c}=harness(),origin='تم إنشاؤها تلقائياً من زيارة بتاريخ 2026-06-29';
  assert.equal(c.crmDealCustomerNotes(origin),'');assert.equal(c.crmDealCustomerNotes(origin+'\nالسعر أعلى من ميزانيتي'),'السعر أعلى من ميزانيتي');

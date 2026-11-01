@@ -27,7 +27,7 @@ function loadHarness(name){
  const pending=[],nodes={dealsContent:{innerHTML:'unchanged'},dealsSub:{textContent:''},cdTabDeals:{innerHTML:''}};
  const c={currentUser:{id:'SYNTHETIC-USER'},crmSessionGeneration:1,viewingClient:{id:'SYNTHETIC-A'},dealsLoadSequence:0,clientDealsLoadSequence:0,allDeals:[],allPropertyInquiries:[],renderDeals(){c.rendered=(c.rendered||0)+1;},$:id=>nodes[id],crmReadAll:()=>new Promise((resolve,reject)=>pending.push({resolve,reject}))};
  c.crmSessionCurrent=(g,u)=>g===c.crmSessionGeneration&&u===c.currentUser?.id;
- vm.createContext(c);vm.runInContext(fn(base,name),c);return{c,pending,nodes};
+ vm.createContext(c);vm.runInContext(fn(base,'crmDealBusinessDate')+'\n'+fn(base,'crmCompareDealsByDate')+'\n'+fn(base,name),c);return{c,pending,nodes};
 }
 test('a late deal list cannot replace a newer list or restore another session data',async()=>{
  const{c,pending,nodes}=loadHarness('loadDeals');const first=c.loadDeals(),second=c.loadDeals();pending[2].resolve([{id:'NEW'}]);pending[3].resolve([]);await second;pending[0].resolve([{id:'OLD'}]);pending[1].resolve([]);await first;assert.equal(c.allDeals[0].id,'NEW');assert.equal(c.rendered,1);
