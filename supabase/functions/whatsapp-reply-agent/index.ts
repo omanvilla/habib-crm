@@ -372,7 +372,7 @@ Deno.serve(async (req) => {
       if (!(u.data || []).length) return json({ ok: false, error: "draft_not_pending" }, 409);
       return json({ ok: true, status: "rewritten", reply_messages: out.reply_messages, action: out.action, analysis });
     }
-    if (dry ||(rt.reply_agent_mode === "approval" && !autoSend)) {
+    if (dry || (rt.reply_agent_mode === "approval" && !autoSend)) {
       await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages, status: "pending" }).eq("id", draftId);
       return json({ ok: true, status: "awaiting_approval" });
     }
