@@ -14,7 +14,7 @@ test('approval screen is owner-only and never writes drafts directly',()=>{
 
 test('each reply line can be deleted before approval',()=>{
   assert.match(js,/data-rp="del-line"/);assert.match(js,/a==='del-line'\)b\.closest\('\.rp-line'\)\.remove\(\)/);
-  assert.match(js,/insertAdjacentHTML\('beforebegin',lineHtml\(''\)\)/);
+  assert.match(js,/box\.insertAdjacentHTML\('beforeend',lineHtml\(''\)\)/);
 });
 
 test('customer text is escaped and trial drafts cannot be sent',()=>{
