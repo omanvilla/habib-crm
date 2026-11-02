@@ -107,8 +107,10 @@ const schema = {
     viewing_time: { type: ["string", "null"] },
     handoff_reason: { type: ["string", "null"] },
     crm_note: { type: "string" },
+    matched_rule_id: { type: ["string", "null"] },
+    alternatives: { type: "array", items: { type: "array", items: { type: "string" } } },
   },
-  required: ["reply_messages", "category", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note"],
+  required: ["reply_messages", "category", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives"],
 };
 
 function propLine(p: any) {
@@ -192,7 +194,7 @@ Deno.serve(async (req) => {
         .eq("conversation_id", conv.id).lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(30),
       db.from("properties").select("id,title,internal_name,type,area,wilayat,price,bedrooms,bathrooms,land_size,built_size,public_details,map_url,visit_method,visit_instructions,lockbox_image_url,owner_id,branch_key")
         .eq("company_id", msg.company_id).eq("status", "available").eq("archived", false),
-      db.from("whatsapp_reply_rules").select("situation,approved_reply").eq("company_id", msg.company_id).eq("active", true).order("created_at", { ascending: false }).limit(40),
+      db.from("whatsapp_reply_rules").select("id,situation,approved_reply,category").eq("company_id", msg.company_id).eq("active", true).order("created_at", { ascending: false }).limit(40),
       db.from("whatsapp_reply_drafts").select("analysis,status").eq("conversation_id", conv.id).in("status", ["sent", "approved", "edited"]),
     ]);
     const history = (histR.data || []).reverse();
@@ -250,7 +252,7 @@ Deno.serve(async (req) => {
       "معلومات المستثمرين:",
       INVESTOR_KNOWLEDGE,
       "",
-      rulesR.data?.length ? "ردود اعتمدها المدير (امش عليها بنفس الأسلوب):\n" + rulesR.data.map((r: any) => `- الموقف: ${r.situation}\n  الرد: ${r.approved_reply}`).join("\n") : "",
+      rulesR.data?.length ? "ردود مثبتة اعتمدها المدير:\n" + rulesR.data.map((r: any) => `- rule_id=${r.id} | الموقف: ${r.situation}\n  الرد: ${r.approved_reply}`).join("\n") : "ردود مثبتة: لا يوجد",
       "",
       "المحادثة (الأقدم أولاً، وآخر سطر هو اللي ترد عليه):",
       transcript,
@@ -275,6 +277,11 @@ Deno.serve(async (req) => {
     if (budgetAskedBefore) texts = texts.filter((t) => !/ميزاني|في حدود كم|كم تقريب/.test(t));
     texts = texts.filter((t) => !/(الموظف|موظف)\s*(بيتواصل|يتواصل|بيرد|يرد)|بيتواصل معك الموظف|تم تحويل/.test(t));
     out.reply_messages = texts.slice(0, 3);
+    // a pinned reply only counts when the id is real
+    const rule = (rulesR.data || []).find((r: any) => r.id === out.matched_rule_id) || null;
+    out.matched_rule_id = rule?.id || null;
+    // other ways to say it, for the owner to pick from (investors)
+    out.alternatives = (out.alternatives || []).map((a: string[]) => (a || []).map((t) => humanize(t)).filter(Boolean).slice(0, 3)).filter((a: string[]) => a.length).slice(0, 2);
     const outgoing: any[] = out.reply_messages.map((t: string) => ({ type: "text", text: { preview_url: false, body: t } }));
 
     if (out.action === "send_location" || out.action === "send_lockbox") {
@@ -293,8 +300,11 @@ Deno.serve(async (req) => {
       } else { out.action = "handoff"; out.handoff_reason = "طلب معاينة تحتاج تنسيق"; }
     }
 
-    const analysis = { ...out, property_id: prop?.id || null, model: OPENAI_MODEL, dry_run: dry, transcribed: pendingAudio.filter((a: any) => a.transcript).length };
-    if (dry || rt.reply_agent_mode === "approval") {
+    // approval mode still sends on its own when the owner switched the category on and the reply is a pinned one
+    const autoSend = !dry && rt.reply_agent_mode === "approval" && !!rule && out.reply_messages.length > 0
+      && ["none", "handoff"].includes(out.action) && (rt.auto_send_categories || []).includes(out.category);
+    const analysis = { ...out, property_id: prop?.id || null, model: OPENAI_MODEL, dry_run: dry, auto_sent: autoSend, transcribed: pendingAudio.filter((a: any) => a.transcript).length };
+    if (dry || (rt.reply_agent_mode === "approval" && !autoSend)) {
       await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages, status: "pending" }).eq("id", draftId);
       return json({ ok: true, status: "awaiting_approval" });
     }
@@ -312,7 +322,7 @@ Deno.serve(async (req) => {
           company_id: msg.company_id, conversation_id: conv.id, client_id: client.id, whatsapp_message_id: wamid,
           direction: "outbound", message_type: outgoing[i].type, sender_wa_id: phoneId, recipient_wa_id: to, body,
           message_timestamp: new Date().toISOString(), delivery_status: "sent", actor_type: "automated",
-          channel_source: "crm_reply_agent", raw_payload: { source: "reply_agent_v1", draft_id: draftId },
+          channel_source: "crm_reply_agent", raw_payload: { source: autoSend ? "reply_agent_auto_pinned" : "reply_agent_v1", draft_id: draftId, rule_id: rule?.id || null },
         });
       }
     }

@@ -36,3 +36,15 @@ test('SQL51: superseding never blocks message intake and RPCs are owner-only',()
   assert.equal((sql.match(/IF public\.my_role\(\) IS DISTINCT FROM 'owner' THEN RAISE EXCEPTION 'owner_only'/g)||[]).length,3);
   assert.match(sql,/coalesce\(d\.analysis->>'dry_run', ''\) <> 'true'/);
 });
+
+test('pinned matches are marked, investors get alternatives, auto-send is owner-only and off by default',()=>{
+  const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8');
+  const sql52=fs.readFileSync('db/changes/52-reply-auto-send.forward.sql','utf8');
+  assert.match(js,/a\.matched_rule_id\?'<span class="rp-chip pinned">مطابق لرد مثبت<\/span>'/);
+  assert.match(js,/supa\.rpc\('crm_reply_auto_send_set',\{p_categories:cats\}\)/);
+  assert.match(agent,/out\.matched_rule_id = rule\?\.id \|\| null/);
+  assert.match(agent,/\["none", "handoff"\]\.includes\(out\.action\) && \(rt\.auto_send_categories \|\| \[\]\)\.includes\(out\.category\)/);
+  assert.match(agent,/if \(dry \|\| \(rt\.reply_agent_mode === "approval" && !autoSend\)\)/);
+  assert.match(sql52,/auto_send_categories text\[\] NOT NULL DEFAULT '\{\}'/);
+  assert.equal((sql52.match(/IF public\.my_role\(\) IS DISTINCT FROM 'owner' THEN RAISE EXCEPTION 'owner_only'/g)||[]).length,2);
+});

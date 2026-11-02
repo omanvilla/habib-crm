@@ -2,7 +2,9 @@
  * Page "ردود تنتظر موافقتك": each draft shows the customer, the number they wrote to, the
  * category, a short summary, their last messages and the proposed reply (editable). Approve
  * sends through the whatsapp-reply-send Edge Function; reject and pin use owner-only RPCs.
- * Tab "الردود المثبتة" lists pinned replies to edit, pause or delete.
+ * Tab "الردود المثبتة" lists pinned replies to edit, pause or delete, and the per-category
+ * auto-send switches (off by default). Drafts that reuse a pinned reply are marked, and investor
+ * drafts carry alternative wordings to pick from.
  * A browser notification fires when new drafts arrive while the CRM is open. Owner only. */
 (function(){
   'use strict';
@@ -17,7 +19,7 @@
     owner_only:'الموافقة لصاحب الشركة فقط.',company_number:'هذا رقم من أرقام الشركة.',dry_run_draft:'هذا رد تجريبي للمراجعة فقط ولا ينرسل.',meta_send_failed:'واتساب رفض الإرسال. حاول مرة ثانية أو أرسل من المحادثة.'};
   const errText=e=>{const raw=String(e&&(e.error||e.message)||e||'');for(const k of Object.keys(ERRORS))if(raw.includes(k))return ERRORS[k];return 'تعذر: '+raw;};
   const ago=d=>typeof timeAgo==='function'?timeAgo(d):String(d||'').slice(0,16);
-  let state={tab:'pending',showTrials:false,drafts:[],rules:[],lastCount:null,loading:false};
+  let state={tab:'pending',showTrials:false,drafts:[],rules:[],autoSend:null,lastCount:null,loading:false};
 
   // ---- page and menu ---------------------------------------------------------
   function ensurePage(){
@@ -63,6 +65,8 @@
   async function loadRules(){
     const r=await supa.from('whatsapp_reply_rules').select('id,situation,approved_reply,category,intent,active,created_at,updated_at').order('created_at',{ascending:false});
     if(r.error)throw r.error;state.rules=r.data||[];
+    const s=await supa.rpc('crm_reply_auto_send_get');
+    state.autoSend=s.error?null:((s.data&&s.data.categories)||[]);
   }
   async function countPending(){
     const r=await supa.from('whatsapp_reply_drafts').select('id,analysis',{count:'exact'}).eq('status','pending').limit(200);
@@ -82,10 +86,12 @@
     return '<article class="rp-card" data-draft="'+esc(d.id)+'">'
       +'<header><div><strong><bdi>'+esc(name)+'</bdi></strong>'+(phone?' <small dir="ltr">'+esc(phone)+'</small>':'')+'</div>'
       +'<div class="rp-chips"><span class="rp-chip route">'+esc(ROUTES[d.conv.route_key]||d.conv.route_key||'')+'</span>'+(a.category?'<span class="rp-chip">'+esc(CATS[a.category]||a.category)+'</span>':'')
+      +(a.matched_rule_id?'<span class="rp-chip pinned">مطابق لرد مثبت</span>':'')
       +(trial?'<span class="rp-chip trial">تجربة</span>':'')+'<span class="rp-time">'+esc(ago(d.created_at))+'</span></div></header>'
       +(a.crm_note?'<p class="rp-summary">'+esc(a.crm_note)+'</p>':'')
       +'<ul class="rp-msgs">'+d.lastMessages.map(msgLine).join('')+'</ul>'
-      +'<div class="rp-reply"><label>الرد المقترح</label>'+(d.reply_messages||[]).map(lineHtml).join('')
+      +'<div class="rp-reply"><label>الرد المقترح</label>'+altChoices(a)
+      +'<div class="rp-lines">'+(d.reply_messages||[]).map(lineHtml).join('')+'</div>'
       +((d.reply_messages||[]).length?'':'<p class="rp-muted">المحرك يقترح عدم الرد.</p>')
       +'<button type="button" class="rp-add" data-rp="add-line">+ سطر</button>'
       +(ACTIONS[a.action]?'<p class="rp-action">'+esc(ACTIONS[a.action])+'</p>':'')+'</div>'
@@ -96,6 +102,21 @@
       +'<button type="button" class="btn-secondary" data-rp="reject">رفض</button>'
       +'<button type="button" class="btn-secondary" data-rp="open">فتح المحادثة</button></div>'
       +'<div class="rp-error" role="alert"></div></article>';
+  }
+  // investors get the proposed reply plus up to two other wordings to pick from
+  function altChoices(a){
+    const alts=Array.isArray(a.alternatives)?a.alternatives.filter(x=>Array.isArray(x)&&x.length):[];
+    if(!alts.length)return '';
+    return '<div class="rp-alts" role="group" aria-label="صيغ الرد"><button type="button" class="rp-alt on" data-rp="alt" data-alt="-1">المقترح</button>'
+      +alts.map((_,i)=>'<button type="button" class="rp-alt" data-rp="alt" data-alt="'+i+'">بديل '+(i+1)+'</button>').join('')+'</div>';
+  }
+  function autoSendBox(){
+    if(!state.autoSend)return '';
+    const on=new Set(state.autoSend);
+    return '<section class="rp-card rp-auto"><strong>الإرسال التلقائي</strong>'
+      +'<p class="rp-muted">إذا شغّلت فئة، المحرك يرسل بدون موافقتك بس لما يكون رده مطابق لرد مثبت. غير كذا كل الردود تنتظرك.</p>'
+      +'<div class="rp-auto-list">'+Object.keys(CATS).map(k=>'<label class="rp-pin"><input type="checkbox" class="rp-auto-cat" value="'+k+'"'+(on.has(k)?' checked':'')+'> '+esc(CATS[k])+'</label>').join('')+'</div>'
+      +'<div class="rp-error" role="alert"></div></section>';
   }
   function ruleCard(r){
     return '<article class="rp-card rp-rule" data-rule="'+esc(r.id)+'">'
@@ -111,7 +132,7 @@
     const trials=byId('rpTrials');if(trials)trials.closest('label').hidden=state.tab!=='pending';
     if(state.tab==='rules'){
       byId('rpSub').textContent=state.rules.length+' رد مثبت';
-      list.innerHTML=state.rules.length?state.rules.map(ruleCard).join(''):'<div class="empty"><div class="empty-ico">📌</div><div class="empty-title">ما في ردود مثبتة لين الحين</div><div class="empty-desc">لما توافق على رد وتختار «ثبّت هذا الرد» يظهر هنا، والمحرك يستخدمه في المواقف المشابهة.</div></div>';
+      list.innerHTML=autoSendBox()+(state.rules.length?state.rules.map(ruleCard).join(''):'<div class="empty"><div class="empty-ico">📌</div><div class="empty-title">ما في ردود مثبتة لين الحين</div><div class="empty-desc">لما توافق على رد وتختار «ثبّت هذا الرد» يظهر هنا، والمحرك يستخدمه في المواقف المشابهة.</div></div>');
       return;
     }
     const real=state.drafts.filter(d=>!(d.analysis&&d.analysis.dry_run)).length;
@@ -161,6 +182,16 @@
     if(r.error){err.textContent=errText(r.error);return;}
     toast(del?'انحذف الرد المثبت':'انحفظ','success');refresh();
   }
+  async function saveAutoSend(input){
+    const box=input.closest('.rp-auto'),err=box.querySelector('.rp-error');err.textContent='';
+    if(input.checked&&!confirm('المحرك بيرسل لفئة «'+(CATS[input.value]||input.value)+'» بدون موافقتك إذا رده مطابق لرد مثبت. متأكد؟')){input.checked=false;return;}
+    const cats=[...box.querySelectorAll('.rp-auto-cat:checked')].map(x=>x.value);
+    box.querySelectorAll('.rp-auto-cat').forEach(x=>x.disabled=true);
+    const r=await supa.rpc('crm_reply_auto_send_set',{p_categories:cats});
+    box.querySelectorAll('.rp-auto-cat').forEach(x=>x.disabled=false);
+    if(r.error){input.checked=!input.checked;err.textContent=errText(r.error);return;}
+    state.autoSend=(r.data&&r.data.categories)||cats;toast('انحفظ','success');
+  }
   document.addEventListener('click',e=>{
     const tab=e.target.closest('[data-rp-tab]');if(tab){state.tab=tab.dataset.rpTab;refresh();return;}
     const b=e.target.closest('[data-rp]');if(!b)return;const card=b.closest('.rp-card');if(!card)return;
@@ -168,13 +199,21 @@
     if(a==='send')send(card,b);
     else if(a==='reject'){if(confirm('ترفض هذا الرد؟'))reject(card,b);}
     else if(a==='open'){const d=state.drafts.find(x=>x.id===card.dataset.draft);if(d&&typeof openDashboardWhatsAppConversation==='function')openDashboardWhatsAppConversation(d.conversation_id);}
-    else if(a==='add-line'){b.insertAdjacentHTML('beforebegin',lineHtml(''));b.previousElementSibling.querySelector('textarea').focus();}
+    else if(a==='add-line'){const box=card.querySelector('.rp-lines');box.insertAdjacentHTML('beforeend',lineHtml(''));box.lastElementChild.querySelector('textarea').focus();}
+    else if(a==='alt'){
+      const d=state.drafts.find(x=>x.id===card.dataset.draft);if(!d)return;
+      const i=Number(b.dataset.alt),alts=(d.analysis&&d.analysis.alternatives)||[];
+      const texts=i<0?(d.reply_messages||[]):(alts[i]||[]);
+      card.querySelector('.rp-lines').innerHTML=texts.map(lineHtml).join('');
+      card.querySelectorAll('.rp-alt').forEach(x=>x.classList.toggle('on',x===b));
+    }
     else if(a==='del-line')b.closest('.rp-line').remove();
     else if(a==='rule-save')saveRule(card,b,false);
     else if(a==='rule-delete'){if(confirm('تحذف هذا الرد المثبت؟'))saveRule(card,b,true);}
   });
   document.addEventListener('change',e=>{
     if(e.target.id==='rpTrials'){state.showTrials=e.target.checked;refresh();}
+    if(e.target.classList.contains('rp-auto-cat'))saveAutoSend(e.target);
     if(e.target.classList.contains('rp-pin-on')){const s=e.target.closest('.rp-card').querySelector('.rp-pin-situation');s.hidden=!e.target.checked;}
   });
 
