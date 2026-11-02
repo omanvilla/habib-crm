@@ -98,3 +98,25 @@ test('cards leave out edits, deletions, reactions and system notices',()=>{
   assert.match(js,/d\.lastMessages=own\.filter\(shown\)\.slice\(0,5\)\.reverse\(\)/);
   assert.match(js,/m\.message_timestamp>d\.sent_at&&shown\(m\)/);
 });
+
+test('agent sees the ad text of each property, without links or phone numbers',()=>{
+  const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8');
+  const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
+  assert.match(agent,/p\.marketing = publicText\(p\.description\) \|\| caps\[0\] \|\| ""/);
+  assert.match(agent,/replace\(\/https\?:\\/\\/\S\+\/gi, ""\)/);
+  assert.match(brain,/لا تقول "بشوف وارد عليك" والمعلومة مكتوبة قدامك/);
+  assert.match(brain,/آخر طلب هو اللي يمشي/);
+});
+
+test('owner instruction rewrites a waiting draft and never sends',()=>{
+  const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8');
+  assert.match(agent,/prof\.data\.role !== "owner"/);
+  assert.match(agent,/if \(d\.data\.status !== "pending"\) return json\(\{ ok: false, error: "draft_not_pending" \}, 409\)/);
+  assert.match(agent,/const autoSend = !review && /);
+  // the rewrite returns before any send code runs
+  assert(agent.indexOf('status: "rewritten"')<agent.indexOf('const wamid = await metaSend'));
+  assert.match(agent,/\.eq\("id", draftId\)\.eq\("status", "pending"\)\.select\("id"\)/);
+  assert.match(js,/supa\.functions\.invoke\('whatsapp-reply-agent',\{body:\{draft_id:id,instruction\}\}\)/);
+  assert.match(js,/data-rp="instr">أمر للذكاء الاصطناعي<\/button>/);
+  assert.match(js,/esc\(a\.owner_instruction\)/);
+});

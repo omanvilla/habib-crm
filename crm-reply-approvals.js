@@ -9,6 +9,8 @@
  * Visit follow-ups (SQL54) wait at the top of the pending tab; approve sends the fixed text.
  * Tab "أُرسلت تلقائياً" lists replies sent without approval, with the customer's answer, and
  * lets the owner pause the pinned reply behind a wrong match.
+ * "أمر للذكاء الاصطناعي" sends the owner's instruction to whatsapp-reply-agent, which rewrites that
+ * draft from the same conversation; the new reply still waits for approval.
  * A browser notification fires when new drafts arrive while the CRM is open. Owner only. */
 (function(){
   'use strict';
@@ -21,6 +23,7 @@
   const ACTIONS={handoff:'يحوّل لك بعد الإرسال',send_location:'يرسل اللوكيشن بعد الرد',send_lockbox:'يرسل اللوكيشن وصورة صندوق المفتاح',send_owner_number:'يرسل رقم المالك',book_viewing:'يسجل زيارة'};
   const ERRORS={outside_24h:'مرّت 24 ساعة على آخر رسالة من العميل. الرد العادي ما يوصل؛ يحتاج قالب معتمد.',draft_not_pending:'هذا الرد تغيّر: إما انرسل أو انلغى لأن العميل أو موظف كتب بعده.',
     owner_only:'الموافقة لصاحب الشركة فقط.',company_number:'هذا رقم من أرقام الشركة.',dry_run_draft:'هذا رد تجريبي للمراجعة فقط ولا ينرسل.',meta_send_failed:'واتساب رفض الإرسال. حاول مرة ثانية أو أرسل من المحادثة.',
+    instruction_required:'اكتب الأمر أولاً.',draft_not_found:'هذا الرد ما عاد موجود.',
     template_pending:'قالب هذي المتابعة لين الحين ما وافقت عليه واتساب. بتقدر ترسلها أول ما يتوافق عليه.',followup_not_found:'المتابعة ما عادت موجودة.',followup_not_pending:'هذي المتابعة ما عادت تنتظر.'};
   const errText=e=>{const raw=String(e&&(e.error||e.message)||e||'');for(const k of Object.keys(ERRORS))if(raw.includes(k))return ERRORS[k];return 'تعذر: '+raw;};
   const ago=d=>typeof timeAgo==='function'?timeAgo(d):String(d||'').slice(0,16);
@@ -148,13 +151,18 @@
       +'<div class="rp-lines">'+(d.reply_messages||[]).map(lineHtml).join('')+'</div>'
       +((d.reply_messages||[]).length?'':'<p class="rp-muted">المحرك يقترح عدم الرد.</p>')
       +'<button type="button" class="rp-add" data-rp="add-line">+ سطر</button>'
-      +(ACTIONS[a.action]?'<p class="rp-action">'+esc(ACTIONS[a.action])+'</p>':'')+'</div>'
+      +(ACTIONS[a.action]?'<p class="rp-action">'+esc(ACTIONS[a.action])+'</p>':'')
+      +(a.owner_instruction?'<p class="rp-instr-done">انكتب حسب أمرك: <span dir="auto">'+esc(a.owner_instruction)+'</span></p>':'')+'</div>'
+      +'<div class="rp-instr" hidden><label>أمر للذكاء الاصطناعي</label>'
+      +'<textarea class="fta rp-instr-text" rows="2" dir="auto" placeholder="مثلاً: ارسل له تفاصيل العقار والمساحات / يبي شي ثاني في الصومحان اعرض عليه المتوفر"></textarea>'
+      +'<div class="rp-actions"><button type="button" class="btn-primary" data-rp="instr-run">اكتب الرد من جديد</button><button type="button" class="btn-secondary" data-rp="instr-close">إلغاء</button></div></div>'
       +'<label class="rp-pin"><input type="checkbox" class="rp-pin-on"> ثبّت هذا الرد للمواقف المشابهة</label>'
       +'<input class="fi rp-pin-situation" hidden placeholder="وصف الموقف" value="'+esc([CATS[a.category]||'',a.intent||''].filter(Boolean).join(': '))+'">'
       +(!ok24&&!trial?'<p class="rp-warn">مرّت 24 ساعة على آخر رسالة من العميل؛ الرد العادي ما يوصل.</p>':'')
       +'<div class="rp-actions"><button type="button" class="btn-primary" data-rp="send"'+(trial||!ok24?' disabled':'')+'>موافقة وإرسال</button>'
       +'<button type="button" class="btn-secondary" data-rp="reject">رفض</button>'
-      +'<button type="button" class="btn-secondary" data-rp="open">فتح المحادثة</button></div>'
+      +'<button type="button" class="btn-secondary" data-rp="open">فتح المحادثة</button>'
+      +'<button type="button" class="btn-secondary" data-rp="instr">أمر للذكاء الاصطناعي</button></div>'
       +'<div class="rp-error" role="alert"></div></article>';
   }
   const msgText=m=>m&&(m.transcript?'🎤 '+m.transcript:(m.body||(m.message_type?'['+m.message_type+']':'')))||'';
@@ -318,6 +326,21 @@
       toast('انرسل الرد'+(pin?' وانثبت':''),'success');refresh();updateBadge();
     }catch(e){err.textContent=errText(e);btn.disabled=false;btn.textContent='موافقة وإرسال';}
   }
+  // the owner tells the agent what to do differently; it rewrites this draft from the same
+  // conversation and the new reply still waits here for approval (nothing is sent)
+  async function rewrite(card,btn){
+    const id=card.dataset.draft,err=card.querySelector('.rp-error');err.textContent='';
+    const instruction=card.querySelector('.rp-instr-text').value.trim();
+    if(instruction.length<3){err.textContent='اكتب الأمر أولاً';return;}
+    btn.disabled=true;btn.textContent='جاري الكتابة…';
+    try{
+      const r=await supa.functions.invoke('whatsapp-reply-agent',{body:{draft_id:id,instruction}});
+      const data=r.data||{};if(r.error||data.ok!==true){let detail=data;try{if(r.error&&r.error.context)detail=await r.error.context.json();}catch(_){}throw detail&&detail.error?detail:(r.error||data);}
+      const d=state.drafts.find(x=>x.id===id);
+      if(d){d.reply_messages=data.reply_messages||[];d.analysis=data.analysis||d.analysis;card.outerHTML=draftCard(d);}
+      toast('انكتب الرد من جديد، راجعه قبل الإرسال','success');
+    }catch(e){err.textContent=errText(e);btn.disabled=false;btn.textContent='اكتب الرد من جديد';}
+  }
   async function reject(card,btn){
     btn.disabled=true;const err=card.querySelector('.rp-error');
     const r=await supa.rpc('crm_reply_draft_reject',{p_draft_id:card.dataset.draft,p_note:null});
@@ -377,6 +400,9 @@
       card.querySelectorAll('.rp-alt').forEach(x=>x.classList.toggle('on',x===b));
     }
     else if(a==='del-line')b.closest('.rp-line').remove();
+    else if(a==='instr'){const box=card.querySelector('.rp-instr');box.hidden=false;box.querySelector('textarea').focus();}
+    else if(a==='instr-close')card.querySelector('.rp-instr').hidden=true;
+    else if(a==='instr-run')rewrite(card,b);
     else if(a==='rule-save')saveRule(card,b,false);
     else if(a==='rule-delete'){if(confirm('تحذف هذا الرد المثبت؟'))saveRule(card,b,true);}
   });
