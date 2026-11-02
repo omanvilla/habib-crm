@@ -20,6 +20,9 @@
 .rp-auto strong{font-size:15px}
 .rp-auto-list{display:flex;flex-wrap:wrap;gap:4px 16px}
 .rp-variant{margin-top:4px}
+.rp-section{font-size:14px;color:#3d4f46;margin:4px 0 10px}
+.rp-fu{border-inline-start:4px solid #b98a32}
+.rp-fu-body{background:#e3f4e7;border-radius:10px;padding:8px 12px;margin:0 0 6px;font-size:15px;line-height:1.7}
 .rp-days{display:flex;gap:6px;margin-bottom:8px}
 .rp-result strong{font-size:14.5px}
 .rp-table-wrap{overflow-x:auto;margin-top:8px}
