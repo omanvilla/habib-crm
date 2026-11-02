@@ -200,6 +200,14 @@ Deno.serve(async (req) => {
     ]);
     const history = (histR.data || []).reverse();
     const props = propsR.data || [];
+    // A/B/C test: each pinned reply shows the model one wording, picked at random among the active ones
+    const ruleIds = (rulesR.data || []).map((r: any) => r.id);
+    const varR = ruleIds.length ? await db.from("whatsapp_reply_variants").select("rule_id,label,reply").in("rule_id", ruleIds).eq("active", true) : { data: [] };
+    const pickedVariant: Record<string, { label: string; reply: string }> = {};
+    for (const r of rulesR.data || []) {
+      const pool = [{ label: "A", reply: r.approved_reply }, ...((varR as any).data || []).filter((v: any) => v.rule_id === r.id)];
+      pickedVariant[r.id] = pool[Math.floor(Math.random() * pool.length)];
+    }
     const budgetAskedBefore = (priorR.data || []).some((d: any) => d.analysis?.budget_asked_now === true);
     const tokens = await routeTokens(msg.company_id, conv.route_key);
 
@@ -253,7 +261,7 @@ Deno.serve(async (req) => {
       "معلومات المستثمرين:",
       INVESTOR_KNOWLEDGE,
       "",
-      rulesR.data?.length ? "ردود مثبتة اعتمدها المدير:\n" + rulesR.data.map((r: any) => `- rule_id=${r.id} | الموقف: ${r.situation}\n  الرد: ${r.approved_reply}`).join("\n") : "ردود مثبتة: لا يوجد",
+      rulesR.data?.length ? "ردود مثبتة اعتمدها المدير:\n" + rulesR.data.map((r: any) => `- rule_id=${r.id} | الموقف: ${r.situation}\n  الرد: ${pickedVariant[r.id].reply}`).join("\n") : "ردود مثبتة: لا يوجد",
       "",
       "المحادثة (الأقدم أولاً، وآخر سطر هو اللي ترد عليه):",
       transcript,
@@ -281,6 +289,7 @@ Deno.serve(async (req) => {
     // a pinned reply only counts when the id is real
     const rule = (rulesR.data || []).find((r: any) => r.id === out.matched_rule_id) || null;
     out.matched_rule_id = rule?.id || null;
+    out.variant_label = rule ? pickedVariant[rule.id].label : null;
     // other ways to say it, for the owner to pick from (investors)
     out.alternatives = (out.alternatives || []).map((a: string[]) => (a || []).map((t) => humanize(t)).filter(Boolean).slice(0, 3)).filter((a: string[]) => a.length).slice(0, 2);
     const outgoing: any[] = out.reply_messages.map((t: string) => ({ type: "text", text: { preview_url: false, body: t } }));
@@ -323,7 +332,7 @@ Deno.serve(async (req) => {
           company_id: msg.company_id, conversation_id: conv.id, client_id: client.id, whatsapp_message_id: wamid,
           direction: "outbound", message_type: outgoing[i].type, sender_wa_id: phoneId, recipient_wa_id: to, body,
           message_timestamp: new Date().toISOString(), delivery_status: "sent", actor_type: "automated",
-          channel_source: "crm_reply_agent", raw_payload: { source: autoSend ? "reply_agent_auto_pinned" : "reply_agent_v1", draft_id: draftId, rule_id: rule?.id || null },
+          channel_source: "crm_reply_agent", raw_payload: { source: autoSend ? "reply_agent_auto_pinned" : "reply_agent_v1", draft_id: draftId, rule_id: rule?.id || null, variant: out.variant_label },
         });
       }
     }
