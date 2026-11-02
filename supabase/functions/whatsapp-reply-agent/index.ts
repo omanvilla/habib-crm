@@ -12,13 +12,22 @@ const WHATSAPP_ACCESS_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN") ?? "";
 const GRAPH = Deno.env.get("META_GRAPH_VERSION") || "v25.0";
 const DEBOUNCE_MS = 7000;
 const STAFF_QUIET_HOURS = 72; // a person from the office talked to this customer recently → stay out
+const ALLOWED_ORIGINS = ["https://omanvilla.github.io"]; // the approval screen asks for a rewrite from here
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const enc = new TextEncoder();
-const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { "content-type": "application/json; charset=utf-8" } });
 const digits = (v: unknown) => String(v ?? "").replace(/\D/g, "");
 const short = (v: unknown, n = 1500) => { const s = String(v ?? "").trim(); return s.length > n ? s.slice(0, n) + "…" : s; };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+function cors(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  return {
+    "Access-Control-Allow-Origin": ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
+}
 function b64(s: string) { const b = atob(s); const o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return o; }
 function omanNow() {
   return new Intl.DateTimeFormat("ar-OM", { timeZone: "Asia/Muscat", weekday: "long", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date())
@@ -113,13 +122,21 @@ const schema = {
   required: ["reply_messages", "category", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives"],
 };
 
+// The marketing text (property description, or the longest reel caption for it) is what the office
+// sends customers as "the details"; links and phone numbers are taken out because the agent
+// must not write links and the location goes through send_location.
+function publicText(v: unknown) {
+  return String(v ?? "").replace(/https?:\/\/\S+/gi, "").replace(/\+?968[\s-]?\d{8}|\b[79]\d{7}\b/g, "")
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "").replace(/\s+/g, " ").trim();
+}
+
 // Office titles carry owner names ("فيلا الرميس 59 سلطان"), so the agent only sees a neutral label.
 function propLine(p: any) {
   const name = p.type || "عقار";
   const bits = [p.area, p.wilayat, p.price ? `${Number(p.price).toLocaleString("en-US")} ريال` : "", p.bedrooms ? `${p.bedrooms} غرف` : "",
     p.land_size ? `أرض ${p.land_size}م` : "", p.built_size ? `بناء ${p.built_size}م` : ""].filter(Boolean).join("، ");
   const visit = { open: "مفتوح ويروح بروحه", lockbox: "صندوق مفتاح برمز", owner_lives: "المالك ساكن (يعطى رقم المالك)", office: "تنسيق منا (handoff)" }[p.visit_method as string] || "غير محدد (handoff للمعاينة)";
-  return `- id=${p.id} | ${name} | ${bits} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? "" : " | اللوكيشن غير متوفر"}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}`;
+  return `- id=${p.id} | ${name} | ${bits} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? " | اللوكيشن متوفر (action=send_location)" : " | اللوكيشن غير متوفر"}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}${p.marketing ? `\n  وصف الإعلان: ${short(p.marketing, 900)}` : ""}`;
 }
 
 async function notifyHandoff(companyId: string, conv: any, client: any, reason: string) {
@@ -139,28 +156,55 @@ async function notifyHandoff(companyId: string, conv: any, client: any, reason: 
 }
 
 Deno.serve(async (req) => {
+  const headers = { ...cors(req), "content-type": "application/json; charset=utf-8" };
+  const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers });
+  if (req.method === "OPTIONS") return new Response("ok", { headers });
   if (req.method !== "POST") return json({ ok: false }, 405);
+  const body = await req.json().catch(() => ({}));
+  let message_id = body?.message_id;
+  let dry = body?.dry_run === true; // review only: never sends, never touches the CRM
+  // redo: the owner, from the approval screen, asks for a waiting draft to be rewritten following
+  // their instruction ("ارسل له تفاصيل العقار"). The new reply replaces the draft and still waits for approval.
+  let redo: { draftId: string; instruction: string } | null = null;
   const secret = req.headers.get("x-crm-agent") || "";
-  const ok = await db.rpc("crm_reply_agent_secret_ok", { p_secret: secret });
-  if (ok.error || ok.data !== true) return json({ ok: false, error: "forbidden" }, 403);
-  const { message_id, dry_run } = await req.json().catch(() => ({}));
-  const dry = dry_run === true; // review only: never sends, never touches the CRM
+  const ok = secret ? await db.rpc("crm_reply_agent_secret_ok", { p_secret: secret }) : null;
+  if (!ok || ok.error || ok.data !== true) {
+    const jwt = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+    const u = jwt ? await db.auth.getUser(jwt) : null;
+    const prof = u?.data?.user ? await db.from("profiles").select("id,company_id,role,is_active").eq("id", u.data.user.id).maybeSingle() : null;
+    if (!prof?.data || prof.data.role !== "owner" || prof.data.is_active === false) return json({ ok: false, error: "owner_only" }, 403);
+    const instruction = short(body?.instruction, 1000);
+    if (!body?.draft_id || !instruction) return json({ ok: false, error: "instruction_required" }, 400);
+    const d = await db.from("whatsapp_reply_drafts").select("id,message_id,status,analysis").eq("id", String(body.draft_id)).eq("company_id", prof.data.company_id).maybeSingle();
+    if (!d.data) return json({ ok: false, error: "draft_not_found" }, 404);
+    if (d.data.status !== "pending") return json({ ok: false, error: "draft_not_pending" }, 409);
+    redo = { draftId: d.data.id, instruction };
+    message_id = d.data.message_id;
+    dry = d.data.analysis?.dry_run === true;
+  }
   if (!message_id) return json({ ok: false, error: "message_id_required" }, 400);
 
   const m = await db.from("whatsapp_messages").select("id,company_id,conversation_id,client_id,direction,message_timestamp").eq("id", message_id).single();
   if (m.error || m.data.direction !== "inbound") return json({ ok: true, ignored: "not_inbound" });
   const msg = m.data;
+  // a rewrite is reviewed like a dry run: the checks below that only decide whether to send are skipped
+  const review = dry || !!redo;
 
   // let the customer finish typing; only the newest inbound message is answered
-  if (!dry) await sleep(DEBOUNCE_MS);
+  if (!review) await sleep(DEBOUNCE_MS);
   const latest = await db.from("whatsapp_messages").select("id").eq("conversation_id", msg.conversation_id).eq("direction", "inbound")
     .order("message_timestamp", { ascending: false }).order("created_at", { ascending: false }).limit(1).maybeSingle();
-  if (!dry && latest.data?.id !== msg.id) return json({ ok: true, ignored: "superseded" });
+  if (!review && latest.data?.id !== msg.id) return json({ ok: true, ignored: "superseded" });
 
-  const claim = await db.from("whatsapp_reply_drafts").insert({ company_id: msg.company_id, conversation_id: msg.conversation_id, message_id: msg.id, client_id: msg.client_id, status: "pending", analysis: dry ? { dry_run: true } : {} }).select("id").single();
-  if (claim.error) return json({ ok: true, ignored: "already_processed" });
-  const draftId = claim.data.id;
-  const fail = async (why: string, status = "skipped") => { await db.from("whatsapp_reply_drafts").update({ status, error: why }).eq("id", draftId); return json({ ok: true, ignored: why }); };
+  let draftId: string;
+  if (redo) draftId = redo.draftId;
+  else {
+    const claim = await db.from("whatsapp_reply_drafts").insert({ company_id: msg.company_id, conversation_id: msg.conversation_id, message_id: msg.id, client_id: msg.client_id, status: "pending", analysis: dry ? { dry_run: true } : {} }).select("id").single();
+    if (claim.error) return json({ ok: true, ignored: "already_processed" });
+    draftId = claim.data.id;
+  }
+  // a failed rewrite leaves the owner's waiting draft as it was
+  const fail = async (why: string, status = "skipped") => { if (!redo) await db.from("whatsapp_reply_drafts").update({ status, error: why }).eq("id", draftId); return json({ ok: !redo, ignored: why, error: redo ? why : undefined }); };
 
   try {
     const [rtR, convR, clientR, routesR] = await Promise.all([
@@ -170,36 +214,42 @@ Deno.serve(async (req) => {
       db.from("company_lead_routes").select("route_key,whatsapp_number,meta_phone_number_id"),
     ]);
     const rt = rtR.data, conv = convR.data, client = clientR.data;
-    if (!rt || (!dry && rt.reply_agent_mode === "off")) return fail("agent_off");
+    if (!rt || (!review && rt.reply_agent_mode === "off")) return fail("agent_off");
     if (!conv || !client) return fail("context_missing", "failed");
     const to = digits(client.phone_normalized || client.phone);
     const companyNumbers = (routesR.data || []).map((r: any) => digits(r.whatsapp_number)).filter(Boolean);
     if (companyNumbers.includes(to)) return fail("company_number");
-    if (!dry && rt.mode === "test" && !(rt.allowed_customer_phones || []).map(digits).includes(to)) return fail("not_allowlisted");
+    if (!review && rt.mode === "test" && !(rt.allowed_customer_phones || []).map(digits).includes(to)) return fail("not_allowlisted");
     if (!(rt.allowed_routes || []).includes(conv.route_key)) return fail("route_blocked");
-    if (!dry && conv.human_handoff_required) return fail("human_handoff_open");
-    if (!dry && client.followup_suppressed) return fail("client_paused");
+    if (!review && conv.human_handoff_required) return fail("human_handoff_open");
+    if (!review && client.followup_suppressed) return fail("client_paused");
 
     // someone from the office already answered after this message → stay quiet
     const after = await db.from("whatsapp_messages").select("id").eq("conversation_id", conv.id).eq("direction", "outbound")
       .gt("message_timestamp", msg.message_timestamp).limit(1);
-    if (!dry && (after.data || []).length) return fail("staff_replied");
+    if (!review && (after.data || []).length) return fail("staff_replied");
     // a person from the office has been talking to this customer recently → this is their conversation
     const since = new Date(new Date(msg.message_timestamp).getTime() - STAFF_QUIET_HOURS * 3600 * 1000).toISOString();
     const staffRecent = await db.from("whatsapp_messages").select("id,message_timestamp").eq("conversation_id", conv.id).eq("direction", "outbound")
       .eq("actor_type", "human").gte("message_timestamp", since).lte("message_timestamp", msg.message_timestamp).limit(1);
-    if ((staffRecent.data || []).length) return fail("staff_active");
+    if (!redo && (staffRecent.data || []).length) return fail("staff_active");
 
     const [histR, propsR, rulesR, priorR] = await Promise.all([
       db.from("whatsapp_messages").select("id,direction,message_type,body,transcript,media_id,actor_type,message_timestamp,matched_property_id,property_link_key,property_image_analysis")
         .eq("conversation_id", conv.id).lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(30),
-      db.from("properties").select("id,title,internal_name,type,area,wilayat,price,bedrooms,bathrooms,land_size,built_size,public_details,map_url,visit_method,visit_instructions,lockbox_image_url,owner_id,branch_key")
+      db.from("properties").select("id,title,internal_name,type,area,wilayat,price,bedrooms,bathrooms,land_size,built_size,public_details,description,map_url,visit_method,visit_instructions,lockbox_image_url,owner_id,branch_key")
         .eq("company_id", msg.company_id).eq("status", "available").eq("archived", false),
       db.from("whatsapp_reply_rules").select("id,situation,approved_reply,category").eq("company_id", msg.company_id).eq("active", true).order("created_at", { ascending: false }).limit(40),
       db.from("whatsapp_reply_drafts").select("analysis,status").eq("conversation_id", conv.id).in("status", ["sent", "approved", "edited"]),
     ]);
     const history = (histR.data || []).reverse();
     const props = propsR.data || [];
+    // the ad text for each property: its description, or else the longest caption of a reel about it
+    const capR = props.length ? await db.from("instagram_media_catalog").select("property_id,caption").in("property_id", props.map((p: any) => p.id)) : { data: [] };
+    for (const p of props as any[]) {
+      const caps = ((capR as any).data || []).filter((c: any) => c.property_id === p.id).map((c: any) => publicText(c.caption)).sort((a: string, b: string) => b.length - a.length);
+      p.marketing = publicText(p.description) || caps[0] || "";
+    }
     // A/B/C test: each pinned reply shows the model one wording, picked at random among the active ones
     const ruleIds = (rulesR.data || []).map((r: any) => r.id);
     const varR = ruleIds.length ? await db.from("whatsapp_reply_variants").select("rule_id,label,reply").in("rule_id", ruleIds).eq("active", true) : { data: [] };
@@ -265,6 +315,7 @@ Deno.serve(async (req) => {
       "",
       "المحادثة (الأقدم أولاً، وآخر سطر هو اللي ترد عليه):",
       transcript,
+      ...(redo ? ["", `أمر من المدير لهذا الرد (نفّذه، وهو أهم من أي قاعدة عن طريقة الرد، بس لا تخالف الممنوعات ولا تكتب معلومة مو مكتوبة قدامك): ${redo.instruction}`] : []),
     ].join("\n");
 
     const ai = await fetch("https://api.openai.com/v1/responses", {
@@ -311,9 +362,16 @@ Deno.serve(async (req) => {
     }
 
     // approval mode still sends on its own when the owner switched the category on and the reply is a pinned one
-    const autoSend = !dry && rt.reply_agent_mode === "approval" && !!rule && out.reply_messages.length > 0
+    const autoSend = !review && rt.reply_agent_mode === "approval" && !!rule && out.reply_messages.length > 0
       && ["none", "handoff"].includes(out.action) && (rt.auto_send_categories || []).includes(out.category);
-    const analysis = { ...out, property_id: prop?.id || null, model: OPENAI_MODEL, dry_run: dry, auto_sent: autoSend, transcribed: pendingAudio.filter((a: any) => a.transcript).length };
+    const analysis = { ...out, property_id: prop?.id || null, model: OPENAI_MODEL, dry_run: dry, auto_sent: autoSend, transcribed: pendingAudio.filter((a: any) => a.transcript).length,
+      ...(redo ? { owner_instruction: redo.instruction, rewritten_at: new Date().toISOString() } : {}) };
+    if (redo) {
+      // only while it still waits: if it was sent or rejected meanwhile, nothing changes
+      const u = await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages }).eq("id", draftId).eq("status", "pending").select("id");
+      if (!(u.data || []).length) return json({ ok: false, error: "draft_not_pending" }, 409);
+      return json({ ok: true, status: "rewritten", reply_messages: out.reply_messages, action: out.action, analysis });
+    }
     if (dry || (rt.reply_agent_mode === "approval" && !autoSend)) {
       await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages, status: "pending" }).eq("id", draftId);
       return json({ ok: true, status: "awaiting_approval" });
@@ -369,7 +427,7 @@ Deno.serve(async (req) => {
     return json({ ok: true, sent: sentIds.length, action: out.action });
   } catch (e) {
     const why = short((e as any)?.message || e, 800);
-    await db.from("whatsapp_reply_drafts").update({ status: "failed", error: why }).eq("id", draftId);
+    if (!redo) await db.from("whatsapp_reply_drafts").update({ status: "failed", error: why }).eq("id", draftId);
     return json({ ok: false, error: why }, 500);
   }
 });

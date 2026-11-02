@@ -53,6 +53,10 @@
 .rp-pin{display:flex;align-items:center;gap:6px;font-size:13px;margin-top:10px}
 .rp-pin-situation{margin-top:6px;width:100%;box-sizing:border-box}
 .rp-warn{color:#b42318;font-size:12.5px;margin:8px 0 0}
+.rp-instr{margin-top:10px;padding:10px;border:1px solid #d9e4dc;border-radius:10px;background:#f7faf8}
+.rp-instr label{display:block;font-size:12.5px;font-weight:600;margin-bottom:6px}
+.rp-instr-text{width:100%;box-sizing:border-box}
+.rp-instr-done{font-size:12px;color:#27624a;margin:6px 0 0}
 .rp-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
 .rp-actions .btn-primary,.rp-actions .btn-secondary{width:auto!important;padding:10px 16px!important}
 .rp-actions .btn-primary[disabled]{opacity:.5}
