@@ -84,3 +84,11 @@ test('visit follow-ups wait for the owner and stop on decline or 3 unanswered',(
   assert.match(js,/supa\.functions\.invoke\('whatsapp-reply-send',\{body:\{followup_id:id\}\}\)/);
   assert.match(js,/esc\(f\.body\)/);
 });
+
+test('auto-sent tab lists replies sent without approval and can pause the pinned reply',()=>{
+  assert.match(js,/data-rp-tab="auto">أُرسلت تلقائياً<\/button>/);
+  assert.match(js,/\.eq\('status','sent'\)\.eq\('analysis->>auto_sent','true'\)/);
+  assert.match(js,/p_active:false\}\)/);
+  assert.match(js,/esc\(String\(msgText\(m\)\)\.slice\(0,300\)\)/);
+  assert.match(js,/esc\(r\.situation\)/);
+});
