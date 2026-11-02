@@ -167,3 +167,10 @@ GRANT EXECUTE ON FUNCTION public.crm_visit_followup_reject(uuid) TO authenticate
 -- Queue job: every hour at :05. It only prepares follow-ups for approval; it never sends.
 -- (The old habib_whatsapp_followups_hourly job stays disabled.)
 SELECT cron.schedule('habib_visit_followups_queue', '5 * * * *', $$SELECT public.crm_queue_visit_followups(20)$$);
+-- Refresh the Meta approval status of the visit templates every 3 hours (read-only on Meta).
+SELECT cron.schedule('habib_visit_templates_status', '20 */3 * * *', $$
+  SELECT net.http_post(
+    url := 'https://dmsckqjkcnsfmnzfjczz.supabase.co/functions/v1/whatsapp-visit-templates',
+    headers := jsonb_build_object('Content-Type','application/json','x-crm-agent',(SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='crm_reply_agent')),
+    body := '{"action":"status"}'::jsonb, timeout_milliseconds := 60000)
+$$);
