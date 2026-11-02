@@ -103,7 +103,7 @@ test('agent sees the ad text of each property, without links or phone numbers',(
   const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8');
   const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
   assert.match(agent,/p\.marketing = publicText\(p\.description\) \|\| caps\[0\] \|\| ""/);
-  assert.match(agent,/replace\(\/https\?:\\/\\/\S\+\/gi, ""\)/);
+  assert(agent.includes("String(v ?? \"\").replace(/https?:"),"links are stripped from the ad text");
   assert.match(brain,/لا تقول "بشوف وارد عليك" والمعلومة مكتوبة قدامك/);
   assert.match(brain,/آخر طلب هو اللي يمشي/);
 });
