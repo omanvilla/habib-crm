@@ -12,6 +12,11 @@ test('approval screen is owner-only and never writes drafts directly',()=>{
   assert(!/from\('whatsapp_reply_drafts'\)\.(update|insert|delete)/.test(js));
 });
 
+test('each reply line can be deleted before approval',()=>{
+  assert.match(js,/data-rp="del-line"/);assert.match(js,/a==='del-line'\)b\.closest\('\.rp-line'\)\.remove\(\)/);
+  assert.match(js,/insertAdjacentHTML\('beforebegin',lineHtml\(''\)\)/);
+});
+
 test('customer text is escaped and trial drafts cannot be sent',()=>{
   for(const f of ['esc(name)','esc(phone)','esc(a.crm_note)','esc(t)','esc(String(text)'])assert(js.includes(f),f);
   assert.match(js,/\(trial\|\|!ok24\?' disabled':''\)/);

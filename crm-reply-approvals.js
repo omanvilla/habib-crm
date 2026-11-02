@@ -85,7 +85,7 @@
       +(trial?'<span class="rp-chip trial">تجربة</span>':'')+'<span class="rp-time">'+esc(ago(d.created_at))+'</span></div></header>'
       +(a.crm_note?'<p class="rp-summary">'+esc(a.crm_note)+'</p>':'')
       +'<ul class="rp-msgs">'+d.lastMessages.map(msgLine).join('')+'</ul>'
-      +'<div class="rp-reply"><label>الرد المقترح</label>'+(d.reply_messages||[]).map((t,i)=>'<textarea class="fta rp-text" rows="2" data-i="'+i+'" dir="auto">'+esc(t)+'</textarea>').join('')
+      +'<div class="rp-reply"><label>الرد المقترح</label>'+(d.reply_messages||[]).map(lineHtml).join('')
       +((d.reply_messages||[]).length?'':'<p class="rp-muted">المحرك يقترح عدم الرد.</p>')
       +'<button type="button" class="rp-add" data-rp="add-line">+ سطر</button>'
       +(ACTIONS[a.action]?'<p class="rp-action">'+esc(ACTIONS[a.action])+'</p>':'')+'</div>'
@@ -124,6 +124,9 @@
     catch(e){const l=byId('rpList');if(l)l.innerHTML='<div class="empty"><div class="empty-title">تعذر التحميل</div><div class="empty-desc">'+esc(e.message||e)+'</div></div>';}
     finally{state.loading=false;}
   }
+
+  // one editable reply line with its own delete button
+  function lineHtml(t){return '<div class="rp-line"><textarea class="fta rp-text" rows="2" dir="auto">'+esc(t)+'</textarea><button type="button" class="rp-del" data-rp="del-line" title="حذف السطر" aria-label="حذف السطر">✕</button></div>';}
 
   // ---- actions -----------------------------------------------------------------
   async function send(card,btn){
@@ -165,7 +168,8 @@
     if(a==='send')send(card,b);
     else if(a==='reject'){if(confirm('ترفض هذا الرد؟'))reject(card,b);}
     else if(a==='open'){const d=state.drafts.find(x=>x.id===card.dataset.draft);if(d&&typeof openDashboardWhatsAppConversation==='function')openDashboardWhatsAppConversation(d.conversation_id);}
-    else if(a==='add-line'){const t=document.createElement('textarea');t.className='fta rp-text';t.rows=2;t.dir='auto';b.before(t);t.focus();}
+    else if(a==='add-line'){b.insertAdjacentHTML('beforebegin',lineHtml(''));b.previousElementSibling.querySelector('textarea').focus();}
+    else if(a==='del-line')b.closest('.rp-line').remove();
     else if(a==='rule-save')saveRule(card,b,false);
     else if(a==='rule-delete'){if(confirm('تحذف هذا الرد المثبت؟'))saveRule(card,b,true);}
   });
