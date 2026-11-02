@@ -92,3 +92,9 @@ test('auto-sent tab lists replies sent without approval and can pause the pinned
   assert.match(js,/esc\(String\(msgText\(m\)\)\.slice\(0,300\)\)/);
   assert.match(js,/esc\(r\.situation\)/);
 });
+
+test('cards leave out edits, deletions, reactions and system notices',()=>{
+  assert.match(js,/const HIDDEN_TYPES=new Set\(\['edit','revoke','reaction','system','unsupported'\]\)/);
+  assert.match(js,/d\.lastMessages=own\.filter\(shown\)\.slice\(0,5\)\.reverse\(\)/);
+  assert.match(js,/m\.message_timestamp>d\.sent_at&&shown\(m\)/);
+});

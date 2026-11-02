@@ -24,6 +24,10 @@
     template_pending:'قالب هذي المتابعة لين الحين ما وافقت عليه واتساب. بتقدر ترسلها أول ما يتوافق عليه.',followup_not_found:'المتابعة ما عادت موجودة.',followup_not_pending:'هذي المتابعة ما عادت تنتظر.'};
   const errText=e=>{const raw=String(e&&(e.error||e.message)||e||'');for(const k of Object.keys(ERRORS))if(raw.includes(k))return ERRORS[k];return 'تعذر: '+raw;};
   const ago=d=>typeof timeAgo==='function'?timeAgo(d):String(d||'').slice(0,16);
+  // WhatsApp also stores edits, deletions, reactions and system notices as messages; they are not
+  // something the customer wrote, so the cards leave them out
+  const HIDDEN_TYPES=new Set(['edit','revoke','reaction','system','unsupported']);
+  const shown=m=>!HIDDEN_TYPES.has(String(m&&m.message_type||''));
   let state={tab:'pending',showTrials:false,drafts:[],followups:[],autoSent:[],rules:[],autoSend:null,variants:null,results:[],days:90,lastCount:null,loading:false};
 
   // ---- page and menu ---------------------------------------------------------
@@ -62,7 +66,7 @@
     rows.forEach(d=>{
       d.conv=cMap.get(d.conversation_id)||{};d.client=clMap.get(d.client_id)||{};
       const own=(msgs.data||[]).filter(m=>m.conversation_id===d.conversation_id);
-      d.lastMessages=own.slice(0,5).reverse();
+      d.lastMessages=own.filter(shown).slice(0,5).reverse();
       const lastIn=own.find(m=>m.direction==='inbound');d.lastInboundAt=lastIn&&lastIn.message_timestamp;
     });
     state.drafts=rows;
@@ -112,7 +116,7 @@
     rows.forEach(d=>{
       d.conv=cm.get(d.conversation_id)||{};d.client=clm.get(d.client_id)||{};d.asked=am.get(d.message_id)||{};
       d.rule=rm.get(d.analysis&&d.analysis.matched_rule_id)||null;
-      d.after=(after.data||[]).filter(m=>m.conversation_id===d.conversation_id&&m.message_timestamp>d.sent_at).slice(0,3);
+      d.after=(after.data||[]).filter(m=>m.conversation_id===d.conversation_id&&m.message_timestamp>d.sent_at&&shown(m)).slice(0,3);
     });
     state.autoSent=rows;
   }
