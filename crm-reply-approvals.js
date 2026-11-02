@@ -149,16 +149,16 @@
     const rows=state.results||[];
     const byRule=[];rows.forEach(x=>{let g=byRule.find(y=>y.id===x.rule_id);if(!g){g={id:x.rule_id,situation:x.situation,active:x.active,rows:[]};byRule.push(g);}g.rows.push(x);});
     const head='<div class="rp-days" role="group" aria-label="الفترة">'+[30,90,365].map(d=>'<button type="button" class="rp-alt'+(state.days===d?' on':'')+'" data-rp-days="'+d+'">'+(d===365?'سنة':d+' يوم')+'</button>').join('')+'</div>'
-      +'<p class="rp-muted">كل رد انرسل يُتابع: رد العميل خلال 24 ساعة، طلب معاينة خلال 14 يوم (زيارة مسجلة أو طلب موقع/معاينة)، زيارة تمت خلال 30 يوم، مكالمة خلال 14 يوم (من ملاحظات الموظفين أو طلب العميل؛ ما عندنا سجل مكالمات)، وصفقة خلال 60 يوم. لا تحكم على نسخة قبل '+MIN_SAMPLE+' إرسال.</p>';
+      +'<p class="rp-muted">كل رد انرسل يُتابع: رد العميل خلال 24 ساعة، طلب معاينة خلال 14 يوم (زيارة مسجلة أو طلب موقع/معاينة)، زيارة تمت خلال 30 يوم، مكالمة خلال 14 يوم (من ملاحظات الموظفين أو طلب العميل؛ ما عندنا سجل مكالمات)، وصفقة خلال 60 يوم. لا تحكم على نسخة قبل '+MIN_SAMPLE+' إرسال. ✎ = عدد المرات اللي عدّلت فيها الرد قبل الإرسال.</p>';
     if(!byRule.length)return head+'<div class="empty"><div class="empty-ico">📊</div><div class="empty-title">ما في نتائج لين الحين</div><div class="empty-desc">النتائج تبدأ لما ينرسل رد مطابق لرد مثبت.</div></div>';
     return head+byRule.map(g=>{
       const ready=g.rows.filter(x=>x.sent>=MIN_SAMPLE);
       const best=ready.length>1?ready.reduce((a,b)=>(b.replied/b.sent)>(a.replied/a.sent)?b:a):null;
       const worst=ready.length>1?ready.reduce((a,b)=>(b.replied/b.sent)<(a.replied/a.sent)?b:a):null;
       return '<section class="rp-card rp-result"><strong>'+esc(g.situation)+'</strong>'+(g.active?'':' <span class="rp-chip trial">موقوف</span>')
-        +'<div class="rp-table-wrap"><table class="rp-table"><thead><tr><th>النسخة</th><th>انرسل</th><th>رد العميل</th><th>طلب معاينة</th><th>زيارة</th><th>مكالمة</th><th>صفقة</th></tr></thead><tbody>'
+        +'<div class="rp-table-wrap"><table class="rp-table"><thead><tr><th>نسخة</th><th>انرسل</th><th>ردّ</th><th>معاينة</th><th>زيارة</th><th>اتصال</th><th>صفقة</th></tr></thead><tbody>'
         +g.rows.map(x=>'<tr class="'+(best&&x===best?'best':'')+(worst&&x===worst&&worst!==best?' worst':'')+'"><th scope="row" title="'+esc(x.reply||'')+'">'+esc(x.label)+(x.variant_active?'':' ⏸')+'</th>'
-          +'<td>'+x.sent+(x.edited?' <small class="rp-muted">('+x.edited+' معدّل)</small>':'')+'</td>'
+          +'<td>'+x.sent+(x.edited?'<small class="rp-edited" title="عدّلته قبل الإرسال">✎'+x.edited+'</small>':'')+'</td>'
           +'<td>'+pct(x.replied,x.sent)+'</td><td>'+x.viewing_requests+'</td><td>'+x.visits+'</td><td>'+x.calls+'</td><td>'+x.deals+'</td></tr>').join('')
         +'</tbody></table></div>'
         +(worst&&worst!==best?'<p class="rp-warn">النسخة '+esc(worst.label)+' أقل تفاعل؛ عدّلها أو أوقفها من «الردود المثبتة».</p>':'')
