@@ -4,7 +4,8 @@
  * sends through the whatsapp-reply-send Edge Function; reject and pin use owner-only RPCs.
  * Tab "الردود المثبتة" lists pinned replies to edit, pause or delete, and the per-category
  * auto-send switches (off by default). Drafts that reuse a pinned reply are marked, and investor
- * drafts carry alternative wordings to pick from.
+ * drafts carry alternative wordings to pick from. Each pinned reply can have wordings B and C;
+ * tab "النتائج" compares A/B/C on replies, viewing requests, visits, calls and deals.
  * A browser notification fires when new drafts arrive while the CRM is open. Owner only. */
 (function(){
   'use strict';
@@ -19,7 +20,7 @@
     owner_only:'الموافقة لصاحب الشركة فقط.',company_number:'هذا رقم من أرقام الشركة.',dry_run_draft:'هذا رد تجريبي للمراجعة فقط ولا ينرسل.',meta_send_failed:'واتساب رفض الإرسال. حاول مرة ثانية أو أرسل من المحادثة.'};
   const errText=e=>{const raw=String(e&&(e.error||e.message)||e||'');for(const k of Object.keys(ERRORS))if(raw.includes(k))return ERRORS[k];return 'تعذر: '+raw;};
   const ago=d=>typeof timeAgo==='function'?timeAgo(d):String(d||'').slice(0,16);
-  let state={tab:'pending',showTrials:false,drafts:[],rules:[],autoSend:null,lastCount:null,loading:false};
+  let state={tab:'pending',showTrials:false,drafts:[],rules:[],autoSend:null,variants:null,results:[],days:90,lastCount:null,loading:false};
 
   // ---- page and menu ---------------------------------------------------------
   function ensurePage(){
@@ -27,7 +28,7 @@
     const content=document.querySelector('.content');if(!content)return;
     const page=document.createElement('div');page.className='page';page.id='page-replies';
     page.innerHTML='<div class="page-header"><div><div class="page-title"><span>ردود تنتظر موافقتك</span></div><div class="page-sub" id="rpSub">جاري التحميل…</div></div></div>'
-      +'<div class="rp-tabs"><button type="button" class="rp-tab on" data-rp-tab="pending">تنتظر موافقتك <b id="rpCount">0</b></button><button type="button" class="rp-tab" data-rp-tab="rules">الردود المثبتة</button>'
+      +'<div class="rp-tabs"><button type="button" class="rp-tab on" data-rp-tab="pending">تنتظر موافقتك <b id="rpCount">0</b></button><button type="button" class="rp-tab" data-rp-tab="rules">الردود المثبتة</button><button type="button" class="rp-tab" data-rp-tab="results">النتائج</button>'
       +'<label class="rp-trials"><input type="checkbox" id="rpTrials"> عرض ردود التجربة</label></div><div id="rpList"></div>';
     content.append(page);
     const nav=document.querySelector('#sidebar .nav-area');
@@ -65,8 +66,13 @@
   async function loadRules(){
     const r=await supa.from('whatsapp_reply_rules').select('id,situation,approved_reply,category,intent,active,created_at,updated_at').order('created_at',{ascending:false});
     if(r.error)throw r.error;state.rules=r.data||[];
-    const s=await supa.rpc('crm_reply_auto_send_get');
+    const [s,v]=await Promise.all([supa.rpc('crm_reply_auto_send_get'),supa.from('whatsapp_reply_variants').select('rule_id,label,reply,active')]);
     state.autoSend=s.error?null:((s.data&&s.data.categories)||[]);
+    state.variants=v.error?null:(v.data||[]);
+  }
+  async function loadResults(){
+    const r=await supa.rpc('crm_reply_variant_stats',{p_days:state.days});
+    if(r.error)throw r.error;state.results=(r.data&&r.data.rows)||[];
   }
   async function countPending(){
     const r=await supa.from('whatsapp_reply_drafts').select('id,analysis',{count:'exact'}).eq('status','pending').limit(200);
@@ -122,9 +128,43 @@
     return '<article class="rp-card rp-rule" data-rule="'+esc(r.id)+'">'
       +'<label>الموقف</label><input class="fi rp-rule-situation" value="'+esc(r.situation)+'">'
       +'<label>الرد المثبت</label><textarea class="fta rp-rule-reply" rows="3" dir="auto">'+esc(r.approved_reply)+'</textarea>'
+      +variantFields(r)
       +'<div class="rp-actions"><label class="rp-pin"><input type="checkbox" class="rp-rule-active"'+(r.active?' checked':'')+'> شغّال</label>'
       +'<button type="button" class="btn-primary" data-rp="rule-save">حفظ</button><button type="button" class="btn-secondary" data-rp="rule-delete">حذف</button></div>'
       +'<div class="rp-error" role="alert"></div></article>';
+  }
+  // wordings B and C of a pinned reply; the agent rotates between A, B and C and the results tab compares them
+  function variantFields(r){
+    if(!state.variants)return '';
+    return ['B','C'].map(l=>{
+      const v=state.variants.find(x=>x.rule_id===r.id&&x.label===l)||{};
+      return '<div class="rp-variant"><label>نسخة '+l+' <small class="rp-muted">(اختياري)</small></label>'
+        +'<textarea class="fta rp-variant-reply" data-label="'+l+'" rows="2" dir="auto" placeholder="صياغة ثانية لنفس الرد">'+esc(v.reply||'')+'</textarea>'
+        +(v.reply?'<label class="rp-pin"><input type="checkbox" class="rp-variant-active" data-label="'+l+'"'+(v.active!==false?' checked':'')+'> تشتغل</label>':'')+'</div>';
+    }).join('');
+  }
+  const pct=(n,d)=>d?Math.round(n*100/d)+'%':'–';
+  const MIN_SAMPLE=20;
+  function resultsHtml(){
+    const rows=state.results||[];
+    const byRule=[];rows.forEach(x=>{let g=byRule.find(y=>y.id===x.rule_id);if(!g){g={id:x.rule_id,situation:x.situation,active:x.active,rows:[]};byRule.push(g);}g.rows.push(x);});
+    const head='<div class="rp-days" role="group" aria-label="الفترة">'+[30,90,365].map(d=>'<button type="button" class="rp-alt'+(state.days===d?' on':'')+'" data-rp-days="'+d+'">'+(d===365?'سنة':d+' يوم')+'</button>').join('')+'</div>'
+      +'<p class="rp-muted">كل رد انرسل يُتابع: رد العميل خلال 24 ساعة، طلب معاينة خلال 14 يوم (زيارة مسجلة أو طلب موقع/معاينة)، زيارة تمت خلال 30 يوم، مكالمة خلال 14 يوم (من ملاحظات الموظفين أو طلب العميل؛ ما عندنا سجل مكالمات)، وصفقة خلال 60 يوم. لا تحكم على نسخة قبل '+MIN_SAMPLE+' إرسال. ✎ = عدد المرات اللي عدّلت فيها الرد قبل الإرسال.</p>';
+    if(!byRule.length)return head+'<div class="empty"><div class="empty-ico">📊</div><div class="empty-title">ما في نتائج لين الحين</div><div class="empty-desc">النتائج تبدأ لما ينرسل رد مطابق لرد مثبت.</div></div>';
+    return head+byRule.map(g=>{
+      const ready=g.rows.filter(x=>x.sent>=MIN_SAMPLE);
+      const best=ready.length>1?ready.reduce((a,b)=>(b.replied/b.sent)>(a.replied/a.sent)?b:a):null;
+      const worst=ready.length>1?ready.reduce((a,b)=>(b.replied/b.sent)<(a.replied/a.sent)?b:a):null;
+      return '<section class="rp-card rp-result"><strong>'+esc(g.situation)+'</strong>'+(g.active?'':' <span class="rp-chip trial">موقوف</span>')
+        +'<div class="rp-table-wrap"><table class="rp-table"><thead><tr><th>نسخة</th><th>انرسل</th><th>ردّ</th><th>معاينة</th><th>زيارة</th><th>اتصال</th><th>صفقة</th></tr></thead><tbody>'
+        +g.rows.map(x=>'<tr class="'+(best&&x===best?'best':'')+(worst&&x===worst&&worst!==best?' worst':'')+'"><th scope="row" title="'+esc(x.reply||'')+'">'+esc(x.label)+(x.variant_active?'':' ⏸')+'</th>'
+          +'<td>'+x.sent+(x.edited?'<small class="rp-edited" title="عدّلته قبل الإرسال">✎'+x.edited+'</small>':'')+'</td>'
+          +'<td>'+pct(x.replied,x.sent)+'</td><td>'+x.viewing_requests+'</td><td>'+x.visits+'</td><td>'+x.calls+'</td><td>'+x.deals+'</td></tr>').join('')
+        +'</tbody></table></div>'
+        +(worst&&worst!==best?'<p class="rp-warn">النسخة '+esc(worst.label)+' أقل تفاعل؛ عدّلها أو أوقفها من «الردود المثبتة».</p>':'')
+        +(ready.length<g.rows.length?'<p class="rp-muted">بعض النسخ ما وصلت '+MIN_SAMPLE+' إرسال، النتيجة مبدئية.</p>':'')
+        +'</section>';
+    }).join('');
   }
   function render(){
     const list=byId('rpList');if(!list)return;
@@ -135,13 +175,18 @@
       list.innerHTML=autoSendBox()+(state.rules.length?state.rules.map(ruleCard).join(''):'<div class="empty"><div class="empty-ico">📌</div><div class="empty-title">ما في ردود مثبتة لين الحين</div><div class="empty-desc">لما توافق على رد وتختار «ثبّت هذا الرد» يظهر هنا، والمحرك يستخدمه في المواقف المشابهة.</div></div>');
       return;
     }
+    if(state.tab==='results'){
+      byId('rpSub').textContent='أي صياغة تجيب نتيجة أكثر';
+      list.innerHTML=resultsHtml();
+      return;
+    }
     const real=state.drafts.filter(d=>!(d.analysis&&d.analysis.dry_run)).length;
     byId('rpSub').textContent=real+' رد ينتظر موافقتك'+(state.showTrials?' · مع ردود التجربة':'');
     list.innerHTML=state.drafts.length?state.drafts.map(draftCard).join(''):'<div class="empty"><div class="empty-ico">✉</div><div class="empty-title">ما في ردود تنتظرك</div><div class="empty-desc">أول ما يكتب المحرك رد جديد يظهر هنا ويوصلك تنبيه.</div></div>';
   }
   async function refresh(){
     if(!isOwnerNow()||state.loading)return;state.loading=true;
-    try{if(state.tab==='rules')await loadRules();else await loadDrafts();render();}
+    try{if(state.tab==='rules')await loadRules();else if(state.tab==='results')await loadResults();else await loadDrafts();render();}
     catch(e){const l=byId('rpList');if(l)l.innerHTML='<div class="empty"><div class="empty-title">تعذر التحميل</div><div class="empty-desc">'+esc(e.message||e)+'</div></div>';}
     finally{state.loading=false;}
   }
@@ -178,8 +223,18 @@
     const r=del?await supa.rpc('crm_reply_rule_delete',{p_rule_id:id})
       :await supa.rpc('crm_reply_rule_save',{p_rule_id:id,p_situation:card.querySelector('.rp-rule-situation').value,p_reply:card.querySelector('.rp-rule-reply').value,
         p_category:rule.category||null,p_intent:rule.intent||null,p_property_id:null,p_source_draft_id:null,p_active:card.querySelector('.rp-rule-active').checked});
+    if(r.error){btn.disabled=false;err.textContent=errText(r.error);return;}
+    if(!del){
+      // only wordings that changed are written (an emptied box removes that wording)
+      for(const t of card.querySelectorAll('.rp-variant-reply')){
+        const l=t.dataset.label,old=(state.variants||[]).find(x=>x.rule_id===id&&x.label===l)||{};
+        const act=card.querySelector('.rp-variant-active[data-label="'+l+'"]'),active=act?act.checked:true;
+        if(t.value.trim()===(old.reply||'')&&active===(old.active!==false))continue;
+        const v=await supa.rpc('crm_reply_variant_save',{p_rule_id:id,p_label:l,p_reply:t.value,p_active:active});
+        if(v.error){btn.disabled=false;err.textContent=errText(v.error);return;}
+      }
+    }
     btn.disabled=false;
-    if(r.error){err.textContent=errText(r.error);return;}
     toast(del?'انحذف الرد المثبت':'انحفظ','success');refresh();
   }
   async function saveAutoSend(input){
@@ -194,6 +249,7 @@
   }
   document.addEventListener('click',e=>{
     const tab=e.target.closest('[data-rp-tab]');if(tab){state.tab=tab.dataset.rpTab;refresh();return;}
+    const days=e.target.closest('[data-rp-days]');if(days){state.days=Number(days.dataset.rpDays);refresh();return;}
     const b=e.target.closest('[data-rp]');if(!b)return;const card=b.closest('.rp-card');if(!card)return;
     const a=b.dataset.rp;
     if(a==='send')send(card,b);

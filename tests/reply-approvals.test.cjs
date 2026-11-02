@@ -54,3 +54,17 @@ test('agent never sees property titles, which carry owner names',()=>{
   const fn=agent.slice(agent.indexOf('function propLine'),agent.indexOf('async function notifyHandoff'));
   assert(!/p\.title|p\.internal_name/.test(fn));
 });
+
+test('pinned replies rotate A/B/C wordings and the results are owner-only',()=>{
+  const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8');
+  const sql53=fs.readFileSync('db/changes/53-reply-variants.forward.sql','utf8');
+  assert.match(agent,/pickedVariant\[r\.id\] = pool\[Math\.floor\(Math\.random\(\) \* pool\.length\)\]/);
+  assert.match(agent,/out\.variant_label = rule \? pickedVariant\[rule\.id\]\.label : null/);
+  assert.match(agent,/الرد: \$\{pickedVariant\[r\.id\]\.reply\}/);
+  assert.match(js,/supa\.rpc\('crm_reply_variant_stats',\{p_days:state\.days\}\)/);
+  assert.match(js,/supa\.rpc\('crm_reply_variant_save',\{p_rule_id:id,p_label:l,p_reply:t\.value,p_active:active\}\)/);
+  assert.match(js,/esc\(g\.situation\)/);
+  assert.equal((sql53.match(/IF public\.my_role\(\) IS DISTINCT FROM 'owner' THEN RAISE EXCEPTION 'owner_only'/g)||[]).length,2);
+  assert.match(sql53,/REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public\.whatsapp_reply_variants FROM authenticated/);
+  assert.match(sql53,/USING \(company_id = \(SELECT public\.my_company\(\)\) AND \(SELECT public\.my_role\(\)\) = 'owner'\)/);
+});
