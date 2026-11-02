@@ -48,3 +48,9 @@ test('pinned matches are marked, investors get alternatives, auto-send is owner-
   assert.match(sql52,/auto_send_categories text\[\] NOT NULL DEFAULT '\{\}'/);
   assert.equal((sql52.match(/IF public\.my_role\(\) IS DISTINCT FROM 'owner' THEN RAISE EXCEPTION 'owner_only'/g)||[]).length,2);
 });
+
+test('agent never sees property titles, which carry owner names',()=>{
+  const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8');
+  const fn=agent.slice(agent.indexOf('function propLine'),agent.indexOf('async function notifyHandoff'));
+  assert(!/p\.title|p\.internal_name/.test(fn));
+});

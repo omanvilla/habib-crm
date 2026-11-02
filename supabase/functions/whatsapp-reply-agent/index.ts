@@ -113,8 +113,9 @@ const schema = {
   required: ["reply_messages", "category", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives"],
 };
 
+// Office titles carry owner names ("فيلا الرميس 59 سلطان"), so the agent only sees a neutral label.
 function propLine(p: any) {
-  const name = p.internal_name || p.title;
+  const name = p.type || "عقار";
   const bits = [p.area, p.wilayat, p.price ? `${Number(p.price).toLocaleString("en-US")} ريال` : "", p.bedrooms ? `${p.bedrooms} غرف` : "",
     p.land_size ? `أرض ${p.land_size}م` : "", p.built_size ? `بناء ${p.built_size}م` : ""].filter(Boolean).join("، ");
   const visit = { open: "مفتوح ويروح بروحه", lockbox: "صندوق مفتاح برمز", owner_lives: "المالك ساكن (يعطى رقم المالك)", office: "تنسيق منا (handoff)" }[p.visit_method as string] || "غير محدد (handoff للمعاينة)";
