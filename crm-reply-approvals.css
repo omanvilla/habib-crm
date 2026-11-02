@@ -1,0 +1,41 @@
+/* Owner approval of WhatsApp reply drafts (crm-reply-approvals.js) */
+.rp-tabs{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.rp-tab{all:unset;cursor:pointer;padding:8px 14px;border-radius:999px;border:1px solid #cfdcd6;background:#fff;font-size:13.5px}
+.rp-tab b{display:inline-block;min-width:18px;text-align:center;margin-inline-start:4px;background:#e7f2ec;border-radius:999px;padding:0 6px;font-size:12px}
+.rp-tab.on{background:#27624a;border-color:#27624a;color:#fff}
+.rp-tab.on b{background:rgba(255,255,255,.25)}
+.rp-trials{font-size:12.5px;color:#62756b;margin-inline-start:auto}
+.rp-card{background:#fff;border:1px solid #dce6e2;border-radius:14px;padding:14px;margin-bottom:12px;max-width:760px}
+.rp-card header{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
+.rp-card header strong{font-size:15px}
+.rp-card header small{color:#62756b;margin-inline-start:6px}
+.rp-chips{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.rp-chip{font-size:11.5px;border-radius:6px;padding:2px 8px;background:#eef4f0;color:#3f6150}
+.rp-chip.route{background:#e8f0fb;color:#1e4f8a}
+.rp-chip.trial{background:#fdf3e1;color:#8b6514}
+.rp-time{font-size:11.5px;color:#7b8d80}
+.rp-summary{margin:8px 0;font-size:13px;color:#3d4f46;background:#f7faf8;border-radius:8px;padding:8px 10px;line-height:1.7}
+.rp-msgs{list-style:none;margin:8px 0;padding:0;display:grid;gap:4px;font-size:13px}
+.rp-msgs li{padding:6px 10px;border-radius:10px;max-width:92%;line-height:1.6}
+.rp-msgs li.in{background:#f2f4f3;justify-self:start}
+.rp-msgs li.out{background:#e3f4e7;justify-self:end}
+.rp-reply{margin-top:10px}
+.rp-reply label,.rp-rule label{display:block;font-size:12.5px;font-weight:700;color:#3d4f46;margin:8px 0 4px}
+.rp-text,.rp-rule-reply{width:100%;box-sizing:border-box;font-size:15px;margin-bottom:6px;border-color:#9fc7b3}
+.rp-add{all:unset;cursor:pointer;font-size:12.5px;color:#27624a;padding:2px 4px}
+.rp-action{font-size:12px;color:#8b6514;margin:6px 0 0}
+.rp-muted{font-size:12.5px;color:#7b8d80}
+.rp-pin{display:flex;align-items:center;gap:6px;font-size:13px;margin-top:10px}
+.rp-pin-situation{margin-top:6px;width:100%;box-sizing:border-box}
+.rp-warn{color:#b42318;font-size:12.5px;margin:8px 0 0}
+.rp-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+.rp-actions .btn-primary,.rp-actions .btn-secondary{width:auto!important;padding:10px 16px!important}
+.rp-actions .btn-primary[disabled]{opacity:.5}
+.rp-error{color:#b42318;font-size:13px;min-height:16px;margin-top:6px}
+.rp-tab:focus-visible,.rp-add:focus-visible{outline:2px solid #27624a;outline-offset:2px}
+@media (max-width:640px){
+  .rp-card{padding:12px}
+  .rp-actions .btn-primary{flex:1 1 100%;padding:13px!important;font-size:15px!important}
+  .rp-actions .btn-secondary{flex:1}
+  .rp-trials{margin-inline-start:0}
+}

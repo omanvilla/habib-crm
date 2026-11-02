@@ -108,7 +108,7 @@
 
   // ---- Phase 2: sidebar groups ----------------------------------------------
   const NAV_GROUPS=[
-    ['اليوم',['dash','daily','whatsapp','calendar','viewings']],
+    ['اليوم',['dash','replies','daily','whatsapp','calendar','viewings']],
     ['العملاء والعقارات',['clients','properties','owners','instagram']],
     ['المبيعات',['deals','deposits']],
     ['التقارير',['reports','expenses','activityLog']],
