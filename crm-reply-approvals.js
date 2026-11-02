@@ -6,6 +6,7 @@
  * auto-send switches (off by default). Drafts that reuse a pinned reply are marked, and investor
  * drafts carry alternative wordings to pick from. Each pinned reply can have wordings B and C;
  * tab "النتائج" compares A/B/C on replies, viewing requests, visits, calls and deals.
+ * Visit follow-ups (SQL54) wait at the top of the pending tab; approve sends the fixed text.
  * A browser notification fires when new drafts arrive while the CRM is open. Owner only. */
 (function(){
   'use strict';
@@ -17,10 +18,11 @@
   const CATS={buyer:'مشتري',tenant:'مستأجر',investor:'مستثمر',seller:'مالك',broker:'وسيط',active_deal:'صفقة شغالة',general:'عام',unclear:'غير واضح'};
   const ACTIONS={handoff:'يحوّل لك بعد الإرسال',send_location:'يرسل اللوكيشن بعد الرد',send_lockbox:'يرسل اللوكيشن وصورة صندوق المفتاح',send_owner_number:'يرسل رقم المالك',book_viewing:'يسجل زيارة'};
   const ERRORS={outside_24h:'مرّت 24 ساعة على آخر رسالة من العميل. الرد العادي ما يوصل؛ يحتاج قالب معتمد.',draft_not_pending:'هذا الرد تغيّر: إما انرسل أو انلغى لأن العميل أو موظف كتب بعده.',
-    owner_only:'الموافقة لصاحب الشركة فقط.',company_number:'هذا رقم من أرقام الشركة.',dry_run_draft:'هذا رد تجريبي للمراجعة فقط ولا ينرسل.',meta_send_failed:'واتساب رفض الإرسال. حاول مرة ثانية أو أرسل من المحادثة.'};
+    owner_only:'الموافقة لصاحب الشركة فقط.',company_number:'هذا رقم من أرقام الشركة.',dry_run_draft:'هذا رد تجريبي للمراجعة فقط ولا ينرسل.',meta_send_failed:'واتساب رفض الإرسال. حاول مرة ثانية أو أرسل من المحادثة.',
+    template_pending:'قالب هذي المتابعة لين الحين ما وافقت عليه واتساب. بتقدر ترسلها أول ما يتوافق عليه.',followup_not_found:'المتابعة ما عادت موجودة.',followup_not_pending:'هذي المتابعة ما عادت تنتظر.'};
   const errText=e=>{const raw=String(e&&(e.error||e.message)||e||'');for(const k of Object.keys(ERRORS))if(raw.includes(k))return ERRORS[k];return 'تعذر: '+raw;};
   const ago=d=>typeof timeAgo==='function'?timeAgo(d):String(d||'').slice(0,16);
-  let state={tab:'pending',showTrials:false,drafts:[],rules:[],autoSend:null,variants:null,results:[],days:90,lastCount:null,loading:false};
+  let state={tab:'pending',showTrials:false,drafts:[],followups:[],rules:[],autoSend:null,variants:null,results:[],days:90,lastCount:null,loading:false};
 
   // ---- page and menu ---------------------------------------------------------
   function ensurePage(){
@@ -62,6 +64,20 @@
       const lastIn=own.find(m=>m.direction==='inbound');d.lastInboundAt=lastIn&&lastIn.message_timestamp;
     });
     state.drafts=rows;
+    await loadFollowups();
+  }
+  // visit follow-ups (SQL54) waiting for approval; missing table (before SQL54) just shows none
+  async function loadFollowups(){
+    const f=await supa.from('whatsapp_visit_followups').select('id,client_id,conversation_id,viewing_id,route_key,step,body,created_at').eq('status','awaiting_approval').order('created_at',{ascending:true}).limit(40);
+    const rows=f.error?[]:(f.data||[]);
+    const cIds=[...new Set(rows.map(x=>x.client_id))],vIds=[...new Set(rows.map(x=>x.viewing_id))];
+    const [cl,vw]=await Promise.all([
+      cIds.length?supa.from('clients').select('id,name,phone').in('id',cIds):{data:[]},
+      vIds.length?supa.from('viewings').select('id,viewing_date,property_id,properties(area,type)').in('id',vIds):{data:[]}
+    ]);
+    const cm=new Map((cl.data||[]).map(x=>[x.id,x])),vm=new Map((vw.data||[]).map(x=>[x.id,x]));
+    rows.forEach(x=>{x.client=cm.get(x.client_id)||{};x.viewing=vm.get(x.viewing_id)||{};});
+    state.followups=rows;
   }
   async function loadRules(){
     const r=await supa.from('whatsapp_reply_rules').select('id,situation,approved_reply,category,intent,active,created_at,updated_at').order('created_at',{ascending:false});
@@ -76,7 +92,9 @@
   }
   async function countPending(){
     const r=await supa.from('whatsapp_reply_drafts').select('id,analysis',{count:'exact'}).eq('status','pending').limit(200);
-    if(r.error)return null;return (r.data||[]).filter(d=>!(d.analysis&&d.analysis.dry_run===true)).length;
+    if(r.error)return null;
+    const f=await supa.from('whatsapp_visit_followups').select('id',{count:'exact',head:true}).eq('status','awaiting_approval');
+    return (r.data||[]).filter(d=>!(d.analysis&&d.analysis.dry_run===true)).length+(f.error?0:(f.count||0));
   }
 
   // ---- render ------------------------------------------------------------------
@@ -107,6 +125,20 @@
       +'<div class="rp-actions"><button type="button" class="btn-primary" data-rp="send"'+(trial||!ok24?' disabled':'')+'>موافقة وإرسال</button>'
       +'<button type="button" class="btn-secondary" data-rp="reject">رفض</button>'
       +'<button type="button" class="btn-secondary" data-rp="open">فتح المحادثة</button></div>'
+      +'<div class="rp-error" role="alert"></div></article>';
+  }
+  const FU_WHEN={1:'بعد الزيارة بيوم',2:'بعد 3 أيام',3:'بعد أسبوع',4:'بعد شهر'};
+  function followupCard(f){
+    const name=f.client.name||'عميل',phone=f.client.phone||'',v=f.viewing||{},p=v.properties||{};
+    return '<article class="rp-card rp-fu" data-fu="'+esc(f.id)+'">'
+      +'<header><div><strong><bdi>'+esc(name)+'</bdi></strong>'+(phone?' <small dir="ltr">'+esc(phone)+'</small>':'')+'</div>'
+      +'<div class="rp-chips"><span class="rp-chip route">'+esc(ROUTES[f.route_key]||f.route_key)+'</span><span class="rp-chip">متابعة '+esc(f.step)+' من 4 · '+esc(FU_WHEN[f.step]||'')+'</span></div></header>'
+      +'<p class="rp-summary">زار '+esc(p.area||'العقار')+(v.viewing_date?' يوم '+esc(v.viewing_date):'')+'</p>'
+      +'<div class="rp-reply"><label>الرسالة</label><p class="rp-fu-body" dir="auto">'+esc(f.body)+'</p>'
+      +'<p class="rp-muted">نص ثابت معتمد من واتساب، ما ينعدّل. إذا العميل كتب قبل ما توافق تنلغي تلقائياً.</p></div>'
+      +'<div class="rp-actions"><button type="button" class="btn-primary" data-rp="fu-send">موافقة وإرسال</button>'
+      +'<button type="button" class="btn-secondary" data-rp="fu-skip">تخطي</button>'
+      +'<button type="button" class="btn-secondary" data-rp="fu-open">فتح المحادثة</button></div>'
       +'<div class="rp-error" role="alert"></div></article>';
   }
   // investors get the proposed reply plus up to two other wordings to pick from
@@ -180,9 +212,11 @@
       list.innerHTML=resultsHtml();
       return;
     }
-    const real=state.drafts.filter(d=>!(d.analysis&&d.analysis.dry_run)).length;
-    byId('rpSub').textContent=real+' رد ينتظر موافقتك'+(state.showTrials?' · مع ردود التجربة':'');
-    list.innerHTML=state.drafts.length?state.drafts.map(draftCard).join(''):'<div class="empty"><div class="empty-ico">✉</div><div class="empty-title">ما في ردود تنتظرك</div><div class="empty-desc">أول ما يكتب المحرك رد جديد يظهر هنا ويوصلك تنبيه.</div></div>';
+    const real=state.drafts.filter(d=>!(d.analysis&&d.analysis.dry_run)).length,fus=state.followups||[];
+    byId('rpSub').textContent=real+' رد ينتظر موافقتك'+(fus.length?' · '+fus.length+' متابعة زيارة':'')+(state.showTrials?' · مع ردود التجربة':'');
+    list.innerHTML=(fus.length?'<h3 class="rp-section">متابعات بعد الزيارة</h3>'+fus.map(followupCard).join(''):'')
+      +(fus.length&&state.drafts.length?'<h3 class="rp-section">ردود على رسائل العملاء</h3>':'')
+      +(state.drafts.length||fus.length?state.drafts.map(draftCard).join(''):'<div class="empty"><div class="empty-ico">✉</div><div class="empty-title">ما في ردود تنتظرك</div><div class="empty-desc">أول ما يكتب المحرك رد جديد يظهر هنا ويوصلك تنبيه.</div></div>');
   }
   async function refresh(){
     if(!isOwnerNow()||state.loading)return;state.loading=true;
@@ -195,6 +229,16 @@
   function lineHtml(t){return '<div class="rp-line"><textarea class="fta rp-text" rows="2" dir="auto">'+esc(t)+'</textarea><button type="button" class="rp-del" data-rp="del-line" title="حذف السطر" aria-label="حذف السطر">✕</button></div>';}
 
   // ---- actions -----------------------------------------------------------------
+  async function followupAct(card,btn,doSend){
+    const id=card.dataset.fu,err=card.querySelector('.rp-error');err.textContent='';btn.disabled=true;
+    let e=null;
+    if(doSend){const r=await supa.functions.invoke('whatsapp-reply-send',{body:{followup_id:id}});e=r.error||(r.data&&r.data.ok===false?r.data:null);
+      if(e&&r.error&&r.error.context&&typeof r.error.context.json==='function'){try{e=await r.error.context.json();}catch(_){}}}
+    else{const r=await supa.rpc('crm_visit_followup_reject',{p_id:id});e=r.error;}
+    btn.disabled=false;
+    if(e){err.textContent=errText(e);return;}
+    toast(doSend?'انرسلت المتابعة':'تم التخطي','success');refresh();updateBadge();
+  }
   async function send(card,btn){
     const id=card.dataset.draft,err=card.querySelector('.rp-error');err.textContent='';
     const messages=[...card.querySelectorAll('.rp-text')].map(t=>t.value.trim()).filter(Boolean);
@@ -254,6 +298,9 @@
     const a=b.dataset.rp;
     if(a==='send')send(card,b);
     else if(a==='reject'){if(confirm('ترفض هذا الرد؟'))reject(card,b);}
+    else if(a==='fu-send')followupAct(card,b,true);
+    else if(a==='fu-skip'){if(confirm('تتخطى هذي المتابعة؟ اللي بعدها تمشي على موعدها.'))followupAct(card,b,false);}
+    else if(a==='fu-open'){const f=(state.followups||[]).find(x=>x.id===card.dataset.fu);if(f&&typeof openDashboardWhatsAppConversation==='function')openDashboardWhatsAppConversation(f.conversation_id);}
     else if(a==='open'){const d=state.drafts.find(x=>x.id===card.dataset.draft);if(d&&typeof openDashboardWhatsAppConversation==='function')openDashboardWhatsAppConversation(d.conversation_id);}
     else if(a==='add-line'){const box=card.querySelector('.rp-lines');box.insertAdjacentHTML('beforeend',lineHtml(''));box.lastElementChild.querySelector('textarea').focus();}
     else if(a==='alt'){

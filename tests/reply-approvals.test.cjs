@@ -68,3 +68,19 @@ test('pinned replies rotate A/B/C wordings and the results are owner-only',()=>{
   assert.match(sql53,/REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public\.whatsapp_reply_variants FROM authenticated/);
   assert.match(sql53,/USING \(company_id = \(SELECT public\.my_company\(\)\) AND \(SELECT public\.my_role\(\)\) = 'owner'\)/);
 });
+
+test('visit follow-ups wait for the owner and stop on decline or 3 unanswered',()=>{
+  const sql54=fs.readFileSync('db/changes/54-visit-followups.forward.sql','utf8');
+  assert.match(sql54,/v_offsets int\[\] := ARRAY\[1, 3, 7, 30\]/);
+  assert.match(sql54,/IF v_hour < 9 OR v_hour >= 21 THEN/);
+  assert.match(sql54,/IF v_unanswered >= 3 THEN/);
+  assert.match(sql54,/'بخصوص الزيارة قدرت تشوف العقار ؟ كيف لقيته ؟'/);
+  assert.match(sql54,/vw\.viewing_date >= greatest\(date '2026-11-02'/);
+  assert.match(sql54,/REVOKE ALL ON FUNCTION public\.crm_queue_visit_followups\(integer\) FROM PUBLIC, anon, authenticated/);
+  assert(!/whatsapp-send|metaSend|graph\.facebook/.test(sql54));
+  assert.match(fn,/if \(body\?\.followup_id\) return json\(\.\.\.await sendFollowup\(owner, String\(body\.followup_id\)\)\)/);
+  assert.match(fn,/if \(!service && String\(tplR\.data\?\.status \|\| ""\)\.toUpperCase\(\) !== "APPROVED"\) return \[\{ ok: false, error: "template_pending" \}, 409\]/);
+  assert.match(fn,/update\(\{ status: "sending" \}\)\.eq\("id", id\)\.eq\("status", "awaiting_approval"\)/);
+  assert.match(js,/supa\.functions\.invoke\('whatsapp-reply-send',\{body:\{followup_id:id\}\}\)/);
+  assert.match(js,/esc\(f\.body\)/);
+});

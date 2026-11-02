@@ -55,6 +55,59 @@ async function metaSend(tokens: string[], phoneId: string, to: string, payload: 
   throw new Error("meta_send_failed");
 }
 
+// A visit follow-up (SQL54) the owner approved. Inside the 24h window it goes as normal text,
+// otherwise as the Meta template of that step, which must be APPROVED for the route.
+async function sendFollowup(owner: any, id: string): Promise<[unknown, number]> {
+  const f0 = await db.from("whatsapp_visit_followups").select("*").eq("id", id).eq("company_id", owner.company_id).maybeSingle();
+  if (f0.error || !f0.data) return [{ ok: false, error: "followup_not_found" }, 404];
+  const f = f0.data;
+  if (f.status !== "awaiting_approval") return [{ ok: false, error: "draft_not_pending", status: f.status }, 409];
+  const [convR, clientR, routesR, lastInR, tplR] = await Promise.all([
+    db.from("whatsapp_conversations").select("*").eq("id", f.conversation_id).single(),
+    db.from("clients").select("id,phone,phone_normalized").eq("id", f.client_id).single(),
+    db.from("company_lead_routes").select("route_key,whatsapp_number"),
+    db.from("whatsapp_messages").select("message_timestamp").eq("conversation_id", f.conversation_id).eq("direction", "inbound")
+      .order("message_timestamp", { ascending: false }).limit(1).maybeSingle(),
+    db.from("whatsapp_template_registry").select("status").eq("company_id", owner.company_id).eq("route_key", f.route_key).eq("template_name", f.template_name).maybeSingle(),
+  ]);
+  const conv = convR.data, client = clientR.data;
+  if (!conv || !client) return [{ ok: false, error: "context_missing" }, 409];
+  const to = digits(client.phone_normalized || client.phone);
+  const companyNumbers = (routesR.data || []).map((r: any) => digits(r.whatsapp_number)).filter(Boolean);
+  if (!to || companyNumbers.includes(to)) return [{ ok: false, error: "company_number" }, 409];
+  if (!["barka", "muscat"].includes(conv.route_key) || conv.route_key !== f.route_key) return [{ ok: false, error: "route_blocked" }, 409];
+  const lastIn = lastInR.data?.message_timestamp ? new Date(lastInR.data.message_timestamp).getTime() : 0;
+  if (lastIn > new Date(f.created_at).getTime()) {
+    await db.from("whatsapp_visit_followups").update({ status: "superseded", updated_at: new Date().toISOString() }).eq("id", id).eq("status", "awaiting_approval");
+    return [{ ok: false, error: "draft_not_pending" }, 409];
+  }
+  const service = lastIn > 0 && Date.now() - lastIn < WINDOW_MS;
+  if (!service && String(tplR.data?.status || "").toUpperCase() !== "APPROVED") return [{ ok: false, error: "template_pending" }, 409];
+
+  const claim = await db.from("whatsapp_visit_followups").update({ status: "sending" }).eq("id", id).eq("status", "awaiting_approval").select("id").maybeSingle();
+  if (claim.error || !claim.data) return [{ ok: false, error: "draft_not_pending" }, 409];
+  const payload = service
+    ? { type: "text", text: { preview_url: false, body: f.body } }
+    : { type: "template", template: { name: f.template_name, language: { code: "ar" } } };
+  const now = new Date().toISOString();
+  try {
+    const wamid = await metaSend(await routeTokens(owner.company_id, f.route_key), digits(conv.meta_phone_number_id), to, payload);
+    if (wamid) await db.from("whatsapp_messages").insert({
+      company_id: owner.company_id, conversation_id: conv.id, client_id: f.client_id, whatsapp_message_id: wamid,
+      direction: "outbound", message_type: service ? "text" : "template", sender_wa_id: digits(conv.meta_phone_number_id), recipient_wa_id: to,
+      body: f.body, message_timestamp: now, delivery_status: "sent", actor_type: "automated", channel_source: "crm_followup",
+      raw_payload: { source: "visit_followup", followup_id: id, step: f.step, viewing_id: f.viewing_id, template_name: service ? null : f.template_name, approved_by: owner.id },
+    });
+    await db.from("whatsapp_visit_followups").update({ status: "sent", send_mode: service ? "service" : "template", sent_at: now, meta_message_id: wamid, decided_by: owner.id, decided_at: now, error: null, updated_at: now }).eq("id", id);
+    await db.from("whatsapp_conversations").update({ last_message_at: now, last_outbound_at: now, updated_at: now }).eq("id", conv.id);
+    return [{ ok: true, sent: wamid ? 1 : 0, mode: service ? "service" : "template" }, 200];
+  } catch (e) {
+    const why = short((e as any)?.message || e, 500);
+    await db.from("whatsapp_visit_followups").update({ status: "failed", error: why, decided_by: owner.id, decided_at: now, updated_at: now }).eq("id", id);
+    return [{ ok: false, error: why }, 502];
+  }
+}
+
 Deno.serve(async (req) => {
   const headers = { ...cors(req), "content-type": "application/json; charset=utf-8" };
   const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers });
@@ -70,6 +123,7 @@ Deno.serve(async (req) => {
   const owner = prof.data;
 
   const body = await req.json().catch(() => ({}));
+  if (body?.followup_id) return json(...await sendFollowup(owner, String(body.followup_id)));
   const draftId = String(body?.draft_id || "");
   const edited = Array.isArray(body?.messages) ? body.messages.map((t: unknown) => String(t ?? "").trim()).filter(Boolean).slice(0, 5) : null;
   if (!draftId) return json({ ok: false, error: "draft_id_required" }, 400);
