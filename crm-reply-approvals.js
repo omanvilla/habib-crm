@@ -32,7 +32,10 @@
     if(nav&&!byId('navReplies')){
       const link=document.createElement('div');link.className='nav-link';link.id='navReplies';link.setAttribute('onclick',"navigate('replies',this)");
       link.innerHTML='<div class="nav-icon">✉</div><span class="nav-text">ردود تنتظر موافقتك</span><span class="nav-badge" id="navRepliesCount" style="display:none">0</span>';
-      const first=nav.querySelector('.nav-link');nav.insertBefore(link,first?first.nextSibling:null);
+      // Links live inside .nav-group blocks; place it right after the dashboard link.
+      const first=nav.querySelector('.nav-link');
+      if(first&&first.parentNode)first.parentNode.insertBefore(link,first.nextSibling);else nav.append(link);
+      syncVisibility();
     }
   }
   function syncVisibility(){const l=byId('navReplies');if(l)l.style.display=isOwnerNow()?'':'none';}
