@@ -4,3 +4,5 @@
 ALTER TABLE public.properties ADD COLUMN IF NOT EXISTS listing_purpose text NOT NULL DEFAULT 'sale';
 ALTER TABLE public.properties DROP CONSTRAINT IF EXISTS properties_listing_purpose_chk;
 ALTER TABLE public.properties ADD CONSTRAINT properties_listing_purpose_chk CHECK (listing_purpose IN ('sale', 'rent'));
+-- Properties are read through column-level SELECT grants, so the new column needs its own.
+GRANT SELECT (listing_purpose) ON public.properties TO authenticated;
