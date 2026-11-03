@@ -132,8 +132,8 @@ function publicText(v: unknown) {
 
 // Office titles carry owner names ("فيلا الرميس 59 سلطان"), so the agent only sees a neutral label.
 function propLine(p: any) {
-  const name = p.type || "عقار";
-  const bits = [p.area, p.wilayat, p.price ? `${Number(p.price).toLocaleString("en-US")} ريال` : "", p.bedrooms ? `${p.bedrooms} غرف` : "",
+  const name = `${p.type || "عقار"} ${p.listing_purpose === "rent" ? "للإيجار" : "للبيع"}`;
+  const bits = [p.area, p.wilayat, p.price ? `${p.listing_purpose === "rent" ? "الإيجار " : ""}${Number(p.price).toLocaleString("en-US")} ريال` : "", p.bedrooms ? `${p.bedrooms} غرف` : "",
     p.land_size ? `أرض ${p.land_size}م` : "", p.built_size ? `بناء ${p.built_size}م` : ""].filter(Boolean).join("، ");
   const visit = { open: "مفتوح ويروح بروحه", lockbox: "صندوق مفتاح برمز", owner_lives: "المالك ساكن (يعطى رقم المالك)", office: "تنسيق منا (handoff)" }[p.visit_method as string] || "غير محدد (handoff للمعاينة)";
   return `- id=${p.id} | ${name} | ${bits} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? " | اللوكيشن متوفر (action=send_location)" : " | اللوكيشن غير متوفر"}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}${p.marketing ? `\n  وصف الإعلان: ${short(p.marketing, 900)}` : ""}`;
@@ -237,7 +237,7 @@ Deno.serve(async (req) => {
     const [histR, propsR, rulesR, priorR] = await Promise.all([
       db.from("whatsapp_messages").select("id,direction,message_type,body,transcript,media_id,actor_type,message_timestamp,matched_property_id,property_link_key,property_image_analysis")
         .eq("conversation_id", conv.id).lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(30),
-      db.from("properties").select("id,title,internal_name,type,area,wilayat,price,bedrooms,bathrooms,land_size,built_size,public_details,description,map_url,visit_method,visit_instructions,lockbox_image_url,owner_id,branch_key")
+      db.from("properties").select("id,title,internal_name,type,area,wilayat,price,bedrooms,bathrooms,land_size,built_size,listing_purpose,public_details,description,map_url,visit_method,visit_instructions,lockbox_image_url,owner_id,branch_key")
         .eq("company_id", msg.company_id).eq("status", "available").eq("archived", false),
       db.from("whatsapp_reply_rules").select("id,situation,approved_reply,category").eq("company_id", msg.company_id).eq("active", true).order("created_at", { ascending: false }).limit(40),
       db.from("whatsapp_reply_drafts").select("analysis,status").eq("conversation_id", conv.id).in("status", ["sent", "approved", "edited"]),
@@ -361,8 +361,12 @@ Deno.serve(async (req) => {
       } else { out.action = "handoff"; out.handoff_reason = "طلب معاينة تحتاج تنسيق"; }
     }
 
+    // A pinned reply that says "we have none" was right on the day it was pinned; once a rental is in
+    // the CRM it may be wrong, so it waits for the owner instead of going out on its own.
+    const saysNone = /ما\s*(معنا|عندنا)|ما\s*(في|متوفر)|مو\s*متوفر|غير\s*متوفر/.test(out.reply_messages.join(" "));
+    const staleNone = saysNone && out.category === "tenant" && props.some((p: any) => p.listing_purpose === "rent");
     // approval mode still sends on its own when the owner switched the category on and the reply is a pinned one
-    const autoSend = !review && rt.reply_agent_mode === "approval" && !!rule && out.reply_messages.length > 0
+    const autoSend = !review && rt.reply_agent_mode === "approval" && !!rule && out.reply_messages.length > 0 && !staleNone
       && ["none", "handoff"].includes(out.action) && (rt.auto_send_categories || []).includes(out.category);
     const analysis = { ...out, property_id: prop?.id || null, model: OPENAI_MODEL, dry_run: dry, auto_sent: autoSend, transcribed: pendingAudio.filter((a: any) => a.transcript).length,
       ...(redo ? { owner_instruction: redo.instruction, rewritten_at: new Date().toISOString() } : {}) };
