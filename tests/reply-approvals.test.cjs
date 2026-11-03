@@ -120,3 +120,19 @@ test('owner instruction rewrites a waiting draft and never sends',()=>{
   assert.match(js,/data-rp="instr">أمر للذكاء الاصطناعي<\/button>/);
   assert.match(js,/esc\(a\.owner_instruction\)/);
 });
+
+test('rental availability comes from the CRM, never from a fixed pinned reply',()=>{
+  const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8');
+  const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
+  const sql55=fs.readFileSync('db/changes/55-property-listing-purpose.forward.sql','utf8');
+  const base=fs.readFileSync('app-base-v15.html','utf8'),patch=fs.readFileSync('crm-v17-patch.js','utf8');
+  assert.match(sql55,/ADD COLUMN IF NOT EXISTS listing_purpose text NOT NULL DEFAULT 'sale'/);
+  assert.match(sql55,/CHECK \(listing_purpose IN \('sale', 'rent'\)\)/);
+  assert.match(sql55,/GRANT SELECT \(listing_purpose\) ON public\.properties TO authenticated/);
+  assert.match(base,/<select class="fs" id="pPurpose"><option value="sale">للبيع<\/option><option value="rent">للإيجار<\/option><\/select>/);
+  assert.match(base,/"map_url", "listing_purpose"/);
+  assert.match(patch,/listing_purpose:\(el\('pPurpose'\)&&el\('pPurpose'\)\.value\)\|\|'sale'/);
+  assert.match(agent,/p\.listing_purpose === "rent" \? "للإيجار" : "للبيع"/);
+  assert.match(agent,/&& !staleNone/);
+  assert.match(brain,/الرد المثبت يعلمك طريقة الكلام، مو اللي متوفر/);
+});
