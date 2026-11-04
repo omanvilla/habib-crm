@@ -55,7 +55,32 @@
   function syncVisibility(){const l=byId('navReplies');if(l)l.style.display=isOwnerNow()?'':'none';}
 
   // ---- data -------------------------------------------------------------------
+  // owners who want to sell but whose property we have not listed yet, with buyers already looking for that
+  async function loadLeads(){
+    try{
+      const l=await supa.from('owner_leads').select('id,client_id,conversation_id,kind,area,wilayat,price,land_size,built_size,notes,status,created_at').in('status',['open','studied']).order('created_at',{ascending:false}).limit(30);
+      const leads=l.data||[];if(!leads.length){state.leads=[];return;}
+      const m=await supa.from('owner_lead_matches').select('lead_id,request_id').in('lead_id',leads.map(x=>x.id));
+      const reqIds=[...new Set((m.data||[]).map(x=>x.request_id))];
+      const q=reqIds.length?await supa.from('client_requests').select('id,client_id,budget_max').in('id',reqIds):{data:[]};
+      const cids=[...new Set([...(q.data||[]).map(x=>x.client_id),...leads.map(x=>x.client_id)].filter(Boolean))];
+      const c=cids.length?await supa.from('clients').select('id,name,phone').in('id',cids):{data:[]};
+      const cm=new Map((c.data||[]).map(x=>[x.id,x])),qm=new Map((q.data||[]).map(x=>[x.id,x]));
+      leads.forEach(x=>{x.owner=cm.get(x.client_id)||{};x.buyers=(m.data||[]).filter(y=>y.lead_id===x.id).map(y=>{const r=qm.get(y.request_id)||{};return {name:(cm.get(r.client_id)||{}).name||'عميل',budget:r.budget_max};});});
+      state.leads=leads;
+    }catch(e){state.leads=[];}
+  }
+  function leadsHtml(){
+    const ls=state.leads||[];if(!ls.length)return '';
+    const kinds={land:'أرض',villa:'فيلا',house:'بيت',building:'مبنى',apartment:'شقة'};
+    return '<h3 class="rp-section">عروض ملاك مو معروضة ('+ls.length+')</h3>'+ls.map(x=>'<section class="rp-card" data-lead="'+esc(x.id)+'"><strong>'+esc((kinds[x.kind]||x.kind)+' '+(x.area||'')+(x.wilayat?' · '+x.wilayat:'')+(x.price?' · '+Math.round(x.price/1000)+' الف':''))+'</strong>'
+      +'<p class="rp-muted">'+esc((x.owner.name||'')+(x.land_size?' · أرض '+x.land_size+' م²':'')+(x.built_size?' · بناء '+x.built_size+' م²':'')+(x.status==='studied'?' · انرسلت الدراسة':''))+'</p>'
+      +(x.notes?'<p>'+esc(x.notes)+'</p>':'')
+      +(x.buyers.length?'<p><b>مشترين يدورون نفس الشي ('+x.buyers.length+'):</b> '+esc(x.buyers.map(b=>b.name+(b.budget?' ('+Math.round(b.budget/1000)+' الف)':'')).join('، '))+'</p>':'<p class="rp-muted">ما في مشتري مطابق لين الحين</p>')
+      +'<div class="rp-actions"><button type="button" class="btn-secondary" data-rp="lead-open">افتح المحادثة</button></div></section>').join('');
+  }
   async function loadDrafts(){
+    loadLeads().then(()=>{if(!['rules','results','auto'].includes(state.tab))render();});
     const q=supa.from('whatsapp_reply_drafts').select('id,conversation_id,client_id,message_id,status,analysis,reply_messages,created_at').eq('status','pending').order('created_at',{ascending:false}).limit(40);
     const r=await q;if(r.error)throw r.error;
     let rows=(r.data||[]).filter(d=>state.showTrials||!(d.analysis&&d.analysis.dry_run===true));
@@ -333,7 +358,7 @@
     }
     const real=state.drafts.filter(d=>!(d.analysis&&d.analysis.dry_run)).length,fus=state.followups||[],outs=state.outreach||[];
     byId('rpSub').textContent=real+' رد ينتظر موافقتك'+(fus.length?' · '+fus.length+' متابعة زيارة':'')+(state.showTrials?' · مع ردود التجربة':'');
-    list.innerHTML=(outs.length?'<h3 class="rp-section">رسائل نبدأها نحن ('+outs.length+') <button type="button" class="btn-secondary" data-rp-bulk="out-all">موافقة على المحدد</button></h3>'+outs.map(outreachCard).join(''):'')
+    list.innerHTML=leadsHtml()+(outs.length?'<h3 class="rp-section">رسائل نبدأها نحن ('+outs.length+') <button type="button" class="btn-secondary" data-rp-bulk="out-all">موافقة على المحدد</button></h3>'+outs.map(outreachCard).join(''):'')
       +(fus.length?'<h3 class="rp-section">متابعات بعد الزيارة</h3>'+fus.map(followupCard).join(''):'')
       +(fus.length&&state.drafts.length?'<h3 class="rp-section">ردود على رسائل العملاء</h3>':'')
       +(state.drafts.length||fus.length||outs.length?state.drafts.map(draftCard).join(''):'<div class="empty"><div class="empty-ico">✉</div><div class="empty-title">ما في ردود تنتظرك</div><div class="empty-desc">أول ما يكتب المحرك رد جديد يظهر هنا ويوصلك تنبيه.</div></div>');
@@ -445,6 +470,7 @@
     const b=e.target.closest('[data-rp]');if(!b)return;const card=b.closest('.rp-card');if(!card)return;
     const a=b.dataset.rp;
     if(a==='out-pick')return;
+    if(a==='lead-open'){const c=b.closest('[data-lead]'),x=(state.leads||[]).find(y=>y.id===(c&&c.dataset.lead));if(x&&x.conversation_id&&typeof openDashboardWhatsAppConversation==='function')openDashboardWhatsAppConversation(x.conversation_id);return;}
     if(a==='coach-ok'||a==='coach-no'){const c=b.closest('[data-coach]');if(c)coachAct(c,b,a==='coach-ok');return;}
     if(a==='out-send'){outreachAct([card.dataset.out],'approve',card,b);return;}
     if(a==='out-skip'){if(confirm('تتخطى هذي الرسالة؟'))outreachAct([card.dataset.out],'reject',card,b);return;}

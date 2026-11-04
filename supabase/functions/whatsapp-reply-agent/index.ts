@@ -98,18 +98,19 @@ async function transcribe(tokens: string[], mediaId: string) {
   return null;
 }
 
-// Customer photos: the agent looks at them itself (a screenshot of our reel, a photo of a villa, a kroki).
-async function imageDataUrl(tokens: string[], mediaId: string) {
+// Customer photos and PDFs: the agent looks at them itself (a screenshot of our reel, a photo of a villa,
+// a kroki, an ownership deed or a listing sheet sent as a file).
+async function imageDataUrl(tokens: string[], mediaId: string, kind = /^image\/(jpeg|png|webp)$/, maxBytes = 5 * 1024 * 1024) {
   for (const t of tokens) {
     try {
       const metaR = await fetch(`https://graph.facebook.com/${GRAPH}/${mediaId}`, { headers: { Authorization: `Bearer ${t}` } });
       const meta = await metaR.json().catch(() => ({}));
-      if (!metaR.ok || !meta?.url || !/^image\/(jpeg|png|webp)$/.test(String(meta.mime_type || ""))) continue;
-      if (Number(meta.file_size || 0) > 5 * 1024 * 1024) return null;
+      if (!metaR.ok || !meta?.url || !kind.test(String(meta.mime_type || ""))) continue;
+      if (Number(meta.file_size || 0) > maxBytes) return null;
       const fileR = await fetch(meta.url, { headers: { Authorization: `Bearer ${t}` } });
       if (!fileR.ok) continue;
       const buf = new Uint8Array(await fileR.arrayBuffer());
-      if (buf.length > 5 * 1024 * 1024) return null;
+      if (buf.length > maxBytes) return null;
       let bin = ""; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
       return `data:${meta.mime_type};base64,${btoa(bin)}`;
     } catch (e) { console.error("[reply-agent] image", String((e as any)?.message || e)); }
@@ -164,6 +165,15 @@ const schema = {
     matched_rule_id: { type: ["string", "null"] },
     alternatives: { type: "array", items: { type: "array", items: { type: "string" } } },
     close_other_branch: { type: "boolean" },
+    owner_offer: { anyOf: [{ type: "null" }, {
+      type: "object", additionalProperties: false,
+      properties: {
+        kind: { type: "string", enum: ["land", "villa", "house", "building", "apartment", "other"] },
+        area: { type: ["string", "null"] }, wilayat: { type: ["string", "null"] },
+        price: { type: ["number", "null"] }, land_size: { type: ["number", "null"] }, built_size: { type: ["number", "null"] },
+      },
+      required: ["kind", "area", "wilayat", "price", "land_size", "built_size"],
+    }] },
     request: { anyOf: [{ type: "null" }, {
       type: "object", additionalProperties: false,
       properties: {
@@ -179,7 +189,7 @@ const schema = {
       required: ["request_type", "areas", "property_types", "budget_max", "bedrooms_min", "notes", "followup_in_days", "followup_note"],
     }] },
   },
-  required: ["reply_messages", "category", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives", "close_other_branch", "request"],
+  required: ["reply_messages", "category", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives", "close_other_branch", "owner_offer", "request"],
 };
 
 // The marketing text (property description, or the longest reel caption for it) is what the office
@@ -424,8 +434,18 @@ Deno.serve(async (req) => {
       parts.push({ type: "input_text", text: `صورة أرسلها العميل (${new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Muscat", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(h.message_timestamp))})${h.body ? ` مع الكلام: ${short(h.body, 200)}` : ""}:` });
       parts.push({ type: "input_image", image_url: url, detail: "high" });
     }
+    const docMsgs = history.slice(-20).filter((h: any) => h.direction === "inbound" && h.message_type === "document" && h.media_id).slice(-2);
+    let docsSeen = 0, coversSeen = 0;
+    for (const h of docMsgs) {
+      const url = await imageDataUrl(tokens, h.media_id, /^application\/pdf$/, 8 * 1024 * 1024);
+      if (!url) continue;
+      docsSeen++;
+      parts.push({ type: "input_text", text: `ملف PDF أرسله العميل (${new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Muscat", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(h.message_timestamp))}):` });
+      parts.push({ type: "input_file", filename: "file.pdf", file_data: url });
+    }
     if (seenImages.length) {
       const covers = await reelCovers(msg.company_id, props.map((p: any) => p.id));
+      coversSeen = Object.keys(covers).length;
       for (const p of props as any[]) if (covers[p.id]) {
         parts.push({ type: "input_text", text: `غلاف ريل العقار id=${p.id} (${p.type || "عقار"} ${p.area || ""} ${p.price ? Math.round(Number(p.price) / 1000) + " الف" : ""}):` });
         parts.push({ type: "input_image", image_url: covers[p.id], detail: "low" });
@@ -436,7 +456,7 @@ Deno.serve(async (req) => {
       headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: OPENAI_MODEL, store: false, reasoning: { effort: "medium" },
-        instructions: BRAIN, input: seenImages.length ? [{ role: "user", content: parts }] : context,
+        instructions: BRAIN, input: parts.length > 1 ? [{ role: "user", content: parts }] : context,
         text: { format: { type: "json_schema", name: "omanvilla_reply", strict: true, schema } },
       }),
     });
@@ -518,7 +538,7 @@ Deno.serve(async (req) => {
     }
     const autoSend = !review && rt.reply_agent_mode === "approval" && !!rule && out.reply_messages.length > 0 && !staleNone
       && ["none", "handoff"].includes(out.action) && (ruleAuto || (rt.auto_send_categories || []).includes(out.category));
-    const analysis = { ...out, property_id: prop?.id || null, model: OPENAI_MODEL, dry_run: dry, auto_sent: autoSend, transcribed: pendingAudio.filter((a: any) => a.transcript).length,
+    const analysis = { ...out, property_id: prop?.id || null, model: OPENAI_MODEL, dry_run: dry, images_seen: seenImages.length, covers_seen: coversSeen, docs_seen: docsSeen, auto_sent: autoSend, transcribed: pendingAudio.filter((a: any) => a.transcript).length,
       ...(redo ? { owner_instruction: redo.instruction, rewritten_at: new Date().toISOString() } : {}) };
     // the customer carries on with the other branch number about the same thing: close what waits there
     if (!review && out.close_other_branch && otherConvId) {
@@ -526,6 +546,61 @@ Deno.serve(async (req) => {
         await db.from("whatsapp_reply_drafts").update({ status: "superseded", superseded_at: new Date().toISOString(), approver_note: "العميل يكمل نفس الموضوع على الرقم الثاني" }).eq("conversation_id", otherConvId).eq("status", "pending");
         await db.from("whatsapp_outreach_queue").update({ status: "skipped", reason: "other_branch" }).eq("conversation_id", otherConvId).eq("status", "pending");
       } catch (_) { /* optional */ }
+    }
+    // an owner who wants to sell is kept as an unlisted offer, so buyers looking for the same thing are found
+    if (!review && out.category === "seller" && out.owner_offer && (out.owner_offer.area || out.owner_offer.wilayat)) {
+      try {
+        const ex = await db.from("owner_leads").select("id").eq("conversation_id", conv.id).limit(1);
+        const o = out.owner_offer;
+        const row = { kind: o.kind, area: o.area, wilayat: o.wilayat, price: o.price, land_size: o.land_size, built_size: o.built_size, notes: short(out.crm_note, 1000), updated_at: new Date().toISOString() };
+        if ((ex.data || []).length) await db.from("owner_leads").update(row).eq("id", ex.data![0].id);
+        else await db.from("owner_leads").insert({ ...row, company_id: msg.company_id, client_id: client.id, conversation_id: conv.id });
+        await db.rpc("crm_match_owner_leads");
+      } catch (e) { console.error("[reply-agent] owner lead", String((e as any)?.message || e)); }
+    }
+    // an owner sent everything (kroki or house details, and the price): a price study goes on Ahmed's task list
+    if (!review && out.action === "handoff" && /^دراسة سعر/.test(String(out.handoff_reason || ""))) {
+      try {
+        const o = await db.from("profiles").select("id").eq("company_id", msg.company_id).eq("role", "owner").eq("is_active", true).limit(1).maybeSingle();
+        const open = await db.from("tasks").select("id").eq("client_id", client.id).ilike("title", "دراسة سعر%").eq("done", false).limit(1);
+        if (!(open.data || []).length) await db.from("tasks").insert({ company_id: msg.company_id, user_id: o.data?.id || null, client_id: client.id, title: short(out.handoff_reason, 200), notes: short(out.crm_note, 1000), due_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), done: false });
+      } catch (e) { console.error("[reply-agent] task", String((e as any)?.message || e)); }
+    }
+    try {
+      const flags: any = {};
+      if (out.category === "buyer" || out.category === "tenant") flags.is_buyer = true;
+      if (out.category === "seller") flags.is_seller = true;
+      if (out.category === "investor") flags.is_investor = true;
+      if (out.area) flags.preferred_area = short(out.area, 200);
+      if (Object.keys(flags).length) await db.from("clients").update(flags).eq("id", client.id);
+    } catch (_) { /* optional */ }
+    // keep what the client is looking for in their open request, so a matching listing can be sent later
+    try {
+      const rq = out.request;
+      if (rq && (rq.areas?.length || rq.property_types?.length || rq.budget_max || rq.bedrooms_min)) {
+        const patch: any = { request_type: rq.request_type, updated_at: now, last_contact_at: now };
+        if (rq.areas?.length) { patch.preferred_areas = rq.areas.slice(0, 6); patch.preferred_area = rq.areas[0]; }
+        if (rq.property_types?.length) { patch.property_types = rq.property_types.slice(0, 4); patch.property_type = rq.property_types[0]; }
+        if (rq.budget_max) patch.budget_max = rq.budget_max;
+        if (rq.bedrooms_min) patch.bedrooms_min = rq.bedrooms_min;
+        if (rq.followup_in_days && rq.followup_in_days > 0) { patch.next_followup = new Date(Date.now() + Math.min(rq.followup_in_days, 120) * 86400000).toISOString(); patch.followup_note = short(rq.followup_note || "متابعة", 300); }
+        patch.ai_extracted = { ...rq, source: "reply_agent", at: now }; // never overwrite staff notes
+        const open = await db.from("client_requests").select("id").eq("client_id", client.id).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle();
+        const w = open.data
+          ? await db.from("client_requests").update(patch).eq("id", open.data.id)
+          : await db.from("client_requests").insert({ ...patch, company_id: msg.company_id, client_id: client.id, route_key: conv.route_key, created_via: "whatsapp_ai", origin_whatsapp_message_id: msg.id, source: "whatsapp" });
+        if (w.error) console.error("[reply-agent] request", w.error.message);
+      }
+    } catch (e) { console.error("[reply-agent] request", String((e as any)?.message || e)); }
+    const visitAction = ["book_viewing", "send_location", "send_lockbox", "send_owner_number"].includes(out.action);
+    if (visitAction && prop && /^\d{4}-\d{2}-\d{2}$/.test(out.viewing_date || "")) {
+      const t = /^([01]\d|2[0-3]):[0-5]\d$/.test(out.viewing_time || "") ? out.viewing_time : "16:00";
+      const v = await db.from("viewings").insert({
+        company_id: msg.company_id, client_id: client.id, property_id: prop.id, agent_id: conv.assigned_to || null,
+        viewing_date: out.viewing_date, viewing_time: t, duration_minutes: 30, location: prop.map_url || prop.area,
+        status: "scheduled", created_via: "whatsapp_ai", source_whatsapp_message_id: msg.id, notes: short(out.crm_note, 1000),
+      });
+      if (v.error) console.error("[reply-agent] viewing", v.error.message);
     }
     if (redo) {
       // only while it still waits: if it was sent or rejected meanwhile, nothing changes
@@ -565,42 +640,6 @@ Deno.serve(async (req) => {
     if (out.action === "handoff") Object.assign(convPatch, { human_handoff_required: true, handoff_reason: short(out.handoff_reason || out.intent, 500), handoff_updated_at: now });
     await db.from("whatsapp_conversations").update(convPatch).eq("id", conv.id);
     if (out.action === "handoff") await notifyHandoff(msg.company_id, conv, client, out.handoff_reason || out.crm_note || out.intent);
-    try {
-      const flags: any = {};
-      if (out.category === "buyer" || out.category === "tenant") flags.is_buyer = true;
-      if (out.category === "seller") flags.is_seller = true;
-      if (out.category === "investor") flags.is_investor = true;
-      if (out.area) flags.preferred_area = short(out.area, 200);
-      if (Object.keys(flags).length) await db.from("clients").update(flags).eq("id", client.id);
-    } catch (_) { /* optional */ }
-    // keep what the client is looking for in their open request, so a matching listing can be sent later
-    try {
-      const rq = out.request;
-      if (rq && (rq.areas?.length || rq.property_types?.length || rq.budget_max || rq.bedrooms_min)) {
-        const patch: any = { request_type: rq.request_type, updated_at: now, last_contact_at: now };
-        if (rq.areas?.length) { patch.preferred_areas = rq.areas.slice(0, 6); patch.preferred_area = rq.areas[0]; }
-        if (rq.property_types?.length) { patch.property_types = rq.property_types.slice(0, 4); patch.property_type = rq.property_types[0]; }
-        if (rq.budget_max) patch.budget_max = rq.budget_max;
-        if (rq.bedrooms_min) patch.bedrooms_min = rq.bedrooms_min;
-        if (rq.followup_in_days && rq.followup_in_days > 0) { patch.next_followup = new Date(Date.now() + Math.min(rq.followup_in_days, 120) * 86400000).toISOString(); patch.followup_note = short(rq.followup_note || "متابعة", 300); }
-        patch.ai_extracted = { ...rq, source: "reply_agent", at: now }; // never overwrite staff notes
-        const open = await db.from("client_requests").select("id").eq("client_id", client.id).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle();
-        const w = open.data
-          ? await db.from("client_requests").update(patch).eq("id", open.data.id)
-          : await db.from("client_requests").insert({ ...patch, company_id: msg.company_id, client_id: client.id, route_key: conv.route_key, created_via: "whatsapp_ai", origin_whatsapp_message_id: msg.id, source: "whatsapp" });
-        if (w.error) console.error("[reply-agent] request", w.error.message);
-      }
-    } catch (e) { console.error("[reply-agent] request", String((e as any)?.message || e)); }
-    const visitAction = ["book_viewing", "send_location", "send_lockbox", "send_owner_number"].includes(out.action);
-    if (visitAction && prop && /^\d{4}-\d{2}-\d{2}$/.test(out.viewing_date || "")) {
-      const t = /^([01]\d|2[0-3]):[0-5]\d$/.test(out.viewing_time || "") ? out.viewing_time : "16:00";
-      const v = await db.from("viewings").insert({
-        company_id: msg.company_id, client_id: client.id, property_id: prop.id, agent_id: conv.assigned_to || null,
-        viewing_date: out.viewing_date, viewing_time: t, duration_minutes: 30, location: prop.map_url || prop.area,
-        status: "scheduled", created_via: "whatsapp_ai", source_whatsapp_message_id: msg.id, notes: short(out.crm_note, 1000),
-      });
-      if (v.error) console.error("[reply-agent] viewing", v.error.message);
-    }
     if (prop && seenImages.length && out.source === "image") {
       try { await db.from("whatsapp_messages").update({ matched_property_id: prop.id }).eq("id", seenImages[seenImages.length - 1].id).is("matched_property_id", null); } catch (_) { /* optional */ }
     }
