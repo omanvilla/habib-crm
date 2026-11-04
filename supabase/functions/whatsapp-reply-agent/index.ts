@@ -11,7 +11,7 @@ const META_APP_SECRET = Deno.env.get("META_APP_SECRET") ?? "";
 const WHATSAPP_ACCESS_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN") ?? "";
 const GRAPH = Deno.env.get("META_GRAPH_VERSION") || "v25.0";
 const DEBOUNCE_MS = 7000;
-const STAFF_QUIET_HOURS = 72; // a person from the office talked to this customer recently → stay out
+const STAFF_QUIET_HOURS = 2; // the last reply was typed by a person from the office in the last 2 hours → they are in the chat, stay out
 const ALLOWED_ORIGINS = ["https://omanvilla.github.io"]; // the approval screen asks for a rewrite from here
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -301,11 +301,13 @@ Deno.serve(async (req) => {
     const after = await db.from("whatsapp_messages").select("id").eq("conversation_id", conv.id).eq("direction", "outbound")
       .gt("message_timestamp", msg.message_timestamp).limit(1);
     if (!review && (after.data || []).length) return fail("staff_replied");
-    // a person from the office has been talking to this customer recently → this is their conversation
-    const since = new Date(new Date(msg.message_timestamp).getTime() - STAFF_QUIET_HOURS * 3600 * 1000).toISOString();
-    const staffRecent = await db.from("whatsapp_messages").select("id,message_timestamp").eq("conversation_id", conv.id).eq("direction", "outbound")
-      .eq("actor_type", "human").gte("message_timestamp", since).lte("message_timestamp", msg.message_timestamp).limit(1);
-    if (!review && (staffRecent.data || []).length) return fail("staff_active");
+    // the office's last reply before this message was typed by a person a short while ago → they are in the chat.
+    // Once the agent has answered after them, or a couple of hours passed, the agent carries the conversation on.
+    const lastOut = await db.from("whatsapp_messages").select("actor_type,message_timestamp").eq("conversation_id", conv.id).eq("direction", "outbound")
+      .lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(1).maybeSingle();
+    const staffInChat = lastOut.data?.actor_type === "human" &&
+      new Date(msg.message_timestamp).getTime() - new Date(lastOut.data.message_timestamp).getTime() < STAFF_QUIET_HOURS * 3600 * 1000;
+    if (!review && staffInChat) return fail("staff_active");
 
     const [histR, propsR, rulesR, priorR] = await Promise.all([
       db.from("whatsapp_messages").select("id,direction,message_type,body,transcript,media_id,actor_type,message_timestamp,matched_property_id,property_link_key,property_image_analysis")
@@ -541,7 +543,7 @@ Deno.serve(async (req) => {
     }
     const autoSend = !review && rt.reply_agent_mode === "approval" && !!rule && out.reply_messages.length > 0 && !staleNone
       && ["none", "handoff"].includes(out.action) && (ruleAuto || (rt.auto_send_categories || []).includes(out.category));
-    const analysis = { ...out, property_id: prop?.id || null, model: OPENAI_MODEL, dry_run: dry, images_seen: seenImages.length, covers_seen: coversSeen, docs_seen: docsSeen, auto_sent: autoSend, transcribed: pendingAudio.filter((a: any) => a.transcript).length,
+    const analysis: any = { ...out, property_id: prop?.id || null, model: OPENAI_MODEL, dry_run: dry, images_seen: seenImages.length, covers_seen: coversSeen, docs_seen: docsSeen, auto_sent: autoSend, transcribed: pendingAudio.filter((a: any) => a.transcript).length,
       ...(redo ? { owner_instruction: redo.instruction, rewritten_at: new Date().toISOString() } : {}) };
     // the customer carries on with the other branch number about the same thing: close what waits there
     if (!review && out.close_other_branch && otherConvId) {
@@ -574,6 +576,15 @@ Deno.serve(async (req) => {
       const u = await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages }).eq("id", draftId).eq("status", "pending").select("id");
       if (!(u.data || []).length) return json({ ok: false, error: "draft_not_pending" }, 409);
       return json({ ok: true, status: "rewritten", reply_messages: out.reply_messages, action: out.action, analysis });
+    }
+    // an owner Ahmed is already handling himself (he sent voice notes, or a price study is under way): the agent stays out
+    const ownerWithAhmed = out.category === "seller" && (
+      history.some((h: any) => h.direction === "outbound" && h.actor_type === "human" && h.message_type === "audio") ||
+      (priorR.data || []).some((d: any) => /^دراسة سعر/.test(String(d.analysis?.handoff_reason || ""))));
+    analysis.owner_with_ahmed = ownerWithAhmed;
+    if (!review && ownerWithAhmed) {
+      await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages, status: "skipped", error: "owner_with_ahmed" }).eq("id", draftId);
+      return json({ ok: true, ignored: "owner_with_ahmed" });
     }
     // live ("direct"): everything goes out on its own except investors and running deals, which wait for the owner
     const holdForOwner = rt.reply_agent_mode === "direct" && ["investor", "active_deal"].includes(out.category);
@@ -656,6 +667,14 @@ Deno.serve(async (req) => {
   } catch (e) {
     const why = short((e as any)?.message || e, 800);
     if (!redo) await db.from("whatsapp_reply_drafts").update({ status: "failed", error: why }).eq("id", draftId);
+    // the customer got no answer: Ahmed has to know
+    if (!review) {
+      try {
+        const c = await db.from("whatsapp_conversations").select("id,assigned_to,customer_name").eq("id", msg.conversation_id).maybeSingle();
+        const cl = await db.from("clients").select("id,name,phone").eq("id", msg.client_id).maybeSingle();
+        if (c.data && cl.data) await notifyHandoff(msg.company_id, c.data, cl.data, "العقل ما قدر يرد على آخر رسالة، رد عليه انت (" + short(why, 120) + ")");
+      } catch (_) { /* optional */ }
+    }
     return json({ ok: false, error: why }, 500);
   }
 });
