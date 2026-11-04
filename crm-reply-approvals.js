@@ -31,7 +31,7 @@
   // something the customer wrote, so the cards leave them out
   const HIDDEN_TYPES=new Set(['edit','revoke','reaction','system','unsupported']);
   const shown=m=>!HIDDEN_TYPES.has(String(m&&m.message_type||''));
-  let state={tab:'pending',showTrials:false,drafts:[],followups:[],autoSent:[],rules:[],autoSend:null,variants:null,results:[],days:90,lastCount:null,loading:false};
+  let state={tab:'pending',showTrials:false,drafts:[],followups:[],outreach:[],autoSent:[],rules:[],autoSend:null,variants:null,results:[],days:90,lastCount:null,loading:false};
 
   // ---- page and menu ---------------------------------------------------------
   function ensurePage(){
@@ -87,6 +87,18 @@
     const cm=new Map((cl.data||[]).map(x=>[x.id,x])),vm=new Map((vw.data||[]).map(x=>[x.id,x]));
     rows.forEach(x=>{x.client=cm.get(x.client_id)||{};x.viewing=vm.get(x.viewing_id)||{};});
     state.followups=rows;
+    await loadOutreach();
+  }
+  // messages the office starts (whatsapp-outreach): request follow-ups, "انحجزت" notices, new listings
+  const OUT_KINDS={request_followup:'متابعة طلب',property_sold:'عقار انحجز',new_listing:'عقار جديد يناسبه'};
+  async function loadOutreach(){
+    const q=await supa.from('whatsapp_outreach_queue').select('id,kind,step,client_id,conversation_id,route_key,messages,send_mode,summary,error,created_at,property_id').eq('status','pending').eq('dry_run',false).order('created_at',{ascending:true}).limit(60);
+    const rows=q.error?[]:(q.data||[]);
+    const cIds=[...new Set(rows.map(x=>x.client_id))];
+    const cl=cIds.length?await supa.from('clients').select('id,name,phone').in('id',cIds):{data:[]};
+    const cm=new Map((cl.data||[]).map(x=>[x.id,x]));
+    rows.forEach(x=>{x.client=cm.get(x.client_id)||{};});
+    state.outreach=rows;
   }
   async function loadRules(){
     const r=await supa.from('whatsapp_reply_rules').select('id,situation,approved_reply,category,intent,active,created_at,updated_at').order('created_at',{ascending:false});
@@ -127,7 +139,8 @@
     const r=await supa.from('whatsapp_reply_drafts').select('id,analysis',{count:'exact'}).eq('status','pending').limit(200);
     if(r.error)return null;
     const f=await supa.from('whatsapp_visit_followups').select('id',{count:'exact',head:true}).eq('status','awaiting_approval');
-    return (r.data||[]).filter(d=>!(d.analysis&&d.analysis.dry_run===true)).length+(f.error?0:(f.count||0));
+    const o=await supa.from('whatsapp_outreach_queue').select('id',{count:'exact',head:true}).eq('status','pending').eq('dry_run',false);
+    return (r.data||[]).filter(d=>!(d.analysis&&d.analysis.dry_run===true)).length+(f.error?0:(f.count||0))+(o.error?0:(o.count||0));
   }
 
   // ---- render ------------------------------------------------------------------
@@ -193,6 +206,21 @@
     toast('توقف الرد المثبت','success');refresh();
   }
   const FU_WHEN={1:'بعد الزيارة بيوم',2:'بعد 3 أيام',3:'بعد أسبوع',4:'بعد شهر'};
+  function outreachCard(o){
+    const name=o.client.name||'عميل',phone=o.client.phone||'';
+    return '<article class="rp-card rp-fu" data-out="'+esc(o.id)+'">'
+      +'<header><div><label class="rp-pick"><input type="checkbox" data-rp="out-pick"> <strong><bdi>'+esc(name)+'</bdi></strong></label>'+(phone?' <small dir="ltr">'+esc(phone)+'</small>':'')+'</div>'
+      +'<div class="rp-chips"><span class="rp-chip route">'+esc(ROUTES[o.route_key]||o.route_key)+'</span><span class="rp-chip">'+esc(OUT_KINDS[o.kind]||o.kind)+'</span>'
+      +'<span class="rp-chip">'+(o.send_mode==='service'?'رسالة عادية':'قالب واتساب')+'</span></div></header>'
+      +(o.summary?'<p class="rp-summary">'+esc(o.summary)+'</p>':'')
+      +'<div class="rp-reply"><label>الرسالة</label>'+(o.messages||[]).map(t=>'<p class="rp-fu-body" dir="auto">'+esc(t)+'</p>').join('')
+      +'<p class="rp-muted">تنرسل من 9 الصبح لين 9 الليل. إذا العميل كتب قبل الإرسال تنلغي، والمحادثة يكملها الرد العادي.</p>'
+      +(o.error==='template_pending'?'<p class="rp-muted">قالب واتساب لهذي الرسالة لين الحين تحت مراجعة ميتا.</p>':'')+'</div>'
+      +'<div class="rp-actions"><button type="button" class="btn-primary" data-rp="out-send">موافقة وإرسال</button>'
+      +'<button type="button" class="btn-secondary" data-rp="out-skip">تخطي</button>'
+      +'<button type="button" class="btn-secondary" data-rp="out-open">فتح المحادثة</button></div>'
+      +'<div class="rp-error" role="alert"></div></article>';
+  }
   function followupCard(f){
     const name=f.client.name||'عميل',phone=f.client.phone||'',v=f.viewing||{},p=v.properties||{};
     return '<article class="rp-card rp-fu" data-fu="'+esc(f.id)+'">'
@@ -283,11 +311,12 @@
       list.innerHTML=rows.length?rows.map(autoCard).join(''):'<div class="empty"><div class="empty-ico">⚡</div><div class="empty-title">ما انرسل شي تلقائياً لين الحين</div><div class="empty-desc">لما يطابق رد العميل رداً مثبتاً وفئته مفتوحة، ينرسل مباشرة ويظهر هنا.</div></div>';
       return;
     }
-    const real=state.drafts.filter(d=>!(d.analysis&&d.analysis.dry_run)).length,fus=state.followups||[];
+    const real=state.drafts.filter(d=>!(d.analysis&&d.analysis.dry_run)).length,fus=state.followups||[],outs=state.outreach||[];
     byId('rpSub').textContent=real+' رد ينتظر موافقتك'+(fus.length?' · '+fus.length+' متابعة زيارة':'')+(state.showTrials?' · مع ردود التجربة':'');
-    list.innerHTML=(fus.length?'<h3 class="rp-section">متابعات بعد الزيارة</h3>'+fus.map(followupCard).join(''):'')
+    list.innerHTML=(outs.length?'<h3 class="rp-section">رسائل نبدأها نحن ('+outs.length+') <button type="button" class="btn-secondary" data-rp-bulk="out-all">موافقة على المحدد</button></h3>'+outs.map(outreachCard).join(''):'')
+      +(fus.length?'<h3 class="rp-section">متابعات بعد الزيارة</h3>'+fus.map(followupCard).join(''):'')
       +(fus.length&&state.drafts.length?'<h3 class="rp-section">ردود على رسائل العملاء</h3>':'')
-      +(state.drafts.length||fus.length?state.drafts.map(draftCard).join(''):'<div class="empty"><div class="empty-ico">✉</div><div class="empty-title">ما في ردود تنتظرك</div><div class="empty-desc">أول ما يكتب المحرك رد جديد يظهر هنا ويوصلك تنبيه.</div></div>');
+      +(state.drafts.length||fus.length||outs.length?state.drafts.map(draftCard).join(''):'<div class="empty"><div class="empty-ico">✉</div><div class="empty-title">ما في ردود تنتظرك</div><div class="empty-desc">أول ما يكتب المحرك رد جديد يظهر هنا ويوصلك تنبيه.</div></div>');
   }
   async function refresh(){
     if(!isOwnerNow()||state.loading)return;state.loading=true;
@@ -377,11 +406,28 @@
     if(r.error){input.checked=!input.checked;err.textContent=errText(r.error);return;}
     state.autoSend=(r.data&&r.data.categories)||cats;toast('انحفظ','success');
   }
+  async function outreachAct(ids,decision,card,btn){
+    const err=card?card.querySelector('.rp-error'):null;if(err)err.textContent='';if(btn)btn.disabled=true;
+    const r=await supa.functions.invoke('whatsapp-outreach',{body:{ids,decision}});
+    let e=r.error||(r.data&&r.data.ok===false?r.data:null);
+    if(e&&r.error&&r.error.context&&typeof r.error.context.json==='function'){try{e=await r.error.context.json();}catch(_){}}
+    if(btn)btn.disabled=false;
+    if(e){if(err)err.textContent=errText(e);else toast(errText(e),'error');return;}
+    const d=r.data||{};
+    toast(decision==='reject'?'تم التخطي':(d.reason==='outside_sending_hours'?'انحفظت الموافقة وبتنرسل الساعة 9 الصبح':'انرسلت '+(d.sent||0)+' رسالة'),'success');refresh();updateBadge();
+  }
   document.addEventListener('click',e=>{
+    const bulk=e.target.closest('[data-rp-bulk]');
+    if(bulk){const ids=[...document.querySelectorAll('[data-out] input[data-rp="out-pick"]:checked')].map(x=>x.closest('[data-out]').dataset.out);
+      if(!ids.length){toast('حدد الرسائل أول','error');return;} if(confirm('توافق على '+ids.length+' رسالة؟'))outreachAct(ids,'approve',null,bulk);return;}
     const tab=e.target.closest('[data-rp-tab]');if(tab){state.tab=tab.dataset.rpTab;refresh();return;}
     const days=e.target.closest('[data-rp-days]');if(days){state.days=Number(days.dataset.rpDays);refresh();return;}
     const b=e.target.closest('[data-rp]');if(!b)return;const card=b.closest('.rp-card');if(!card)return;
     const a=b.dataset.rp;
+    if(a==='out-pick')return;
+    if(a==='out-send'){outreachAct([card.dataset.out],'approve',card,b);return;}
+    if(a==='out-skip'){if(confirm('تتخطى هذي الرسالة؟'))outreachAct([card.dataset.out],'reject',card,b);return;}
+    if(a==='out-open'){const o=(state.outreach||[]).find(x=>x.id===card.dataset.out);if(o&&typeof openDashboardWhatsAppConversation==='function')openDashboardWhatsAppConversation(o.conversation_id);return;}
     if(a==='send')send(card,b);
     else if(a==='reject'){if(confirm('ترفض هذا الرد؟'))reject(card,b);}
     else if(a==='auto-open'){const d=(state.autoSent||[]).find(x=>x.id===card.dataset.auto);if(d&&typeof openDashboardWhatsAppConversation==='function')openDashboardWhatsAppConversation(d.conversation_id);}

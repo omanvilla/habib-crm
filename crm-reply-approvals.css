@@ -68,3 +68,5 @@
   .rp-actions .btn-secondary{flex:1}
   .rp-trials{margin-inline-start:0}
 }
+.rp-pick{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.rp-section [data-rp-bulk]{margin-inline-start:8px;font-size:.8rem;padding:4px 10px}

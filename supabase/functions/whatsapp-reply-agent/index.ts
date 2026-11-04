@@ -253,7 +253,7 @@ Deno.serve(async (req) => {
         .eq("conversation_id", conv.id).lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(30),
       db.from("properties").select("id,title,internal_name,type,area,wilayat,price,bedrooms,bathrooms,land_size,built_size,listing_purpose,public_details,description,map_url,visit_method,visit_instructions,lockbox_image_url,owner_id,branch_key")
         .eq("company_id", msg.company_id).eq("status", "available").eq("archived", false),
-      db.from("whatsapp_reply_rules").select("id,situation,approved_reply,category").eq("company_id", msg.company_id).eq("active", true).order("created_at", { ascending: false }).limit(40),
+      db.from("whatsapp_reply_rules").select("id,situation,approved_reply,category,auto_send,auto_match_regex").eq("company_id", msg.company_id).eq("active", true).order("created_at", { ascending: false }).limit(40),
       db.from("whatsapp_reply_drafts").select("analysis,status").eq("conversation_id", conv.id).in("status", ["sent", "approved", "edited"]),
     ]);
     const history = (histR.data || []).reverse();
@@ -390,8 +390,8 @@ Deno.serve(async (req) => {
     out.variant_label = rule ? pickedVariant[rule.id].label : null;
     // other ways to say it, for the owner to pick from (investors)
     out.alternatives = (out.alternatives || []).map((a: string[]) => (a || []).map((t) => humanize(t)).filter(Boolean).slice(0, 3)).filter((a: string[]) => a.length).slice(0, 2);
-    const outgoing: any[] = out.reply_messages.map((t: string) => ({ type: "text", text: { preview_url: false, body: t } }));
-
+    let outgoing: any[] = out.reply_messages.map((t: string) => ({ type: "text", text: { preview_url: false, body: t } }));
+    
     if (out.action === "send_location" || out.action === "send_lockbox") {
       if (prop?.map_url) outgoing.push({ type: "text", text: { preview_url: true, body: prop.map_url } });
       else { out.action = "handoff"; out.handoff_reason = "العميل يبي يزور واللوكيشن غير مسجل للعقار"; }
@@ -413,8 +413,25 @@ Deno.serve(async (req) => {
     const saysNone = /ما\s*(معنا|عندنا)|ما\s*(في|متوفر)|مو\s*متوفر|غير\s*متوفر/.test(out.reply_messages.join(" "));
     const staleNone = saysNone && out.category === "tenant" && props.some((p: any) => p.listing_purpose === "rent");
     // approval mode still sends on its own when the owner switched the category on and the reply is a pinned one
+    // a pinned reply marked auto_send goes out on its own only when what the customer wrote since our last
+    // message really is that situation: "^..." patterns must match every message (a bare greeting, nothing after
+    // it), other patterns must appear in one of them (the salary-prompt question)
+    let ruleAuto = false;
+    if (rule?.auto_send && rule.auto_match_regex && out.action === "none") {
+      let lastOut = -1; history.forEach((h: any, i: number) => { if (h.direction === "outbound") lastOut = i; });
+      const burst = history.slice(lastOut + 1).filter((h: any) => h.direction === "inbound" && !["edit", "revoke", "reaction", "system", "unsupported"].includes(h.message_type));
+      const texts2 = burst.map((h: any) => (h.message_type === "text" ? String(h.body || "") : "\u0000" + h.message_type).trim());
+      try {
+        const re = new RegExp(rule.auto_match_regex, "i");
+        ruleAuto = texts2.length > 0 && (rule.auto_match_regex.startsWith("^") ? texts2.every((t: string) => re.test(t)) : texts2.some((t: string) => re.test(t)));
+      } catch (_) { ruleAuto = false; }
+      if (ruleAuto) {
+        out.reply_messages = String(pickedVariant[rule.id].reply).split("\n").map((t) => t.trim()).filter(Boolean).slice(0, 3);
+        outgoing = out.reply_messages.map((t: string) => ({ type: "text", text: { preview_url: false, body: t } }));
+      }
+    }
     const autoSend = !review && rt.reply_agent_mode === "approval" && !!rule && out.reply_messages.length > 0 && !staleNone
-      && ["none", "handoff"].includes(out.action) && (rt.auto_send_categories || []).includes(out.category);
+      && ["none", "handoff"].includes(out.action) && (ruleAuto || (rt.auto_send_categories || []).includes(out.category));
     const analysis = { ...out, property_id: prop?.id || null, model: OPENAI_MODEL, dry_run: dry, auto_sent: autoSend, transcribed: pendingAudio.filter((a: any) => a.transcript).length,
       ...(redo ? { owner_instruction: redo.instruction, rewritten_at: new Date().toISOString() } : {}) };
     if (redo) {
