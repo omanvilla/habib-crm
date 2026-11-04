@@ -98,6 +98,51 @@ async function transcribe(tokens: string[], mediaId: string) {
   return null;
 }
 
+// Customer photos: the agent looks at them itself (a screenshot of our reel, a photo of a villa, a kroki).
+async function imageDataUrl(tokens: string[], mediaId: string) {
+  for (const t of tokens) {
+    try {
+      const metaR = await fetch(`https://graph.facebook.com/${GRAPH}/${mediaId}`, { headers: { Authorization: `Bearer ${t}` } });
+      const meta = await metaR.json().catch(() => ({}));
+      if (!metaR.ok || !meta?.url || !/^image\/(jpeg|png|webp)$/.test(String(meta.mime_type || ""))) continue;
+      if (Number(meta.file_size || 0) > 5 * 1024 * 1024) return null;
+      const fileR = await fetch(meta.url, { headers: { Authorization: `Bearer ${t}` } });
+      if (!fileR.ok) continue;
+      const buf = new Uint8Array(await fileR.arrayBuffer());
+      if (buf.length > 5 * 1024 * 1024) return null;
+      let bin = ""; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+      return `data:${meta.mime_type};base64,${btoa(bin)}`;
+    } catch (e) { console.error("[reply-agent] image", String((e as any)?.message || e)); }
+  }
+  return null;
+}
+
+// The cover of the newest reel of each available property, to compare with what the customer sent.
+async function reelCovers(companyId: string, propIds: string[]) {
+  const out: Record<string, string> = {};
+  if (!propIds.length) return out;
+  try {
+    const cat = await db.from("instagram_media_catalog").select("property_id,instagram_media_id,account_id,published_at").eq("company_id", companyId).in("property_id", propIds)
+      .not("instagram_media_id", "is", null).order("published_at", { ascending: false }).limit(60);
+    const newest: Record<string, any> = {};
+    for (const r of cat.data || []) if (!newest[r.property_id]) newest[r.property_id] = r;
+    const tokens: Record<string, string> = {};
+    for (const r of Object.values(newest)) {
+      if (!tokens[r.account_id]) {
+        const c = await db.from("instagram_account_credentials").select("token_ciphertext,token_iv").eq("account_id", r.account_id).eq("company_id", companyId).maybeSingle();
+        if (!c.data) continue;
+        const key = await crypto.subtle.importKey("raw", await crypto.subtle.digest("SHA-256", enc.encode(`${META_APP_SECRET}|${companyId}|${r.account_id}|habib-crm-instagram-v1`)), { name: "AES-GCM" }, false, ["decrypt"]);
+        tokens[r.account_id] = new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(c.data.token_iv) }, key, b64(c.data.token_ciphertext)));
+      }
+      const g = await fetch(`https://graph.facebook.com/${GRAPH}/${digits(r.instagram_media_id)}?fields=thumbnail_url,media_url,media_type`, { headers: { Authorization: `Bearer ${tokens[r.account_id]}` } });
+      const d = await g.json().catch(() => ({}));
+      const url = d?.thumbnail_url || (d?.media_type === "IMAGE" ? d?.media_url : null);
+      if (g.ok && url) out[r.property_id] = url;
+    }
+  } catch (e) { console.error("[reply-agent] covers", String((e as any)?.message || e)); }
+  return out;
+}
+
 const IG_RE = /instagram\.com\/(?:reels?|p|tv)\/([A-Za-z0-9_-]+)/i;
 
 const schema = {
@@ -366,12 +411,31 @@ Deno.serve(async (req) => {
       ...(redo ? ["", `أمر من المدير لهذا الرد (نفّذه، وهو أهم من أي قاعدة عن طريقة الرد، بس لا تخالف الممنوعات ولا تكتب معلومة مو مكتوبة قدامك): ${redo.instruction}`] : []),
     ].join("\n");
 
+    // photos the customer sent lately (not yet tied to a property) go to the model as images,
+    // with the cover of each available property's newest reel to compare against
+    const parts: any[] = [{ type: "input_text", text: context }];
+    const imgMsgs = history.slice(-15).filter((h: any) => h.direction === "inbound" && h.message_type === "image" && h.media_id && !h.matched_property_id).slice(-2);
+    const seenImages: any[] = [];
+    for (const h of imgMsgs) {
+      const url = await imageDataUrl(tokens, h.media_id);
+      if (!url) continue;
+      seenImages.push(h);
+      parts.push({ type: "input_text", text: `صورة أرسلها العميل (${new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Muscat", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(h.message_timestamp))})${h.body ? ` مع الكلام: ${short(h.body, 200)}` : ""}:` });
+      parts.push({ type: "input_image", image_url: url, detail: "high" });
+    }
+    if (seenImages.length) {
+      const covers = await reelCovers(msg.company_id, props.map((p: any) => p.id));
+      for (const p of props as any[]) if (covers[p.id]) {
+        parts.push({ type: "input_text", text: `غلاف ريل العقار id=${p.id} (${p.type || "عقار"} ${p.area || ""} ${p.price ? Math.round(Number(p.price) / 1000) + " الف" : ""}):` });
+        parts.push({ type: "input_image", image_url: covers[p.id], detail: "low" });
+      }
+    }
     const ai = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: OPENAI_MODEL, store: false, reasoning: { effort: "medium" },
-        instructions: BRAIN, input: context,
+        instructions: BRAIN, input: seenImages.length ? [{ role: "user", content: parts }] : context,
         text: { format: { type: "json_schema", name: "omanvilla_reply", strict: true, schema } },
       }),
     });
@@ -535,6 +599,9 @@ Deno.serve(async (req) => {
         status: "scheduled", created_via: "whatsapp_ai", source_whatsapp_message_id: msg.id, notes: short(out.crm_note, 1000),
       });
       if (v.error) console.error("[reply-agent] viewing", v.error.message);
+    }
+    if (prop && seenImages.length && out.source === "image") {
+      try { await db.from("whatsapp_messages").update({ matched_property_id: prop.id }).eq("id", seenImages[seenImages.length - 1].id).is("matched_property_id", null); } catch (_) { /* optional */ }
     }
     await db.from("whatsapp_automation_events").insert({
       company_id: msg.company_id, conversation_id: conv.id, message_id: msg.id, client_id: client.id, property_id: prop?.id || null,
