@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { BRAIN } from "./brain.ts";
-import { INVESTOR_KNOWLEDGE } from "./knowledge.ts";
+// The brain and investor knowledge live in whatsapp_agent_prompts (synced from the repo by agent-prompt-sync),
+// so wording changes do not need a redeploy.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -127,8 +127,10 @@ const schema = {
         budget_max: { type: ["number", "null"] },
         bedrooms_min: { type: ["integer", "null"] },
         notes: { type: ["string", "null"] },
+        followup_in_days: { type: ["integer", "null"] },
+        followup_note: { type: ["string", "null"] },
       },
-      required: ["request_type", "areas", "property_types", "budget_max", "bedrooms_min", "notes"],
+      required: ["request_type", "areas", "property_types", "budget_max", "bedrooms_min", "notes", "followup_in_days", "followup_note"],
     }] },
   },
   required: ["reply_messages", "category", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives", "request"],
@@ -272,6 +274,10 @@ Deno.serve(async (req) => {
     }
     const budgetAskedBefore = (priorR.data || []).some((d: any) => d.analysis?.budget_asked_now === true);
     const tokens = await routeTokens(msg.company_id, conv.route_key);
+    const pr = await db.from("whatsapp_agent_prompts").select("key,content").in("key", ["brain", "knowledge"]);
+    const BRAIN = (pr.data || []).find((x: any) => x.key === "brain")?.content || "";
+    const INVESTOR_KNOWLEDGE = (pr.data || []).find((x: any) => x.key === "knowledge")?.content || "";
+    if (BRAIN.length < 2000) return fail("prompt_missing", "failed");
 
     // understand the latest voice notes
     const pendingAudio = history.filter((h: any) => h.direction === "inbound" && h.message_type === "audio" && !h.transcript && h.media_id).slice(-3);
@@ -297,6 +303,15 @@ Deno.serve(async (req) => {
       for (const x of r.data || []) reels[x.link_key] = x;
     }
 
+    // the same customer may be talking to the other branch number too
+    let otherRoute = "";
+    try {
+      const oc = await db.from("whatsapp_conversations").select("id,route_key").eq("company_id", msg.company_id).eq("customer_wa_id", conv.customer_wa_id).neq("id", conv.id).limit(1).maybeSingle();
+      if (oc.data) {
+        const om = await db.from("whatsapp_messages").select("direction,message_type,body,transcript").eq("conversation_id", oc.data.id).order("message_timestamp", { ascending: false }).limit(8);
+        otherRoute = `محادثة نفس العميل على الرقم الثاني (${oc.data.route_key === "barka" ? "بركاء" : "مسقط"}):\n` + (om.data || []).reverse().map((x: any) => `${x.direction === "inbound" ? "العميل" : "المكتب"}: ${short(x.transcript || x.body || `[${x.message_type}]`, 300)}`).join("\n");
+      }
+    } catch (_) { /* optional */ }
     const transcript = history.map((h: any) => {
       const who = h.direction === "inbound" ? "العميل" : (h.actor_type === "human" ? "المكتب (شخص)" : "المكتب (رد سابق منك)");
       let text = h.transcript ? `[رسالة صوتية: ${h.transcript}]` : (h.body || (h.message_type === "audio" ? "[رسالة صوتية ما انفهمت]" : `[${h.message_type}]`));
@@ -325,6 +340,7 @@ Deno.serve(async (req) => {
       "",
       rulesR.data?.length ? "ردود مثبتة اعتمدها المدير:\n" + rulesR.data.map((r: any) => `- rule_id=${r.id} | الموقف: ${r.situation}\n  الرد: ${pickedVariant[r.id].reply}`).join("\n") : "ردود مثبتة: لا يوجد",
       "",
+      ...(otherRoute ? [otherRoute, ""] : []),
       "المحادثة (الأقدم أولاً، وآخر سطر هو اللي ترد عليه):",
       transcript,
       ...(redo ? ["", `أمر من المدير لهذا الرد (نفّذه، وهو أهم من أي قاعدة عن طريقة الرد، بس لا تخالف الممنوعات ولا تكتب معلومة مو مكتوبة قدامك): ${redo.instruction}`] : []),
@@ -355,6 +371,17 @@ Deno.serve(async (req) => {
       texts = texts.filter((t) => !SOLD_RE.test(t));
       if (!texts.length) texts = ["تمام بشوف وارد عليك"];
       out.action = "handoff"; out.handoff_reason = "العقل كان بيقول العقار انباع وهو متوفر في الـ CRM، راجع المحادثة";
+    }
+    // the ad text goes once per conversation: if a long office message about this property already went out, drop it
+    if (prop) {
+      const priceKey = prop.price ? String(Math.round(Number(prop.price) / 1000)) : "";
+      const sentAd = history.some((h: any) => h.direction === "outbound" && String(h.body || "").length > 250
+        && (!priceKey || String(h.body).replace(/[,٬]/g, "").includes(priceKey)));
+      if (sentAd) texts = texts.filter((t) => t.length <= 250);
+      // after the ad, always ask when they can visit (unless the action already books it)
+      const hasAd = texts.some((t) => t.length > 250);
+      const asksVisit = texts.some((t) => /تزور|الزيارة|زياره|تشوف/.test(t));
+      if ((hasAd || sentAd) && !asksVisit && out.action === "none" && !history.some((h: any) => h.direction === "outbound" && /تزور/.test(String(h.body || "")) ) ) texts.push("متى يناسبك تزور ؟");
     }
     out.reply_messages = texts.slice(0, 3);
     // a pinned reply only counts when the id is real
@@ -443,6 +470,7 @@ Deno.serve(async (req) => {
         if (rq.property_types?.length) { patch.property_types = rq.property_types.slice(0, 4); patch.property_type = rq.property_types[0]; }
         if (rq.budget_max) patch.budget_max = rq.budget_max;
         if (rq.bedrooms_min) patch.bedrooms_min = rq.bedrooms_min;
+        if (rq.followup_in_days && rq.followup_in_days > 0) { patch.next_followup = new Date(Date.now() + Math.min(rq.followup_in_days, 120) * 86400000).toISOString(); patch.followup_note = short(rq.followup_note || "متابعة", 300); }
         patch.ai_extracted = { ...rq, source: "reply_agent", at: now }; // never overwrite staff notes
         const open = await db.from("client_requests").select("id").eq("client_id", client.id).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle();
         const w = open.data
