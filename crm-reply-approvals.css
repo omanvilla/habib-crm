@@ -70,3 +70,7 @@
 }
 .rp-pick{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
 .rp-section [data-rp-bulk]{margin-inline-start:8px;font-size:.8rem;padding:4px 10px}
+.cn-dialog{border:1px solid var(--border,#ddd);border-radius:14px;padding:18px;max-width:520px;width:calc(100% - 32px)}
+.cn-dialog h3{margin:0 0 6px}.cn-ctx{margin:0 0 10px;opacity:.75;font-size:.9rem}
+.cn-dialog textarea{width:100%;box-sizing:border-box;border-radius:10px;padding:10px;font:inherit}
+.cn-actions{display:flex;gap:8px;margin-top:10px}.cn-chat-btn{font-size:.8rem;padding:4px 10px;margin-inline-start:auto}
