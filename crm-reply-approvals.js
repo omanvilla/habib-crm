@@ -80,7 +80,6 @@
       +'<div class="rp-actions"><button type="button" class="btn-secondary" data-rp="lead-open">افتح المحادثة</button></div></section>').join('');
   }
   async function loadDrafts(){
-    loadLeads().then(()=>{if(!['rules','results','auto'].includes(state.tab))render();});
     const q=supa.from('whatsapp_reply_drafts').select('id,conversation_id,client_id,message_id,status,analysis,reply_messages,created_at').eq('status','pending').order('created_at',{ascending:false}).limit(40);
     const r=await q;if(r.error)throw r.error;
     let rows=(r.data||[]).filter(d=>state.showTrials||!(d.analysis&&d.analysis.dry_run===true));
@@ -358,7 +357,7 @@
     }
     const real=state.drafts.filter(d=>!(d.analysis&&d.analysis.dry_run)).length,fus=state.followups||[],outs=state.outreach||[];
     byId('rpSub').textContent=real+' رد ينتظر موافقتك'+(fus.length?' · '+fus.length+' متابعة زيارة':'')+(state.showTrials?' · مع ردود التجربة':'');
-    list.innerHTML=leadsHtml()+(outs.length?'<h3 class="rp-section">رسائل نبدأها نحن ('+outs.length+') <button type="button" class="btn-secondary" data-rp-bulk="out-all">موافقة على المحدد</button></h3>'+outs.map(outreachCard).join(''):'')
+    list.innerHTML=(outs.length?'<h3 class="rp-section">رسائل نبدأها نحن ('+outs.length+') <button type="button" class="btn-secondary" data-rp-bulk="out-all">موافقة على المحدد</button></h3>'+outs.map(outreachCard).join(''):'')
       +(fus.length?'<h3 class="rp-section">متابعات بعد الزيارة</h3>'+fus.map(followupCard).join(''):'')
       +(fus.length&&state.drafts.length?'<h3 class="rp-section">ردود على رسائل العملاء</h3>':'')
       +(state.drafts.length||fus.length||outs.length?state.drafts.map(draftCard).join(''):'<div class="empty"><div class="empty-ico">✉</div><div class="empty-title">ما في ردود تنتظرك</div><div class="empty-desc">أول ما يكتب المحرك رد جديد يظهر هنا ويوصلك تنبيه.</div></div>');

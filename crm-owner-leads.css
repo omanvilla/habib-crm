@@ -1,0 +1,12 @@
+#page-owner-leads .ol-filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
+#page-owner-leads .ol-filters input[type=search]{flex:1 1 220px;min-width:0;padding:8px 10px;border:1px solid var(--border,#e5e0d8);border-radius:9px}
+#page-owner-leads .ol-filters select{padding:8px 10px;border:1px solid var(--border,#e5e0d8);border-radius:9px;background:#fff}
+#page-owner-leads .ol-filters label{font-size:13px;display:flex;gap:6px;align-items:center}
+#page-owner-leads .ol-head{display:flex;justify-content:space-between;gap:10px;align-items:center}
+#page-owner-leads .ol-count{font-size:12px;padding:2px 9px;border-radius:20px;background:#f1efe9;color:#6b6457;white-space:nowrap}
+#page-owner-leads .ol-count.on{background:#e7f5ec;color:#17643a;font-weight:600}
+#page-owner-leads .ol-facts{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+#page-owner-leads .ol-facts span{font-size:12px;background:#f7f5f0;border-radius:6px;padding:2px 7px}
+#page-owner-leads .ol-buyers{margin:6px 0;padding-inline-start:18px;font-size:13px;line-height:1.9}
+#page-owner-leads .ol-link{background:none;border:0;padding:0;color:#1d5fa8;cursor:pointer;font:inherit;text-decoration:underline}
+#page-owner-leads .rp-actions select{padding:6px 8px;border:1px solid var(--border,#e5e0d8);border-radius:8px;background:#fff}
