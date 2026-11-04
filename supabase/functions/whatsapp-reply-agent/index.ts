@@ -566,42 +566,6 @@ Deno.serve(async (req) => {
         if (!(open.data || []).length) await db.from("tasks").insert({ company_id: msg.company_id, user_id: o.data?.id || null, client_id: client.id, title: short(out.handoff_reason, 200), notes: short(out.crm_note, 1000), due_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), done: false });
       } catch (e) { console.error("[reply-agent] task", String((e as any)?.message || e)); }
     }
-    try {
-      const flags: any = {};
-      if (out.category === "buyer" || out.category === "tenant") flags.is_buyer = true;
-      if (out.category === "seller") flags.is_seller = true;
-      if (out.category === "investor") flags.is_investor = true;
-      if (out.area) flags.preferred_area = short(out.area, 200);
-      if (Object.keys(flags).length) await db.from("clients").update(flags).eq("id", client.id);
-    } catch (_) { /* optional */ }
-    // keep what the client is looking for in their open request, so a matching listing can be sent later
-    try {
-      const rq = out.request;
-      if (rq && (rq.areas?.length || rq.property_types?.length || rq.budget_max || rq.bedrooms_min)) {
-        const patch: any = { request_type: rq.request_type, updated_at: now, last_contact_at: now };
-        if (rq.areas?.length) { patch.preferred_areas = rq.areas.slice(0, 6); patch.preferred_area = rq.areas[0]; }
-        if (rq.property_types?.length) { patch.property_types = rq.property_types.slice(0, 4); patch.property_type = rq.property_types[0]; }
-        if (rq.budget_max) patch.budget_max = rq.budget_max;
-        if (rq.bedrooms_min) patch.bedrooms_min = rq.bedrooms_min;
-        if (rq.followup_in_days && rq.followup_in_days > 0) { patch.next_followup = new Date(Date.now() + Math.min(rq.followup_in_days, 120) * 86400000).toISOString(); patch.followup_note = short(rq.followup_note || "متابعة", 300); }
-        patch.ai_extracted = { ...rq, source: "reply_agent", at: now }; // never overwrite staff notes
-        const open = await db.from("client_requests").select("id").eq("client_id", client.id).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle();
-        const w = open.data
-          ? await db.from("client_requests").update(patch).eq("id", open.data.id)
-          : await db.from("client_requests").insert({ ...patch, company_id: msg.company_id, client_id: client.id, route_key: conv.route_key, created_via: "whatsapp_ai", origin_whatsapp_message_id: msg.id, source: "whatsapp" });
-        if (w.error) console.error("[reply-agent] request", w.error.message);
-      }
-    } catch (e) { console.error("[reply-agent] request", String((e as any)?.message || e)); }
-    const visitAction = ["book_viewing", "send_location", "send_lockbox", "send_owner_number"].includes(out.action);
-    if (visitAction && prop && /^\d{4}-\d{2}-\d{2}$/.test(out.viewing_date || "")) {
-      const t = /^([01]\d|2[0-3]):[0-5]\d$/.test(out.viewing_time || "") ? out.viewing_time : "16:00";
-      const v = await db.from("viewings").insert({
-        company_id: msg.company_id, client_id: client.id, property_id: prop.id, agent_id: conv.assigned_to || null,
-        viewing_date: out.viewing_date, viewing_time: t, duration_minutes: 30, location: prop.map_url || prop.area,
-        status: "scheduled", created_via: "whatsapp_ai", source_whatsapp_message_id: msg.id, notes: short(out.crm_note, 1000),
-      });
-      if (v.error) console.error("[reply-agent] viewing", v.error.message);
-    }
     if (redo) {
       // only while it still waits: if it was sent or rejected meanwhile, nothing changes
       const u = await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages }).eq("id", draftId).eq("status", "pending").select("id");
@@ -640,6 +604,42 @@ Deno.serve(async (req) => {
     if (out.action === "handoff") Object.assign(convPatch, { human_handoff_required: true, handoff_reason: short(out.handoff_reason || out.intent, 500), handoff_updated_at: now });
     await db.from("whatsapp_conversations").update(convPatch).eq("id", conv.id);
     if (out.action === "handoff") await notifyHandoff(msg.company_id, conv, client, out.handoff_reason || out.crm_note || out.intent);
+    try {
+      const flags: any = {};
+      if (out.category === "buyer" || out.category === "tenant") flags.is_buyer = true;
+      if (out.category === "seller") flags.is_seller = true;
+      if (out.category === "investor") flags.is_investor = true;
+      if (out.area) flags.preferred_area = short(out.area, 200);
+      if (Object.keys(flags).length) await db.from("clients").update(flags).eq("id", client.id);
+    } catch (_) { /* optional */ }
+    // keep what the client is looking for in their open request, so a matching listing can be sent later
+    try {
+      const rq = out.request;
+      if (rq && (rq.areas?.length || rq.property_types?.length || rq.budget_max || rq.bedrooms_min)) {
+        const patch: any = { request_type: rq.request_type, updated_at: now, last_contact_at: now };
+        if (rq.areas?.length) { patch.preferred_areas = rq.areas.slice(0, 6); patch.preferred_area = rq.areas[0]; }
+        if (rq.property_types?.length) { patch.property_types = rq.property_types.slice(0, 4); patch.property_type = rq.property_types[0]; }
+        if (rq.budget_max) patch.budget_max = rq.budget_max;
+        if (rq.bedrooms_min) patch.bedrooms_min = rq.bedrooms_min;
+        if (rq.followup_in_days && rq.followup_in_days > 0) { patch.next_followup = new Date(Date.now() + Math.min(rq.followup_in_days, 120) * 86400000).toISOString(); patch.followup_note = short(rq.followup_note || "متابعة", 300); }
+        patch.ai_extracted = { ...rq, source: "reply_agent", at: now }; // never overwrite staff notes
+        const open = await db.from("client_requests").select("id").eq("client_id", client.id).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle();
+        const w = open.data
+          ? await db.from("client_requests").update(patch).eq("id", open.data.id)
+          : await db.from("client_requests").insert({ ...patch, company_id: msg.company_id, client_id: client.id, route_key: conv.route_key, created_via: "whatsapp_ai", origin_whatsapp_message_id: msg.id, source: "whatsapp" });
+        if (w.error) console.error("[reply-agent] request", w.error.message);
+      }
+    } catch (e) { console.error("[reply-agent] request", String((e as any)?.message || e)); }
+    const visitAction = ["book_viewing", "send_location", "send_lockbox", "send_owner_number"].includes(out.action);
+    if (visitAction && prop && /^\d{4}-\d{2}-\d{2}$/.test(out.viewing_date || "")) {
+      const t = /^([01]\d|2[0-3]):[0-5]\d$/.test(out.viewing_time || "") ? out.viewing_time : "16:00";
+      const v = await db.from("viewings").insert({
+        company_id: msg.company_id, client_id: client.id, property_id: prop.id, agent_id: conv.assigned_to || null,
+        viewing_date: out.viewing_date, viewing_time: t, duration_minutes: 30, location: prop.map_url || prop.area,
+        status: "scheduled", created_via: "whatsapp_ai", source_whatsapp_message_id: msg.id, notes: short(out.crm_note, 1000),
+      });
+      if (v.error) console.error("[reply-agent] viewing", v.error.message);
+    }
     if (prop && seenImages.length && out.source === "image") {
       try { await db.from("whatsapp_messages").update({ matched_property_id: prop.id }).eq("id", seenImages[seenImages.length - 1].id).is("matched_property_id", null); } catch (_) { /* optional */ }
     }
