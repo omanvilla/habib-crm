@@ -114,15 +114,25 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers });
   if (req.method !== "POST") return json({ ok: false }, 405);
 
-  // the caller must be the company owner
-  const jwt = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-  const u = await db.auth.getUser(jwt);
-  if (u.error || !u.data.user) return json({ ok: false, error: "not_signed_in" }, 401);
-  const prof = await db.from("profiles").select("id,company_id,role,is_active").eq("id", u.data.user.id).single();
-  if (prof.error || prof.data.role !== "owner" || prof.data.is_active === false) return json({ ok: false, error: "owner_only" }, 403);
-  const owner = prof.data;
-
   const body = await req.json().catch(() => ({}));
+  // the caller must be the company owner, or the CRM itself sending a draft the owner already approved in bulk
+  let owner: any = null;
+  const secret = req.headers.get("x-crm-agent") || "";
+  const okSecret = secret ? await db.rpc("crm_reply_agent_secret_ok", { p_secret: secret }) : null;
+  if (okSecret && !okSecret.error && okSecret.data === true && body?.draft_id) {
+    const dc = await db.from("whatsapp_reply_drafts").select("company_id").eq("id", String(body.draft_id)).maybeSingle();
+    const o = dc.data ? await db.from("profiles").select("id,company_id,role,is_active").eq("company_id", dc.data.company_id).eq("role", "owner").eq("is_active", true).limit(1).maybeSingle() : null;
+    owner = o?.data || null;
+    if (!owner) return json({ ok: false, error: "owner_missing" }, 409);
+  } else {
+    const jwt = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+    const u = await db.auth.getUser(jwt);
+    if (u.error || !u.data.user) return json({ ok: false, error: "not_signed_in" }, 401);
+    const prof = await db.from("profiles").select("id,company_id,role,is_active").eq("id", u.data.user.id).single();
+    if (prof.error || prof.data.role !== "owner" || prof.data.is_active === false) return json({ ok: false, error: "owner_only" }, 403);
+    owner = prof.data;
+  }
+
   if (body?.followup_id) return json(...await sendFollowup(owner, String(body.followup_id)));
   const draftId = String(body?.draft_id || "");
   const edited = Array.isArray(body?.messages) ? body.messages.map((t: unknown) => String(t ?? "").trim()).filter(Boolean).slice(0, 5) : null;

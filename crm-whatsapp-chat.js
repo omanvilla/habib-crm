@@ -327,9 +327,8 @@
   if(typeof baseRender==='function')window.renderWhatsAppChat=function(preserveScroll){
     const result=baseRender.apply(this,arguments);
     try{installComposer();renderBody(preserveScroll);
-      // The request/alert strip folds to one line so the messages keep the space.
-      const strip=$('waClientStrip');if(strip&&strip.style.display!=='none'){strip.classList.add('wa2-strip');strip.classList.toggle('collapsed',!stripOpen);
-        if(!strip.querySelector('[data-wa2-strip]'))strip.insertAdjacentHTML('beforeend','<button type="button" class="wa2-strip-toggle" data-wa2-strip>'+(stripOpen?'إخفاء التفاصيل ▴':'تفاصيل الطلب والتنبيهات ▾')+'</button>');}
+      // The old request/alert strip is gone: the reply agent links requests and properties itself.
+      const strip=$('waClientStrip');if(strip)strip.style.display='none';
       const head=$('waChatHeader'),c=waInboxActiveConversation;
       if(head&&c&&!head.querySelector('.wa2-avatar')){const name=(c.client&&c.client.name)||c.customer_name||c.customer_phone||'؟';head.insertAdjacentHTML('afterbegin','<span class="wa2-avatar" aria-hidden="true">'+esc(String(name).trim().charAt(0)||'؟')+'</span>');}
     }catch(e){console.warn('[wa2]',e);}
