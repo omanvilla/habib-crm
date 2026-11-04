@@ -110,6 +110,26 @@
   async function loadResults(){
     const r=await supa.rpc('crm_reply_variant_stats',{p_days:state.days});
     if(r.error)throw r.error;state.results=(r.data&&r.data.rows)||[];
+    // the weekly coach: its report and the new wordings it proposes, waiting for the owner
+    try{const c=await supa.functions.invoke('whatsapp-reply-coach',{body:{}});state.coach=(c.data&&c.data.ok)?c.data:null;}catch(e){state.coach=null;}
+  }
+  function coachHtml(){
+    const c=state.coach;if(!c)return '';
+    const rep=c.report?'<section class="rp-card"><strong>تقرير المستشار الأسبوعي</strong><p class="rp-muted">'+esc(new Date(c.report.created_at).toLocaleDateString('ar-OM'))+'</p><p style="white-space:pre-line">'+esc(c.report.summary||'')+'</p></section>':'';
+    const props=(c.proposals||[]).map(p=>'<section class="rp-card" data-coach="'+esc(p.id)+'"><strong>صياغة جديدة مقترحة ('+esc(p.label)+')</strong>'
+      +'<p class="rp-muted">الموقف: '+esc((p.rule&&p.rule.situation)||'')+'</p>'
+      +(p.rule?'<p class="rp-muted">الرد الحالي: '+esc(p.rule.approved_reply||'')+'</p>':'')
+      +'<p>ليش: '+esc(p.rationale||'')+'</p>'
+      +'<textarea class="fta rp-text rp-coach-text" rows="3" dir="auto">'+esc(p.reply||'')+'</textarea>'
+      +'<div class="rp-actions"><button type="button" class="btn-primary" data-rp="coach-ok">جرّبها</button><button type="button" class="btn-secondary" data-rp="coach-no">لا</button></div></section>').join('');
+    return rep+(props?'<h3 class="rp-section">صياغات مقترحة للتجربة</h3>'+props:'');
+  }
+  async function coachAct(card,btn,ok){
+    btn.disabled=true;
+    const r=await supa.functions.invoke('whatsapp-reply-coach',{body:{decide:{id:card.dataset.coach,decision:ok?'approve':'reject',reply:ok?card.querySelector('.rp-coach-text').value:null}}});
+    btn.disabled=false;
+    if(r.error||!(r.data&&r.data.ok)){if(typeof showToast==='function')showToast('تعذر الحفظ','error');return;}
+    card.remove();if(typeof showToast==='function')showToast(ok?'دخلت التجربة':'انرفضت','success');
   }
   // replies the agent sent on its own (pinned match + category switched on), newest first,
   // with what the customer wrote afterwards so a wrong match is easy to spot
@@ -302,7 +322,7 @@
     }
     if(state.tab==='results'){
       byId('rpSub').textContent='أي صياغة تجيب نتيجة أكثر';
-      list.innerHTML=resultsHtml();
+      list.innerHTML=coachHtml()+resultsHtml();
       return;
     }
     if(state.tab==='auto'){
@@ -425,6 +445,7 @@
     const b=e.target.closest('[data-rp]');if(!b)return;const card=b.closest('.rp-card');if(!card)return;
     const a=b.dataset.rp;
     if(a==='out-pick')return;
+    if(a==='coach-ok'||a==='coach-no'){const c=b.closest('[data-coach]');if(c)coachAct(c,b,a==='coach-ok');return;}
     if(a==='out-send'){outreachAct([card.dataset.out],'approve',card,b);return;}
     if(a==='out-skip'){if(confirm('تتخطى هذي الرسالة؟'))outreachAct([card.dataset.out],'reject',card,b);return;}
     if(a==='out-open'){const o=(state.outreach||[]).find(x=>x.id===card.dataset.out);if(o&&typeof openDashboardWhatsAppConversation==='function')openDashboardWhatsAppConversation(o.conversation_id);return;}

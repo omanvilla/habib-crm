@@ -1,0 +1,4 @@
+-- applied 4 Nov 2026 (owner at computer)
+-- whatsapp_reply_coach_reports (weekly report of the reply experiments, owner read)
+-- cron reply_coach_weekly '12 4 * * 6' (Saturday 8:12 Oman) → POST /functions/v1/whatsapp-reply-coach
+-- فيلا الرميس 59 سلطان → sold (انباعت عن طريق غيرنا، التوين الثانية متوفرة); its pending outreach rows skipped
