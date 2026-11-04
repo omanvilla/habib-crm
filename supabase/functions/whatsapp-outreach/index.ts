@@ -163,11 +163,20 @@ async function queueListing(propertyId: string, dry: boolean) {
   const typeWords = TYPE_WORDS[prop.type] || [];
   const done = await db.from("whatsapp_outreach_queue").select("client_id").eq("kind", "new_listing").eq("property_id", prop.id);
   const already = new Set((done.data || []).map((d: any) => d.client_id));
+  // people who already asked about this very property got it in their conversation; and one office message a week
+  const reelKeys = ((await db.from("instagram_media_catalog").select("link_key").eq("property_id", prop.id)).data || []).map((r: any) => r.link_key).filter(Boolean);
+  const asked = new Set<string>([
+    ...(((await db.from("whatsapp_messages").select("client_id").eq("matched_property_id", prop.id)).data || []).map((m: any) => m.client_id)),
+    ...(reelKeys.length ? ((await db.from("whatsapp_messages").select("client_id").in("property_link_key", reelKeys)).data || []).map((m: any) => m.client_id) : []),
+  ]);
+  const busy = new Set<string>(((await db.from("whatsapp_outreach_queue").select("client_id").in("status", ["pending", "approved", "sent"]).gte("created_at", new Date(Date.now() - 7 * DAY).toISOString())).data || []).map((m: any) => m.client_id));
   const rows: any[] = [], seen = new Set<string>();
   const noun = NOUN[prop.type]?.[2] || "عقار";
   const label = `${noun} في ${prop.area || prop.wilayat || ""} بـ ${thousands(prop.price)}`.replace(/\s+/g, " ").trim();
   for (const r of reqs.data || []) {
-    if (seen.has(r.client_id) || already.has(r.client_id) || r.search_status === "found") continue;
+    if (seen.has(r.client_id) || already.has(r.client_id) || asked.has(r.client_id) || busy.has(r.client_id) || r.search_status === "found") continue;
+    // without a budget we only trust a recent request
+    if (!r.budget_max && new Date(r.updated_at).getTime() < Date.now() - 30 * DAY) continue;
     const areas = [...(Array.isArray(r.preferred_areas) ? r.preferred_areas : []), r.preferred_area, r.wilayat].filter(Boolean).map(String);
     const areaOk = areas.length > 0 && areas.some((a) => placeWords.some((w) => w && (a.includes(w) || w.includes(a.replace(/^ال/, "")))));
     const types = [...(Array.isArray(r.property_types) ? r.property_types : []), r.property_type].filter(Boolean).map(String);
