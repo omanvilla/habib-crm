@@ -244,7 +244,7 @@ Deno.serve(async (req) => {
     const since = new Date(new Date(msg.message_timestamp).getTime() - STAFF_QUIET_HOURS * 3600 * 1000).toISOString();
     const staffRecent = await db.from("whatsapp_messages").select("id,message_timestamp").eq("conversation_id", conv.id).eq("direction", "outbound")
       .eq("actor_type", "human").gte("message_timestamp", since).lte("message_timestamp", msg.message_timestamp).limit(1);
-    if (!redo && (staffRecent.data || []).length) return fail("staff_active");
+    if (!review && (staffRecent.data || []).length) return fail("staff_active");
 
     const [histR, propsR, rulesR, priorR] = await Promise.all([
       db.from("whatsapp_messages").select("id,direction,message_type,body,transcript,media_id,actor_type,message_timestamp,matched_property_id,property_link_key,property_image_analysis")
