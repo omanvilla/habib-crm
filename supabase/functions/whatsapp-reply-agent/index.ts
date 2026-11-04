@@ -118,6 +118,7 @@ const schema = {
     crm_note: { type: "string" },
     matched_rule_id: { type: ["string", "null"] },
     alternatives: { type: "array", items: { type: "array", items: { type: "string" } } },
+    close_other_branch: { type: "boolean" },
     request: { anyOf: [{ type: "null" }, {
       type: "object", additionalProperties: false,
       properties: {
@@ -133,7 +134,7 @@ const schema = {
       required: ["request_type", "areas", "property_types", "budget_max", "bedrooms_min", "notes", "followup_in_days", "followup_note"],
     }] },
   },
-  required: ["reply_messages", "category", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives", "request"],
+  required: ["reply_messages", "category", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives", "close_other_branch", "request"],
 };
 
 // The marketing text (property description, or the longest reel caption for it) is what the office
@@ -150,7 +151,9 @@ function propLine(p: any) {
   const bits = [p.area, p.wilayat, p.price ? `${p.listing_purpose === "rent" ? "الإيجار " : ""}${Number(p.price).toLocaleString("en-US")} ريال` : "", p.bedrooms ? `${p.bedrooms} غرف` : "",
     p.land_size ? `أرض ${p.land_size}م` : "", p.built_size ? `بناء ${p.built_size}م` : ""].filter(Boolean).join("، ");
   const visit = { open: "مفتوح ويروح بروحه", lockbox: "صندوق مفتاح برمز", owner_lives: "المالك ساكن (يعطى رقم المالك)", office: "تنسيق منا (handoff)" }[p.visit_method as string] || "غير محدد (handoff للمعاينة)";
-  return `- id=${p.id} | ${name} | ${bits} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? " | اللوكيشن متوفر (action=send_location)" : " | اللوكيشن غير متوفر"}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}${p.marketing ? `\n  وصف الإعلان: ${short(p.marketing, 1600)}` : ""}`;
+  const TERMS: Record<string, string> = { daily: "يومي", weekly: "أسبوعي", monthly: "شهري", "3m": "3 شهور", "6m": "6 شهور", yearly: "سنة" };
+  const terms = p.listing_purpose === "rent" ? ` | مدة الإيجار المسموحة: ${(p.rental_terms || []).length ? (p.rental_terms as string[]).map((t) => TERMS[t] || t).join(" او ") : "غير محددة (handoff اذا سأل عن مدة قصيرة)"}` : "";
+  return `- id=${p.id} | ${name} | ${bits}${terms} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? " | اللوكيشن متوفر (action=send_location)" : " | اللوكيشن غير متوفر"}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}${p.marketing ? `\n  وصف الإعلان: ${short(p.marketing, 1600)}` : ""}`;
 }
 
 async function notifyHandoff(companyId: string, conv: any, client: any, reason: string) {
@@ -230,6 +233,7 @@ Deno.serve(async (req) => {
     const rt = rtR.data, conv = convR.data, client = clientR.data;
     if (!rt || (!review && rt.reply_agent_mode === "off")) return fail("agent_off");
     if (!conv || !client) return fail("context_missing", "failed");
+    if (conv.agent_muted) return fail("agent_muted");
     const to = digits(client.phone_normalized || client.phone);
     const companyNumbers = (routesR.data || []).map((r: any) => digits(r.whatsapp_number)).filter(Boolean);
     if (companyNumbers.includes(to)) return fail("company_number");
@@ -251,7 +255,7 @@ Deno.serve(async (req) => {
     const [histR, propsR, rulesR, priorR] = await Promise.all([
       db.from("whatsapp_messages").select("id,direction,message_type,body,transcript,media_id,actor_type,message_timestamp,matched_property_id,property_link_key,property_image_analysis")
         .eq("conversation_id", conv.id).lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(30),
-      db.from("properties").select("id,title,internal_name,type,area,wilayat,price,bedrooms,bathrooms,land_size,built_size,listing_purpose,public_details,description,map_url,visit_method,visit_instructions,lockbox_image_url,owner_id,branch_key")
+      db.from("properties").select("id,title,internal_name,type,area,wilayat,price,bedrooms,bathrooms,land_size,built_size,listing_purpose,public_details,description,map_url,visit_method,visit_instructions,lockbox_image_url,owner_id,branch_key,rental_terms")
         .eq("company_id", msg.company_id).eq("status", "available").eq("archived", false),
       db.from("whatsapp_reply_rules").select("id,situation,approved_reply,category,auto_send,auto_match_regex").eq("company_id", msg.company_id).eq("active", true).order("created_at", { ascending: false }).limit(40),
       db.from("whatsapp_reply_drafts").select("analysis,status").eq("conversation_id", conv.id).in("status", ["sent", "approved", "edited"]),
@@ -266,11 +270,15 @@ Deno.serve(async (req) => {
     }
     // A/B/C test: each pinned reply shows the model one wording, picked at random among the active ones
     const ruleIds = (rulesR.data || []).map((r: any) => r.id);
-    const varR = ruleIds.length ? await db.from("whatsapp_reply_variants").select("rule_id,label,reply").in("rule_id", ruleIds).eq("active", true) : { data: [] };
+    const varR = ruleIds.length ? await db.from("whatsapp_reply_variants").select("rule_id,label,reply,status").in("rule_id", ruleIds).eq("active", true) : { data: [] };
     const pickedVariant: Record<string, { label: string; reply: string }> = {};
     for (const r of rulesR.data || []) {
       const pool = [{ label: "A", reply: r.approved_reply }, ...((varR as any).data || []).filter((v: any) => v.rule_id === r.id)];
-      pickedVariant[r.id] = pool[Math.floor(Math.random() * pool.length)];
+      // a proven wording ("winner") is used 8 times in 10; the rest of the time the others keep being tested
+      const winners = pool.filter((v: any) => v.status === "winner");
+      const testing = pool.filter((v: any) => v.status !== "winner");
+      const from = winners.length && (!testing.length || Math.random() < 0.8) ? winners : (testing.length ? testing : pool);
+      pickedVariant[r.id] = from[Math.floor(Math.random() * from.length)];
     }
     const budgetAskedBefore = (priorR.data || []).some((d: any) => d.analysis?.budget_asked_now === true);
     const tokens = await routeTokens(msg.company_id, conv.route_key);
@@ -303,11 +311,20 @@ Deno.serve(async (req) => {
       for (const x of r.data || []) reels[x.link_key] = x;
     }
 
+    // recently sold or booked: the agent must recognise them and answer with the sold rule, never offer them
+    let soldList = "";
+    try {
+      const sr = await db.from("properties").select("type,area,wilayat,price,status,title").eq("company_id", msg.company_id).in("status", ["sold", "reserved"])
+        .eq("archived", false).gte("updated_at", new Date(Date.now() - 150 * 86400000).toISOString()).limit(40);
+      soldList = (sr.data || []).map((p: any) => `- ${p.type || "عقار"} | ${[p.area, p.wilayat].filter(Boolean).join("، ")} | ${p.price ? Number(p.price).toLocaleString("en-US") + " ريال" : ""} | ${p.status === "sold" ? "انباع" : "انحجز"}`).join("\n");
+    } catch (_) { /* optional */ }
     // the same customer may be talking to the other branch number too
     let otherRoute = "";
+    let otherConvId: string | null = null;
     try {
       const oc = await db.from("whatsapp_conversations").select("id,route_key").eq("company_id", msg.company_id).eq("customer_wa_id", conv.customer_wa_id).neq("id", conv.id).limit(1).maybeSingle();
       if (oc.data) {
+        otherConvId = oc.data.id;
         const om = await db.from("whatsapp_messages").select("direction,message_type,body,transcript").eq("conversation_id", oc.data.id).order("message_timestamp", { ascending: false }).limit(8);
         otherRoute = `محادثة نفس العميل على الرقم الثاني (${oc.data.route_key === "barka" ? "بركاء" : "مسقط"}):\n` + (om.data || []).reverse().map((x: any) => `${x.direction === "inbound" ? "العميل" : "المكتب"}: ${short(x.transcript || x.body || `[${x.message_type}]`, 300)}`).join("\n");
       }
@@ -334,6 +351,9 @@ Deno.serve(async (req) => {
       "",
       "العقارات المتاحة الآن (لا تعرض غيرها، ولا تذكر id للعميل):",
       props.map(propLine).join("\n") || "لا يوجد",
+      "",
+      "عقارات انباعت او انحجزت مؤخراً (لا تعرضها، واذا العميل سأل عنها طبق قاعدة المباع):",
+      soldList || "لا يوجد",
       "",
       "معلومات المستثمرين:",
       INVESTOR_KNOWLEDGE,
@@ -381,7 +401,8 @@ Deno.serve(async (req) => {
       // after the ad, always ask when they can visit (unless the action already books it)
       const hasAd = texts.some((t) => t.length > 250);
       const asksVisit = texts.some((t) => /تزور|الزيارة|زياره|تشوف/.test(t));
-      if ((hasAd || sentAd) && !asksVisit && out.action === "none" && !history.some((h: any) => h.direction === "outbound" && /تزور/.test(String(h.body || "")) ) ) texts.push("متى يناسبك تزور ؟");
+      const waitsBank = /تمويل|البنك|بنك/.test(String(out.request?.followup_note || ""));
+      if (texts.length && !waitsBank && (hasAd || sentAd) && !asksVisit && out.action === "none" && !history.some((h: any) => h.direction === "outbound" && /تزور/.test(String(h.body || "")) ) ) texts.push("متى يناسبك تزور ؟");
     }
     out.reply_messages = texts.slice(0, 3);
     // a pinned reply only counts when the id is real
@@ -434,6 +455,13 @@ Deno.serve(async (req) => {
       && ["none", "handoff"].includes(out.action) && (ruleAuto || (rt.auto_send_categories || []).includes(out.category));
     const analysis = { ...out, property_id: prop?.id || null, model: OPENAI_MODEL, dry_run: dry, auto_sent: autoSend, transcribed: pendingAudio.filter((a: any) => a.transcript).length,
       ...(redo ? { owner_instruction: redo.instruction, rewritten_at: new Date().toISOString() } : {}) };
+    // the customer carries on with the other branch number about the same thing: close what waits there
+    if (!review && out.close_other_branch && otherConvId) {
+      try {
+        await db.from("whatsapp_reply_drafts").update({ status: "superseded", superseded_at: new Date().toISOString(), approver_note: "العميل يكمل نفس الموضوع على الرقم الثاني" }).eq("conversation_id", otherConvId).eq("status", "pending");
+        await db.from("whatsapp_outreach_queue").update({ status: "skipped", reason: "other_branch" }).eq("conversation_id", otherConvId).eq("status", "pending");
+      } catch (_) { /* optional */ }
+    }
     if (redo) {
       // only while it still waits: if it was sent or rejected meanwhile, nothing changes
       const u = await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages }).eq("id", draftId).eq("status", "pending").select("id");
@@ -441,7 +469,9 @@ Deno.serve(async (req) => {
       return json({ ok: true, status: "rewritten", reply_messages: out.reply_messages, action: out.action, analysis });
     }
     if (dry || (rt.reply_agent_mode === "approval" && !autoSend)) {
-      await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages, status: "pending" }).eq("id", draftId);
+      // nothing to say (closing words, the other branch handles it): no empty card in the approval screen
+      const nothing = !dry && !out.reply_messages.length && out.action === "none";
+      await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages, status: nothing ? "skipped" : "pending", error: nothing ? "no_reply_needed" : null }).eq("id", draftId);
       return json({ ok: true, status: "awaiting_approval" });
     }
 
