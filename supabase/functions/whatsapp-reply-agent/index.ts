@@ -127,7 +127,7 @@ const schema = {
 // must not write links and the location goes through send_location.
 function publicText(v: unknown) {
   return String(v ?? "").replace(/https?:\/\/\S+/gi, "").replace(/\+?968[\s-]?\d{8}|\b[79]\d{7}\b/g, "")
-    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "").replace(/\s+/g, " ").trim();
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "").replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").trim();
 }
 
 // Office titles carry owner names ("فيلا الرميس 59 سلطان"), so the agent only sees a neutral label.
@@ -136,7 +136,7 @@ function propLine(p: any) {
   const bits = [p.area, p.wilayat, p.price ? `${p.listing_purpose === "rent" ? "الإيجار " : ""}${Number(p.price).toLocaleString("en-US")} ريال` : "", p.bedrooms ? `${p.bedrooms} غرف` : "",
     p.land_size ? `أرض ${p.land_size}م` : "", p.built_size ? `بناء ${p.built_size}م` : ""].filter(Boolean).join("، ");
   const visit = { open: "مفتوح ويروح بروحه", lockbox: "صندوق مفتاح برمز", owner_lives: "المالك ساكن (يعطى رقم المالك)", office: "تنسيق منا (handoff)" }[p.visit_method as string] || "غير محدد (handoff للمعاينة)";
-  return `- id=${p.id} | ${name} | ${bits} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? " | اللوكيشن متوفر (action=send_location)" : " | اللوكيشن غير متوفر"}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}${p.marketing ? `\n  وصف الإعلان: ${short(p.marketing, 900)}` : ""}`;
+  return `- id=${p.id} | ${name} | ${bits} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? " | اللوكيشن متوفر (action=send_location)" : " | اللوكيشن غير متوفر"}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}${p.marketing ? `\n  وصف الإعلان: ${short(p.marketing, 1600)}` : ""}`;
 }
 
 async function notifyHandoff(companyId: string, conv: any, client: any, reason: string) {
@@ -248,7 +248,7 @@ Deno.serve(async (req) => {
     const capR = props.length ? await db.from("instagram_media_catalog").select("property_id,caption").in("property_id", props.map((p: any) => p.id)) : { data: [] };
     for (const p of props as any[]) {
       const caps = ((capR as any).data || []).filter((c: any) => c.property_id === p.id).map((c: any) => publicText(c.caption)).sort((a: string, b: string) => b.length - a.length);
-      p.marketing = publicText(p.description) || caps[0] || "";
+      p.marketing = [publicText(p.public_details), publicText(p.description), caps[0] || ""].sort((a: string, b: string) => b.length - a.length)[0] || ""; // the fullest ad text wins
     }
     // A/B/C test: each pinned reply shows the model one wording, picked at random among the active ones
     const ruleIds = (rulesR.data || []).map((r: any) => r.id);
