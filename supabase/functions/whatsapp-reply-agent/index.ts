@@ -384,7 +384,8 @@ Deno.serve(async (req) => {
       else if (key) extra += " {ريل ما عرفنا وصفه}";
       if (h.matched_property_id) extra += ` {عقار مرتبط: ${h.matched_property_id}}`;
       if (h.property_image_analysis) extra += ` {تحليل الصورة: ${short(JSON.stringify(h.property_image_analysis), 300)}}`;
-      return `${who}: ${short(text, 700)}${extra}`;
+      const when = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Muscat", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(h.message_timestamp));
+      return `[${when}] ${who}: ${short(text, 700)}${extra}`;
     }).join("\n");
 
     const context = [
