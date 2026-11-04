@@ -348,6 +348,14 @@ Deno.serve(async (req) => {
     let texts: string[] = (out.reply_messages || []).map((t: string) => humanize(t)).filter(Boolean);
     if (budgetAskedBefore) texts = texts.filter((t) => !/ميزاني|في حدود كم|كم تقريب/.test(t));
     texts = texts.filter((t) => !/(الموظف|موظف)\s*(بيتواصل|يتواصل|بيرد|يرد)|بيتواصل معك الموظف|تم تحويل/.test(t));
+    // never tell a customer that a property is sold when the CRM still lists it as available
+    const SOLD_RE = /ابتاع|انباع|انحجز|تم البيع|مباع/;
+    const linkedAvailable = props.some((p: any) => p.id === out.property_id || history.some((h: any) => h.matched_property_id === p.id));
+    if (linkedAvailable && texts.some((t) => SOLD_RE.test(t))) {
+      texts = texts.filter((t) => !SOLD_RE.test(t));
+      if (!texts.length) texts = ["تمام بشوف وارد عليك"];
+      out.action = "handoff"; out.handoff_reason = "العقل كان بيقول العقار انباع وهو متوفر في الـ CRM، راجع المحادثة";
+    }
     out.reply_messages = texts.slice(0, 3);
     // a pinned reply only counts when the id is real
     const rule = (rulesR.data || []).find((r: any) => r.id === out.matched_rule_id) || null;
