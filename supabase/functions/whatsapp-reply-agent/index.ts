@@ -575,7 +575,9 @@ Deno.serve(async (req) => {
       if (!(u.data || []).length) return json({ ok: false, error: "draft_not_pending" }, 409);
       return json({ ok: true, status: "rewritten", reply_messages: out.reply_messages, action: out.action, analysis });
     }
-    if (dry || (rt.reply_agent_mode === "approval" && !autoSend)) {
+    // live ("direct"): everything goes out on its own except investors and running deals, which wait for the owner
+    const holdForOwner = rt.reply_agent_mode === "direct" && ["investor", "active_deal"].includes(out.category);
+    if (dry || holdForOwner || (rt.reply_agent_mode === "approval" && !autoSend)) {
       // nothing to say (closing words, the other branch handles it): no empty card in the approval screen
       const nothing = !dry && !out.reply_messages.length && out.action === "none";
       await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages, status: nothing ? "skipped" : "pending", error: nothing ? "no_reply_needed" : null }).eq("id", draftId);
