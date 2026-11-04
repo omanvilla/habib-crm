@@ -487,7 +487,10 @@ Deno.serve(async (req) => {
       const hasAd = texts.some((t) => t.length > 250);
       const asksVisit = texts.some((t) => /تزور|الزيارة|زياره|تشوف/.test(t));
       const waitsBank = /تمويل|البنك|بنك/.test(String(out.request?.followup_note || ""));
-      if (texts.length && !waitsBank && (hasAd || sentAd) && !asksVisit && out.action === "none" && !history.some((h: any) => h.direction === "outbound" && /تزور/.test(String(h.body || "")) ) ) texts.push("متى يناسبك تزور ؟");
+      // not after closing words, and not when the visit is already with the owner or was already asked about
+      const onlyClosing = texts.every((t) => t.length < 25 && /العفو|الله يسعدك|مبروك|تسلم|حياك/.test(t));
+      const visitHandled = history.some((h: any) => h.direction === "outbound" && /تزور|زيار|المالك مباشرة|نسق مع المالك|\[contacts\]/.test(String(h.body || "") + (h.message_type === "contacts" ? "[contacts]" : "")));
+      if (texts.length && !onlyClosing && !waitsBank && (hasAd || sentAd) && !asksVisit && out.action === "none" && !visitHandled) texts.push("متى يناسبك تزور ؟");
     }
     out.reply_messages = texts.slice(0, 3);
     // a pinned reply only counts when the id is real
