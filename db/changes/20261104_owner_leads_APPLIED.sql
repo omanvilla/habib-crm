@@ -1,0 +1,7 @@
+-- applied 4 Nov 2026 evening (owner at computer)
+-- owner_leads: owners who want to sell, before we list the property (open / studied / listed / closed)
+-- owner_lead_matches + crm_match_owner_leads(): daily (cron owner_leads_match_daily 25 4 * * * = 8:25 Oman) and
+-- whenever the reply agent records an owner offer; one CRM notification per lead with the matching buyers
+-- (active buyer requests, same area or wilayat, same type, budget between 90% and 160% of the asking price)
+-- conversations muted: Mohammed Hani (ads service, both numbers), job seeker 91321223
+-- reel caption DfTqCRUv9A8 fixed ("قبل يوم على الأقل"); pinned prompt reply: "ارسل على الفيديو نفسه في الانستجرام وراح يوصلك البرومبت"
