@@ -118,8 +118,20 @@ const schema = {
     crm_note: { type: "string" },
     matched_rule_id: { type: ["string", "null"] },
     alternatives: { type: "array", items: { type: "array", items: { type: "string" } } },
+    request: { anyOf: [{ type: "null" }, {
+      type: "object", additionalProperties: false,
+      properties: {
+        request_type: { type: "string", enum: ["buyer", "tenant", "seller", "consultation"] },
+        areas: { type: "array", items: { type: "string" } },
+        property_types: { type: "array", items: { type: "string" } },
+        budget_max: { type: ["number", "null"] },
+        bedrooms_min: { type: ["integer", "null"] },
+        notes: { type: ["string", "null"] },
+      },
+      required: ["request_type", "areas", "property_types", "budget_max", "bedrooms_min", "notes"],
+    }] },
   },
-  required: ["reply_messages", "category", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives"],
+  required: ["reply_messages", "category", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives", "request"],
 };
 
 // The marketing text (property description, or the longest reel caption for it) is what the office
@@ -149,7 +161,7 @@ async function notifyHandoff(companyId: string, conv: any, client: any, reason: 
     if (!userId) return;
     await db.from("notifications").insert({
       user_id: userId, type: "whatsapp_handoff", is_read: false, client_id: client.id, link: "whatsapp",
-      title: `محادثة تحتاجك: ${client.name || conv.customer_name || client.phone || "عميل"}`,
+      title: `${/^طلب اتصال/.test(reason) ? "📞 طلب اتصال" : "محادثة تحتاجك"}: ${client.name || conv.customer_name || client.phone || "عميل"}`,
       body: short(reason, 400),
     });
   } catch (e) { console.error("[reply-agent] notify", String((e as any)?.message || e)); }
@@ -414,6 +426,23 @@ Deno.serve(async (req) => {
       if (out.area) flags.preferred_area = short(out.area, 200);
       if (Object.keys(flags).length) await db.from("clients").update(flags).eq("id", client.id);
     } catch (_) { /* optional */ }
+    // keep what the client is looking for in their open request, so a matching listing can be sent later
+    try {
+      const rq = out.request;
+      if (rq && (rq.areas?.length || rq.property_types?.length || rq.budget_max || rq.bedrooms_min)) {
+        const patch: any = { request_type: rq.request_type, updated_at: now, last_contact_at: now };
+        if (rq.areas?.length) { patch.preferred_areas = rq.areas.slice(0, 6); patch.preferred_area = rq.areas[0]; }
+        if (rq.property_types?.length) { patch.property_types = rq.property_types.slice(0, 4); patch.property_type = rq.property_types[0]; }
+        if (rq.budget_max) patch.budget_max = rq.budget_max;
+        if (rq.bedrooms_min) patch.bedrooms_min = rq.bedrooms_min;
+        patch.ai_extracted = { ...rq, source: "reply_agent", at: now }; // never overwrite staff notes
+        const open = await db.from("client_requests").select("id").eq("client_id", client.id).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle();
+        const w = open.data
+          ? await db.from("client_requests").update(patch).eq("id", open.data.id)
+          : await db.from("client_requests").insert({ ...patch, company_id: msg.company_id, client_id: client.id, route_key: conv.route_key, created_via: "whatsapp_ai", origin_whatsapp_message_id: msg.id, source: "whatsapp" });
+        if (w.error) console.error("[reply-agent] request", w.error.message);
+      }
+    } catch (e) { console.error("[reply-agent] request", String((e as any)?.message || e)); }
     const visitAction = ["book_viewing", "send_location", "send_lockbox", "send_owner_number"].includes(out.action);
     if (visitAction && prop && /^\d{4}-\d{2}-\d{2}$/.test(out.viewing_date || "")) {
       const t = /^([01]\d|2[0-3]):[0-5]\d$/.test(out.viewing_time || "") ? out.viewing_time : "16:00";
