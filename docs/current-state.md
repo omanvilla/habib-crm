@@ -1,6 +1,36 @@
 # Habib CRM — current state
 
-Updated 2026-10-21. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
+Updated 2026-11-05. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
+
+## 5 November 2026 — audit fixes, owner type agent, visit presence, Instagram cards
+
+Live on main (PRs #36, #37, #38). Database changes SQL55 to SQL59 are applied, each with a rollback file in `db/changes/`.
+
+- **Runtime.** `mode=live`, `reply_agent_mode=direct` (investors and active deals wait for the owner), `auto_send_categories=[]`, `enabled_scenarios=[]`. The old engine and `buyer_intake_v1` stay stopped. `habib_whatsapp_followups_hourly` stays disabled.
+- **Database closed (SQL56, SQL57).** The review tables moved to `crm_repair_private`, four functions got a fixed `search_path`, `crm_queue_property_outreach` lost public execute, and agents see only their own branch's owners.
+- **Record of live changes.** `db/changes/20261105_live_sync_APPLIED.sql` holds the changes that existed only in the database, plus the scheduled jobs. `whatsapp-reply-agent-test` is a retired stub that returns 410.
+- **Reply agent v26.**
+  - `watchVisit` reads quiet paths and normal paths and logs agreed visits with `created_via='whatsapp_ai'`. It needs confidence of at least 0.7 and never moves or cancels a manual visit.
+  - `visit_test:true` runs it without writing.
+  - Requests are saved with `created_via='ai'`.
+- **Owner type agent and visit presence (SQL58).**
+  - `owners` gains `original_owner_name`, `kinship`, `has_power_of_attorney`.
+  - `viewings` gains `ahmed_present`, `owner_visit_notes`.
+  - `crm_set_visit_presence` and `crm_add_property_with_owner` accept the owner's login or a server call with no login, and refuse Barka. See `docs/add-property-from-claude.md`.
+- **Listing purpose (SQL55).** New property column, which also needs the grant and the `crm_properties_access` view (see `CRM_DATA_COLUMNS`).
+- **Instagram (SQL59, PR #38).**
+  - The home page shows a card for each unlinked video from the last 14 days, with a suggested property. The owner confirms it, nothing links by itself.
+  - Properties with no video for 7 days raise an alert.
+  - Matching is `caption-facts-v2`. A caption with no price can link on area, bedrooms, bathrooms and one exact size, and a type conflict blocks it.
+  - `thumbnail_url` refreshes on each scan for the newest 25 videos, and on the daily full scan for the rest.
+
+**Verification limits.**
+- CI passed on each PR.
+- SQL was tried as live roles inside transactions that were rolled back.
+- `watchVisit` was tried read-only on 12 real messages. No real visit has been logged by it yet.
+- Screens were checked from the Barka account in the built-in browser. Owner-account screens have not been checked in a live session, because the Chrome extension was not connected.
+
+**Not done.** The new home page shape, deletion of unused items, and the utility wording for follow-up templates 2 to 4 all wait for the owner. Nothing was deleted.
 
 ## 1 November 2026 — deals by date, quick visit result
 
