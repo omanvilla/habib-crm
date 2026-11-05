@@ -47,7 +47,8 @@ BEGIN
   v_week := v_today - extract(dow FROM v_today)::int;
   v_month := date_trunc('month', v_today)::date;
 
-  SELECT count(*) INTO v_n FROM public.whatsapp_reply_drafts WHERE company_id = v_company AND status = 'failed' AND created_at > now() - interval '48 hours';
+  SELECT count(*) INTO v_n FROM public.whatsapp_reply_drafts WHERE company_id = v_company AND status = 'failed' AND created_at > now() - interval '48 hours'
+     AND NOT EXISTS (SELECT 1 FROM public.whatsapp_messages m WHERE m.conversation_id = whatsapp_reply_drafts.conversation_id AND m.direction = 'outbound' AND m.message_timestamp > whatsapp_reply_drafts.created_at);
   IF v_n > 0 THEN v_problems := v_problems || jsonb_build_object('title', 'ردود فشلت خلال يومين', 'count', v_n, 'nav', 'replies'); END IF;
 
   SELECT count(*), string_agg(DISTINCT j.jobname, ' · ') INTO v_n, v_text FROM cron.job_run_details d JOIN cron.job j ON j.jobid = d.jobid
@@ -72,7 +73,8 @@ BEGIN
   SELECT count(*) INTO v_n FROM public.deals d WHERE d.company_id = v_company AND d.stage = 'viewing_scheduled' AND d.updated_at < now() - interval '30 days';
   IF v_n > 0 THEN v_problems := v_problems || jsonb_build_object('title', 'صفقات واقفة على زيارة مجدولة من أكثر من شهر', 'count', v_n, 'nav', 'deals'); END IF;
 
-  SELECT n.title, 1 INTO v_text, v_n FROM public.notifications n WHERE n.user_id = auth.uid() AND n.type = 'system_alert' AND NOT coalesce(n.is_read, false) AND n.created_at > now() - interval '3 days' ORDER BY n.created_at DESC LIMIT 1;
+  SELECT n.title, 1 INTO v_text, v_n FROM public.notifications n WHERE n.user_id = auth.uid() AND n.type = 'system_alert' AND NOT coalesce(n.is_read, false) AND n.created_at > now() - interval '3 days'
+     AND NOT EXISTS (SELECT 1 FROM public.whatsapp_reply_drafts r WHERE r.company_id = v_company AND r.status IN ('sent','pending') AND r.created_at > n.created_at) ORDER BY n.created_at DESC LIMIT 1;
   IF v_text IS NOT NULL THEN v_problems := v_problems || jsonb_build_object('title', v_text); END IF;
 
   RETURN jsonb_build_object(
