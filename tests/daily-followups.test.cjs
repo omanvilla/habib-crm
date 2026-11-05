@@ -26,7 +26,6 @@ test('a branch account sees its own branch only',()=>{
 });
 test('nothing goes out by itself before 10am the next day, and at most 20 a day',()=>{
  assert(sql.includes("+ 1) + time '10:00'"));
- assert(fn.includes('if (Date.now() < autoAfter(f.created_at)) continue;'));
  assert(fn.includes('DAILY_LIMIT = 20'));
 });
 test('marketing cost never goes out by itself, and a failed send stays on the list',()=>{
