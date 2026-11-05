@@ -645,6 +645,8 @@ Deno.serve(async (req) => {
     if (out.action === "send_owner_number") {
       if (prop?.visit_method === "owner_lives" && prop.owner_id) {
         const o = await db.from("owners").select("phone").eq("id", prop.owner_id).maybeSingle();
+        // the location goes with the owner's number: the customer arranges the visit with him directly
+        if (prop.map_url) outgoing.push({ type: "text", text: { preview_url: true, body: prop.map_url } });
         if (o.data?.phone) outgoing.push({ type: "text", text: { preview_url: false, body: digits(o.data.phone) } });
         else { out.action = "handoff"; out.handoff_reason = "رقم المالك غير مسجل"; }
       } else { out.action = "handoff"; out.handoff_reason = "طلب معاينة تحتاج تنسيق"; }
