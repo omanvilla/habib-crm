@@ -39,7 +39,7 @@ Live on main (PRs #36, #37, #38). Database changes SQL55 to SQL59 are applied, e
 **Automatic visit follow-ups (SQL63, PR #45).** `whatsapp-visit-followup-auto` runs every 15 minutes, 9am to 9pm Muscat, and sends without approval. It covers visits with no result from the last 30 days. Only UTILITY templates or free text inside 24 hours go out, and MARKETING ones stay in the approval list. Off switch: `visit_followups_auto`. Negotiation now gets no reply and goes to the owner. Interior photos of an occupied home get a fixed reply. Both rules were tried as dry runs on real messages.
 
 **Not done.**
-- `whatsapp-reply-agent` version 28 with project and twin awareness is deployed. No real client from a project video has passed through it yet.
+- `whatsapp-reply-agent` version 31 with project and twin awareness is deployed. No real client from a project video has passed through it yet.
 - `whatsapp-visit-templates` is deployed and the six v2 templates went to Meta on 5 Nov, status PENDING. Follow-ups keep v1 until v2 is approved as UTILITY.
 - Deletion of unused items waits for the owner. Nothing was deleted.
 
