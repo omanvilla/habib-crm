@@ -1,0 +1,22 @@
+/* Daily follow-ups list. */
+.cfu{padding:16px!important;margin-bottom:14px;min-width:0}
+.coh .cfu{margin-bottom:0}
+.cfu[hidden]{display:none}
+.cfu-title{margin:0 0 4px;font-size:17px;font-weight:700}
+.cfu-title b,.cfu-tab b{color:#9a6b12}
+.cfu-hint{margin:0 0 10px;font-size:12px;color:#6f6552}
+.cfu-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.cfu-tab{min-height:36px;padding:6px 14px;border:1px solid #eadfc6;border-radius:18px;background:#fff;font:inherit;font-size:13px;cursor:pointer}
+.cfu-tab.on{background:#fbf7ec;border-color:#9a6b12;font-weight:700}
+.cfu-list{list-style:none;margin:0;padding:0}
+.cfu-row{display:grid;gap:6px;padding:12px 0;border-top:1px solid #efe7d6;min-width:0}
+.cfu-row:first-child{border-top:0}
+.cfu-head{display:grid;gap:2px;min-width:0}
+.cfu-head strong{font-size:14px;overflow-wrap:anywhere}
+.cfu-head small,.cfu-auto{font-size:12px;color:#6f6552;overflow-wrap:anywhere}
+.cfu-text{margin:0;padding:8px 10px;border-radius:8px;background:#fbf7ec;font-size:13px;line-height:1.6;overflow-wrap:anywhere;white-space:pre-wrap}
+.cfu-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.cfu-actions>*{width:auto!important}
+.cfu-open{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;text-decoration:none}
+.cfu-actions .btn-secondary{min-height:44px}
+@media(max-width:600px){.cfu{padding:12px!important}.cfu-open{flex:1}}
