@@ -35,7 +35,7 @@ Live on main (PRs #36, #37, #38). Database changes SQL55 to SQL59 are applied, e
 **Automatic visits and requests.** A client with several open requests made the visit save fail with `viewing_request_ambiguous`, which would also have stopped `watchVisit`. Trigger `crm_pick_viewing_request` now picks the closest request for `whatsapp_ai` and `system` visits. The manual form still asks.
 
 **Not done.**
-- `whatsapp-visit-templates` with the three v2 texts is in the repo but not deployed, because the deploy was refused. Follow-ups keep v1 until v2 is approved as UTILITY.
+- `whatsapp-visit-templates` is deployed and the six v2 templates went to Meta on 5 Nov, status PENDING. Follow-ups keep v1 until v2 is approved as UTILITY.
 - Deletion of unused items waits for the owner. Nothing was deleted.
 
 ## 1 November 2026 — deals by date, quick visit result
