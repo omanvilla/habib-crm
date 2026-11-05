@@ -69,7 +69,7 @@ test('home cards count only the last 14 days and stay a suggestion',()=>{
  const ui=fs.readFileSync('crm-instagram-discovery.js','utf8'),sql=fs.readFileSync('db/changes/59-instagram-thumbnail.forward.sql','utf8');
  assert.match(ui,/RECENT_DAYS=14,NO_VIDEO_DAYS=7/);
  assert.match(ui,/\.eq\('state','needs_review'\)\.gte\('published_at',recentSince\(\)\)/);
- assert.match(ui,/data-igd="link" data-id="'\+escape\(row\.id\)\+'">اربطه بعقار/);
+ assert.match(ui,/data-igd="link" data-id="'\+escape\(row\.id\)\+'">اربطه</);
  assert.match(ui,/data-igd="general" data-id="'\+escape\(row\.id\)\+'">مو عقار/);
  assert(ui.includes("escape(row.caption||'بدون وصف')"));
  assert.match(ui,/\.cdninstagram\\.com\|\\.fbcdn\\.net/);
