@@ -22,6 +22,12 @@ test('nothing is on the list or sent before its chat is read; closed topics leav
  assert(fn.includes('enum: ["followup", "skip", "wait_for_match"]'));
  assert(fn.includes('[رسالة صوتية قديمة ما انقرت]'));
 });
+test('a client the review removed does not come back through another request',()=>{
+ const sql=fs.readFileSync('db/changes/67-followup-removed-stay-removed.forward.sql','utf8');
+ assert(sql.includes('BEFORE INSERT ON public.whatsapp_outreach_queue'));
+ assert(sql.includes("NEW.reason IS NOT NULL THEN RETURN NEW"));
+ assert(sql.includes('RETURN NULL'));
+});
 test('a message from a person takes the client off the list',()=>{
  assert(sql.includes("WHEN (new.direction = 'outbound' AND new.actor_type = 'human')"));
 });
