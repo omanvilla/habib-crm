@@ -34,7 +34,10 @@ Live on main (PRs #36, #37, #38). Database changes SQL55 to SQL59 are applied, e
 
 **Automatic visits and requests.** A client with several open requests made the visit save fail with `viewing_request_ambiguous`, which would also have stopped `watchVisit`. Trigger `crm_pick_viewing_request` now picks the closest request for `whatsapp_ai` and `system` visits. The manual form still asks.
 
+**Investment projects and identical properties (SQL61, SQL62, PRs #42, #43).** Owner-only projects page. A video links to a project from a card, by link, or when its caption names one project. A video counts for identical properties only after the owner says yes. Each gets a row with `twin_of`, and inquiries count for each. The live test ran inside a rolled-back transaction, and no twin link exists until the owner approves.
+
 **Not done.**
+- `whatsapp-reply-agent` version 28 with project and twin awareness is deployed. No real client from a project video has passed through it yet.
 - `whatsapp-visit-templates` is deployed and the six v2 templates went to Meta on 5 Nov, status PENDING. Follow-ups keep v1 until v2 is approved as UTILITY.
 - Deletion of unused items waits for the owner. Nothing was deleted.
 
