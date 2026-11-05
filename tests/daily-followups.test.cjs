@@ -14,7 +14,11 @@ test('the button asks for WhatsApp Business on the phone',()=>{
 test('nothing is on the list or sent before its chat is read; closed topics leave',()=>{
  const review=fs.readFileSync('db/changes/65-followup-review.forward.sql','utf8');
  assert(review.includes("f.status = 'awaiting_approval' AND f.reviewed_at IS NOT NULL"));
- assert(fn.includes('if (!f.reviewed_at || !f.auto_ok || Date.now() < autoAfter(f.created_at)) continue;'));
+ assert(fn.includes('if (!f.reviewed_at || !f.auto_ok || Date.now() < autoAfter(f.reviewed_at)) continue;'));
+ assert(fn.includes('out.auto_ok = false;'));
+ assert(fn.includes('out.text.slice(0, out.text.indexOf("؟") + 1)'));
+ const clock=fs.readFileSync('db/changes/66-followup-wait-from-review.forward.sql','utf8');
+ assert(clock.includes('public.crm_followup_auto_after(i.reviewed_at)'));
  assert(fn.includes('enum: ["followup", "skip", "wait_for_match"]'));
  assert(fn.includes('[رسالة صوتية قديمة ما انقرت]'));
 });
