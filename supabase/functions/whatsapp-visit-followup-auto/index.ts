@@ -21,7 +21,7 @@ const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: 
 const digits = (v: unknown) => String(v ?? "").replace(/\D/g, "");
 const short = (v: unknown, n = 500) => { const s = String(v ?? "").trim(); return s.length > n ? s.slice(0, n) + "…" : s; };
 function b64(s: string) { const b = atob(s); const o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return o; }
-// due at 10am Muscat on the day after it was prepared
+// due at 10am Muscat on the day after it reached his list (the review puts it there)
 function autoAfter(created: string) {
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date(created));
   return new Date(new Date(`${day}T10:00:00+04:00`).getTime() + 24 * 3600 * 1000).getTime();
@@ -64,7 +64,7 @@ const REVIEW_RULES = `أنت تراجع متابعة عميل لمكتب عقا�
 التفاوض لصاحب المكتب بس: لا تفتح موضوع السعر ولا تخفيض في text.
 إذا فيه "[رسالة صوتية قديمة ما انقرت]" قريب من آخر المحادثة، ما تعرف اللي انقال فيها: لا تخمن، قل هذا في reason، وخل auto_ok=false.
 
-text (لـ followup بس): رسالة واحدة يرسلها صاحب المكتب بنفسه باللهجة العمانية البسيطة. تبدأ بـ "السلام عليكم". سطر أو سطرين، خاصة بهذا العميل، وسؤال واحد ينتهي بـ " ؟". لا تكرر سؤال انجاب عليه. لا تخترع شي مو مكتوب. ممنوع: الفواصل والنقاط وعلامات التعجب، الأسعار إلا سعر عقار تعرضه، الوعود، كلمة هلا.
+text (لـ followup بس): رسالة واحدة يرسلها صاحب المكتب بنفسه باللهجة العمانية البسيطة. إذا واضح من الاسم أو الكلام إنها امرأة خاطبها بالمؤنث. تبدأ بـ "السلام عليكم". سطر أو سطرين، خاصة بهذا العميل، وسؤال واحد ينتهي بـ " ؟". لا تكرر سؤال انجاب عليه. لا تخترع شي مو مكتوب. ممنوع: الفواصل والنقاط وعلامات التعجب، الأسعار إلا سعر عقار تعرضه، الوعود، كلمة هلا.
 reason: سطر قصير لصاحب المكتب يوضح وضع العميل، مثل "شاف فيلا الرميس وما عجبه الموقع".
 auto_ok: true بس إذا النص الثابت "${"{fixed}"}" مناسب لهذا العميل لو انرسل بدل text.
 request: اللي يبغاه العميل إذا واضح من كلامه، وإلا null. لا تكتب شي ما قاله.`;
@@ -113,6 +113,10 @@ async function review(item: any, companyId: string, available: string, fixed: st
   if (!ai.ok) throw new Error(p?.error?.message || `openai_${ai.status}`);
   const out = JSON.parse(p.output_text || p.output?.flatMap((x: any) => x?.content || []).find((x: any) => x?.type === "output_text")?.text || "{}");
   out.text = out.text ? String(out.text).replace(/[،,!]/g, " ").replace(/\.(\s|$)/g, "$1").replace(/\s*[؟?]/g, " ؟").replace(/[ \t]+/g, " ").trim() : null;
+  // one question only
+  if (out.text && out.text.includes("؟")) out.text = out.text.slice(0, out.text.indexOf("؟") + 1);
+  // an unread voice note near the end means nobody knows what was said; he decides, never the automatic send
+  if (chat.split("\n").slice(-6).some((l: string) => l.includes("[رسالة صوتية قديمة ما انقرت]"))) out.auto_ok = false;
   return out;
 }
 
@@ -254,7 +258,7 @@ Deno.serve(async (req) => {
     for (const f of list.data || []) {
       if (room <= 0 || failed) break;
       // only what the review kept and said the fixed text fits
-      if (!f.reviewed_at || !f.auto_ok || Date.now() < autoAfter(f.created_at)) continue;
+      if (!f.reviewed_at || !f.auto_ok || Date.now() < autoAfter(f.reviewed_at)) continue;
       const r = await sendOne(f, numbers);
       out[r] = (out[r] || 0) + 1;
       if (r === "failed") failed = true;
@@ -267,7 +271,7 @@ Deno.serve(async (req) => {
     const qs = await db.from("whatsapp_outreach_queue").select("id,client_id,route_key,template_name,created_at,conversation_id,reviewed_at,auto_ok").eq("company_id", rt.company_id).eq("status", "pending").eq("kind", "request_followup").eq("dry_run", false).order("created_at").limit(60);
     for (const q of qs.data || []) {
       if (room <= 0) break;
-      if (!q.reviewed_at || !q.auto_ok || waiting.has(q.client_id) || !q.conversation_id || Date.now() < autoAfter(q.created_at) || !usable.has(`${q.route_key}|${q.template_name}`)) continue;
+      if (!q.reviewed_at || !q.auto_ok || waiting.has(q.client_id) || !q.conversation_id || Date.now() < autoAfter(q.reviewed_at) || !usable.has(`${q.route_key}|${q.template_name}`)) continue;
       await db.from("whatsapp_outreach_queue").update({ status: "approved", approved_at: new Date().toISOString(), reason: "auto_after_wait" }).eq("id", q.id).eq("status", "pending");
       out.released = (out.released || 0) + 1; room--;
     }
