@@ -17,7 +17,7 @@
     if(box)return box;
     box=document.createElement('div');box.id='crmOwnerHome';box.className='coh';box.hidden=true;
     box.innerHTML=''
-      +'<section class="card coh-sec"><h2 class="coh-title">يحتاج قرارك</h2><div id="cohDecide"></div><div id="cohIg"></div></section>'
+      +'<section class="card coh-sec"><h2 class="coh-title">يحتاج قرارك</h2><div id="cohDecide"></div><div id="cohTwins"></div><div id="cohIg"></div></section>'
       +'<section class="card coh-sec"><h2 class="coh-title">مشاكل</h2><div id="cohProblems"></div></section>'
       +'<section class="card coh-sec"><h2 class="coh-title">العقارات</h2><div id="cohProperties"></div></section>'
       +'<section class="card coh-sec"><h2 class="coh-title">تقرير قصير</h2><div id="cohReport"></div></section>'
@@ -50,6 +50,11 @@
     // The Instagram cards keep their own code and buttons; only their place on the page changes.
     const ig=byId('igDiscoveryAlert'),slot=byId('cohIg');if(ig&&slot&&ig.parentNode!==slot)slot.append(ig);
   }
+  // Identical properties where a video is on one and not on the other. Nothing links before a yes.
+  function drawTwins(groups){
+    const open=(groups||[]).filter(g=>!g.dismissed&&g.properties.some(p=>Number(p.videos)<Number(g.videos)));
+    byId('cohTwins').innerHTML=open.length?'<div class="coh-subhead"><h3>عقارات بنفس المواصفات <b dir="ltr">'+num(open.length)+'</b></h3></div><ul class="coh-list">'+open.map(g=>'<li class="coh-twin"><strong>'+g.properties.map(p=>esc(p.title)).join(' · ')+'</strong><small>'+g.properties.map(p=>num(p.videos)+' فيديو').join(' · ')+'</small><p>تربط كل الفيديوهات على الكل ؟ أداء الفيديو واستفساراته تنحسب لكل عقار</p><div class="coh-twin-actions"><button type="button" class="btn-primary" data-coh="twin-yes" data-key="'+esc(g.key)+'">نعم اربطهم</button><button type="button" class="btn-secondary" data-coh="twin-no" data-key="'+esc(g.key)+'">لا مختلفين</button></div></li>').join('')+'</ul>':'';
+  }
   function drawProblems(list){
     byId('cohProblems').innerHTML=list.length?'<ul class="coh-list">'+list.map(p=>'<li class="coh-row coh-problem"><div class="coh-info"><strong>'+esc(p.title)+(p.count?' <b dir="ltr">'+num(p.count)+'</b>':'')+'</strong>'+(p.detail?'<small>'+esc(p.detail)+'</small>':'')+'</div>'
       +(p.nav?'<button type="button" class="btn-secondary coh-go" data-coh="nav" data-nav="'+esc(p.nav)+'">فتح</button>':'')+'</li>').join('')+'</ul>':'<p class="coh-empty">ما في مشاكل الحين</p>';
@@ -72,23 +77,29 @@
     const page=byId('page-dash'),box=mount();if(!page||!box)return;
     if(!isOwner()||typeof supa==='undefined'){box.hidden=true;page.classList.remove('coh-on');return;}
     const seq=++sequence;
-    const [home,pending]=await Promise.all([supa.rpc('crm_owner_home'),typeof window.crmPendingReplies==='function'?window.crmPendingReplies().catch(()=>0):0]);
+    const [home,pending,twinGroups]=await Promise.all([supa.rpc('crm_owner_home'),typeof window.crmPendingReplies==='function'?window.crmPendingReplies().catch(()=>0):0,supa.rpc('crm_property_twins')]);
     if(seq!==sequence)return;
     if(home.error||!home.data){if(!last){box.hidden=true;page.classList.remove('coh-on');}return;}
-    last={data:home.data,pending:pending||0};
+    last={data:home.data,pending:pending||0,twins:twinGroups&&!twinGroups.error?twinGroups.data:[]};
     render();
     box.hidden=false;page.classList.add('coh-on');
   }
   function render(){
     if(!last)return;
     const d=last.data;
-    drawDecide(d,last.pending);drawProblems(d.problems||[]);drawProperties(d.properties||{});drawReport(d.report||{});
+    drawDecide(d,last.pending);drawTwins(last.twins);drawProblems(d.problems||[]);drawProperties(d.properties||{});drawReport(d.report||{});
   }
   document.addEventListener('click',e=>{
     const b=e.target.closest('[data-coh]');if(!b)return;
     const act=b.dataset.coh;
     if(act==='more'){showAll=!showAll;render();}
     else if(act==='full'){const page=byId('page-dash'),open=page.classList.toggle('coh-full-open');b.setAttribute('aria-expanded',String(open));b.textContent=open?'إخفاء قائمة العمل الكاملة':'قائمة العمل الكاملة';}
+    else if(act==='twin-yes'||act==='twin-no'){
+      b.disabled=true;
+      const toast=(m,t)=>{if(typeof showToast==='function')showToast(m,t);};
+      const call=act==='twin-yes'?supa.rpc('crm_link_twin_group',{p_properties:b.dataset.key.split(',')}):supa.rpc('crm_dismiss_twin_group',{p_key:b.dataset.key});
+      call.then(r=>{if(r.error)throw r.error;toast(act==='twin-yes'?'انربطت الفيديوهات على الكل':'تمام ما راح أسأل عنهم مرة ثانية','success');return window.crmOwnerHomeRefresh();}).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});
+    }
     else if(act==='nav'&&typeof navigate==='function'){const nav=b.dataset.nav;navigate(nav,{replies:byId('navReplies'),'owner-leads':byId('navOwnerLeads')}[nav]||null);}
   });
   window.crmOwnerHomeRefresh=()=>load().catch(()=>{});

@@ -445,8 +445,16 @@ Deno.serve(async (req) => {
     }
     const reels: Record<string, any> = {};
     if (codes.size) {
-      const r = await db.from("instagram_media_catalog").select("link_key,caption,property_id,state").eq("company_id", msg.company_id).in("link_key", [...codes]);
+      const r = await db.from("instagram_media_catalog").select("link_key,caption,property_id,state,project_id").eq("company_id", msg.company_id).in("link_key", [...codes]);
       for (const x of r.data || []) reels[x.link_key] = x;
+      // a video can belong to an investment project, or count for identical properties
+      const projectIds = [...new Set((r.data || []).map((x: any) => x.project_id).filter(Boolean))];
+      if (projectIds.length) {
+        const pr = await db.from("investment_projects").select("id,name,developer").in("id", projectIds);
+        for (const x of Object.values(reels) as any[]) x.project = (pr.data || []).find((y: any) => y.id === x.project_id) || null;
+      }
+      const ev = await db.from("property_marketing_events").select("link_key,property_id").eq("company_id", msg.company_id).in("link_key", [...codes]);
+      for (const e of ev.data || []) if (reels[e.link_key]) (reels[e.link_key].propertyIds ||= []).push(e.property_id);
     }
 
     // recently sold or booked: the agent must recognise them and answer with the sold rule, never offer them
@@ -473,7 +481,7 @@ Deno.serve(async (req) => {
       const key = String(h.property_link_key || "") || ((String(h.body || "").match(IG_RE) || [])[1] ? `instagram:${String(h.body).match(IG_RE)![1]}` : "");
       const reel = key ? reels[key] : null;
       let extra = "";
-      if (reel) extra += ` {ريل من حسابنا. وصفه: ${short(reel.caption, 300).replace(/\n+/g, " / ")}${reel.property_id ? ` | عقار مرتبط: ${reel.property_id}` : ""}}`;
+      if (reel) extra += ` {ريل من حسابنا. وصفه: ${short(reel.caption, 300).replace(/\n+/g, " / ")}${reel.property_id ? ` | عقار مرتبط: ${reel.property_id}` : ""}${reel.project ? ` | عن مشروع استثماري: ${reel.project.name}${reel.project.developer ? ` للمطور ${reel.project.developer}` : ""}` : ""}${(reel.propertyIds || []).length > 1 ? ` | نفس الفيديو لعقارات متطابقة: ${reel.propertyIds.join(" و ")}، إذا واحد راح اعرض الثاني المتوفر` : ""}}`;
       else if (key) extra += " {ريل ما عرفنا وصفه}";
       if (h.matched_property_id) extra += ` {عقار مرتبط: ${h.matched_property_id}}`;
       if (h.property_image_analysis) extra += ` {تحليل الصورة: ${short(JSON.stringify(h.property_image_analysis), 300)}}`;
@@ -667,6 +675,8 @@ Deno.serve(async (req) => {
       await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages, status: "skipped", error: "owner_with_ahmed" }).eq("id", draftId);
       return json({ ok: true, ignored: "owner_with_ahmed" });
     }
+    // a client who came from a project video is an investor, and his replies wait for the owner like any investor
+    if (Object.values(reels).some((x: any) => x.project)) out.category = "investor";
     // live ("direct"): everything goes out on its own except investors and running deals, which wait for the owner
     const holdForOwner = rt.reply_agent_mode === "direct" && ["investor", "active_deal"].includes(out.category);
     if (dry || holdForOwner || (rt.reply_agent_mode === "approval" && !autoSend)) {

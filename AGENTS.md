@@ -24,6 +24,12 @@ Manual review is owner-only, optimistic-version checked and audited; it can link
 
 The queue lives in **أداء العقارات > ربط المنشورات بالعقارات**, with status, counts, pagination and manual decisions. Keep ordinary performance below it, Marketing visible on property rows and IG direct messages removed. Tests must cover real database authorization separately from synthetic UI and actual provider execution.
 
+## Identical properties and investment projects — 5 November 2026
+
+Ahmed's instruction supersedes "never duplicate" above in one case only: a video may count for identical properties (same owner, land, built size, bedrooms and price) after he says yes. Each gets its own publication row with `twin_of`, and inquiries from the video count for each. Saving a link that belongs to another property is still refused. Nothing links to identical properties without his yes.
+
+Videos can belong to an owner-only investment project. The scan links one only when the caption names exactly one project, not when it says near or opposite the place, and never over Ahmed's decision or a property link.
+
 ## Unchanged product guardrails
 
 Keep stacked client/property lists, coherent Arabic typography and line icons, exact existing filters/export sources, secondary actions under More, four home shortcuts, six initially collapsed work categories, branch targets and period performance in Reports. Keep calendar. Do not redesign Deals or alter deal forms/workflow without an explicit new instruction. Preserve customer text/emoji; no broad DOM text rewriting.

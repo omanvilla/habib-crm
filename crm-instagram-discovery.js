@@ -17,7 +17,10 @@
   return hits.length===1?hits[0]:null;
  }
  const projectOptions=near=>projects.length?'<optgroup label="المشاريع الاستثمارية">'+projects.map(p=>'<option value="project:'+escape(p.id)+'"'+(near&&near.id===p.id?' selected':'')+'>'+escape(p.name)+(near&&near.id===p.id?' · الأقرب':'')+'</option>').join('')+'</optgroup>':'';
- async function loadProjects(){const r=await supa.from('investment_projects').select('id,name,aliases').eq('archived',false).order('created_at');if(!r.error)projects=r.data||[];}
+ async function loadProjects(){const r=await supa.from('investment_projects').select('id,name,aliases').eq('archived',false).order('created_at');if(!r.error)projects=r.data||[];
+  const t=await supa.rpc('crm_property_twins');twins=t.error?[]:(t.data||[]);}
+ let twins=[];
+ const twinsOf=id=>{const g=twins.find(x=>x.properties.some(p=>p.id===id));return g?g.properties:null;};
  const fold=v=>String(v||'').replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').toLowerCase();
  function safeThumb(value){try{const u=new URL(value);return u.protocol==='https:'&&/(\.cdninstagram\.com|\.fbcdn\.net)$/.test(u.hostname)?u.href:'';}catch{return '';}}
  // Nearest property for the card: area, type, rooms, baths and sizes from the caption, available ones without a video first. Only a suggestion: Ahmed links it.
@@ -120,10 +123,18 @@
   const property=decision==='link'?button.closest('article')?.querySelector('[data-ig-property]')?.value:null;
   if(decision==='link'&&!property){showToast('اختر العقار أو المشروع أولًا','error');return;}
   const project=String(property||'').startsWith('project:')?String(property).slice(8):null;
+  // Identical properties: ask first, and link to all of them only on a yes.
+  const twinList=decision==='link'&&!project?twinsOf(property):null;
+  if(twinList&&!button.dataset.twinChoice){
+   const host=button.closest('article');host.querySelector('.ig-twin')?.remove();
+   host.querySelector('[data-ig-property]').parentNode.insertAdjacentHTML('beforeend','<div class="ig-twin"><strong>هذا العقار له عقارات بنفس المواصفات</strong><p>'+twinList.map(p=>escape(p.title)).join(' · ')+'</p><p>تربط الفيديو على الكل ؟</p><div class="ws-actions"><button class="btn-primary" data-igd="link" data-id="'+escape(id)+'" data-twin-choice="all">نعم على الكل</button><button class="btn-secondary" data-igd="link" data-id="'+escape(id)+'" data-twin-choice="one">بس على هذا</button></div></div>');
+   return;
+  }
+  const linkAll=twinList&&button.dataset.twinChoice==='all';
   busy.add(id);document.querySelectorAll('[data-igd][data-id="'+id+'"]').forEach(b=>b.disabled=true);
-  try{const result=project?await supa.rpc('crm_instagram_link_project',{p_id:id,p_expected:row.updated_at,p_project:project}):await supa.rpc('crm_instagram_review',{p_id:id,p_expected:row.updated_at,p_decision:decision,p_property:property});
+  try{const result=linkAll?await supa.rpc('crm_instagram_link_twins',{p_id:id,p_expected:row.updated_at,p_properties:[property,...twinList.map(p=>p.id).filter(x=>x!==property)]}):project?await supa.rpc('crm_instagram_link_project',{p_id:id,p_expected:row.updated_at,p_project:project}):await supa.rpc('crm_instagram_review',{p_id:id,p_expected:row.updated_at,p_decision:decision,p_property:property});
    if(identity!==scope())return;if(result.error)throw result.error;
-   showToast(project?'تم ربط الفيديو بالمشروع':decision==='link'?'تم ربط المنشور بالعقار':'تم تسجيله كمحتوى آخر دون ربطه بعقار','success');await load();await overview();
+   showToast(linkAll?'تم ربط الفيديو على العقارات المتطابقة':project?'تم ربط الفيديو بالمشروع':decision==='link'?'تم ربط المنشور بالعقار':'تم تسجيله كمحتوى آخر دون ربطه بعقار','success');await load();await overview();
   }catch(error){if(identity===scope())showToast(error?.code==='40001'?'تغير السجل أثناء المراجعة. حدّث القائمة قبل الحفظ.':'تعذر حفظ المراجعة. لم يتم تأكيد أي تغيير.','error');}
   finally{busy.delete(id);if(identity===scope())document.querySelectorAll('[data-igd][data-id="'+id+'"]').forEach(b=>b.disabled=false);}
  }
