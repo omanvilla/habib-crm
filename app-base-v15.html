@@ -2248,7 +2248,7 @@ async function loadApp(){
  return appLoadPromise;
 }
 async function loadAppInternal(){$('loaderScreen').style.display='flex';$('authScreen').classList.add('hidden');try{const u=await supa.auth.getUser();if(u.error||!u.data.user)throw new Error('لم يتم العثور على المستخدم');currentUser=u.data.user;const p=await supa.from('profiles').select('*').eq('id',currentUser.id).single();if(p.error||!p.data)throw new Error('لم يكتمل ملف هذا الحساب. تواصل مع صاحب الشركة.');currentProfile=p.data;if(currentProfile.is_active===false){throw new Error('حسابك معطّل. تواصل مع صاحب الشركة.')}if(!currentProfile.company_id){throw new Error('هذا الحساب غير مربوط بالشركة. استخدم رابط الدعوة الخاص بالموظف أو تواصل مع صاحب الشركة.')}const c=await supa.from('companies').select('*').eq('id',currentProfile.company_id).single();if(c.error||!c.data)throw new Error('تعذر تحميل بيانات الشركة.');currentCompany=c.data;updateUserUI();applyRoleVisibility();$('loaderScreen').style.display='none';$('appScreen').classList.add('visible');await loadDashboard();loadNotifications();refreshWhatsAppBadge();if(canManage()){try{const mr=await supa.from('profiles').select('*').eq('company_id',currentProfile.company_id).order('created_at');allMembers=mr.data||[]}catch(e){console.warn('Members load:',e)}}try{const or_=await supa.from('owners').select('id,name,phone,owner_type,archived').eq('archived',false);allOwners=or_.data||[]}catch(e){}}catch(err){console.error(err);showToast('خطأ: '+err.message,'error');$('loaderScreen').style.display='none';$('authScreen').classList.remove('hidden');await supa.auth.signOut({scope:'local'})}}
-function crmBranchName(branch){return ({muscat:'مسقط',barka:'بركاء',investment:'المستثمرون · خاص بالمالك',general:'غير محدد'}[branch]||'حساب الفرع')}
+function crmBranchName(branch){return ({muscat:'مسقط',barka:'بركاء',investment:'المستثمرون · خاص بالمالك',owner:'واتساب المالك · خاص',general:'غير محدد'}[branch]||'حساب الفرع')}
 function crmRecordBranchLabel(row){
  const request=row?.request||(typeof clientWorkRequests!=='undefined'?clientWorkRequests:[]).find(r=>r.id===row?.request_id),client=row?.client||(typeof allClients!=='undefined'?allClients:[]).find(c=>c.id===row?.client_id),property=row?.property||(typeof allProperties!=='undefined'?allProperties:[]).find(p=>p.id===row?.property_id);
  const branches=[row?.lead_route,row?.route_key,row?.branch_key,request?.route_key,request?.branch_key,property?.branch_key,client?.lead_route];
@@ -3965,7 +3965,7 @@ function waInboxTime(v){
   if(!v)return '';
   try{const d=new Date(v);return d.toLocaleString('ar-OM-u-nu-latn',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e){return ''}
 }
-function waRouteLabel(k){return ({investment:'💼 استثمار',muscat:'🏙️ مسقط',barka:'🏡 بركاء',general:'🗺️ عام'})[k]||k||'واتساب'}
+function waRouteLabel(k){return ({investment:'💼 استثمار',muscat:'🏙️ مسقط',barka:'🏡 بركاء',general:'🗺️ عام',owner:'🔒 واتساب المالك'})[k]||k||'واتساب'}
 function waRequestSummary(r){
   const type=({buyer:'شراء',seller:'بيع',tenant:'استئجار',landlord:'تأجير',consultation:'استشارة',investor:'استثمار'})[r.request_type]||r.request_type||'طلب';
   const areas=(r.preferred_areas&&r.preferred_areas.length?r.preferred_areas.join('، '):(r.preferred_area||''));
@@ -4144,7 +4144,8 @@ const LEAD_ROUTE_DEFS=[
   {key:'muscat',label:'مسقط',icon:'🏙️'},
   {key:'barka',label:'بركاء',icon:'🏡'},
   {key:'investment',label:'المشاريع الاستثمارية',icon:'💼'},
-  {key:'general',label:'باقي سلطنة عمان / غير محدد',icon:'🗺️'}
+  {key:'general',label:'باقي سلطنة عمان / غير محدد',icon:'🗺️'},
+  {key:'owner',label:'واتساب المالك',icon:'🔒'}
 ];
 let leadRouteData={};
 let leadRouteLoadSeq=0;
@@ -4156,11 +4157,11 @@ async function loadLeadRouting(){
   if(seq!==leadRouteLoadSeq||!crmSessionCurrent(generation,user)||!isOwner())return;if(members.error)throw members.error;if(routes.error)throw routes.error;
   allMembers=members.data||[];leadRouteData=Object.fromEntries((routes.data||[]).map(row=>[row.route_key,row]));
   box.innerHTML=LEAD_ROUTE_DEFS.map(def=>{
-   const row=leadRouteData[def.key];if(!row)return '';const investment=def.key==='investment',general=def.key==='general',transport=investment?leadRouteData.muscat:row;
-   const members=allMembers.filter(m=>m.is_active!==false&&(!investment||m.role==='owner'));
+   const row=leadRouteData[def.key];if(!row)return '';const investment=def.key==='investment',general=def.key==='general',ownerLine=def.key==='owner',transport=investment?leadRouteData.muscat:row;
+   const members=allMembers.filter(m=>m.is_active!==false&&(!(investment||ownerLine)||m.role==='owner'));
    const opts='<option value="">— '+(general?'يبقى بدون إسناد':'اختر حساب الفرع')+' —</option>'+members.map(m=>'<option value="'+m.id+'" '+(row.assigned_to===m.id?'selected':'')+'>'+escapeHtml(crmMemberChoiceLabel(m))+'</option>').join('');
-   const metaState=investment?'الاستقبال عبر رقم مسقط · بيانات الاستثمار خاصة بالمالك':transport?.meta_phone_number_id?'معرّف Meta محفوظ؛ اكتمال وصول الرسائل يُتحقق منه بشكل مستقل':'غير مربوط بـ Meta';
-   return '<div data-lead-route="'+def.key+'" style="padding:14px;border:1px solid var(--cream-deeper);border-radius:12px;margin-bottom:10px"><h3>'+def.icon+' '+def.label+'</h3><p>'+metaState+'</p><div class="fgrid"><div class="fg"><label class="fl">'+(investment?'مسؤول بيانات المستثمرين':'حساب الفرع')+'</label><select class="fs" id="routeAgent_'+def.key+'" '+(general||investment?'disabled':'')+'>'+opts+'</select></div><div class="fg"><label class="fl">'+(investment?'رقم مسقط المستخدم للاستقبال':'رقم واتساب لهذا المسار')+'</label><input class="fi" id="routePhone_'+def.key+'" dir="ltr" value="'+escapeHtml(transport?.whatsapp_number||'')+'" '+(investment?'readonly disabled':'')+'></div></div>'+(investment?'<p>يستخدم المستثمرون رقم مسقط نفسه. سجلاتهم ومحادثاتهم الخاصة تبقى للمالك.</p>':general?'':'<button type="button" class="btn-secondary" onclick="launchWhatsAppEmbeddedSignup(\''+def.key+'\')">ربط / تحديث عبر Meta</button>')+'<div class="share-link-input" style="margin-top:8px" onclick="copyTextValue(this.textContent)">'+escapeHtml(getLeadFormUrl(def.key))+'</div></div>';
+   const metaState=investment?'الاستقبال عبر رقم مسقط · بيانات الاستثمار خاصة بالمالك':ownerLine?(row.meta_phone_number_id&&row.is_active?'مربوط بـ Meta · المحادثات تظهر للمالك فقط':'غير مربوط بـ Meta بعد'):transport?.meta_phone_number_id?'معرّف Meta محفوظ؛ اكتمال وصول الرسائل يُتحقق منه بشكل مستقل':'غير مربوط بـ Meta';
+   return '<div data-lead-route="'+def.key+'" style="padding:14px;border:1px solid var(--cream-deeper);border-radius:12px;margin-bottom:10px"><h3>'+def.icon+' '+def.label+'</h3><p>'+metaState+'</p><div class="fgrid"><div class="fg"><label class="fl">'+(investment?'مسؤول بيانات المستثمرين':ownerLine?'صاحب المحادثات':'حساب الفرع')+'</label><select class="fs" id="routeAgent_'+def.key+'" '+(general||investment||ownerLine?'disabled':'')+'>'+opts+'</select></div><div class="fg"><label class="fl">'+(investment?'رقم مسقط المستخدم للاستقبال':ownerLine?'رقم المالك الخاص':'رقم واتساب لهذا المسار')+'</label><input class="fi" id="routePhone_'+def.key+'" dir="ltr" value="'+escapeHtml(transport?.whatsapp_number||'')+'" '+(investment||ownerLine?'readonly disabled':'')+'></div></div>'+(investment?'<p>يستخدم المستثمرون رقم مسقط نفسه. سجلاتهم ومحادثاتهم الخاصة تبقى للمالك.</p>':ownerLine?'<p>محادثات هذا الرقم تظهر لك وحدك. ما تنضاف للعملاء ولا يرد عليها الوكيل، والرد يكون من واتساب في جوالك.</p><button type="button" class="btn-secondary" onclick="launchWhatsAppEmbeddedSignup(\'owner\')">ربط / تحديث عبر Meta</button>':general?'':'<button type="button" class="btn-secondary" onclick="launchWhatsAppEmbeddedSignup(\''+def.key+'\')">ربط / تحديث عبر Meta</button>')+(ownerLine?'':'<div class="share-link-input" style="margin-top:8px" onclick="copyTextValue(this.textContent)">'+escapeHtml(getLeadFormUrl(def.key))+'</div>')+'</div>';
   }).join('');
  }catch(e){if(seq===leadRouteLoadSeq&&crmSessionCurrent(generation,user))box.innerHTML='<div role="alert">تعذر تحميل المسارات: '+escapeHtml(e.message)+'</div>'}
 }
@@ -4196,6 +4197,7 @@ function scheduleEmbeddedSignupFinalize(delay){
 async function launchWhatsAppEmbeddedSignup(routeKey){
   if(routeKey==='investment'){showToast('استقبال المستثمرين يستخدم رقم مسقط. الربط يُدار من مسار مسقط.','info');return}
   if(!isOwner()){showToast('⚠️ فقط صاحب الشركة يمكنه ربط أرقام واتساب','error');return}
+  if(!['muscat','barka','owner'].includes(routeKey)){showToast('⚠️ هذا المسار لا يربط رقماً','error');return}
   const row=leadRouteData[routeKey]||{};
   const input=$('routePhone_'+routeKey);
   const routePhone=(input?.value||row.whatsapp_number||'').trim();
@@ -4247,8 +4249,8 @@ async function saveLeadRouting(){
  if(!isOwner()||!crmBeginSave('leadRoutingRows'))return;const generation=crmSessionGeneration,user=currentUser.id;
  try{
   const rows=LEAD_ROUTE_DEFS.filter(def=>leadRouteData[def.key]).map(def=>{
-   const current=leadRouteData[def.key],investment=def.key==='investment',general=def.key==='general';
-   return {company_id:currentProfile.company_id,route_key:def.key,label:def.label,assigned_to:investment?currentUser.id:general?current.assigned_to:$('routeAgent_'+def.key)?.value||null,whatsapp_number:investment?null:($('routePhone_'+def.key)?.value||'').trim()||null,is_active:current.is_active===true,transport_route_key:investment?'muscat':current.transport_route_key||null,...(investment?{owner_only_inbox:true}:{}),updated_at:new Date().toISOString()};
+   const current=leadRouteData[def.key],investment=def.key==='investment',general=def.key==='general',ownerLine=def.key==='owner';
+   return {company_id:currentProfile.company_id,route_key:def.key,label:def.label,assigned_to:investment||ownerLine?currentUser.id:general?current.assigned_to:$('routeAgent_'+def.key)?.value||null,whatsapp_number:investment?null:ownerLine?current.whatsapp_number:($('routePhone_'+def.key)?.value||'').trim()||null,is_active:current.is_active===true,transport_route_key:investment?'muscat':current.transport_route_key||null,...(investment?{owner_only_inbox:true}:{}),updated_at:new Date().toISOString()};
   });if(!rows.length)throw new Error('حدّث المسارات قبل الحفظ');
   const r=await supa.from('company_lead_routes').upsert(rows,{onConflict:'company_id,route_key'}).select('route_key');if(r.error)throw r.error;if(!crmSessionCurrent(generation,user))return;if(r.data?.length!==rows.length)throw new Error('لم يصل تأكيد حفظ جميع المسارات');
   showToast('تم حفظ توزيع العملاء','success');await loadLeadRouting();

@@ -27,3 +27,29 @@ jobs:
           node-version: '22'
       - run: node --test tests/*.test.cjs
       - run: node tests/security-regressions.cjs
+  owner-route-sql:
+    # SQL68 on a synthetic copy of the live owner-only isolation catalog.
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: synthetic-test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: synthetic-test-only
+      PGHOST: 127.0.0.1
+      PGUSER: postgres
+      PGPORT: 5432
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: bash tests/owner-private-route-sql.sh

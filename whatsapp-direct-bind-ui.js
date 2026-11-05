@@ -38,7 +38,7 @@
   }
 
   function nearestRouteForButton(btn){
-    var keys=['muscat','barka','investment'];
+    var keys=['muscat','barka','investment','owner'];
     var best=null,bestScore=1e9;
     keys.forEach(function(k){
       var input=document.getElementById('routePhone_'+k);if(!input)return;

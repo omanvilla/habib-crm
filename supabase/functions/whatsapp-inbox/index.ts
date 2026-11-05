@@ -194,7 +194,8 @@ Deno.serve(async (req) => {
       const physical=await admin.rpc("resolve_whatsapp_route",{p_company_id:companyId,p_meta_phone_number_id:String(conversation.meta_phone_number_id||"")});
       const physicalRoute=Array.isArray(physical.data)?physical.data[0]:physical.data;
       const credentialRoute=String(physicalRoute?.route_key||"");
-      if(physical.error||!physicalRoute?.whatsapp_number||!["muscat","barka"].includes(credentialRoute)) return json({ok:false,error:"media_credentials_unavailable"},502);
+      // SQL68: the owner's private line is owner-only; getConversation already refused staff.
+      if(physical.error||!physicalRoute?.whatsapp_number||!["muscat","barka","owner"].includes(credentialRoute)||(credentialRoute==="owner"&&profile.role!=="owner")) return json({ok:false,error:"media_credentials_unavailable"},502);
       const tokens:string[]=[];
       const credential=await admin.from("whatsapp_route_credentials").select("token_ciphertext,token_iv,expires_at").eq("company_id",companyId).eq("route_key",credentialRoute).maybeSingle();
       if (credential.data && META_APP_SECRET && (!credential.data.expires_at || Date.parse(credential.data.expires_at)>Date.now()+60000)) {
@@ -237,7 +238,7 @@ Deno.serve(async (req) => {
         const physical=await admin.rpc("resolve_whatsapp_route",{p_company_id:companyId,p_meta_phone_number_id:String(conversation.meta_phone_number_id||"")});
         const physicalRoute=Array.isArray(physical.data)?physical.data[0]:physical.data;
         const credentialRoute=String(physicalRoute?.route_key||"");
-        if(physical.error||!physicalRoute?.whatsapp_number||!["muscat","barka"].includes(credentialRoute)) throw new Error("media_credentials_unavailable");
+        if(physical.error||!physicalRoute?.whatsapp_number||!["muscat","barka","owner"].includes(credentialRoute)||(credentialRoute==="owner"&&profile.role!=="owner")) throw new Error("media_credentials_unavailable");
         const credential=await admin.from("whatsapp_route_credentials").select("token_ciphertext,token_iv,expires_at")
           .eq("company_id",companyId).eq("route_key",credentialRoute).maybeSingle();
         if (credential.error) throw new Error("media_credentials_unavailable");

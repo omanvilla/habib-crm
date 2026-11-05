@@ -69,6 +69,8 @@ Deno.serve(async (req) => {
 
   let q = db.from("whatsapp_messages").select("id,company_id,conversation_id,media_id,whatsapp_conversations!inner(route_key)")
     .eq("message_type", "audio").is("transcript", null).not("media_id", "is", null)
+    // SQL68: voice notes on the owner's private line are not sent for transcription.
+    .neq("whatsapp_conversations.route_key", "owner")
     .or("transcription_status.is.null,transcription_status.not.in.(completed,failed)")
     .order("message_timestamp", { ascending: false }).limit(limit);
   if (convIds.length) q = q.in("conversation_id", convIds);

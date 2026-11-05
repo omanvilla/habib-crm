@@ -45,7 +45,9 @@ Deno.serve(async(req)=>{
     const code=String(body?.code||"").trim(); const routeKey=String(body?.route_key||"investment").trim();
     const sessionInfo=body?.session_info&&typeof body.session_info==='object'?body.session_info:{};
     if(!code) return json({ok:false,error:"code_required"},400);
-    if(!['investment','muscat','barka'].includes(routeKey)) return json({ok:false,error:"invalid_route"},400);
+    if(!['investment','muscat','barka','owner'].includes(routeKey)) return json({ok:false,error:"invalid_route"},400);
+    // SQL68: the owner's private line (+96890944469) is linked by the owner only.
+    if(routeKey==="owner"&&(profile.role!=="owner"||profile.is_active!==true))return json({ok:false,error:"owner_required"},403);
 
     if(routeKey==="investment"&&(profile.role!=="owner"||profile.is_active!==true))return json({ok:false,error:"owner_required"},403);
     if(routeKey==="investment")return json({ok:false,error:"investment_uses_muscat",route_key:"investment",transport_route_key:"muscat",message:"استقبال المستثمرين يستخدم رقم مسقط. لا يوجد ربط مستقل لرقم المستثمر."},409);
@@ -84,6 +86,8 @@ Deno.serve(async(req)=>{
     if(!phone&&route.whatsapp_number){const wanted=digits(route.whatsapp_number);phone=phones.find((p:any)=>digits(p.display_phone_number)===wanted)||null;}
     if(!phone&&phones.length===1) phone=phones[0];
     if(!phone) throw new Error("More than one phone number is available and the intended route number could not be matched");
+    // The owner route only ever binds its own saved number, never another WABA phone.
+    if(routeKey==="owner"&&(!digits(route.whatsapp_number)||digits(phone.display_phone_number)!==digits(route.whatsapp_number))) throw new Error("owner_route_number_mismatch: Meta returned a different number than the saved owner line");
     const phoneId=String(phone.id); const displayNumber=e164(phone.display_phone_number)||e164(route.whatsapp_number);
 
     const sub=await graphJson(`https://graph.facebook.com/${META_GRAPH_VERSION}/${wabaId}/subscribed_apps`,businessToken,{method:'POST',body:'{}'});
@@ -109,7 +113,8 @@ Deno.serve(async(req)=>{
 
     if(eventId) await admin.from("whatsapp_onboarding_events").update({waba_id:wabaId,phone_number_id:phoneId,display_phone_number:displayNumber,status:'completed',completed_at:now,details:{mode:'embedded_signup_v5',session_info:sessionInfo,debug_target_ids:targetIds,debug_scopes:waScopes.map((x:any)=>x.scope),verified_name:phone.verified_name||null,quality_rating:phone.quality_rating||null,platform_type:phone.platform_type||null,phone_status:phone.status||null,account_mode:phone.account_mode||null,subscribed_apps:true,system_token_waba_access:systemTokenAccess,assignment_attempted:assignmentAttempted,assignment_succeeded:assignmentSucceeded,assignment_error:assignmentError}}).eq("id",eventId);
 
-    await admin.from("activities").insert({company_id:profile.company_id,user_id:user.id,activity_type:'whatsapp',activity_text:`تم ربط واتساب ${displayNumber||phoneId} بمسار ${routeKey} عبر Meta Embedded Signup`,actor_type:'human',channel:'whatsapp',direction:'internal',occurred_at:now});
+    // The owner-line activity carries route_key 'owner', so the owner-only policy hides it from staff.
+    await admin.from("activities").insert({company_id:profile.company_id,user_id:user.id,activity_type:'whatsapp',activity_text:`تم ربط واتساب ${displayNumber||phoneId} بمسار ${routeKey} عبر Meta Embedded Signup`,actor_type:'human',channel:'whatsapp',direction:'internal',occurred_at:now,...(routeKey==='owner'?{after_data:{route_key:'owner'}}:{})});
     return json({ok:true,route_key:routeKey,waba_id:wabaId,phone_number_id:phoneId,display_phone_number:displayNumber,verified_name:phone.verified_name||null,subscribed_apps:true,system_token_waba_access:systemTokenAccess,assignment_attempted:assignmentAttempted,assignment_succeeded:assignmentSucceeded,assignment_error:assignmentError});
   }catch(err){
     const message=String((err as any)?.message||err).slice(0,1500); console.error('[whatsapp-embedded-signup]',message);

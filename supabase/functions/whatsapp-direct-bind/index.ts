@@ -38,7 +38,9 @@ Deno.serve(async(req)=>{
     if(!["owner","manager"].includes(String(profile.role)))return json({ok:false,error:"owner_or_manager_required"},403);
     if(CRM_COMPANY_ID&&profile.company_id!==CRM_COMPANY_ID)return json({ok:false,error:"wrong_company"},403);
 
-    const body=await req.json().catch(()=>({}));routeKey=String(body?.route_key||"").trim();if(!["muscat","barka","investment"].includes(routeKey))return json({ok:false,error:"invalid_route"},400);
+    const body=await req.json().catch(()=>({}));routeKey=String(body?.route_key||"").trim();if(!["muscat","barka","investment","owner"].includes(routeKey))return json({ok:false,error:"invalid_route"},400);
+    // SQL68: the owner's private line is bound by the owner only. discoverPhone matches its saved number exactly.
+    if(routeKey==="owner"&&(profile.role!=="owner"||profile.is_active!==true))return json({ok:false,error:"owner_required"},403);
     if(routeKey==="investment"&&(profile.role!=="owner"||profile.is_active!==true))return json({ok:false,error:"owner_required"},403);
     if(routeKey==="investment")return json({ok:false,error:"investment_uses_muscat",route_key:"investment",transport_route_key:"muscat",message:"استقبال المستثمرين يستخدم رقم مسقط. لا يوجد ربط مستقل لرقم المستثمر."},409);
     const suppliedUserToken=String(body?.user_access_token||"").trim();

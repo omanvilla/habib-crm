@@ -382,6 +382,8 @@ Deno.serve(async (req) => {
     const rt = rtR.data, conv = convR.data, client = clientR.data;
     if (!rt || (!review && rt.reply_agent_mode === "off")) return fail("agent_off");
     if (!conv || !client) return fail("context_missing", "failed");
+    // SQL68: the owner's private line never gets drafts or replies from the agent.
+    if (conv.route_key === "owner") return fail("owner_private_route");
     if (conv.agent_muted) { await watch(); return fail("agent_muted"); }
     const to = digits(client.phone_normalized || client.phone);
     const companyNumbers = (routesR.data || []).map((r: any) => digits(r.whatsapp_number)).filter(Boolean);
@@ -510,7 +512,7 @@ Deno.serve(async (req) => {
     let otherRoute = "";
     let otherConvId: string | null = null;
     try {
-      const oc = await db.from("whatsapp_conversations").select("id,route_key").eq("company_id", msg.company_id).eq("customer_wa_id", conv.customer_wa_id).neq("id", conv.id).limit(1).maybeSingle();
+      const oc = await db.from("whatsapp_conversations").select("id,route_key").eq("company_id", msg.company_id).eq("customer_wa_id", conv.customer_wa_id).neq("id", conv.id).neq("route_key", "owner").limit(1).maybeSingle();
       if (oc.data) {
         otherConvId = oc.data.id;
         const om = await db.from("whatsapp_messages").select("direction,message_type,body,transcript").eq("conversation_id", oc.data.id).order("message_timestamp", { ascending: false }).limit(8);

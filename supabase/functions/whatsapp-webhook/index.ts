@@ -1265,10 +1265,49 @@ async function logInboundActivity(clientId: string, assignedTo: string | null, b
   if (saved.error) throw new Error(`inbound activity: ${saved.error.message}`);
 }
 
+// SQL68: the owner's private WhatsApp line (route 'owner'). It is owner-only and
+// never part of the CRM pipeline: no client identity, request extraction, inquiry
+// attribution, transcription or reply agent. Only the conversation and message are
+// stored, with client_id NULL, so every client-based trigger stays inactive.
+async function getOrCreateOwnerPrivateConversation(args: { metaPhoneNumberId: string; customerWaId: string; customerPhone: string; customerName: string | null; route: any }, collisionRetry = false): Promise<any> {
+  const { metaPhoneNumberId, customerWaId, customerPhone, customerName, route } = args;
+  if (route.route_key !== "owner" || !route.assigned_to) throw new Error("owner_private_route_unavailable");
+  const existing = await supabase.from("whatsapp_conversations").select("id,route_key").eq("company_id", CRM_COMPANY_ID).eq("meta_phone_number_id", metaPhoneNumberId).eq("customer_wa_id", customerWaId).maybeSingle();
+  if (existing.error) throw new Error(`owner conversation select: ${existing.error.message}`);
+  if (existing.data) {
+    if (existing.data.route_key !== "owner") throw new Error("owner_private_conversation_mismatch");
+    const patch: Record<string, unknown> = { inbound_number: route.whatsapp_number, customer_phone: customerPhone, status: "open", updated_at: new Date().toISOString() };
+    if (customerName) patch.customer_name = customerName;
+    const { data, error } = await supabase.from("whatsapp_conversations").update(patch).eq("id", existing.data.id).eq("company_id", CRM_COMPANY_ID).select("id,route_key").single();
+    if (error) throw new Error(`owner conversation update: ${error.message}`);
+    if (data?.route_key !== "owner") throw new Error("owner_private_conversation_mismatch");
+    return data;
+  }
+  const { data, error } = await supabase.from("whatsapp_conversations").insert({ company_id: CRM_COMPANY_ID, route_key: "owner", assigned_to: route.assigned_to, client_id: null, meta_phone_number_id: metaPhoneNumberId, inbound_number: route.whatsapp_number, customer_wa_id: customerWaId, customer_phone: customerPhone, customer_name: customerName, status: "open", unread_count: 0 }).select("id,route_key").single();
+  if (error?.code === "23505" && !collisionRetry) return getOrCreateOwnerPrivateConversation(args, true);
+  if (error) throw new Error(`owner conversation insert: ${error.message}`);
+  if (data?.route_key !== "owner") throw new Error("owner_private_conversation_mismatch");
+  return data;
+}
+async function processOwnerPrivateMessage(value: any, m: any, route: any, direction: "inbound" | "outbound") {
+  const metaPhoneNumberId = String(value?.metadata?.phone_number_id || "");
+  const customerWaId = String(direction === "inbound" ? m?.from || "" : m?.to || ""), customerPhone = cleanPhone(customerWaId);
+  if (!metaPhoneNumberId || !customerWaId || !customerPhone || !m?.id) return;
+  const contact = direction === "inbound" ? ((value?.contacts || []).find((c: any) => String(c?.wa_id) === customerWaId) || value?.contacts?.[0]) : null;
+  const customerName = shortText(contact?.profile?.name, 120) || null, messageAt = messageTime(m.timestamp), body = bodyFromMessage(m);
+  const conversation = await getOrCreateOwnerPrivateConversation({ metaPhoneNumberId, customerWaId, customerPhone, customerName, route });
+  const row: Record<string, unknown> = { company_id: CRM_COMPANY_ID, conversation_id: conversation.id, client_id: null, whatsapp_message_id: m.id, direction, message_type: m.type || "unknown", body: body || null, media_id: m?.[m.type]?.id || null, reply_to_message_id: m?.context?.id || null, message_timestamp: messageAt, raw_payload: m };
+  if (direction === "inbound") Object.assign(row, { sender_wa_id: customerWaId, recipient_wa_id: metaPhoneNumberId });
+  else Object.assign(row, { sender_wa_id: String(m?.from || metaPhoneNumberId), recipient_wa_id: customerWaId, actor_type: "human", channel_source: "owner_private_app" });
+  const inserted = await supabase.from("whatsapp_messages").insert(row).select("id").single();
+  if (inserted.error && inserted.error.code !== "23505") throw new Error(`owner message insert: ${inserted.error.message}`);
+}
+
 async function processInboundMessage(value: any, m: any) {
   const metaPhoneNumberId = String(value?.metadata?.phone_number_id || ""), customerWaId = String(m?.from || ""), customerPhone = cleanPhone(customerWaId);
   if (!metaPhoneNumberId || !customerWaId || !customerPhone || !m?.id) return;
   const physicalRoute = await resolveRoute(metaPhoneNumberId); if (!physicalRoute.mapped) throw new Error(`unmapped_phone_number_id:${metaPhoneNumberId}`);
+  if (physicalRoute.route_key === "owner") return processOwnerPrivateMessage(value, m, physicalRoute, "inbound");
   const contact = (value?.contacts || []).find((c: any) => String(c?.wa_id) === customerWaId) || value?.contacts?.[0];
   const customerName = shortText(contact?.profile?.name, 120) || null, messageAt = messageTime(m.timestamp);
   let body = bodyFromMessage(m);
@@ -1487,6 +1526,7 @@ async function processOutboundEcho(value: any, echo: any) {
   const metaPhoneNumberId = String(value?.metadata?.phone_number_id || ""), customerWaId = String(echo?.to || ""), customerPhone = cleanPhone(customerWaId);
   if (!metaPhoneNumberId || !customerWaId || !customerPhone || !echo?.id) return;
   const physicalRoute = await resolveRoute(metaPhoneNumberId); if (!physicalRoute.mapped) throw new Error(`unmapped_phone_number_id:${metaPhoneNumberId}`);
+  if (physicalRoute.route_key === "owner") return processOwnerPrivateMessage(value, echo, physicalRoute, "outbound");
   const messageAt = messageTime(echo.timestamp), body = bodyFromMessage(echo);
   const normalizedBody = body.replace(/\s+/g, " ").trim();
   const isLegacyBusinessGreeting = normalizedBody === "مرحبًا بك في Oman Villa 👋 كيف ممكن نساعدك؟";
