@@ -227,6 +227,82 @@ async function notifyHandoff(companyId: string, conv: any, client: any, reason: 
   } catch (e) { console.error("[reply-agent] notify", String((e as any)?.message || e)); }
 }
 
+// Visit watch: most visits are agreed in chats a person is handling, where the agent stays quiet, so visits are
+// read from the conversation on their own path instead of depending on the reply. A location request or
+// "I may pass by" is interest, not a visit. Manual visits are never moved or cancelled from here.
+const VISIT_HINT = /زيار|زور|معاين|اشوف|أشوف|بشوف|نشوف|شفت|شفنا|زرت|زرنا|بمر|بجي|بوصل|رحت|رحنا|موعد|اليوم|بكره|بكرة|باكر|عصر|الصبح|صباح|المغرب|الغي|ألغي|visit|view|tomorrow|today/i;
+const visitSchema = {
+  type: "object", additionalProperties: false,
+  properties: {
+    event: { type: "string", enum: ["none", "agreed", "done", "cancelled"] },
+    property_id: { type: ["string", "null"] },
+    date: { type: ["string", "null"] },
+    time: { type: ["string", "null"] },
+    confidence: { type: "number" },
+    note: { type: "string" },
+  },
+  required: ["event", "property_id", "date", "time", "confidence", "note"],
+};
+const VISIT_RULES = `تقرأ محادثة واتساب لمكتب عقاري وتحدد هل آخر رسائل العميل فيها حدث زيارة لعقار. رجّع واحد بس:
+- agreed: العميل حدد يوم يزور فيه عقار (حتى لو الوقت تقريبي مثل "بكره العصر")، أو اتفق معه المكتب على موعد.
+- done: العميل قال إنه زار العقار أو شافه فعلاً.
+- cancelled: العميل قال إنه ما بيجي أو ألغى موعد متفق عليه.
+- none: أي شي ثاني. طلب اللوكيشن بدون يوم = none. "بمر" أو "بشوف" بدون يوم = none. سؤال "متى يناسبك" من المكتب بدون جواب = none. مقابلة مالك أو وسيط مع المكتب، أو مالك يعرض عقاره = none. موعد قديم فات وما تكلم عنه العميل الحين = none.
+property_id: id العقار من القائمة، بس إذا واضح من المحادثة أي عقار. إذا مو واضح خله null.
+date بصيغة YYYY-MM-DD حسب تاريخ اليوم المكتوب. time بصيغة HH:MM إذا مذكور، وإلا null (العصر=16:00، المغرب=18:00، الصبح=10:00).
+confidence من 0 إلى 1. note سطر قصير بالعربي عن اللي قاله العميل، بدون أسماء.`;
+
+async function watchVisit(msg: any, dry = false) {
+  const hist = await db.from("whatsapp_messages").select("direction,actor_type,message_type,body,transcript,message_timestamp")
+    .eq("conversation_id", msg.conversation_id).lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(16);
+  const rows = (hist.data || []).reverse();
+  const lastIn = rows.filter((h: any) => h.direction === "inbound").slice(-3).map((h: any) => h.transcript || h.body || "").join(" ");
+  if (!VISIT_HINT.test(lastIn)) return { event: "none", skipped: "no_hint" };
+  const [propsR, openR] = await Promise.all([
+    db.from("properties").select("id,type,area,price,bedrooms,land_size,listing_purpose").eq("company_id", msg.company_id).in("status", ["available", "reserved"]).eq("archived", false),
+    db.from("viewings").select("id,property_id,viewing_date,viewing_time,status,created_via").eq("client_id", msg.client_id).eq("archived", false).in("status", ["scheduled", "confirmed", "postponed"]),
+  ]);
+  const props = propsR.data || [];
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
+  const input = [`تاريخ اليوم: ${today}`, "", "العقارات:",
+    props.map((p: any) => `- id=${p.id} | ${p.type} ${p.listing_purpose === "rent" ? "للإيجار" : "للبيع"} | ${p.area} | ${Number(p.price || 0).toLocaleString("en-US")} | ${p.bedrooms || "?"} غرف | أرض ${p.land_size || "?"}م`).join("\n"),
+    "", "مواعيد مسجلة الحين لهذا العميل:", (openR.data || []).map((v: any) => `- ${v.property_id} يوم ${v.viewing_date}`).join("\n") || "لا يوجد",
+    "", "المحادثة (الأقدم أولاً):",
+    rows.map((h: any) => `[${String(h.message_timestamp).slice(0, 16)}] ${h.direction === "inbound" ? "العميل" : "المكتب"}: ${short(h.transcript || h.body || `[${h.message_type}]`, 400)}`).join("\n")].join("\n");
+  const ai = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST", headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: OPENAI_MODEL, store: false, reasoning: { effort: "low" }, instructions: VISIT_RULES, input, text: { format: { type: "json_schema", name: "visit_event", strict: true, schema: visitSchema } } }),
+  });
+  const p = await ai.json().catch(() => ({}));
+  if (!ai.ok) throw new Error(p?.error?.message || `openai_${ai.status}`);
+  const out = JSON.parse(p.output_text || p.output?.flatMap((x: any) => x?.content || []).find((x: any) => x?.type === "output_text")?.text || "{}");
+  if (dry || out.event === "none" || !(out.confidence >= 0.7)) return { ...out, applied: false };
+  const prop = props.find((x: any) => x.id === out.property_id);
+  const open = (openR.data || []).find((v: any) => v.property_id === out.property_id) || (out.event !== "agreed" && !prop && (openR.data || []).length === 1 ? openR.data![0] : null);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(out.date || "") ? out.date : null;
+  const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(out.time || "") ? out.time : null;
+  const provenance = { created_via: "whatsapp_ai", source_whatsapp_message_id: msg.id, auto_confidence: out.confidence };
+  let w: any = null;
+  if (out.event === "agreed") {
+    if (!prop || !date || date < today) return { ...out, applied: false, why: "no_property_or_date" };
+    if (open) {
+      if (open.created_via !== "whatsapp_ai" || (open.viewing_date === date && (!time || open.viewing_time?.slice(0, 5) === time))) return { ...out, applied: false, why: "already_recorded" };
+      w = await db.from("viewings").update({ viewing_date: date, viewing_time: time || open.viewing_time, status: "scheduled", notes: short(out.note, 1000) }).eq("id", open.id);
+    } else {
+      w = await db.from("viewings").insert({ company_id: msg.company_id, client_id: msg.client_id, property_id: prop.id, viewing_date: date, viewing_time: time || "16:00", duration_minutes: 30, status: "scheduled", notes: short(out.note, 1000), ...provenance });
+    }
+  } else if (out.event === "done") {
+    if (open) w = await db.from("viewings").update({ status: "done" }).eq("id", open.id);
+    else if (prop) w = await db.from("viewings").insert({ company_id: msg.company_id, client_id: msg.client_id, property_id: prop.id, viewing_date: date && date <= today ? date : today, viewing_time: time, duration_minutes: 30, status: "done", notes: short(out.note, 1000), ...provenance });
+    else return { ...out, applied: false, why: "no_property" };
+  } else if (out.event === "cancelled") {
+    if (!open || open.created_via !== "whatsapp_ai") return { ...out, applied: false, why: "nothing_to_cancel" };
+    w = await db.from("viewings").update({ status: "cancelled" }).eq("id", open.id);
+  }
+  if (w?.error) throw new Error(w.error.message);
+  return { ...out, applied: true };
+}
+
 Deno.serve(async (req) => {
   const headers = { ...cors(req), "content-type": "application/json; charset=utf-8" };
   const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers });
@@ -259,8 +335,12 @@ Deno.serve(async (req) => {
   const m = await db.from("whatsapp_messages").select("id,company_id,conversation_id,client_id,direction,message_timestamp").eq("id", message_id).single();
   if (m.error || m.data.direction !== "inbound") return json({ ok: true, ignored: "not_inbound" });
   const msg = m.data;
+  // a read-only look at what the visit watch would decide for this message
+  if (body?.visit_test === true && ok?.data === true) return json(await watchVisit(msg, true));
   // a rewrite is reviewed like a dry run: the checks below that only decide whether to send are skipped
   const review = dry || !!redo;
+  // never lets a visit problem get in the way of the reply
+  const watch = async () => { if (review) return; try { const v = await watchVisit(msg); if (v?.applied) console.log("[reply-agent] visit", v.event); } catch (e) { console.error("[reply-agent] visit", String((e as any)?.message || e)); } };
 
   // let the customer finish typing; only the newest inbound message is answered
   if (!review) await sleep(DEBOUNCE_MS);
@@ -288,26 +368,27 @@ Deno.serve(async (req) => {
     const rt = rtR.data, conv = convR.data, client = clientR.data;
     if (!rt || (!review && rt.reply_agent_mode === "off")) return fail("agent_off");
     if (!conv || !client) return fail("context_missing", "failed");
-    if (conv.agent_muted) return fail("agent_muted");
+    if (conv.agent_muted) { await watch(); return fail("agent_muted"); }
     const to = digits(client.phone_normalized || client.phone);
     const companyNumbers = (routesR.data || []).map((r: any) => digits(r.whatsapp_number)).filter(Boolean);
     if (companyNumbers.includes(to)) return fail("company_number");
     if (!review && rt.mode === "test" && !(rt.allowed_customer_phones || []).map(digits).includes(to)) return fail("not_allowlisted");
     if (!(rt.allowed_routes || []).includes(conv.route_key)) return fail("route_blocked");
-    if (!review && conv.human_handoff_required) return fail("human_handoff_open");
-    if (!review && client.followup_suppressed) return fail("client_paused");
+    if (!review && conv.human_handoff_required) { await watch(); return fail("human_handoff_open"); }
+    if (!review && client.followup_suppressed) { await watch(); return fail("client_paused"); }
 
     // someone from the office already answered after this message → stay quiet
     const after = await db.from("whatsapp_messages").select("id").eq("conversation_id", conv.id).eq("direction", "outbound")
       .gt("message_timestamp", msg.message_timestamp).limit(1);
-    if (!review && (after.data || []).length) return fail("staff_replied");
+    if (!review && (after.data || []).length) { await watch(); return fail("staff_replied"); }
     // the office's last reply before this message was typed by a person a short while ago → they are in the chat.
     // Once the agent has answered after them, or a couple of hours passed, the agent carries the conversation on.
     const lastOut = await db.from("whatsapp_messages").select("actor_type,message_timestamp").eq("conversation_id", conv.id).eq("direction", "outbound")
       .lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(1).maybeSingle();
     const staffInChat = lastOut.data?.actor_type === "human" &&
       new Date(msg.message_timestamp).getTime() - new Date(lastOut.data.message_timestamp).getTime() < STAFF_QUIET_HOURS * 3600 * 1000;
-    if (!review && staffInChat) return fail("staff_active");
+    if (!review && staffInChat) { await watch(); return fail("staff_active"); }
+    await watch();
 
     const [histR, propsR, rulesR, priorR] = await Promise.all([
       db.from("whatsapp_messages").select("id,direction,message_type,body,transcript,media_id,actor_type,message_timestamp,matched_property_id,property_link_key,property_image_analysis")
@@ -642,20 +723,10 @@ Deno.serve(async (req) => {
         const open = await db.from("client_requests").select("id").eq("client_id", client.id).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle();
         const w = open.data
           ? await db.from("client_requests").update(patch).eq("id", open.data.id)
-          : await db.from("client_requests").insert({ ...patch, company_id: msg.company_id, client_id: client.id, route_key: conv.route_key, created_via: "whatsapp_ai", origin_whatsapp_message_id: msg.id, source: "whatsapp" });
+          : await db.from("client_requests").insert({ ...patch, company_id: msg.company_id, client_id: client.id, route_key: conv.route_key, created_via: "ai", origin_whatsapp_message_id: msg.id, source: "whatsapp" });
         if (w.error) console.error("[reply-agent] request", w.error.message);
       }
     } catch (e) { console.error("[reply-agent] request", String((e as any)?.message || e)); }
-    const visitAction = ["book_viewing", "send_location", "send_lockbox", "send_owner_number"].includes(out.action);
-    if (visitAction && prop && /^\d{4}-\d{2}-\d{2}$/.test(out.viewing_date || "")) {
-      const t = /^([01]\d|2[0-3]):[0-5]\d$/.test(out.viewing_time || "") ? out.viewing_time : "16:00";
-      const v = await db.from("viewings").insert({
-        company_id: msg.company_id, client_id: client.id, property_id: prop.id, agent_id: conv.assigned_to || null,
-        viewing_date: out.viewing_date, viewing_time: t, duration_minutes: 30, location: prop.map_url || prop.area,
-        status: "scheduled", created_via: "whatsapp_ai", source_whatsapp_message_id: msg.id, notes: short(out.crm_note, 1000),
-      });
-      if (v.error) console.error("[reply-agent] viewing", v.error.message);
-    }
     if (prop && seenImages.length && out.source === "image") {
       try { await db.from("whatsapp_messages").update({ matched_property_id: prop.id }).eq("id", seenImages[seenImages.length - 1].id).is("matched_property_id", null); } catch (_) { /* optional */ }
     }
