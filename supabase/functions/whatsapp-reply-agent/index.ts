@@ -10,7 +10,7 @@ const TRANSCRIBE_MODEL = Deno.env.get("OPENAI_TRANSCRIBE_MODEL") || "gpt-4o-mini
 const META_APP_SECRET = Deno.env.get("META_APP_SECRET") ?? "";
 const WHATSAPP_ACCESS_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN") ?? "";
 const GRAPH = Deno.env.get("META_GRAPH_VERSION") || "v25.0";
-const DEBOUNCE_MS = 7000;
+const DEBOUNCE_MS = Number(Deno.env.get("REPLY_DEBOUNCE_MS") || 35000); // wait for the customer to finish typing (30 to 60 seconds)
 const STAFF_QUIET_HOURS = 2; // the last reply was typed by a person from the office in the last 2 hours → they are in the chat, stay out
 const ALLOWED_ORIGINS = ["https://omanvilla.github.io"]; // the approval screen asks for a rewrite from here
 
@@ -378,7 +378,8 @@ Deno.serve(async (req) => {
     if (!review && client.followup_suppressed) { await watch(); return fail("client_paused"); }
 
     // someone from the office already answered after this message → stay quiet
-    const after = await db.from("whatsapp_messages").select("id").eq("conversation_id", conv.id).eq("direction", "outbound")
+    // (an automated reply that went out while the customer was still typing does not count: this newer message still needs its answer)
+    const after = await db.from("whatsapp_messages").select("id").eq("conversation_id", conv.id).eq("direction", "outbound").eq("actor_type", "human")
       .gt("message_timestamp", msg.message_timestamp).limit(1);
     if (!review && (after.data || []).length) { await watch(); return fail("staff_replied"); }
     // the office's last reply before this message was typed by a person a short while ago → they are in the chat.
@@ -389,6 +390,15 @@ Deno.serve(async (req) => {
       new Date(msg.message_timestamp).getTime() - new Date(lastOut.data.message_timestamp).getTime() < STAFF_QUIET_HOURS * 3600 * 1000;
     if (!review && staffInChat) { await watch(); return fail("staff_active"); }
     await watch();
+    // the owner of a property we list writes to us: Ahmed answers owners himself
+    if (!review) {
+      const ow = await db.from("owners").select("id,phone").eq("company_id", msg.company_id).limit(2000);
+      const mine = (ow.data || []).filter((o: any) => digits(o.phone).slice(-8) && digits(o.phone).slice(-8) === to.slice(-8)).map((o: any) => o.id);
+      if (mine.length) {
+        const lp = await db.from("properties").select("id").in("owner_id", mine).in("status", ["available", "reserved"]).eq("archived", false).limit(1);
+        if ((lp.data || []).length) return fail("property_owner");
+      }
+    }
 
     const [histR, propsR, rulesR, priorR] = await Promise.all([
       db.from("whatsapp_messages").select("id,direction,message_type,body,transcript,media_id,actor_type,message_timestamp,matched_property_id,property_link_key,property_image_analysis")
@@ -686,6 +696,12 @@ Deno.serve(async (req) => {
       return json({ ok: true, status: "awaiting_approval" });
     }
 
+    // the customer wrote again while this reply was being prepared: the newer message's run answers everything
+    const newer = await db.from("whatsapp_messages").select("id").eq("conversation_id", conv.id).eq("direction", "inbound").gt("message_timestamp", msg.message_timestamp).limit(1);
+    if ((newer.data || []).length) {
+      await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages, status: "superseded", error: "newer_message" }).eq("id", draftId);
+      return json({ ok: true, ignored: "newer_message" });
+    }
     // send, in order, like a person typing separate messages
     const phoneId = digits(conv.meta_phone_number_id);
     const sentIds: string[] = [];

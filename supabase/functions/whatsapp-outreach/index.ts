@@ -169,6 +169,15 @@ async function queueListing(propertyId: string, dry: boolean) {
     ...(((await db.from("whatsapp_messages").select("client_id").eq("matched_property_id", prop.id)).data || []).map((m: any) => m.client_id)),
     ...(reelKeys.length ? ((await db.from("whatsapp_messages").select("client_id").in("property_link_key", reelKeys)).data || []).map((m: any) => m.client_id) : []),
   ]);
+  // and people the office already wrote to about this area (the ad, the details, "متوفر"): for them it is not news.
+  // Their open request is followed up weekly instead ("بخصوص طلبك ... لين الحين تبحث ؟").
+  const tok = String(prop.area || prop.wilayat || "").replace(/^(بركاء|بركا|مسقط)\s+/, "").split(/\s+/)
+    .filter((w: string) => w.length >= 3 && !/^(الجنوبي|الجنوبية|الجنوبيه|الشمالي|الشمالية|الشماليه|مدينة|حي|منطقة)$/.test(w))
+    .sort((x: string, y: string) => y.length - x.length)[0];
+  const priceKeys = prop.price ? [String(Math.round(Number(prop.price) / 1000)), Number(prop.price).toLocaleString("en-US"), String(Math.round(Number(prop.price)))] : [];
+  if (tok) for (const m of ((await db.from("whatsapp_messages").select("client_id,body").eq("company_id", prop.company_id).eq("direction", "outbound")
+    .ilike("body", `%${tok}%`).gte("message_timestamp", new Date(Date.now() - 150 * DAY).toISOString()).limit(5000)).data || []))
+    if (!priceKeys.length || priceKeys.some((k) => String(m.body || "").includes(k))) asked.add(m.client_id);
   const busy = new Set<string>(((await db.from("whatsapp_outreach_queue").select("client_id").in("status", ["pending", "approved", "sent"]).gte("created_at", new Date(Date.now() - 7 * DAY).toISOString())).data || []).map((m: any) => m.client_id));
   const rows: any[] = [], seen = new Set<string>();
   const noun = NOUN[prop.type]?.[2] || "عقار";
