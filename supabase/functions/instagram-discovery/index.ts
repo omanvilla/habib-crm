@@ -4,7 +4,7 @@ const BASE=Deno.env.get('SUPABASE_URL')||'';
 const KEY=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||'';
 const APP_SECRET=Deno.env.get('META_APP_SECRET')||'';
 const COMPANY=Deno.env.get('CRM_COMPANY_ID')||'';
-const VERSION='instagram-discovery-v2';
+const VERSION='instagram-discovery-v3';
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 class SafeError extends Error {constructor(public code:string){super(code);}}
 async function db(path:string,method='GET',body?:unknown){
@@ -22,14 +22,14 @@ async function tokenFor(a:any){
 async function page(a:any,token:string,after:string|null,limit:number){
  if(!/^\d+$/.test(a.instagram_user_id))throw new SafeError('invalid_account');
  const url=new URL('https://graph.facebook.com/v25.0/'+a.instagram_user_id+'/media');
- url.searchParams.set('fields','id,caption,permalink,media_type,media_product_type,timestamp,like_count,comments_count');url.searchParams.set('limit',String(limit));if(after)url.searchParams.set('after',after);
+ url.searchParams.set('fields','id,caption,permalink,media_type,media_product_type,timestamp,like_count,comments_count,thumbnail_url');url.searchParams.set('limit',String(limit));if(after)url.searchParams.set('after',after);
  const r=await fetch(url,{headers:{Authorization:'Bearer '+token},redirect:'error',signal:AbortSignal.timeout(25000)});const data=await r.json().catch(()=>({}));
  if(!r.ok)throw new SafeError(data.error?.code===190?'meta_reconnect_required':r.status===429||[4,17,32,613].includes(data.error?.code)?'meta_rate_limited':'meta_'+String(data.error?.code||r.status));
  if(!Array.isArray(data.data))throw new SafeError('meta_invalid_response');
  // Never persist or follow paging.next: it can contain credentials. Rebuild the fixed-host URL.
  const hasMore=!!data.paging?.next,cursor=hasMore?String(data.paging?.cursors?.after||''):null;
  if(hasMore&&(!cursor||cursor.length>4000))throw new SafeError('meta_invalid_cursor');
- return {media:data.data.map((m:any)=>({id:m.id,caption:m.caption||'',permalink:m.permalink,media_type:m.media_type,media_product_type:m.media_product_type,timestamp:m.timestamp,like_count:m.like_count??null,comments_count:m.comments_count??null})),cursor,complete:!hasMore};
+ return {media:data.data.map((m:any)=>({id:m.id,caption:m.caption||'',permalink:m.permalink,media_type:m.media_type,media_product_type:m.media_product_type,timestamp:m.timestamp,like_count:m.like_count??null,comments_count:m.comments_count??null,thumbnail_url:m.thumbnail_url||null})),cursor,complete:!hasMore};
 }
 // Metric refresh for saved publications. The manual "sync" button was the only
 // writer, so links saved later (catalog, staff) showed "metrics unavailable".
