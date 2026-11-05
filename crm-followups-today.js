@@ -11,6 +11,13 @@
   let data={items:[],auto_on:false},branch='all',seq=0;
   try{branch=localStorage.getItem('crmFollowupsBranch')||'all';}catch{}
   const waLink=(phone,text)=>{const d=String(phone||'').replace(/\D/g,'');return d?'https://wa.me/'+d+'?text='+encodeURIComponent(text||''):'';};
+  // Work numbers are on WhatsApp Business only, so the button asks for that app; other phones get the normal link.
+  const businessLink=(phone,text)=>{
+    const d=String(phone||'').replace(/\D/g,''),t=encodeURIComponent(text||''),ua=navigator.userAgent||'';if(!d)return '';
+    if(/Android/i.test(ua))return 'intent://send?phone='+d+'&text='+t+'#Intent;scheme=whatsapp;package=com.whatsapp.w4b;S.browser_fallback_url='+encodeURIComponent(waLink(d,text))+';end';
+    if(/iPhone|iPad|iPod/i.test(ua))return 'whatsapp-smb://send?phone='+d+'&text='+t;
+    return waLink(d,text);
+  };
   const autoLine=i=>{
     if(!data.auto_on)return 'الإرسال التلقائي موقف الحين';
     if(!i.can_auto)return i.has_chat?'ما ينرسل تلقائي، ينتظرك أنت':'ما له محادثة عندنا، ينتظرك أنت';
@@ -29,13 +36,14 @@
   function render(){
     const box=host();if(!box)return;
     const all=data.items||[],items=branch==='all'?all:all.filter(i=>i.route_key===branch);
-    box.hidden=!all.length;
-    if(!all.length){box.innerHTML='';return;}
+    const waiting=Number(data.waiting_review||0);
+    box.hidden=!all.length&&!waiting;
+    if(!all.length){box.innerHTML=waiting?'<h2 class="cfu-title">متابعات اليوم</h2><p class="cfu-hint">جاري قراءة المحادثات، باقي <b dir="ltr">'+waiting+'</b>. تطلع هنا بعد المراجعة.</p>':'';return;}
     const tabs=[['all','الكل'],['barka','بركاء'],['muscat','مسقط']].map(([k,l])=>{const n=k==='all'?all.length:all.filter(i=>i.route_key===k).length;return '<button type="button" class="cfu-tab'+(branch===k?' on':'')+'" data-cfu="tab" data-v="'+k+'" aria-pressed="'+(branch===k)+'">'+l+' <b dir="ltr">'+n+'</b></button>';}).join('');
-    box.innerHTML='<h2 class="cfu-title">متابعات اليوم <b dir="ltr">'+all.length+'</b></h2><p class="cfu-hint">افتح الصفحة من جوال الفرع، واضغط «فتح المحادثة» وأرسل. العميل ينشال من القائمة لحاله.</p><div class="cfu-tabs">'+tabs+'</div>'
-      +(items.length?'<ul class="cfu-list">'+items.map(i=>{const url=waLink(i.phone,i.text);return '<li class="cfu-row"><div class="cfu-head"><strong>'+esc(i.client||'عميل')+'</strong><small>'+esc(LABEL[i.route_key]||i.route_key)+' · '+esc(i.reason)+(i.property?' · '+esc(i.property):'')+'</small></div>'
+    box.innerHTML='<h2 class="cfu-title">متابعات اليوم <b dir="ltr">'+all.length+'</b></h2><p class="cfu-hint">افتح الصفحة من جوال الفرع، واضغط «فتح المحادثة» وأرسل. العميل ينشال من القائمة لحاله.'+(waiting?' باقي <b dir="ltr">'+waiting+'</b> قيد القراءة.':'')+'</p><div class="cfu-tabs">'+tabs+'</div>'
+      +(items.length?'<ul class="cfu-list">'+items.map(i=>{const url=businessLink(i.phone,i.text),other=waLink(i.phone,i.text);return '<li class="cfu-row"><div class="cfu-head"><strong>'+esc(i.client||'عميل')+'</strong><small>'+esc(LABEL[i.route_key]||i.route_key)+' · '+esc(i.reason)+(i.property?' · '+esc(i.property):'')+'</small></div>'
         +'<p class="cfu-text" dir="auto">'+esc(i.text)+'</p><small class="cfu-auto">'+esc(autoLine(i))+'</small>'
-        +'<div class="cfu-actions">'+(url?'<a class="btn-primary cfu-open" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">فتح المحادثة</a>':'<span class="cfu-auto">ما له رقم</span>')+'<button type="button" class="btn-secondary" data-cfu="done" data-id="'+esc(i.client_id)+'">أرسلتها</button></div></li>';}).join('')+'</ul>':'<p class="cfu-hint">ما في متابعات لهذا الفرع</p>');
+        +'<div class="cfu-actions">'+(url?'<a class="btn-primary cfu-open" href="'+esc(url)+'" rel="noopener noreferrer">فتح المحادثة</a><a class="cfu-other" href="'+esc(other)+'" target="_blank" rel="noopener noreferrer">رابط عادي</a>':'<span class="cfu-auto">ما له رقم</span>')+'<button type="button" class="btn-secondary" data-cfu="done" data-id="'+esc(i.client_id)+'">أرسلتها</button></div></li>';}).join('')+'</ul>':'<p class="cfu-hint">ما في متابعات لهذا الفرع</p>');
   }
   async function load(){
     if(typeof supa==='undefined'||typeof currentProfile==='undefined'||!currentProfile)return;

@@ -19,4 +19,5 @@
 .cfu-actions>*{width:auto!important}
 .cfu-open{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;text-decoration:none}
 .cfu-actions .btn-secondary{min-height:44px}
+.cfu-other{font-size:12px;color:#6f6552}
 @media(max-width:600px){.cfu{padding:12px!important}.cfu-open{flex:1}}
