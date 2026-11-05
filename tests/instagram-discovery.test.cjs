@@ -39,12 +39,15 @@ test('partner accounts: engagement-only lookup, owner-only connect, manual sync 
 });
 
 test('a caption without a price links on area, rooms, baths and one exact size, and never on less',async()=>{
- const m=await matcher,base={...property,price:90000};
+ // No stored built size, so land + built cannot qualify: only the no-price rule can link this.
+ const m=await matcher,base={...property,price:90000,built_size:null};
  const text=caption.replace(/سعرها[^\n]*|السعر[^\n]*/g,'');
  const r=m.matchMedia(media(text),[base]);
  assert.equal(r.decision,'link');
  const twin=m.matchMedia(media(text),[base,{...base,id:'twin'}]);
  assert.equal(twin.decision,'needs_review');
+ const noBaths=m.matchMedia(media(text),[{...base,bathrooms:null}]);
+ assert.equal(noBaths.decision,'needs_review');
 });
 
 test('home cards count only the last 14 days and stay a suggestion',()=>{
