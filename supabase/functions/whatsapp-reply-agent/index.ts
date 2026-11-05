@@ -388,7 +388,17 @@ Deno.serve(async (req) => {
       .lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(1).maybeSingle();
     const staffInChat = lastOut.data?.actor_type === "human" &&
       new Date(msg.message_timestamp).getTime() - new Date(lastOut.data.message_timestamp).getTime() < STAFF_QUIET_HOURS * 3600 * 1000;
-    if (!review && staffInChat) { await watch(); return fail("staff_active"); }
+    // a follow-up the owner sent from the daily list hands the chat to the agent; any other message of his keeps it quiet
+    let fromList = false;
+    if (staffInChat) {
+      const since = new Date(new Date(lastOut.data!.message_timestamp).getTime() - 2000).toISOString();
+      const [lf, lq] = await Promise.all([
+        db.from("whatsapp_visit_followups").select("id").eq("client_id", msg.client_id).eq("send_mode", "owner").gte("sent_at", since).limit(1),
+        db.from("whatsapp_outreach_queue").select("id").eq("client_id", msg.client_id).eq("reason", "owner_sent").gte("sent_at", since).limit(1),
+      ]);
+      fromList = (lf.data || []).length > 0 || (lq.data || []).length > 0;
+    }
+    if (!review && staffInChat && !fromList) { await watch(); return fail("staff_active"); }
     await watch();
     // the owner of a property we list writes to us: Ahmed answers owners himself
     if (!review) {
