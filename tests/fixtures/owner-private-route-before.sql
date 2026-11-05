@@ -43,11 +43,14 @@ CREATE TABLE public.whatsapp_conversations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), company_id uuid NOT NULL, client_id uuid, route_key text NOT NULL, assigned_to uuid,
   meta_phone_number_id text NOT NULL, inbound_number text, customer_wa_id text, customer_phone text, customer_name text,
   status text DEFAULT 'open', unread_count int DEFAULT 0,
+  last_message_at timestamptz, last_inbound_at timestamptz, last_outbound_at timestamptz,
+  last_message_seq bigint NOT NULL DEFAULT 0, read_through_seq bigint NOT NULL DEFAULT 0, updated_at timestamptz,
   CONSTRAINT whatsapp_conversations_company_id_meta_phone_number_id_cust_key UNIQUE (company_id, meta_phone_number_id, customer_wa_id),
   CONSTRAINT whatsapp_conversations_route_check CHECK (route_key = ANY (ARRAY['muscat'::text, 'barka'::text, 'investment'::text, 'general'::text])));
 CREATE TABLE public.whatsapp_messages (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), company_id uuid NOT NULL, conversation_id uuid NOT NULL, client_id uuid, request_id uuid,
-  whatsapp_message_id text, direction text, body text);
+  whatsapp_message_id text UNIQUE, direction text, body text, message_type text, media_id text, channel_source text, actor_type text,
+  message_timestamp timestamptz, created_at timestamptz NOT NULL DEFAULT now(), conversation_touched_at timestamptz, ingestion_seq bigint, raw_payload jsonb);
 CREATE TABLE public.whatsapp_onboarding_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), company_id uuid NOT NULL, route_key text NOT NULL, status text NOT NULL DEFAULT 'started',
   CONSTRAINT whatsapp_onboarding_events_route_check CHECK (route_key = ANY (ARRAY['muscat'::text, 'barka'::text, 'investment'::text, 'general'::text])));
@@ -347,8 +350,53 @@ INSERT INTO public.company_lead_routes (company_id,route_key,label,transport_rou
 INSERT INTO public.whatsapp_conversations (id,company_id,route_key,assigned_to,meta_phone_number_id,customer_wa_id,customer_phone) VALUES
  ('00000000-0000-4000-8000-00000000d001','00000000-0000-4000-8000-0000000000c1','muscat','00000000-0000-4000-8000-0000000000a2','TEST-PNID-MUSCAT','96811110001','+96811110001');
 
+-- Live conversation counters (copied verbatim).
+CREATE OR REPLACE FUNCTION public.crm_touch_whatsapp_conversation(p_conversation_id uuid, p_message_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE c public.whatsapp_conversations%rowtype; m public.whatsapp_messages%rowtype; v_unread boolean;
+BEGIN
+ SELECT * INTO c FROM public.whatsapp_conversations WHERE id=p_conversation_id FOR UPDATE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'conversation_not_found'; END IF;
+ SELECT * INTO m FROM public.whatsapp_messages WHERE id=p_message_id AND conversation_id=c.id AND company_id=c.company_id FOR UPDATE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'message_not_found'; END IF;
+ IF m.conversation_touched_at IS NOT NULL THEN RETURN jsonb_build_object('ok',true,'duplicate',true,'unread_count',c.unread_count); END IF;
+ v_unread:=m.direction='inbound';
+ UPDATE public.whatsapp_conversations SET
+  last_message_at=greatest(last_message_at,coalesce(m.message_timestamp,m.created_at)),
+  last_inbound_at=CASE WHEN m.direction='inbound' THEN greatest(last_inbound_at,coalesce(m.message_timestamp,m.created_at)) ELSE last_inbound_at END,
+  last_outbound_at=CASE WHEN m.direction='outbound' THEN greatest(last_outbound_at,coalesce(m.message_timestamp,m.created_at)) ELSE last_outbound_at END,
+  last_message_seq=last_message_seq+1,unread_count=coalesce(unread_count,0)+CASE WHEN v_unread THEN 1 ELSE 0 END,updated_at=now()
+ WHERE id=c.id RETURNING * INTO c;
+ UPDATE public.whatsapp_messages SET conversation_touched_at=now(),ingestion_seq=c.last_message_seq WHERE id=m.id;
+ RETURN jsonb_build_object('ok',true,'unread_count',c.unread_count);
+END $function$;
+CREATE OR REPLACE FUNCTION public.crm_touch_whatsapp_after_insert()
+ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO ''
+AS $function$
+BEGIN
+ IF new.direction IN ('inbound','outbound') THEN PERFORM public.crm_touch_whatsapp_conversation(new.conversation_id,new.id); END IF;
+ RETURN new;
+END $function$;
+CREATE OR REPLACE FUNCTION public.crm_guard_whatsapp_conversation_counters()
+ RETURNS trigger LANGUAGE plpgsql SET search_path TO ''
+AS $function$
+BEGIN
+ IF new.last_message_seq=old.last_message_seq THEN
+  new.last_message_at:=old.last_message_at;
+  new.last_inbound_at:=old.last_inbound_at;
+  new.last_outbound_at:=old.last_outbound_at;
+  IF new.read_through_seq<=old.read_through_seq THEN new.unread_count:=old.unread_count; END IF;
+ END IF;
+ RETURN new;
+END $function$;
+CREATE TRIGGER trg_crm_touch_whatsapp_atomic AFTER INSERT ON public.whatsapp_messages FOR EACH ROW EXECUTE FUNCTION public.crm_touch_whatsapp_after_insert();
+CREATE TRIGGER trg_crm_guard_whatsapp_counters BEFORE UPDATE ON public.whatsapp_conversations FOR EACH ROW EXECUTE FUNCTION public.crm_guard_whatsapp_conversation_counters();
+
 -- Snapshots compared after forward and rollback.
 CREATE TABLE public.test_sql68_snapshot AS
 SELECT 'investment_route'::text AS item, (to_jsonb(r) - 'updated_at')::text AS value FROM public.company_lead_routes r WHERE r.route_key='investment'
 UNION ALL SELECT 'fn:'||p.proname, md5(pg_get_functiondef(p.oid)) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
- WHERE n.nspname='crm_repair_private' AND p.proname IN ('investment_link_is_private','propagate_private_whatsapp_context','guard_shared_reception_route','guard_investment_route','resolve_shared_whatsapp_business_route','guard_shared_whatsapp_conversation');
+ WHERE (n.nspname='public' AND p.proname='crm_touch_whatsapp_conversation') OR n.nspname='crm_repair_private' AND p.proname IN ('investment_link_is_private','propagate_private_whatsapp_context','guard_shared_reception_route','guard_investment_route','resolve_shared_whatsapp_business_route','guard_shared_whatsapp_conversation');

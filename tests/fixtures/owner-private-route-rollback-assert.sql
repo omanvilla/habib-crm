@@ -11,7 +11,7 @@ DO $$ BEGIN
     RAISE EXCEPTION 'route check still allows owner';
   END IF;
   IF EXISTS (SELECT 1 FROM public.test_sql68_snapshot s JOIN pg_proc p ON 'fn:'||p.proname=s.item
-             JOIN pg_namespace n ON n.oid=p.pronamespace AND n.nspname='crm_repair_private'
+             JOIN pg_namespace n ON n.oid=p.pronamespace AND n.nspname IN ('crm_repair_private','public')
              WHERE md5(pg_get_functiondef(p.oid)) <> s.value) THEN
     RAISE EXCEPTION 'a replaced function was not restored exactly';
   END IF;

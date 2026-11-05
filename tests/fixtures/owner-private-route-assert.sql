@@ -125,12 +125,48 @@ INSERT INTO public.activities (company_id,activity_text,after_data) VALUES
  ('00000000-0000-4000-8000-0000000000c1','TEST owner message','{"conversation_id":"00000000-0000-4000-8000-00000000d0a1","message_id":"00000000-0000-4000-8000-00000000e0a1"}'),
  ('00000000-0000-4000-8000-0000000000c1','TEST muscat message','{"conversation_id":"00000000-0000-4000-8000-00000000d002"}');
 
+-- 7b) Imported history: idempotent on wamid, original timestamps, no unread count.
+DO $$ DECLARE before_unread int; n int; BEGIN
+  SELECT unread_count INTO before_unread FROM public.whatsapp_conversations WHERE id='00000000-0000-4000-8000-00000000d0a1';
+  INSERT INTO public.whatsapp_messages (company_id,conversation_id,whatsapp_message_id,direction,body,channel_source,message_timestamp) VALUES
+   ('00000000-0000-4000-8000-0000000000c1','00000000-0000-4000-8000-00000000d0a1','wamid.TEST-hist-1','inbound','TEST old investor','owner_history_import','2026-06-01T08:00:00Z'),
+   ('00000000-0000-4000-8000-0000000000c1','00000000-0000-4000-8000-00000000d0a1','wamid.TEST-hist-2','outbound','TEST old reply','owner_history_import','2026-06-01T08:05:00Z');
+  BEGIN
+    INSERT INTO public.whatsapp_messages (company_id,conversation_id,whatsapp_message_id,direction,body,channel_source,message_timestamp) VALUES
+     ('00000000-0000-4000-8000-0000000000c1','00000000-0000-4000-8000-00000000d0a1','wamid.TEST-hist-1','inbound','TEST dup','owner_history_import','2026-06-01T08:00:00Z');
+    RAISE EXCEPTION 'duplicate history wamid was accepted';
+  EXCEPTION WHEN unique_violation THEN NULL;
+  END;
+  SELECT count(*) INTO n FROM public.whatsapp_messages WHERE whatsapp_message_id LIKE 'wamid.TEST-hist-%';
+  IF n <> 2 THEN RAISE EXCEPTION 'history rows %', n; END IF;
+  IF (SELECT unread_count FROM public.whatsapp_conversations WHERE id='00000000-0000-4000-8000-00000000d0a1') <> before_unread THEN
+    RAISE EXCEPTION 'imported history changed the unread count';
+  END IF;
+  IF (SELECT last_message_at FROM public.whatsapp_conversations WHERE id='00000000-0000-4000-8000-00000000d0a1') < '2026-06-01T08:05:00Z' THEN
+    RAISE EXCEPTION 'history did not set last_message_at';
+  END IF;
+  -- A live inbound on the same line still counts as unread.
+  INSERT INTO public.whatsapp_messages (company_id,conversation_id,whatsapp_message_id,direction,body,message_timestamp) VALUES
+   ('00000000-0000-4000-8000-0000000000c1','00000000-0000-4000-8000-00000000d0a1','wamid.TEST-live-1','inbound','TEST live',now());
+  IF (SELECT unread_count FROM public.whatsapp_conversations WHERE id='00000000-0000-4000-8000-00000000d0a1') <> before_unread+1 THEN
+    RAISE EXCEPTION 'live owner-line inbound did not count as unread';
+  END IF;
+  -- Branch lines are unaffected even if a producer used the history label.
+  SELECT unread_count INTO before_unread FROM public.whatsapp_conversations WHERE id='00000000-0000-4000-8000-00000000d003';
+  INSERT INTO public.whatsapp_messages (company_id,conversation_id,whatsapp_message_id,direction,body,channel_source,message_timestamp) VALUES
+   ('00000000-0000-4000-8000-0000000000c1','00000000-0000-4000-8000-00000000d003','wamid.TEST-barka-h','inbound','TEST','owner_history_import',now());
+  IF (SELECT unread_count FROM public.whatsapp_conversations WHERE id='00000000-0000-4000-8000-00000000d003') <> before_unread+1 THEN
+    RAISE EXCEPTION 'branch unread counting changed';
+  END IF;
+END $$;
+
 -- 8) Staff cannot read anything of the owner line; ordinary branch visibility stays.
 SELECT pg_temp.as_user('00000000-0000-4000-8000-0000000000a2');
 SET ROLE authenticated;
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM public.whatsapp_conversations WHERE route_key='owner') THEN RAISE EXCEPTION 'manager sees owner conversation'; END IF;
   IF EXISTS (SELECT 1 FROM public.whatsapp_messages WHERE id='00000000-0000-4000-8000-00000000e0a1') THEN RAISE EXCEPTION 'manager sees owner message'; END IF;
+  IF EXISTS (SELECT 1 FROM public.whatsapp_messages WHERE whatsapp_message_id LIKE 'wamid.TEST-hist-%') THEN RAISE EXCEPTION 'manager sees imported history'; END IF;
   IF EXISTS (SELECT 1 FROM public.company_lead_routes WHERE route_key='owner') THEN RAISE EXCEPTION 'manager sees owner route row'; END IF;
   IF EXISTS (SELECT 1 FROM public.whatsapp_onboarding_events WHERE route_key='owner') THEN RAISE EXCEPTION 'manager sees owner onboarding'; END IF;
   IF EXISTS (SELECT 1 FROM public.activities WHERE activity_text LIKE 'TEST owner%') THEN RAISE EXCEPTION 'manager sees owner activity'; END IF;
@@ -153,6 +189,7 @@ SET ROLE authenticated;
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM public.whatsapp_conversations WHERE route_key='owner') THEN RAISE EXCEPTION 'agent sees owner conversation'; END IF;
   IF EXISTS (SELECT 1 FROM public.whatsapp_messages WHERE id='00000000-0000-4000-8000-00000000e0a1') THEN RAISE EXCEPTION 'agent sees owner message'; END IF;
+  IF EXISTS (SELECT 1 FROM public.whatsapp_messages WHERE whatsapp_message_id LIKE 'wamid.TEST-hist-%') THEN RAISE EXCEPTION 'agent sees imported history'; END IF;
   IF EXISTS (SELECT 1 FROM public.activities WHERE activity_text LIKE 'TEST owner%') THEN RAISE EXCEPTION 'agent sees owner activity'; END IF;
   IF NOT EXISTS (SELECT 1 FROM public.whatsapp_conversations WHERE id='00000000-0000-4000-8000-00000000d003') THEN RAISE EXCEPTION 'Barka agent lost Barka conversation'; END IF;
 END $$;
@@ -164,6 +201,7 @@ SET ROLE authenticated;
 DO $$ BEGIN
   IF (SELECT count(*) FROM public.whatsapp_conversations) <> 4 THEN RAISE EXCEPTION 'owner does not see all conversations'; END IF;
   IF NOT EXISTS (SELECT 1 FROM public.whatsapp_messages WHERE id='00000000-0000-4000-8000-00000000e0a1') THEN RAISE EXCEPTION 'owner cannot read owner message'; END IF;
+  IF (SELECT count(*) FROM public.whatsapp_messages WHERE whatsapp_message_id LIKE 'wamid.TEST-hist-%') <> 2 THEN RAISE EXCEPTION 'owner cannot read imported history'; END IF;
   IF (SELECT count(*) FROM public.company_lead_routes) <> 5 THEN RAISE EXCEPTION 'owner does not see all routes'; END IF;
   IF (SELECT count(*) FROM public.activities WHERE activity_text LIKE 'TEST owner%') <> 2 THEN RAISE EXCEPTION 'owner cannot read owner activities'; END IF;
 END $$;
@@ -185,6 +223,7 @@ SELECT pg_temp.as_user('00000000-0000-4000-8000-0000000000a2');
 SET ROLE authenticated;
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM public.whatsapp_messages WHERE id='00000000-0000-4000-8000-00000000e0a1') THEN RAISE EXCEPTION 'manager sees owner message on slow path'; END IF;
+  IF EXISTS (SELECT 1 FROM public.whatsapp_messages WHERE whatsapp_message_id LIKE 'wamid.TEST-hist-%') THEN RAISE EXCEPTION 'manager sees imported history on slow path'; END IF;
   IF EXISTS (SELECT 1 FROM public.activities WHERE activity_text LIKE 'TEST owner%') THEN RAISE EXCEPTION 'manager sees owner activity on slow path'; END IF;
   IF EXISTS (SELECT 1 FROM public.whatsapp_conversations WHERE id='00000000-0000-4000-8000-00000000d002') THEN RAISE EXCEPTION 'manager sees investment conversation'; END IF;
 END $$;

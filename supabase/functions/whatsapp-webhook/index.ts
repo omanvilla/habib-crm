@@ -1299,8 +1299,61 @@ async function processOwnerPrivateMessage(value: any, m: any, route: any, direct
   const row: Record<string, unknown> = { company_id: CRM_COMPANY_ID, conversation_id: conversation.id, client_id: null, whatsapp_message_id: m.id, direction, message_type: m.type || "unknown", body: body || null, media_id: m?.[m.type]?.id || null, reply_to_message_id: m?.context?.id || null, message_timestamp: messageAt, raw_payload: m };
   if (direction === "inbound") Object.assign(row, { sender_wa_id: customerWaId, recipient_wa_id: metaPhoneNumberId });
   else Object.assign(row, { sender_wa_id: String(m?.from || metaPhoneNumberId), recipient_wa_id: customerWaId, actor_type: "human", channel_source: "owner_private_app" });
+  await saveOwnerPrivateMessage(row);
+}
+// Idempotent on wamid. A history media_placeholder is upgraded in place when Meta
+// later delivers the real media under the same message id.
+async function saveOwnerPrivateMessage(row: Record<string, unknown>) {
   const inserted = await supabase.from("whatsapp_messages").insert(row).select("id").single();
-  if (inserted.error && inserted.error.code !== "23505") throw new Error(`owner message insert: ${inserted.error.message}`);
+  if (!inserted.error) return { id: inserted.data?.id, created: true };
+  if (inserted.error.code !== "23505") throw new Error(`owner message insert: ${inserted.error.message}`);
+  if (row.message_type === "media_placeholder") return { created: false };
+  const upgraded = await supabase.from("whatsapp_messages").update({ message_type: row.message_type, body: row.body, media_id: row.media_id, raw_payload: row.raw_payload })
+    .eq("company_id", CRM_COMPANY_ID).eq("whatsapp_message_id", String(row.whatsapp_message_id)).eq("conversation_id", String(row.conversation_id)).eq("message_type", "media_placeholder").select("id");
+  if (upgraded.error) throw new Error(`owner media upgrade: ${upgraded.error.message}`);
+  return { created: false, upgraded: (upgraded.data || []).length > 0 };
+}
+async function logOwnerOnboarding(metaPhoneNumberId: string, status: "completed" | "failed", details: Record<string, unknown>) {
+  const r = await supabase.from("whatsapp_onboarding_events").insert({ company_id: CRM_COMPANY_ID, route_key: "owner", phone_number_id: metaPhoneNumberId, configuration_id: "coexistence-sync", status, completed_at: new Date().toISOString(), details });
+  if (r.error) console.error("[whatsapp-webhook] owner onboarding log", r.error.message);
+}
+// Coexistence history (field "history"): the owner's past WhatsApp Business app
+// chats. Owner line only; stored like live owner-line messages with their original
+// timestamps, marked owner_history_import so they never count as unread.
+async function processOwnerHistory(value: any) {
+  const metaPhoneNumberId = String(value?.metadata?.phone_number_id || "");
+  if (!metaPhoneNumberId) return;
+  const route = await resolveRoute(metaPhoneNumberId); if (!route.mapped) throw new Error(`unmapped_phone_number_id:${metaPhoneNumberId}`);
+  if (route.route_key !== "owner") { console.log("[whatsapp-webhook] history ignored for route", route.route_key); return; }
+  const ownerDigits = String(route.whatsapp_number || value?.metadata?.display_phone_number || "").replace(/\D/g, "");
+  let stored = 0, skipped = 0;
+  for (const chunk of Array.isArray(value?.history) ? value.history : []) {
+    const errors = Array.isArray(chunk?.errors) ? chunk.errors : [];
+    if (errors.length) {
+      const declined = errors.some((e: any) => Number(e?.code) === 2593109);
+      await logOwnerOnboarding(metaPhoneNumberId, "failed", { mode: "coexistence_history", declined, errors: errors.slice(0, 5) });
+      continue;
+    }
+    for (const thread of Array.isArray(chunk?.threads) ? chunk.threads : []) {
+      for (const m of Array.isArray(thread?.messages) ? thread.messages : []) {
+        const fromDigits = String(m?.from || "").replace(/\D/g, "");
+        const direction: "inbound" | "outbound" = ownerDigits && fromDigits === ownerDigits ? "outbound" : "inbound";
+        const customerWaId = String(thread?.id || (direction === "inbound" ? m?.from : m?.to) || "").replace(/\D/g, "");
+        const customerPhone = cleanPhone(customerWaId);
+        if (!customerWaId || !customerPhone || !m?.id || customerWaId === ownerDigits) { skipped++; continue; }
+        const conversation = await getOrCreateOwnerPrivateConversation({ metaPhoneNumberId, customerWaId, customerPhone, customerName: null, route });
+        const type = String(m.type || "unknown");
+        const row: Record<string, unknown> = { company_id: CRM_COMPANY_ID, conversation_id: conversation.id, client_id: null, whatsapp_message_id: String(m.id), direction, message_type: type,
+          body: type === "media_placeholder" ? null : (bodyFromMessage(m) || null), media_id: type === "media_placeholder" ? null : (m?.[type]?.id || null),
+          reply_to_message_id: m?.context?.id || null, message_timestamp: messageTime(m.timestamp), raw_payload: m, channel_source: "owner_history_import",
+          sender_wa_id: direction === "inbound" ? customerWaId : ownerDigits || metaPhoneNumberId, recipient_wa_id: direction === "inbound" ? metaPhoneNumberId : customerWaId,
+          ...(direction === "outbound" ? { actor_type: "human" } : {}), ...(m?.history_context?.status ? { delivery_status: String(m.history_context.status).toLowerCase() } : {}) };
+        await saveOwnerPrivateMessage(row); stored++;
+      }
+    }
+    if (String(chunk?.metadata?.progress ?? "") === "100") await logOwnerOnboarding(metaPhoneNumberId, "completed", { mode: "coexistence_history", phase: chunk?.metadata?.phase ?? null, chunk_order: chunk?.metadata?.chunk_order ?? null, progress: 100 });
+  }
+  console.log("[whatsapp-webhook] owner history", JSON.stringify({ stored, skipped }));
 }
 
 async function processInboundMessage(value: any, m: any) {
@@ -1553,6 +1606,9 @@ async function processEnvelopeOnce(payload: any) {
   const errors: string[] = [];
   for (const entry of payload?.entry || []) for (const change of entry?.changes || []) {
     const value = change?.value || {}, field = String(change?.field || "");
+    if (field === "history") { try { await processOwnerHistory(value); } catch (err) { errors.push(String((err as any)?.message || err).slice(0, 1000)); } continue; }
+    // Contact sync from the WhatsApp Business app: accepted, not stored (contacts are not CRM clients).
+    if (field === "smb_app_state_sync") { console.log("[whatsapp-webhook] smb_app_state_sync", Array.isArray(value?.state_sync) ? value.state_sync.length : 0); continue; }
     if (field === "smb_message_echoes") { for (const echo of value?.message_echoes || []) { try { await processOutboundEcho(value, echo); } catch (err) { errors.push(String((err as any)?.message || err).slice(0, 1000)); } } continue; }
     for (const m of value?.messages || []) { try { await processInboundMessage(value, m); } catch (err) { errors.push(String((err as any)?.message || err).slice(0, 1000)); } }
     for (const s of value?.statuses || []) { try { await processStatus(value, s); } catch (err) { errors.push(String((err as any)?.message || err).slice(0, 1000)); } }

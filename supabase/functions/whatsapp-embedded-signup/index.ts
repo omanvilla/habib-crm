@@ -111,11 +111,23 @@ Deno.serve(async(req)=>{
     const {error:updateError}=await admin.from("company_lead_routes").update({meta_phone_number_id:phoneId,meta_waba_id:wabaId,meta_login_configuration_id:configId,whatsapp_number:displayNumber||route.whatsapp_number,is_active:true,updated_at:now}).eq("id",route.id).eq("company_id",profile.company_id);
     if(updateError) throw new Error(`route_update_failed: ${updateError.message}`);
 
-    if(eventId) await admin.from("whatsapp_onboarding_events").update({waba_id:wabaId,phone_number_id:phoneId,display_phone_number:displayNumber,status:'completed',completed_at:now,details:{mode:'embedded_signup_v5',session_info:sessionInfo,debug_target_ids:targetIds,debug_scopes:waScopes.map((x:any)=>x.scope),verified_name:phone.verified_name||null,quality_rating:phone.quality_rating||null,platform_type:phone.platform_type||null,phone_status:phone.status||null,account_mode:phone.account_mode||null,subscribed_apps:true,system_token_waba_access:systemTokenAccess,assignment_attempted:assignmentAttempted,assignment_succeeded:assignmentSucceeded,assignment_error:assignmentError}}).eq("id",eventId);
+    // Coexistence (owner line): ask Meta for the WhatsApp Business app contacts and
+    // chat history. Allowed once each, within 24h of onboarding; the data arrives later
+    // through the smb_app_state_sync / history webhooks. A failure never undoes the bind.
+    let coexistenceSync:Record<string,unknown>|null=null;
+    if(routeKey==="owner"){
+      coexistenceSync={};
+      for(const syncType of ["smb_app_state_sync","history"]){
+        try{const res=await graphJson(`https://graph.facebook.com/${META_GRAPH_VERSION}/${phoneId}/smb_app_data`,businessToken,{method:'POST',body:JSON.stringify({messaging_product:"whatsapp",sync_type:syncType})});coexistenceSync[syncType]={ok:true,request_id:res?.request_id||null};}
+        catch(e){coexistenceSync[syncType]={ok:false,error:String((e as any)?.message||e).slice(0,500)};}
+      }
+    }
+
+    if(eventId) await admin.from("whatsapp_onboarding_events").update({waba_id:wabaId,phone_number_id:phoneId,display_phone_number:displayNumber,status:'completed',completed_at:now,details:{mode:'embedded_signup_v5',session_info:sessionInfo,debug_target_ids:targetIds,debug_scopes:waScopes.map((x:any)=>x.scope),verified_name:phone.verified_name||null,quality_rating:phone.quality_rating||null,platform_type:phone.platform_type||null,phone_status:phone.status||null,account_mode:phone.account_mode||null,subscribed_apps:true,system_token_waba_access:systemTokenAccess,assignment_attempted:assignmentAttempted,assignment_succeeded:assignmentSucceeded,assignment_error:assignmentError,...(coexistenceSync?{coexistence_sync:coexistenceSync}:{})}}).eq("id",eventId);
 
     // The owner-line activity carries route_key 'owner', so the owner-only policy hides it from staff.
     await admin.from("activities").insert({company_id:profile.company_id,user_id:user.id,activity_type:'whatsapp',activity_text:`تم ربط واتساب ${displayNumber||phoneId} بمسار ${routeKey} عبر Meta Embedded Signup`,actor_type:'human',channel:'whatsapp',direction:'internal',occurred_at:now,...(routeKey==='owner'?{after_data:{route_key:'owner'}}:{})});
-    return json({ok:true,route_key:routeKey,waba_id:wabaId,phone_number_id:phoneId,display_phone_number:displayNumber,verified_name:phone.verified_name||null,subscribed_apps:true,system_token_waba_access:systemTokenAccess,assignment_attempted:assignmentAttempted,assignment_succeeded:assignmentSucceeded,assignment_error:assignmentError});
+    return json({ok:true,route_key:routeKey,waba_id:wabaId,phone_number_id:phoneId,display_phone_number:displayNumber,verified_name:phone.verified_name||null,subscribed_apps:true,system_token_waba_access:systemTokenAccess,assignment_attempted:assignmentAttempted,assignment_succeeded:assignmentSucceeded,assignment_error:assignmentError,...(coexistenceSync?{coexistence_sync:coexistenceSync}:{})});
   }catch(err){
     const message=String((err as any)?.message||err).slice(0,1500); console.error('[whatsapp-embedded-signup]',message);
     if(eventId) await admin.from("whatsapp_onboarding_events").update({status:'failed',completed_at:new Date().toISOString(),details:{mode:'embedded_signup_v3',error:message}}).eq("id",eventId);

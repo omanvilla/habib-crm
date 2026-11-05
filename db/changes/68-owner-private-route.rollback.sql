@@ -121,3 +121,28 @@ BEGIN
 END $function$;
 REVOKE ALL ON FUNCTION crm_repair_private.investment_link_is_private(uuid,jsonb,text[]) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION crm_repair_private.propagate_private_whatsapp_context() FROM PUBLIC, anon, authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.crm_touch_whatsapp_conversation(p_conversation_id uuid, p_message_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE c public.whatsapp_conversations%rowtype; m public.whatsapp_messages%rowtype; v_unread boolean;
+BEGIN
+ SELECT * INTO c FROM public.whatsapp_conversations WHERE id=p_conversation_id FOR UPDATE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'conversation_not_found'; END IF;
+ SELECT * INTO m FROM public.whatsapp_messages WHERE id=p_message_id AND conversation_id=c.id AND company_id=c.company_id FOR UPDATE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'message_not_found'; END IF;
+ IF m.conversation_touched_at IS NOT NULL THEN RETURN jsonb_build_object('ok',true,'duplicate',true,'unread_count',c.unread_count); END IF;
+ v_unread:=m.direction='inbound';
+ UPDATE public.whatsapp_conversations SET
+  last_message_at=greatest(last_message_at,coalesce(m.message_timestamp,m.created_at)),
+  last_inbound_at=CASE WHEN m.direction='inbound' THEN greatest(last_inbound_at,coalesce(m.message_timestamp,m.created_at)) ELSE last_inbound_at END,
+  last_outbound_at=CASE WHEN m.direction='outbound' THEN greatest(last_outbound_at,coalesce(m.message_timestamp,m.created_at)) ELSE last_outbound_at END,
+  last_message_seq=last_message_seq+1,unread_count=coalesce(unread_count,0)+CASE WHEN v_unread THEN 1 ELSE 0 END,updated_at=now()
+ WHERE id=c.id RETURNING * INTO c;
+ UPDATE public.whatsapp_messages SET conversation_touched_at=now(),ingestion_seq=c.last_message_seq WHERE id=m.id;
+ RETURN jsonb_build_object('ok',true,'unread_count',c.unread_count);
+END $function$;
+REVOKE ALL ON FUNCTION public.crm_touch_whatsapp_conversation(uuid,uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.crm_touch_whatsapp_conversation(uuid,uuid) TO service_role;

@@ -73,6 +73,8 @@ function fakeDb(rows, calls, writes, rpc) {
           let m = rows[table].filter(r => predicates.every(p => p(r)));
           if (call.limit) m = m.slice(0, call.limit);
           if (call.operation === 'update') { writes.push(call); m.forEach(r => Object.assign(r, call.patch)); }
+          if (call.operation === 'insert' && table === 'whatsapp_messages' && rows[table].some(r => r.whatsapp_message_id && r.whatsapp_message_id === call.patch.whatsapp_message_id))
+            return Promise.resolve({ data: null, error: { code: '23505', message: 'duplicate key' } }).then(resolve, reject);
           if (['insert', 'upsert'].includes(call.operation)) {
             writes.push(call);
             const row = { id: 'TEST-new-' + table + '-' + rows[table].length, ...call.patch };
@@ -150,8 +152,9 @@ for (const name of ['whatsapp-embedded-signup', 'whatsapp-direct-bind']) {
   });
 }
 
-function fakeMeta(displayNumber) {
+function fakeMeta(displayNumber, { syncFails = false } = {}) {
   return async url => {
+    if (String(url).includes('/smb_app_data')) return new Response(JSON.stringify(syncFails ? { error: { message: 'TEST onboarding window expired' } } : { success: true, request_id: 'TEST-req' }), { status: syncFails ? 400 : 200 });
     const u = String(url), body = d => new Response(JSON.stringify(d), { status: 200, headers: { 'content-type': 'application/json' } });
     if (u.includes('/oauth/access_token')) return body({ access_token: 'TEST-business-token' });
     if (u.includes('/debug_token')) return body({ data: { granular_scopes: [{ scope: 'whatsapp_business_management', target_ids: ['TEST-waba-owner'] }] } });
@@ -299,4 +302,102 @@ test('the owner Meta button goes to coexistence signup, never to Barka direct bi
   assert.equal(prevented, false);
   ctx.window.launchWhatsAppEmbeddedSignup('owner');
   assert.deepEqual(calls, [['embedded', 'owner']]);
+});
+
+// ---------- Coexistence: history import and sync requests ----------
+test('owner bind requests contacts then history sync with the business token', async () => {
+  const rows = baseRows(); Object.assign(rows.company_lead_routes.find(r => r.route_key === 'owner'), { meta_phone_number_id: null, is_active: false });
+  const f = runtime('whatsapp-embedded-signup', { userId: OWNER, rows, fetchImpl: fakeMeta('+968 9094 4469') });
+  const r = await f.invoke({ route_key: 'owner', code: 'TEST-only', session_info: {} });
+  assert.equal(r.status, 200);
+  const syncs = f.fetches.filter(([u]) => String(u).includes('/TEST-phone/smb_app_data'));
+  assert.deepEqual(syncs.map(([, init]) => JSON.parse(init.body).sync_type), ['smb_app_state_sync', 'history']);
+  for (const [, init] of syncs) { assert.equal(JSON.parse(init.body).messaging_product, 'whatsapp'); assert.equal(new Headers(init.headers).get('authorization'), 'Bearer TEST-business-token'); }
+  assert.equal(r.body.coexistence_sync.history.ok, true);
+  assert.equal(rows.whatsapp_onboarding_events.at(-1).details.coexistence_sync.smb_app_state_sync.ok, true);
+});
+test('a failed sync request never undoes the owner bind', async () => {
+  const rows = baseRows(); Object.assign(rows.company_lead_routes.find(r => r.route_key === 'owner'), { meta_phone_number_id: null, is_active: false });
+  const f = runtime('whatsapp-embedded-signup', { userId: OWNER, rows, fetchImpl: fakeMeta('+968 9094 4469', { syncFails: true }) });
+  const r = await f.invoke({ route_key: 'owner', code: 'TEST-only', session_info: {} });
+  assert.equal(r.status, 200); assert.equal(r.body.ok, true);
+  assert.equal(r.body.coexistence_sync.history.ok, false); assert.match(r.body.coexistence_sync.history.error, /window expired/);
+  const route = rows.company_lead_routes.find(x => x.route_key === 'owner');
+  assert.equal(route.is_active, true); assert.equal(route.meta_phone_number_id, 'TEST-phone');
+});
+test('Muscat/Barka binds never request coexistence sync', async () => {
+  const rows = baseRows(); rows.company_lead_routes.find(r => r.route_key === 'barka').whatsapp_number = '+96890000002';
+  const f = runtime('whatsapp-embedded-signup', { userId: OWNER, rows, fetchImpl: fakeMeta('+968 9000 0002') });
+  const r = await f.invoke({ route_key: 'barka', code: 'TEST-only', session_info: {} });
+  assert.equal(r.status, 200); assert.equal(r.body.coexistence_sync, undefined);
+  assert(!f.fetches.some(([u]) => String(u).includes('smb_app_data')));
+});
+
+function historyValue(pnid, messages, extra = {}) {
+  return { messaging_product: 'whatsapp', metadata: { phone_number_id: pnid, display_phone_number: '96890944469' },
+    history: [{ metadata: { phase: 0, chunk_order: 1, progress: 100 }, threads: [{ id: '96811110005', messages }], ...extra }] };
+}
+const histMessages = [
+  { from: '96811110005', id: 'wamid.TEST-h1', timestamp: '1780000000', type: 'text', text: { body: 'TEST investor question' }, history_context: { status: 'READ' } },
+  { from: '96890944469', to: '96811110005', id: 'wamid.TEST-h2', timestamp: '1780000060', type: 'text', text: { body: 'TEST owner answer' }, history_context: { status: 'DELIVERED' } },
+  { from: '96811110005', id: 'wamid.TEST-h3', timestamp: '1780000120', type: 'media_placeholder' },
+];
+test('history import stores owner-line chats with original time and direction, no CRM identity', async () => {
+  const f = runtime('whatsapp-webhook');
+  await f.ctx.processEnvelopeOnce({ entry: [{ changes: [{ field: 'history', value: historyValue(OWNER_PNID, histMessages) }] }] }).then(errs => assert.deepEqual([...errs], []));
+  const conv = f.rows.whatsapp_conversations.find(c => c.customer_wa_id === '96811110005');
+  assert.equal(conv.route_key, 'owner'); assert.equal(conv.client_id, null); assert.equal(conv.assigned_to, OWNER);
+  const msgs = f.rows.whatsapp_messages.filter(m => m.conversation_id === conv.id);
+  assert.deepEqual(msgs.map(m => [m.whatsapp_message_id, m.direction, m.message_type]), [['wamid.TEST-h1', 'inbound', 'text'], ['wamid.TEST-h2', 'outbound', 'text'], ['wamid.TEST-h3', 'inbound', 'media_placeholder']]);
+  assert(msgs.every(m => m.client_id === null && m.channel_source === 'owner_history_import'));
+  assert.equal(msgs[0].message_timestamp, new Date(1780000000 * 1000).toISOString());
+  assert.equal(msgs[0].delivery_status, 'read');
+  assert(!f.calls.some(c => ['clients', 'client_requests', 'activities'].includes(c.table)));
+  assert(!f.calls.some(c => c.rpc && c.rpc !== 'resolve_whatsapp_route')); assert.equal(f.fetches.length, 0);
+  assert.equal(f.rows.whatsapp_onboarding_events.at(-1).status, 'completed');
+});
+test('history import is idempotent and upgrades a media placeholder in place', async () => {
+  const f = runtime('whatsapp-webhook');
+  const env = { entry: [{ changes: [{ field: 'history', value: historyValue(OWNER_PNID, histMessages) }] }] };
+  await f.ctx.processEnvelopeOnce(env); await f.ctx.processEnvelopeOnce(env);
+  assert.equal(f.rows.whatsapp_messages.filter(m => String(m.whatsapp_message_id).startsWith('wamid.TEST-h')).length, 3);
+  assert.equal(f.rows.whatsapp_conversations.filter(c => c.customer_wa_id === '96811110005').length, 1);
+  const media = [{ from: '96811110005', id: 'wamid.TEST-h3', timestamp: '1780000120', type: 'image', image: { id: '998877', mime_type: 'image/jpeg' } }];
+  await f.ctx.processEnvelopeOnce({ entry: [{ changes: [{ field: 'history', value: historyValue(OWNER_PNID, media) }] }] });
+  const row = f.rows.whatsapp_messages.find(m => m.whatsapp_message_id === 'wamid.TEST-h3');
+  assert.equal(row.message_type, 'image'); assert.equal(row.media_id, '998877');
+  assert.equal(f.rows.whatsapp_messages.filter(m => m.whatsapp_message_id === 'wamid.TEST-h3').length, 1);
+});
+test('declined history sharing is logged, not crashed', async () => {
+  const f = runtime('whatsapp-webhook');
+  const value = { metadata: { phone_number_id: OWNER_PNID }, history: [{ errors: [{ code: 2593109, title: 'History sync is turned off by the business from the WhatsApp Business App' }] }] };
+  const errs = await f.ctx.processEnvelopeOnce({ entry: [{ changes: [{ field: 'history', value }] }] });
+  assert.deepEqual([...errs], []);
+  const ev = f.rows.whatsapp_onboarding_events.at(-1);
+  assert.equal(ev.route_key, 'owner'); assert.equal(ev.status, 'failed'); assert.equal(ev.details.declined, true);
+  assert(!f.writes.some(w => w.table === 'whatsapp_messages'));
+});
+test('history on a branch line is ignored; contact sync is accepted without writes', async () => {
+  const f = runtime('whatsapp-webhook');
+  const errs = await f.ctx.processEnvelopeOnce({ entry: [{ changes: [
+    { field: 'history', value: historyValue(MUSCAT_PNID, histMessages) },
+    { field: 'smb_app_state_sync', value: { metadata: { phone_number_id: OWNER_PNID }, state_sync: [{ type: 'contact', action: 'add', contact: { phone_number: '96811110005' } }] } },
+  ] }] });
+  assert.deepEqual([...errs], []); assert.equal(f.writes.length, 0);
+});
+test('staff never see imported owner history in the inbox; the owner does', async () => {
+  const f = runtime('whatsapp-webhook');
+  await f.ctx.processEnvelopeOnce({ entry: [{ changes: [{ field: 'history', value: historyValue(OWNER_PNID, histMessages) }] }] });
+  const rows = f.rows;
+  const conv = rows.whatsapp_conversations.find(c => c.customer_wa_id === '96811110005');
+  for (const userId of [MANAGER, AGENT]) {
+    const inbox = runtime('whatsapp-inbox', { userId, rows });
+    const list = await inbox.invoke({ action: 'list' });
+    assert(!list.body.conversations.some(c => c.id === conv.id));
+    const r = await inbox.invoke({ action: 'messages', conversation_id: conv.id });
+    assert.equal(r.status, 404);
+  }
+  const owner = runtime('whatsapp-inbox', { userId: OWNER, rows });
+  const r = await owner.invoke({ action: 'messages', conversation_id: conv.id });
+  assert.equal(r.status, 200); assert.equal(r.body.messages.length, 3);
 });

@@ -4236,6 +4236,7 @@ async function completeWhatsAppEmbeddedSignup(){
     }else{
       showToast('✅ تم ربط '+number+'، لكن سنراجع صلاحية System Token قبل الإرسال','success');
     }
+    if(d.coexistence_sync){showToast(d.coexistence_sync.history&&d.coexistence_sync.history.ok?'طلبنا من واتساب سجل محادثاتك السابقة، يوصل خلال ساعات ويظهر لك وحدك':'تم الربط، لكن تعذر طلب سجل المحادثات السابقة من Meta','info')}
     waEmbeddedCode=null;waEmbeddedSessionInfo=null;waEmbeddedRouteKey=null;
     await loadLeadRouting();
   }catch(e){
