@@ -5,8 +5,8 @@ const fs=require('fs');
 const js=fs.readFileSync('crm-attention.js','utf8');
 const sql=fs.readFileSync('db/changes/42-attention-queue.forward.sql','utf8');
 const index=fs.readFileSync('index.html','utf8');
-test('loader includes the attention module and stylesheet',()=>{
-  assert.match(index,/crm-attention\.js\?v=/);assert.match(index,/crm-attention\.css\?v=/);
+test('the old attention strip stays out of the loader (dropped 4 Nov 2026)',()=>{
+  assert(!/crm-attention\.(js|css)/.test(index));
 });
 test('queue rows deep-link to the exact conversation and escape CRM text',()=>{
   assert(js.includes("openDashboardWhatsAppConversation(id)"));

@@ -43,8 +43,8 @@ test('pinned matches are marked, investors get alternatives, auto-send is owner-
   assert.match(js,/a\.matched_rule_id\?'<span class="rp-chip pinned">مطابق لرد مثبت<\/span>'/);
   assert.match(js,/supa\.rpc\('crm_reply_auto_send_set',\{p_categories:cats\}\)/);
   assert.match(agent,/out\.matched_rule_id = rule\?\.id \|\| null/);
-  assert.match(agent,/\["none", "handoff"\]\.includes\(out\.action\) && \(rt\.auto_send_categories \|\| \[\]\)\.includes\(out\.category\)/);
-  assert.match(agent,/if \(dry \|\| \(rt\.reply_agent_mode === "approval" && !autoSend\)\)/);
+  assert.match(agent,/\["none", "handoff"\]\.includes\(out\.action\) && \(ruleAuto \|\| \(rt\.auto_send_categories \|\| \[\]\)\.includes\(out\.category\)\)/);
+  assert.match(agent,/if \(dry \|\| holdForOwner \|\| \(rt\.reply_agent_mode === "approval" && !autoSend\)\)/);
   assert.match(sql52,/auto_send_categories text\[\] NOT NULL DEFAULT '\{\}'/);
   assert.equal((sql52.match(/IF public\.my_role\(\) IS DISTINCT FROM 'owner' THEN RAISE EXCEPTION 'owner_only'/g)||[]).length,2);
 });
@@ -58,7 +58,7 @@ test('agent never sees property titles, which carry owner names',()=>{
 test('pinned replies rotate A/B/C wordings and the results are owner-only',()=>{
   const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8');
   const sql53=fs.readFileSync('db/changes/53-reply-variants.forward.sql','utf8');
-  assert.match(agent,/pickedVariant\[r\.id\] = pool\[Math\.floor\(Math\.random\(\) \* pool\.length\)\]/);
+  assert.match(agent,/pickedVariant\[r\.id\] = from\[Math\.floor\(Math\.random\(\) \* from\.length\)\]/);
   assert.match(agent,/out\.variant_label = rule \? pickedVariant\[rule\.id\]\.label : null/);
   assert.match(agent,/الرد: \$\{pickedVariant\[r\.id\]\.reply\}/);
   assert.match(js,/supa\.rpc\('crm_reply_variant_stats',\{p_days:state\.days\}\)/);
@@ -102,7 +102,7 @@ test('cards leave out edits, deletions, reactions and system notices',()=>{
 test('agent sees the ad text of each property, without links or phone numbers',()=>{
   const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8');
   const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
-  assert.match(agent,/p\.marketing = publicText\(p\.description\) \|\| caps\[0\] \|\| ""/);
+  assert.match(agent,/p\.marketing = \[publicText\(p\.public_details\), publicText\(p\.description\), caps\[0\] \|\| ""\]/);
   assert(agent.includes("String(v ?? \"\").replace(/https?:"),"links are stripped from the ad text");
   assert.match(brain,/لا تقول "بشوف وارد عليك" والمعلومة مكتوبة قدامك/);
   assert.match(brain,/آخر طلب هو اللي يمشي/);
@@ -135,4 +135,21 @@ test('rental availability comes from the CRM, never from a fixed pinned reply',(
   assert.match(agent,/p\.listing_purpose === "rent" \? "للإيجار" : "للبيع"/);
   assert.match(agent,/&& !staleNone/);
   assert.match(brain,/الرد المثبت يعلمك طريقة الكلام، مو اللي متوفر/);
+});
+
+test('visits are read from the conversation even when the agent stays quiet, and requests save with an allowed origin',()=>{
+  const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8');
+  for(const why of ['agent_muted','human_handoff_open','client_paused','staff_replied','staff_active'])
+    assert(agent.includes('{ await watch(); return fail("'+why+'"); }'),why);
+  assert(agent.includes('if (review) return; try { const v = await watchVisit(msg)'),'trials never write visits');
+  assert(agent.includes('if (open.created_via !== "whatsapp_ai"'),'manual visits are not moved');
+  assert(agent.includes('if (!open || open.created_via !== "whatsapp_ai") return { ...out, applied: false, why: "nothing_to_cancel" }'),'manual visits are not cancelled');
+  assert.match(agent,/created_via: "ai", origin_whatsapp_message_id/);
+});
+
+test('review tables are closed and a branch account sees only its own owners',()=>{
+  const s56=fs.readFileSync('db/changes/56-close-review-tables.forward.sql','utf8'),s57=fs.readFileSync('db/changes/57-function-hardening-owner-branch-scope.forward.sql','utf8');
+  assert.match(s56,/REVOKE ALL ON public\.review_batch4, public\.review_redo FROM anon, authenticated, service_role/);
+  assert.match(s57,/\(SELECT public\.my_role\(\)\) IN \('owner','manager','viewer'\)/);
+  assert.match(s57,/REVOKE EXECUTE ON FUNCTION public\.crm_queue_property_outreach\(\) FROM PUBLIC, anon, authenticated/);
 });
