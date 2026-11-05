@@ -208,7 +208,7 @@ function propLine(p: any) {
   const visit = { open: "مفتوح ويروح بروحه", lockbox: "صندوق مفتاح برمز", owner_lives: "المالك ساكن (يعطى رقم المالك)", office: "تنسيق منا (handoff)" }[p.visit_method as string] || "غير محدد (handoff للمعاينة)";
   const TERMS: Record<string, string> = { daily: "يومي", weekly: "أسبوعي", monthly: "شهري", "3m": "3 شهور", "6m": "6 شهور", yearly: "سنة" };
   const terms = p.listing_purpose === "rent" ? ` | مدة الإيجار المسموحة: ${(p.rental_terms || []).length ? (p.rental_terms as string[]).map((t) => TERMS[t] || t).join(" او ") : "غير محددة (handoff اذا سأل عن مدة قصيرة)"}` : "";
-  return `- id=${p.id} | ${name} | ${bits}${terms} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? " | اللوكيشن متوفر (action=send_location)" : " | اللوكيشن غير متوفر"}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}${p.marketing ? `\n  وصف الإعلان: ${short(p.marketing, 1600)}` : ""}`;
+  return `- id=${p.id} | ${name} | ${bits}${terms} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? " | اللوكيشن متوفر (action=send_location)" : " | اللوكيشن غير متوفر"} | الفرع: ${p.branch_key === "muscat" ? "مسقط (رقم 71770030)" : p.branch_key === "barka" ? "بركاء (رقم 92344273)" : "غير محدد"}${p.video ? ` | رابط الفيديو (ترسله إذا طلب فيديو): ${p.video}` : ""}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}${p.marketing ? `\n  وصف الإعلان: ${short(p.marketing, 1600)}` : ""}`;
 }
 
 async function notifyHandoff(companyId: string, conv: any, client: any, reason: string) {
@@ -347,6 +347,20 @@ Deno.serve(async (req) => {
   const latest = await db.from("whatsapp_messages").select("id").eq("conversation_id", msg.conversation_id).eq("direction", "inbound")
     .order("message_timestamp", { ascending: false }).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (!review && latest.data?.id !== msg.id) return json({ ok: true, ignored: "superseded" });
+  // a bare greeting is usually followed by the question: give the customer a little longer
+  if (!review) {
+    const lo = await db.from("whatsapp_messages").select("message_timestamp").eq("conversation_id", msg.conversation_id).eq("direction", "outbound")
+      .order("message_timestamp", { ascending: false }).limit(1).maybeSingle();
+    const burst = await db.from("whatsapp_messages").select("body,message_type").eq("conversation_id", msg.conversation_id).eq("direction", "inbound")
+      .gt("message_timestamp", lo.data?.message_timestamp || "1970-01-01").limit(10);
+    const GREET = /^\s*(السلام عليكم[\s\S]{0,30}|سلام[\s\S]{0,20}|مرحبا[\s\S]{0,20}|هلا[\s\S]{0,15}|مساء الخير|صباح الخير|كيف الحال[\s\S]{0,10}|عساك بخير|hi|hello|salam[\s\S]{0,15})\s*$/i;
+    if ((burst.data || []).length && (burst.data || []).every((m: any) => m.message_type === "text" && GREET.test(String(m.body || "")))) {
+      await sleep(25000);
+      const l2 = await db.from("whatsapp_messages").select("id").eq("conversation_id", msg.conversation_id).eq("direction", "inbound")
+        .order("message_timestamp", { ascending: false }).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (l2.data?.id !== msg.id) return json({ ok: true, ignored: "superseded" });
+    }
+  }
 
   let draftId: string;
   if (redo) draftId = redo.draftId;
@@ -421,8 +435,12 @@ Deno.serve(async (req) => {
     const history = (histR.data || []).reverse();
     const props = propsR.data || [];
     // the ad text for each property: its description, or else the longest caption of a reel about it
-    const capR = props.length ? await db.from("instagram_media_catalog").select("property_id,caption").in("property_id", props.map((p: any) => p.id)) : { data: [] };
+    const capR = props.length ? await db.from("instagram_media_catalog").select("property_id,caption,permalink,likes,comments").in("property_id", props.map((p: any) => p.id)) : { data: [] };
     for (const p of props as any[]) {
+      // the video to send when someone asks for it: the reel of this property that did best
+      const vids = ((capR as any).data || []).filter((c: any) => c.property_id === p.id && /^https:\/\/(www\.)?instagram\.com\//.test(String(c.permalink || "")))
+        .sort((a: any, b: any) => (Number(b.likes || 0) + Number(b.comments || 0)) - (Number(a.likes || 0) + Number(a.comments || 0)));
+      p.video = vids[0]?.permalink || null;
       const caps = ((capR as any).data || []).filter((c: any) => c.property_id === p.id).map((c: any) => publicText(c.caption)).sort((a: string, b: string) => b.length - a.length);
       p.marketing = [publicText(p.public_details), publicText(p.description), caps[0] || ""].sort((a: string, b: string) => b.length - a.length)[0] || ""; // the fullest ad text wins
     }
