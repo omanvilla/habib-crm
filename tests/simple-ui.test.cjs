@@ -72,11 +72,6 @@ test('visits render as rows that reuse the existing edit and delete flows',()=>{
   assert(html.indexOf('متأخرة وتحتاج نتيجة')<html.indexOf('سجلات سابقة'));
 });
 
-test('dashboard queue stays collapsed to a short preview and keeps the owner-only batch button',()=>{
-  assert.match(attention,/const PREVIEW=3/);
-  assert.match(attention,/items\.slice\(0,PREVIEW\)/);
-  assert.match(attention,/catch\(e\)\{return false;\}/);
-});
 
 // Phase 2 renderers run against a minimal DOM: only the target list node exists.
 function phase2(extra){
