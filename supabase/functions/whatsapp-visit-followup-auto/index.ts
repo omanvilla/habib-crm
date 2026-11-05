@@ -57,9 +57,9 @@ async function metaSend(tokens: string[], phoneId: string, to: string, payload: 
 }
 
 const REVIEW_RULES = `أنت تراجع متابعة عميل لمكتب عقاري في عمان قبل ما يرسلها صاحب المكتب. اقرأ المحادثة كاملة، ومحادثة الرقم الثاني إذا موجودة، وقرر واحد:
-- skip: ما يحتاج متابعة. مثل: مالك أو وسيط يعرض عقار أو بناية، أو حولناه للرقم الثاني أو موضوعه ماشي هناك، أو موضوعه انتهى، أو اشترى أو حصل، أو قال ما يبغى، أو مو عميل يدور عقار (موظف، بنك، شركة، مقاول).
+- skip: ما يحتاج متابعة. مثل: مالك أو وسيط يعرض عقار أو بناية، أو حولناه للرقم الثاني أو موضوعه ماشي هناك، أو موضوعه انتهى، أو اشترى أو حصل، أو قال ما يبغى، أو مو عميل يدور عقار (موظف، بنك، شركة، مقاول). وكذلك: سأل عن عقار واستلم التفاصيل أو الموقع وبعدها ما رد ولا طلب زيارة، سكوته جواب.
 - wait_for_match: شاف أو سأل ووضح اللي يبغاه، وما عندنا الحين شي يناسبه. سؤال "لين الحين تبحث" ما له داعي. مثال: شاف فيلا وسأل عن السعر النهائي وقال ما يناسبه قيد الإنشاء ويدور جاهز. احفظ اللي يبغاه في request، ونرسله لما يتوفر.
-- followup: في سبب حقيقي نتابعه. إذا في القائمة عقار متاح يطابق اللي يبغاه، اعرضه في text باختصار.
+- followup: في سبب حقيقي نتابعه، وهو واحد من هذي بس: طلب زيارة أو تحدد له موعد وما نعرف النتيجة، أو زار والكلام لسه مفتوح، أو سأل سؤال وما جاه رد، أو في القائمة عقار متاح يطابق اللي قال يبغاه. إذا في القائمة عقار متاح يطابق اللي يبغاه، اعرضه في text باختصار.
 
 التفاوض لصاحب المكتب بس: لا تفتح موضوع السعر ولا تخفيض في text.
 إذا فيه "[رسالة صوتية قديمة ما انقرت]" قريب من آخر المحادثة، ما تعرف اللي انقال فيها: لا تخمن، قل هذا في reason، وخل auto_ok=false.
@@ -135,10 +135,7 @@ async function saveRequest(companyId: string, item: any, wanted: any, reason: st
   if (w.error) console.error("[followup-auto] request", w.error.message);
 }
 
-async function reviewOne(kind: "visit" | "request", x: any, companyId: string, available: string) {
-  const now = new Date().toISOString();
-  const table = kind === "visit" ? "whatsapp_visit_followups" : "whatsapp_outreach_queue";
-  const openStatus = kind === "visit" ? "awaiting_approval" : "pending";
+async function judge(kind: "visit" | "request", x: any, companyId: string, available: string) {
   let about = "متابعة طلب: هل لين الحين يبحث";
   if (kind === "visit") {
     const v = await db.from("viewings").select("viewing_date,status,properties(type,area)").eq("id", x.viewing_id).maybeSingle();
@@ -146,7 +143,14 @@ async function reviewOne(kind: "visit" | "request", x: any, companyId: string, a
     about = `متابعة بعد زيارة ${pr?.type || "عقار"} في ${pr?.area || "غير معروف"} يوم ${v.data?.viewing_date || "غير معروف"}. ${v.data?.status === "done" ? "الزيارة تمت" : "ما نعرف هل زار"}.`;
   }
   const fixed = kind === "visit" ? String(x.body || "") : (x.messages || []).join(" ");
-  const out = await review(x, companyId, available, fixed, about);
+  return review(x, companyId, available, fixed, about);
+}
+
+async function reviewOne(kind: "visit" | "request", x: any, companyId: string, available: string) {
+  const now = new Date().toISOString();
+  const table = kind === "visit" ? "whatsapp_visit_followups" : "whatsapp_outreach_queue";
+  const openStatus = kind === "visit" ? "awaiting_approval" : "pending";
+  const out = await judge(kind, x, companyId, available);
   const reason = short(out.reason, 300);
   if (out.decision === "followup" && out.text) {
     await db.from(table).update({ owner_text: short(out.text, 500), review_reason: reason, auto_ok: !!out.auto_ok, reviewed_at: now }).eq("id", x.id).eq("status", openStatus);
@@ -160,14 +164,38 @@ async function reviewOne(kind: "visit" | "request", x: any, companyId: string, a
   return "removed";
 }
 
+async function availableText(companyId: string) {
+  const props = await db.from("properties").select("type,area,price,bedrooms,listing_purpose").eq("company_id", companyId).eq("status", "available").eq("archived", false);
+  return (props.data || []).map((p: any) => `- ${p.type} ${p.listing_purpose === "rent" ? "للإيجار" : "للبيع"} في ${p.area} بـ ${Number(p.price || 0).toLocaleString("en-US")} ${p.bedrooms ? `${p.bedrooms} غرف` : ""}`).join("\n");
+}
+
+// Reads what is on the list again under the current rules and returns the decisions. Writes nothing.
+// Follow-ups the owner decided himself (they carry a reason) are left out.
+async function preview(companyId: string, offset: number) {
+  const f = await db.from("whatsapp_visit_followups").select("id,client_id,route_key,conversation_id,viewing_id,step,body").eq("company_id", companyId).eq("status", "awaiting_approval").not("reviewed_at", "is", null).order("id");
+  const q = await db.from("whatsapp_outreach_queue").select("id,client_id,route_key,conversation_id,request_id,messages").eq("company_id", companyId).eq("status", "pending").eq("kind", "request_followup").eq("dry_run", false).is("reason", null).not("reviewed_at", "is", null).order("id");
+  const all: ["visit" | "request", any][] = [...(f.data || []).map((x: any) => ["visit", x] as ["visit", any]), ...(q.data || []).map((x: any) => ["request", x] as ["request", any])];
+  const jobs = all.slice(offset, offset + REVIEWS_PER_RUN);
+  const names = await db.from("clients").select("id,name").in("id", jobs.map(([, x]) => x.client_id));
+  const nameOf = new Map((names.data || []).map((c: any) => [c.id, c.name]));
+  const available = await availableText(companyId);
+  const items: any[] = [];
+  for (let i = 0; i < jobs.length; i += REVIEWS_AT_ONCE) {
+    await Promise.all(jobs.slice(i, i + REVIEWS_AT_ONCE).map(async ([kind, x]) => {
+      try { const r = await judge(kind, x, companyId, available); items.push({ kind, id: x.id, client: nameOf.get(x.client_id), route: x.route_key, decision: r.decision, reason: short(r.reason, 200), request: r.request }); }
+      catch (e) { items.push({ kind, id: x.id, client: nameOf.get(x.client_id), error: String((e as any)?.message || e) }); }
+    }));
+  }
+  return { total: all.length, offset, items };
+}
+
 async function reviewAll(companyId: string, out: Record<string, number>) {
   const f = await db.from("whatsapp_visit_followups").select("id,client_id,route_key,conversation_id,viewing_id,step,body").eq("company_id", companyId).eq("status", "awaiting_approval").is("reviewed_at", null).limit(REVIEWS_PER_RUN);
   const left = REVIEWS_PER_RUN - (f.data || []).length;
   const q = left > 0 ? await db.from("whatsapp_outreach_queue").select("id,client_id,route_key,conversation_id,request_id,messages").eq("company_id", companyId).eq("status", "pending").eq("kind", "request_followup").eq("dry_run", false).is("reviewed_at", null).limit(left) : { data: [] as any[] };
   const jobs: ["visit" | "request", any][] = [...(f.data || []).map((x: any) => ["visit", x] as ["visit", any]), ...((q as any).data || []).map((x: any) => ["request", x] as ["request", any])];
   if (!jobs.length) return;
-  const props = await db.from("properties").select("type,area,price,bedrooms,listing_purpose").eq("company_id", companyId).eq("status", "available").eq("archived", false);
-  const available = (props.data || []).map((p: any) => `- ${p.type} ${p.listing_purpose === "rent" ? "للإيجار" : "للبيع"} في ${p.area} بـ ${Number(p.price || 0).toLocaleString("en-US")} ${p.bedrooms ? `${p.bedrooms} غرف` : ""}`).join("\n");
+  const available = await availableText(companyId);
   for (let i = 0; i < jobs.length; i += REVIEWS_AT_ONCE) {
     await Promise.all(jobs.slice(i, i + REVIEWS_AT_ONCE).map(async ([kind, x]) => {
       try { const r = await reviewOne(kind, x, companyId, available); out[r] = (out[r] || 0) + 1; }
@@ -238,6 +266,11 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ ok: false }, 405);
   const ok = await db.rpc("crm_reply_agent_secret_ok", { p_secret: req.headers.get("x-crm-agent") || "" });
   if (ok.error || ok.data !== true) return json({ ok: false, error: "forbidden" }, 403);
+  const input = await req.json().catch(() => ({}));
+  if (input?.preview) {
+    const co = await db.from("whatsapp_automation_runtime").select("company_id").eq("mode", "live").limit(1).maybeSingle();
+    return json({ ok: true, ...(await preview(co.data?.company_id, Number(input.offset) || 0)) });
+  }
   const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Muscat", hour: "2-digit", hour12: false }).format(new Date()));
   if (hour < 9 || hour >= 21) return json({ ok: true, reason: "outside_hours" });
   const rts = await db.from("whatsapp_automation_runtime").select("company_id,mode,visit_followups_auto");
