@@ -22,6 +22,12 @@ test('nothing is on the list or sent before its chat is read; closed topics leav
  assert(fn.includes('enum: ["followup", "skip", "wait_for_match"]'));
  assert(fn.includes('[رسالة صوتية قديمة ما انقرت]'));
 });
+test('silence after getting the details is not a reason to follow up; the preview writes nothing',()=>{
+ assert(fn.includes('سكوته جواب'));
+ const body=fn.slice(fn.indexOf('async function preview('),fn.indexOf('async function reviewAll('));
+ assert(body.includes('.is("reason", null)'));
+ assert(!body.includes('.update(')&&!body.includes('.insert('));
+});
 test('a client the review removed does not come back through another request',()=>{
  const sql=fs.readFileSync('db/changes/67-followup-removed-stay-removed.forward.sql','utf8');
  assert(sql.includes('BEFORE INSERT ON public.whatsapp_outreach_queue'));
