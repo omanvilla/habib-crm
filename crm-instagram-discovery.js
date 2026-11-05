@@ -9,7 +9,15 @@
  const scope=()=>typeof currentUser!=='undefined'&&currentUser&&currentProfile&&isOwner()?currentUser.id+':'+currentProfile.company_id+':'+crmSessionGeneration+':'+resetEpoch:'';
  // The home alert counts only videos from the last 14 days, so a new one does not get lost among old posts.
  const RECENT_DAYS=14,NO_VIDEO_DAYS=7,recentSince=()=>new Date(Date.now()-RECENT_DAYS*86400000).toISOString();
- let sequence=0,rows=[],homeRows=[],properties=[],offset=0,filter='recent',busy=new Set();
+ let sequence=0,rows=[],homeRows=[],properties=[],projects=[],offset=0,filter='recent',busy=new Set();
+ // A caption that names one investment project is a suggestion for that project, not for a property with a similar name.
+ function suggestProject(caption){
+  const t=fold(caption).replace(/_/g,' ');
+  const hits=projects.filter(p=>[p.name,...(p.aliases||[])].some(a=>a&&t.includes(fold(a))));
+  return hits.length===1?hits[0]:null;
+ }
+ const projectOptions=near=>projects.length?'<optgroup label="المشاريع الاستثمارية">'+projects.map(p=>'<option value="project:'+escape(p.id)+'"'+(near&&near.id===p.id?' selected':'')+'>'+escape(p.name)+(near&&near.id===p.id?' · الأقرب':'')+'</option>').join('')+'</optgroup>':'';
+ async function loadProjects(){const r=await supa.from('investment_projects').select('id,name,aliases').eq('archived',false).order('created_at');if(!r.error)projects=r.data||[];}
  const fold=v=>String(v||'').replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').toLowerCase();
  function safeThumb(value){try{const u=new URL(value);return u.protocol==='https:'&&/(\.cdninstagram\.com|\.fbcdn\.net)$/.test(u.hostname)?u.href:'';}catch{return '';}}
  // Nearest property for the card: area, type, rooms, baths and sizes from the caption, available ones without a video first. Only a suggestion: Ahmed links it.
@@ -17,7 +25,7 @@
   const t=fold(caption);let best=null,top=0;
   for(const p of list){
    const words=fold(p.area).split(/\s+/).filter(w=>w.length>2&&!['مسقط','بركاء','ولايه','منطقه'].includes(w));
-   if(!words.length||!words.some(w=>t.includes(w)))continue;
+   if(!words.length||!words.every(w=>t.includes(w)))continue;
    let score=2*words.filter(w=>t.includes(w)).length;
    if(/villa|house/.test(p.type||'')&&/فيلا|فلل|منزل|بيت/.test(t))score+=1;
    if(p.type==='apartment'&&/شقه|شقق/.test(t))score+=1;
@@ -33,7 +41,7 @@
  function mount(){
   const page=$('page-instagram');if(!page||$('igDiscovery'))return;
   const section=document.createElement('section');section.id='igDiscovery';section.className='card ig-discovery';section.hidden=true;
-  section.innerHTML='<div class="card-head"><div><div class="card-title">ربط المنشورات بالعقارات</div><p class="ws-subtitle">فحص تلقائي كل 5 دقائق. الربط الواضح يتم مباشرة؛ المحتوى الملتبس ينتظر قرارك.</p></div><div class="ws-actions"><button class="btn-secondary" data-igd="scan">فحص الآن</button><button class="btn-secondary" data-igd="refresh">تحديث القائمة</button></div></div><div class="card-body"><div id="igDiscoveryStatus" role="status"></div><label class="ig-discovery-filter">عرض <select id="igDiscoveryFilter" class="fs"><option value="recent">جديد يحتاج مراجعة (آخر 14 يوم)</option><option value="needs_review">كل اللي يحتاج مراجعة</option><option value="linked">مرتبط بالعقارات</option><option value="non_property">نصائح / محتوى آخر</option><option value="pending">قيد الفحص</option></select></label><div id="igDiscoveryRows" aria-live="polite"></div><div id="igDiscoveryPages" class="ws-actions"></div><p class="ws-subtitle">يحفظ النظام رابط المنشور ووصفه وتاريخ نشره، وليس نسخة فيديو مستقلة. القياسات غير المتاحة لا تُسجّل صفرًا. المراجعة تشمل السجلات القديمة والمباعة أيضًا.</p></div>';
+  section.innerHTML='<div class="card-head"><div><div class="card-title">ربط المنشورات بالعقارات</div><p class="ws-subtitle">فحص تلقائي كل 5 دقائق. الربط الواضح يتم مباشرة؛ المحتوى الملتبس ينتظر قرارك.</p></div><div class="ws-actions"><button class="btn-secondary" data-igd="scan">فحص الآن</button><button class="btn-secondary" data-igd="refresh">تحديث القائمة</button></div></div><div class="card-body"><div id="igDiscoveryStatus" role="status"></div><label class="ig-discovery-filter">عرض <select id="igDiscoveryFilter" class="fs"><option value="recent">جديد يحتاج مراجعة (آخر 14 يوم)</option><option value="needs_review">كل اللي يحتاج مراجعة</option><option value="linked">مرتبط بالعقارات</option><option value="project">مرتبط بمشروع استثماري</option><option value="non_property">نصائح / محتوى آخر</option><option value="pending">قيد الفحص</option></select></label><div id="igDiscoveryRows" aria-live="polite"></div><div id="igDiscoveryPages" class="ws-actions"></div><p class="ws-subtitle">يحفظ النظام رابط المنشور ووصفه وتاريخ نشره، وليس نسخة فيديو مستقلة. القياسات غير المتاحة لا تُسجّل صفرًا. المراجعة تشمل السجلات القديمة والمباعة أيضًا.</p></div>';
   page.querySelector('.page-header').after(section);
   const banner=document.createElement('div');banner.id='igDiscoveryAlert';banner.className='ig-discovery-alert';banner.hidden=true;
   $('page-dash')?.querySelector('.page-header')?.after(banner);
@@ -43,7 +51,7 @@
   const company=currentProfile.company_id;
   const state=await supa.from('instagram_discovery_state').select('enabled,auto_link_enabled,backfill_complete,last_success_at,last_error_code').eq('company_id',company);
   if(state.error)throw state.error;
-  const counts={};for(const status of ['needs_review','linked','non_property','pending']){
+  const counts={};for(const status of ['needs_review','linked','project','non_property','pending']){
    const result=await supa.from('instagram_media_catalog').select('id',{count:'exact',head:true}).eq('company_id',company).eq('state',status);
    if(result.error)throw result.error;counts[status]=result.count;
   }
@@ -52,7 +60,7 @@
   if(identity!==scope())return null;
   const states=state.data||[],active=states.some(s=>s.enabled&&s.auto_link_enabled),failed=states.some(s=>s.last_error_code),complete=states.length&&states.every(s=>s.backfill_complete);
   const last=states.map(s=>s.last_success_at).filter(Boolean).sort().at(-1);
-  $('igDiscoveryStatus').innerHTML='<strong>'+(failed?'توجد مشكلة اتصال؛ المحفوظات لم تتغير':active?'الربط التلقائي مفعّل':'الربط التلقائي غير مفعّل بعد')+'</strong><p class="ws-subtitle">آخر فحص ناجح: '+escape(date(last))+' · '+(complete?'اكتملت قراءة أرشيف الحساب':'قراءة الأرشيف لم تكتمل بعد')+'</p><div class="ig-discovery-counts">'+[['linked','مرتبط'],['recent','جديد للمراجعة'],['needs_review','كل المراجعة'],['non_property','محتوى آخر'],['pending','قيد الفحص']].map(([key,label])=>'<span>'+label+' <strong>'+escape(counts[key]==null?'—':number(counts[key]))+'</strong></span>').join('')+'</div>';
+  $('igDiscoveryStatus').innerHTML='<strong>'+(failed?'توجد مشكلة اتصال؛ المحفوظات لم تتغير':active?'الربط التلقائي مفعّل':'الربط التلقائي غير مفعّل بعد')+'</strong><p class="ws-subtitle">آخر فحص ناجح: '+escape(date(last))+' · '+(complete?'اكتملت قراءة أرشيف الحساب':'قراءة الأرشيف لم تكتمل بعد')+'</p><div class="ig-discovery-counts">'+[['linked','مرتبط'],['project','مشاريع'],['recent','جديد للمراجعة'],['needs_review','كل المراجعة'],['non_property','محتوى آخر'],['pending','قيد الفحص']].map(([key,label])=>'<span>'+label+' <strong>'+escape(counts[key]==null?'—':number(counts[key]))+'</strong></span>').join('')+'</div>';
   await homeCards(identity,failed,counts.recent);
   return counts;
  }
@@ -60,6 +68,7 @@
  async function homeCards(identity,failed,recent){
   const banner=$('igDiscoveryAlert');if(!banner)return;
   const company=currentProfile.company_id;
+  await loadProjects();
   const [media,props,events,linked]=await Promise.all([
    recent?supa.from('instagram_media_catalog').select('id,permalink,caption,published_at,state,reason_code,property_id,updated_at,thumbnail_url').eq('company_id',company).eq('state','needs_review').gte('published_at',recentSince()).order('published_at',{ascending:false}).limit(12):{data:[]},
    supa.from('crm_properties_access').select('id,title,area,type,bedrooms,bathrooms,land_size,built_size,status,archived,created_at').eq('company_id',company).eq('archived',false).in('status',['available','reserved']),
@@ -75,12 +84,12 @@
   banner.hidden=!failed&&!homeRows.length&&!noVideo.length;
   banner.innerHTML=(failed?'<div class="ig-home-line"><span>مزامنة Instagram تحتاج المراجعة</span><button class="btn-secondary" data-igd="open">فتح</button></div>':'')
    +homeRows.map(row=>{
-    const url=safeLink(row.permalink),thumb=safeThumb(row.thumbnail_url),near=suggest(row.caption,list,withVideo);
+    const nearProject=suggestProject(row.caption),url=safeLink(row.permalink),thumb=safeThumb(row.thumbnail_url),near=nearProject?null:suggest(row.caption,list,withVideo);
     return '<article class="ig-home-card">'+(thumb?'<img src="'+escape(thumb)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<div class="ig-home-thumb">فيديو</div>')
      +'<div class="ig-home-body"><div class="ig-home-top"><strong>'+escape(reason[row.reason_code]||'بحاجة إلى مراجعة')+'</strong><span>'+escape(date(row.published_at))+'</span>'+(url?'<a href="'+escape(url)+'" target="_blank" rel="noopener noreferrer">فتح الفيديو ↗</a>':'')+'</div>'
      +'<p class="ig-home-caption">'+escape(row.caption||'بدون وصف')+'</p>'
-     +'<select class="fs" data-ig-property="'+escape(row.id)+'"><option value="">اختر العقار…</option>'+list.map(p=>'<option value="'+escape(p.id)+'"'+(near&&near.id===p.id?' selected':'')+'>'+escape(p.title)+(near&&near.id===p.id?' · الأقرب':'')+'</option>').join('')+'</select>'
-     +'<div class="ws-actions"><button class="btn-primary" data-igd="link" data-id="'+escape(row.id)+'">اربطه بعقار</button><button class="btn-secondary" data-igd="general" data-id="'+escape(row.id)+'">مو عقار</button></div></div></article>';
+     +'<select class="fs" data-ig-property="'+escape(row.id)+'"><option value="">اختر العقار أو المشروع…</option>'+projectOptions(nearProject)+'<optgroup label="العقارات">'+list.map(p=>'<option value="'+escape(p.id)+'"'+(near&&near.id===p.id?' selected':'')+'>'+escape(p.title)+(near&&near.id===p.id?' · الأقرب':'')+'</option>').join('')+'</optgroup></select>'
+     +'<div class="ws-actions"><button class="btn-primary" data-igd="link" data-id="'+escape(row.id)+'">اربطه</button><button class="btn-secondary" data-igd="general" data-id="'+escape(row.id)+'">مو عقار</button></div></div></article>';
    }).join('')
    +(noVideo.length?'<div class="ig-home-line ig-home-novideo"><div><strong>عقارات متاحة من أكثر من '+NO_VIDEO_DAYS+' أيام بدون فيديو ('+number(noVideo.length)+')</strong><p>'+noVideo.map(p=>escape(p.title)).join(' · ')+'</p></div></div>':'');
  }
@@ -89,7 +98,8 @@
   $('igDiscovery').hidden=false;$('igDiscoveryRows').textContent='جاري تحميل المنشورات…';$('igDiscoveryPages').textContent='';
   try{
    const counts=await overview();if(identity!==scope()||seq!==sequence)return;
-   let query=supa.from('instagram_media_catalog').select('id,permalink,caption,published_at,state,reason_code,property_id,updated_at',{count:'exact'}).eq('company_id',currentProfile.company_id).eq('state',filter==='recent'?'needs_review':filter);
+   const projectNames=new Map(projects.map(p=>[p.id,p.name]));
+   let query=supa.from('instagram_media_catalog').select('id,permalink,caption,published_at,state,reason_code,property_id,project_id,updated_at',{count:'exact'}).eq('company_id',currentProfile.company_id).eq('state',filter==='recent'?'needs_review':filter);
    if(filter==='recent')query=query.gte('published_at',recentSince());
    const response=await query.order('published_at',{ascending:false}).order('id').range(offset,offset+19);
    if(response.error)throw response.error;
@@ -98,8 +108,8 @@
    rows=response.data||[];properties=choices;
    $('igDiscoveryRows').innerHTML=rows.length?rows.map(row=>{
     const url=safeLink(row.permalink),property=properties.find(p=>p.id===row.property_id);
-    const decisions=filter==='needs_review'||filter==='recent'?'<details><summary>تحديد العقار أو نوع المحتوى</summary><label>العقار الصحيح<select class="fs" data-ig-property="'+escape(row.id)+'"><option value="">اختر العقار…</option>'+properties.map(p=>'<option value="'+escape(p.id)+'">'+escape(p.title)+(p.archived?' · مؤرشف':'')+'</option>').join('')+'</select></label><div class="ws-actions"><button class="btn-primary" data-igd="link" data-id="'+escape(row.id)+'">ربط بالعقار المحدد</button><button class="btn-secondary" data-igd="general" data-id="'+escape(row.id)+'">نصيحة / ليس إعلان عقار</button></div></details>':'';
-    return '<article class="ig-discovery-row"><div class="ws-actions"><strong>'+escape(reason[row.reason_code]||'بحاجة إلى مراجعة')+'</strong><span>'+escape(date(row.published_at))+'</span>'+(url?'<a class="ws-action" href="'+escape(url)+'" target="_blank" rel="noopener noreferrer">فتح المنشور ↗</a>':'')+'</div>'+(property?'<p>العقار: <strong>'+escape(property.title)+'</strong></p>':'')+'<p class="ig-discovery-caption">'+escape(row.caption||'لا يوجد وصف للمنشور؛ افتح الفيديو لتحديد محتواه.')+'</p>'+decisions+'</article>';
+    const decisions=filter==='needs_review'||filter==='recent'?'<details><summary>تحديد العقار أو نوع المحتوى</summary><label>العقار أو المشروع الصحيح<select class="fs" data-ig-property="'+escape(row.id)+'"><option value="">اختر العقار أو المشروع…</option>'+projectOptions(suggestProject(row.caption))+'<optgroup label="العقارات">'+properties.map(p=>'<option value="'+escape(p.id)+'">'+escape(p.title)+(p.archived?' · مؤرشف':'')+'</option>').join('')+'</optgroup></select></label><div class="ws-actions"><button class="btn-primary" data-igd="link" data-id="'+escape(row.id)+'">ربط بالمحدد</button><button class="btn-secondary" data-igd="general" data-id="'+escape(row.id)+'">نصيحة / ليس إعلان عقار</button></div></details>':'';
+    return '<article class="ig-discovery-row"><div class="ws-actions"><strong>'+escape(reason[row.reason_code]||'بحاجة إلى مراجعة')+'</strong><span>'+escape(date(row.published_at))+'</span>'+(url?'<a class="ws-action" href="'+escape(url)+'" target="_blank" rel="noopener noreferrer">فتح المنشور ↗</a>':'')+'</div>'+(property?'<p>العقار: <strong>'+escape(property.title)+'</strong></p>':'')+(row.project_id&&projectNames.has(row.project_id)?'<p>المشروع: <strong>'+escape(projectNames.get(row.project_id))+'</strong></p>':'')+'<p class="ig-discovery-caption">'+escape(row.caption||'لا يوجد وصف للمنشور؛ افتح الفيديو لتحديد محتواه.')+'</p>'+decisions+'</article>';
    }).join(''):'<p class="ws-empty">لا توجد منشورات في هذا التصنيف.</p>';
    const total=response.count??counts?.[filter]??rows.length;
    $('igDiscoveryPages').innerHTML=(offset?'<button class="btn-secondary" data-igd="previous">السابق</button>':'')+'<span>'+number(Math.min(offset+1,total))+'–'+number(offset+rows.length)+' من '+number(total)+'</span>'+(offset+20<total?'<button class="btn-secondary" data-igd="next">التالي</button>':'');
@@ -108,11 +118,12 @@
  async function decide(id,decision,button){
   const identity=scope(),row=rows.concat(homeRows).find(r=>r.id===id);if(!identity||!row||busy.has(id))return;
   const property=decision==='link'?button.closest('article')?.querySelector('[data-ig-property]')?.value:null;
-  if(decision==='link'&&!property){showToast('اختر العقار الصحيح أولًا','error');return;}
+  if(decision==='link'&&!property){showToast('اختر العقار أو المشروع أولًا','error');return;}
+  const project=String(property||'').startsWith('project:')?String(property).slice(8):null;
   busy.add(id);document.querySelectorAll('[data-igd][data-id="'+id+'"]').forEach(b=>b.disabled=true);
-  try{const result=await supa.rpc('crm_instagram_review',{p_id:id,p_expected:row.updated_at,p_decision:decision,p_property:property});
+  try{const result=project?await supa.rpc('crm_instagram_link_project',{p_id:id,p_expected:row.updated_at,p_project:project}):await supa.rpc('crm_instagram_review',{p_id:id,p_expected:row.updated_at,p_decision:decision,p_property:property});
    if(identity!==scope())return;if(result.error)throw result.error;
-   showToast(decision==='link'?'تم ربط المنشور بالعقار':'تم تسجيله كمحتوى آخر دون ربطه بعقار','success');await load();await overview();
+   showToast(project?'تم ربط الفيديو بالمشروع':decision==='link'?'تم ربط المنشور بالعقار':'تم تسجيله كمحتوى آخر دون ربطه بعقار','success');await load();await overview();
   }catch(error){if(identity===scope())showToast(error?.code==='40001'?'تغير السجل أثناء المراجعة. حدّث القائمة قبل الحفظ.':'تعذر حفظ المراجعة. لم يتم تأكيد أي تغيير.','error');}
   finally{busy.delete(id);if(identity===scope())document.querySelectorAll('[data-igd][data-id="'+id+'"]').forEach(b=>b.disabled=false);}
  }

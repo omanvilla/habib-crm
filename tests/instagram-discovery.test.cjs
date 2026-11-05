@@ -50,6 +50,21 @@ test('a caption without a price links on area, rooms, baths and one exact size, 
  assert.equal(noBaths.decision,'needs_review');
 });
 
+test('a caption naming one project links to it; a nearby mention or two projects does not',async()=>{
+ const {matchProject}=await matcher;
+ const projects=[{id:'h',name:'مدينة السلطان هيثم',aliases:['مدينة السلطان هيثم','وادي زها']},{id:'y',name:'اليزن',aliases:['اليزن']},{id:'a',name:'عايدة',aliases:['عايدة','aida']}];
+ assert.equal(matchProject('تحديث للأعمال في ارض \nالواقع\n\nفي مدينة السلطان هيثم',projects)?.id,'h');
+ assert.equal(matchProject('جانب من الأعمال الحاليه ل #مدينة_السلطان_هيثم',projects)?.id,'h');
+ assert.equal(matchProject('مشروع عايده في قلب مسقط',projects)?.id,'a');
+ assert.equal(matchProject('مشروع Aida من أقوى المشاريع',projects)?.id,'a');
+ assert.equal(matchProject('مشروع اليزن على واجهة مطرح',projects)?.id,'y');
+ assert.equal(matchProject('ارض في المعبيلة مقابل مدينة السلطان هيثم',projects),null);
+ assert.equal(matchProject('موقع قريب من مسقط ومدينة السلطان هيثم',projects),null);
+ assert.equal(matchProject('ليش تستثمر في هذه المنطقة مشروع ضخم قادم مدينة السلطان هيثم',projects),null);
+ assert.equal(matchProject('قارن بين اليزن و عايدة',projects),null);
+ assert.equal(matchProject('فيلا للبيع في الرميس',projects),null);
+});
+
 test('home cards count only the last 14 days and stay a suggestion',()=>{
  const ui=fs.readFileSync('crm-instagram-discovery.js','utf8'),sql=fs.readFileSync('db/changes/59-instagram-thumbnail.forward.sql','utf8');
  assert.match(ui,/RECENT_DAYS=14,NO_VIDEO_DAYS=7/);

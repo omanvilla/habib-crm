@@ -21,6 +21,17 @@ function areaTokens(property){
  return a.split(/\s+/).filter(w=>w&&!['مسقط','بركاء','بركا','سلطنه','عمان','ولايه','منطقه','في','حي'].includes(w)&&!/^\d/.test(w));
 }
 function containsWord(t,w){return (' '+t.replace(/\n/g,' ')+' ').includes(' '+w+' ');}
+// A caption that names exactly one investment project belongs to it. "Near the city" or "this area" talks about another place.
+export function matchProject(caption,projects=[]){
+ const t=' '+clean(caption).replace(/[\n.,]/g,' ').replace(/\s+/g,' ').trim()+' ';
+ if(/هذه المنطقه|هذي المنطقه|المنطقه القريبه/.test(t))return null;
+ const hits=projects.filter(p=>[p.name,...(p.aliases||[])].some(alias=>{
+  const a=clean(alias).trim();if(!a)return false;
+  const e=a.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return new RegExp('\\s[وبل]{0,2}'+e+'(?=\\s)','u').test(t)&&!new RegExp('(مقابل|قرب|قريب|جنب|بجانب|خلف)[^\\n]{0,30}'+e,'u').test(t);
+ }));
+ return hits.length===1?hits[0]:null;
+}
 export function matchMedia(media,properties,knownLinks=[]){
  const f=facts(media.caption),code=String(media.permalink||'').match(/\/(?:p|reels?|tv)\/([A-Za-z0-9_-]+)/)?.[1];
  const existing=knownLinks.filter(e=>(code&&e.link_key==='instagram:'+code)||String(e.instagram_media_id||'')===String(media.instagram_media_id||media.id));
