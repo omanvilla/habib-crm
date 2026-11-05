@@ -1,5 +1,5 @@
 // Deterministic evidence only. Captions are data, never instructions. No price-only/face guesses.
-export const MATCH_VERSION='caption-facts-v1';
+export const MATCH_VERSION='caption-facts-v2';
 export function normalize(value){return String(value??'').normalize('NFKC').replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776)).replace(/[\u064b-\u065f\u0670\u0640\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').replace(/[أإآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/٫/g,'.').replace(/٬/g,',').toLowerCase();}
 const clean=s=>normalize(s).replace(/[^\p{L}\p{N}.\n ,]/gu,' ').replace(/[ \t]+/g,' ');
 const value=s=>Number(String(s).replace(/[, ]/g,''));
@@ -40,8 +40,11 @@ export function matchMedia(media,properties,knownLinks=[]){
    // No rounding or maid-room guessing: conflicting stored facts require review.
    if(Math.abs(Number(p[key])-vals[0])<0.01)hits.push(key);else conflicts.push(key);
   }
+  // Captions above 60k carry no price, so area + rooms + baths + one exact size is enough without it.
+  if((/شقه|شقق/.test(f.text)&&/villa|house/.test(p.type||''))||(/فيلا|منزل/.test(f.text)&&/^land/.test(p.type||'')))conflicts.push('type');
   const dimensions=hits.includes('land_size')&&hits.includes('built_size');
-  const strong=dimensions||(hits.includes('price')&&(hits.includes('land_size')||hits.includes('built_size'))&&hits.includes('bedrooms'));
+  const sized=hits.includes('land_size')||hits.includes('built_size');
+  const strong=dimensions||(hits.includes('price')&&sized&&hits.includes('bedrooms'))||(sized&&hits.includes('bedrooms')&&hits.includes('bathrooms'));
   candidates.push({property_id:p.id,hits,conflicts,strong});
  }
  const eligible=candidates.filter(c=>c.strong&&!c.conflicts.length);

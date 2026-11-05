@@ -37,3 +37,23 @@ test('partner accounts: engagement-only lookup, owner-only connect, manual sync 
  assert.match(ui,/if\(!isOwner\(\)\|\|!Array\.isArray\(partners\)/);
  assert.match(sql,/\(SELECT public\.my_role\(\)\) = 'owner'/);
 });
+
+test('a caption without a price links on area, rooms, baths and one exact size, and never on less',async()=>{
+ const m=await matcher,base={...property,price:90000};
+ const text=caption.replace(/سعرها[^\n]*|السعر[^\n]*/g,'');
+ const r=m.matchMedia(media(text),[base]);
+ assert.equal(r.decision,'link');
+ const twin=m.matchMedia(media(text),[base,{...base,id:'twin'}]);
+ assert.equal(twin.decision,'needs_review');
+});
+
+test('home cards count only the last 14 days and stay a suggestion',()=>{
+ const ui=fs.readFileSync('crm-instagram-discovery.js','utf8'),sql=fs.readFileSync('db/changes/59-instagram-thumbnail.forward.sql','utf8');
+ assert.match(ui,/RECENT_DAYS=14,NO_VIDEO_DAYS=7/);
+ assert.match(ui,/\.eq\('state','needs_review'\)\.gte\('published_at',recentSince\(\)\)/);
+ assert.match(ui,/data-igd="link" data-id="'\+escape\(row\.id\)\+'">اربطه بعقار/);
+ assert.match(ui,/data-igd="general" data-id="'\+escape\(row\.id\)\+'">مو عقار/);
+ assert(ui.includes("escape(row.caption||'بدون وصف')"));
+ assert.match(ui,/\.cdninstagram\\.com\|\\.fbcdn\\.net/);
+ assert.match(sql,/thumbnail_url=coalesce\(excluded\.thumbnail_url,instagram_media_catalog\.thumbnail_url\)/);
+});
