@@ -4213,11 +4213,12 @@ async function launchWhatsAppEmbeddedSignup(routeKey){
     // the server can normally derive the single WABA from the exchanged business token.
     scheduleEmbeddedSignupFinalize(1800);
   },{
-    config_id:META_WA_CONFIG_ID,
+    // Owner line: the coexistence configuration that reaches the WhatsApp Business app step.
+    config_id:routeKey==='owner'?'1790225632111798':META_WA_CONFIG_ID,
     auth_type:'rerequest',
     response_type:'code',
     override_default_response_type:true,
-    extras:{setup:{},featureType:'whatsapp_business_app_onboarding'}
+    extras:{setup:{},featureType:'whatsapp_business_app_onboarding',sessionInfoVersion:'3'}
   });
 }
 
