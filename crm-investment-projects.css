@@ -1,0 +1,28 @@
+/* Investment projects page. */
+.ip-list{display:grid;gap:14px}
+.ip-card,.ip-form{padding:16px!important;min-width:0}
+.ip-form{display:grid;gap:10px;margin-bottom:14px}
+.ip-form h3{margin:0;font-size:15px}
+.ip-form label{display:grid;gap:4px;font-size:13px}
+.ip-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.ip-head h2{margin:0;font-size:17px;font-weight:700}
+.ip-head small,.ip-empty,.ip-notes{font-size:12px;color:#6f6552}
+.ip-notes{margin:8px 0 0}
+.ip-card h3{margin:14px 0 6px;font-size:14px;font-weight:700}
+.ip-card h3 b{color:#9a6b12}
+.ip-add{display:flex;gap:8px;margin-top:12px}
+.ip-add .fi{flex:1;min-width:0}
+.ip-add .btn-primary{flex:0 0 auto;width:auto!important;white-space:nowrap}
+.ip-videos,.ip-clients{list-style:none;margin:0;padding:0}
+.ip-video{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid #efe7d6}
+.ip-video:first-child{border-top:0}
+.ip-video img,.ip-thumb{flex:0 0 56px;width:56px;height:84px;object-fit:cover;border-radius:8px;background:#f0e9d8;color:#8a7a5a;display:flex;align-items:center;justify-content:center;font-size:11px}
+.ip-video-body{flex:1;min-width:0}
+.ip-video-body small{font-size:12px;color:#6f6552}
+.ip-video-body p{margin:4px 0 0;font-size:13px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.ip-remove{flex:0 0 auto;width:auto!important}
+.ip-clients li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid #efe7d6}
+.ip-clients li:first-child{border-top:0}
+.ip-client{background:none;border:0;padding:0;font:inherit;font-size:13px;font-weight:600;color:#9a6b12;cursor:pointer;text-align:start;overflow-wrap:anywhere}
+.ip-clients small{font-size:12px;color:#6f6552;flex:0 0 auto}
+@media(max-width:600px){.ip-add{flex-wrap:wrap}.ip-add .btn-primary{width:100%!important}}

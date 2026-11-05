@@ -1,5 +1,5 @@
 // Server-owned feed ingestion. No messaging, publishing, ads or arbitrary fetch destinations.
-import {matchMedia} from './matcher.mjs';
+import {matchMedia,matchProject} from './matcher.mjs';
 const BASE=Deno.env.get('SUPABASE_URL')||'';
 const KEY=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||'';
 const APP_SECRET=Deno.env.get('META_APP_SECRET')||'';
@@ -134,11 +134,21 @@ async function runAccount(a:any,deadline:number){
   if(state.auto_link_enabled){
    const inventory=await all('properties?select=id,title,area,price,land_size,built_size,bedrooms,bathrooms,type,branch_key,archived,updated_at&company_id=eq.'+a.company_id+'&order=id');
    const known=await all('property_marketing_events?select=id,property_id,link_key,instagram_media_id&company_id=eq.'+a.company_id+'&order=id');
+   const projects=await db('investment_projects?select=id,name,aliases&company_id=eq.'+a.company_id+'&archived=eq.false');
    const pending=await db('instagram_media_catalog?select=*&account_id=eq.'+a.id+'&state=eq.pending&order=published_at.desc,id&limit=200');
    for(const media of pending){
     if(Date.now()>deadline)break;
     const result=matchMedia(media,inventory,known),p=inventory.find(x=>x.id===result.property_id);
     if(result.decision==='link'&&!p)result.decision='needs_review';
+    // A clear property match wins; otherwise a caption naming one project links to that project.
+    const project=result.decision==='link'?null:matchProject(media.caption,projects);
+    if(project){
+     try{
+      const saved=await rpc('crm_instagram_auto_link_project',{p_id:media.id,p_expected:media.updated_at,p_project:project.id,p_reason:'caption_names_project',p_evidence:{caption_only:true,project:project.name}});
+      if(saved.state==='project')counts.project=Number(counts.project||0)+1;
+     }catch(error){if(!(error instanceof SafeError&&error.code==='db_40001'))throw error;}
+     continue;
+    }
     try{
      const saved=await rpc('crm_instagram_auto_decide',{p_id:media.id,p_expected:media.updated_at,p_decision:result.decision,p_property:result.decision==='link'?result.property_id:null,p_property_version:p?.updated_at||null,p_reason:result.reason,p_evidence:result.evidence});
      if(saved.state==='linked'){counts.linked++;if(saved.new_marketing_event){counts.added++;known.push({id:saved.event_id,property_id:p.id,link_key:media.link_key,instagram_media_id:media.instagram_media_id});}
