@@ -386,6 +386,10 @@ Deno.serve(async (req) => {
     const to = digits(client.phone_normalized || client.phone);
     const companyNumbers = (routesR.data || []).map((r: any) => digits(r.whatsapp_number)).filter(Boolean);
     if (companyNumbers.includes(to)) return fail("company_number");
+    // Ahmed's own number and the staff phones are internal chats: never answered
+    const staffR = await db.from("profiles").select("phone").eq("company_id", msg.company_id);
+    const staffNums = (staffR.data || []).map((r: any) => digits(r.phone).slice(-8)).filter((x: string) => x.length === 8);
+    if (staffNums.includes(to.slice(-8))) return fail("staff_number");
     if (!review && rt.mode === "test" && !(rt.allowed_customer_phones || []).map(digits).includes(to)) return fail("not_allowlisted");
     if (!(rt.allowed_routes || []).includes(conv.route_key)) return fail("route_blocked");
     if (!review && conv.human_handoff_required) { await watch(); return fail("human_handoff_open"); }
@@ -704,9 +708,9 @@ Deno.serve(async (req) => {
       if (!(u.data || []).length) return json({ ok: false, error: "draft_not_pending" }, 409);
       return json({ ok: true, status: "rewritten", reply_messages: out.reply_messages, action: out.action, analysis });
     }
-    // an owner Ahmed is already handling himself (he sent voice notes, or a price study is under way): the agent stays out
+    // an owner Ahmed is already handling himself (he wrote to him in this chat, or a price study is under way): the agent stays out
     const ownerWithAhmed = out.category === "seller" && (
-      history.some((h: any) => h.direction === "outbound" && h.actor_type === "human" && h.message_type === "audio") ||
+      history.some((h: any) => h.direction === "outbound" && h.actor_type === "human") ||
       (priorR.data || []).some((d: any) => /^دراسة سعر/.test(String(d.analysis?.handoff_reason || ""))));
     analysis.owner_with_ahmed = ownerWithAhmed;
     if (!review && ownerWithAhmed) {

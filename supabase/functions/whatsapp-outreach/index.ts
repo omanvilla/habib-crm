@@ -33,6 +33,8 @@ const NOUN: Record<string, [string, string, string]> = { // label, "booked" verb
   villa: ["الفيلا", "انحجزت", "فيلا"], twin_villa: ["الفيلا", "انحجزت", "توين فيلا"], townhouse: ["الفيلا", "انحجزت", "تاون هاوس"], house: ["البيت", "انحجز", "بيت"],
   land: ["الارض", "انحجزت", "ارض"], land_residential: ["الارض", "انحجزت", "ارض سكنية"], land_commercial: ["الارض", "انحجزت", "ارض تجارية"],
   apartment: ["الشقة", "انحجزت", "شقة"], resthouse: ["الاستراحة", "انحجزت", "استراحة"], chalet: ["الشاليه", "انحجز", "شاليه"], farm: ["المزرعة", "انحجزت", "مزرعة"],
+  building: ["المبنى", "انحجز", "مبنى"], penthouse: ["البنتهاوس", "انحجز", "بنتهاوس"], office: ["المكتب", "انحجز", "مكتب"], shop: ["المحل", "انحجز", "محل"],
+  warehouse: ["المخزن", "انحجز", "مخزن"], other: ["العقار", "انحجز", "عقار"],
 };
 const TYPE_WORDS: Record<string, string[]> = {
   villa: ["فيلا", "فله", "فلة", "villa"], twin_villa: ["توين", "فيلا", "villa"], house: ["بيت", "منزل", "house"], apartment: ["شقة", "شقه", "apartment"],
@@ -69,7 +71,7 @@ async function upsertRows(rows: any[]) {
 }
 function requestSummary(r: any) {
   const t = (Array.isArray(r.property_types) && r.property_types[0]) || r.property_type || "";
-  const type = NOUN[t]?.[2] || t || "عقار";
+  const type = NOUN[t]?.[2] || (/^[\u0600-\u06FF\s]+$/.test(t) ? t : "عقار");
   const area = (Array.isArray(r.preferred_areas) && r.preferred_areas.length ? r.preferred_areas[0] : r.preferred_area) || "";
   const budget = r.budget_max ? ` بحدود ${thousands(r.budget_max)}` : "";
   return `${type}${area ? " في " + area : ""}${budget}`.trim();
