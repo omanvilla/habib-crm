@@ -153,3 +153,16 @@ test('review tables are closed and a branch account sees only its own owners',()
   assert.match(s57,/\(SELECT public\.my_role\(\)\) IN \('owner','manager','viewer'\)/);
   assert.match(s57,/REVOKE EXECUTE ON FUNCTION public\.crm_queue_property_outreach\(\) FROM PUBLIC, anon, authenticated/);
 });
+
+test('owner type agent, Ahmed presence on a visit and the safe add function',()=>{
+  const s58=fs.readFileSync('db/changes/58-owner-agent-visit-presence-add-property.forward.sql','utf8');
+  const base=fs.readFileSync('app-base-v15.html','utf8'),ui=fs.readFileSync('crm-simple-ui.js','utf8');
+  assert.match(base,/<option value="agent">🧾 وكيل عن المالك<\/option>/);
+  assert.match(base,/setOwnerType\('agent',this\)/);
+  assert.match(ui,/agent:'وكيل'/);
+  assert.match(ui,/set\('cntOwAgent'/);
+  assert.match(base,/supa\.rpc\('crm_set_visit_presence'/);
+  assert.equal((s58.match(/auth\.uid\(\) IS NOT NULL AND public\.my_role\(\) IS DISTINCT FROM 'owner'/g)||[]).length,2);
+  assert.match(s58,/REVOKE ALL ON FUNCTION public\.crm_add_property_with_owner\(jsonb, jsonb\) FROM PUBLIC, anon/);
+  assert(s58.includes("right(v_phone, 8)"),'owner is reused by phone');
+});
