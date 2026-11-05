@@ -28,7 +28,7 @@
       +'<td class="crm-grid-name">'+esc(v.property&&v.property.title||'عقار غير محدد')+(v.property&&v.property.area?' <small>'+esc(v.property.area)+'</small>':'')+'</td>'
       +'<td>'+(v.client&&v.client_id?'<button type="button" class="crm-grid-link" onclick="viewClient(\''+esc(v.client_id)+'\')">'+esc(v.client.name)+'</button>':esc(v.client&&v.client.name||'—'))+'</td>'
       +'<td>'+esc(branch||'—')+'</td>'
-      +'<td><span class="viewing-status '+esc(v.status)+'">'+esc(statusLabels[v.status]||v.status||'—')+'</span></td>'
+      +'<td><span class="viewing-status '+esc(v.status)+'">'+esc(statusLabels[v.status]||v.status||'—')+'</span>'+(v.ahmed_present===true?' <span class="crm-grid-chip">أحمد حاضر</span>':v.ahmed_present===false?' <span class="crm-grid-chip">زار لحاله</span>':'')+(v.created_via==='whatsapp_ai'?' <span class="crm-grid-chip">من واتساب</span>':'')+'</td>'
       // Today's and overdue scheduled visits open the quick result sheet (crm-quick-visit.js).
       +'<td class="crm-grid-actions">'+(v.status==='scheduled'&&(v.viewing_date||'')<=today?'<button type="button" class="ops-action" onclick="(window.crmQuickVisit||editViewing)(\''+id+'\')">تسجيل النتيجة</button>':'')
       +'<button type="button" class="ops-action" onclick="editViewing(\''+id+'\')">تعديل</button>'
@@ -179,7 +179,7 @@
   if(typeof window.setCalView==='function'){const set=window.setCalView;window.setCalView=function(){const r=set.apply(this,arguments);calNavState();return r;};}
 
   // ---- Phase 2: owners as rows ---------------------------------------------
-  const ownerTypes={owner:'مالك',broker:'وسيط',agency:'مكتب',developer:'مطوّر'};
+  const ownerTypes={owner:'مالك',agent:'وكيل',broker:'وسيط',agency:'مكتب',developer:'مطوّر'};
   if(typeof window.renderOwners==='function'){
     window.renderOwners=async function(){
       const list=byId('ownersList');if(!list)return;
@@ -190,7 +190,7 @@
       if(q)rows=rows.filter(o=>(o.name||'').toLowerCase().includes(q)||(o.phone||'').includes(q));
       const set=(id,n)=>{const el=byId(id);if(el)el.textContent=n;};
       set('cntOwAll',all.length);set('cntOwOwner',all.filter(o=>(o.owner_type||'owner')==='owner').length);set('cntOwBroker',all.filter(o=>o.owner_type==='broker').length);
-      set('cntOwAgency',all.filter(o=>o.owner_type==='agency').length);set('cntOwDev',all.filter(o=>o.owner_type==='developer').length);
+      set('cntOwAgent',all.filter(o=>o.owner_type==='agent').length);set('cntOwAgency',all.filter(o=>o.owner_type==='agency').length);set('cntOwDev',all.filter(o=>o.owner_type==='developer').length);
       if(!rows.length){list.innerHTML=q||filter!=='all'?emptyState('🔍','لا توجد نتائج','جرّب كلمة بحث أخرى أو اختر «الكل».'):emptyState('🏛','لا يوجد ملاك بعد','المالك هو صاحب العقار أو الوسيط الذي جاء منه. أضفه مرة واحدة ثم اربطه بعقاراته.',canEditNow()?{label:'+ مالك جديد',action:"openModal('mOwner')"}:null);return;}
       const counts={};
       try{const r=await crmDataFrom('properties').select('owner_id, status').eq('archived',false);(r.data||[]).forEach(p=>{const c=counts[p.owner_id]||(counts[p.owner_id]={total:0,available:0,sold:0});c.total++;if(p.status==='available')c.available++;if(p.status==='sold')c.sold++;});}catch(e){}
@@ -198,7 +198,7 @@
       const phoneText=p=>typeof formatPhoneDisplay==='function'?plain(formatPhoneDisplay(p)):p;
       list.innerHTML='<div class="crm-grid-wrap"><table class="crm-grid" aria-label="قائمة الملاك"><thead><tr><th>الاسم</th><th>النوع</th><th>الهاتف</th><th>العقارات</th><th>متاح</th><th>مباع</th><th>إجراءات</th></tr></thead><tbody>'
         +rows.map(o=>{const s=counts[o.id]||{total:0,available:0,sold:0},id=esc(o.id),wa=o.phone?String(o.phone).replace(/[^0-9+]/g,'').replace(/^\+/,''):'';
-          return '<tr><td class="crm-grid-name">'+(canEditNow()?'<button type="button" class="ops-title" onclick="editOwner(\''+id+'\')">'+esc(o.name||'—')+'</button>':esc(o.name||'—'))+(o.exclusive?'<span class="crm-grid-chip">حصري</span>':'')+'</td>'
+          return '<tr><td class="crm-grid-name">'+(canEditNow()?'<button type="button" class="ops-title" onclick="editOwner(\''+id+'\')">'+esc(o.name||'—')+'</button>':esc(o.name||'—'))+(o.exclusive?'<span class="crm-grid-chip">حصري</span>':'')+(o.owner_type==='agent'?'<span class="crm-grid-chip">عن '+esc([o.original_owner_name,o.kinship].filter(Boolean).join(' · ')||'المالك')+(o.has_power_of_attorney?' · وكالة':'')+'</span>':'')+'</td>'
             +'<td>'+esc(ownerTypes[o.owner_type||'owner']||o.owner_type)+'</td><td><bdi dir="ltr">'+esc(o.phone?phoneText(o.phone):'—')+'</bdi></td>'
             +'<td class="crm-grid-num">'+s.total+'</td><td class="crm-grid-num">'+s.available+'</td><td class="crm-grid-num">'+s.sold+'</td>'
             +'<td class="crm-grid-actions">'+(canEditNow()?'<button type="button" class="ops-action" onclick="editOwner(\''+id+'\')">تعديل</button>':'')
