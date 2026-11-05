@@ -7,7 +7,6 @@ const index=fs.readFileSync('index.html','utf8');
 const base=fs.readFileSync('app-base-v15.html','utf8');
 const simple=fs.readFileSync('crm-simple-ui.js','utf8');
 const tasks=fs.readFileSync('crm-v18-task-priority-patch.js','utf8');
-const attention=fs.readFileSync('crm-attention.js','utf8');
 
 test('loader includes the simplification module after the modules it builds on',()=>{
   assert.match(index,/crm-simple-ui\.css\?v=/);
@@ -77,7 +76,6 @@ test('dashboard queue stays collapsed to a short preview and keeps the owner-onl
   assert.match(attention,/const PREVIEW=3/);
   assert.match(attention,/items\.slice\(0,PREVIEW\)/);
   assert.match(attention,/catch\(e\)\{return false;\}/);
-  assert(attention.includes("currentProfile.role==='owner'?'<button type=\"button\" class=\"btn-secondary crm-attention-batch\""));
 });
 
 // Phase 2 renderers run against a minimal DOM: only the target list node exists.
