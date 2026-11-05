@@ -178,6 +178,8 @@ Deno.serve(async (req) => {
   if (analysis.action === "send_lockbox" && prop?.lockbox_image_url) outgoing.push({ type: "image", image: { link: prop.lockbox_image_url } });
   if (analysis.action === "send_owner_number" && prop?.visit_method === "owner_lives" && prop.owner_id) {
     const o = await db.from("owners").select("phone").eq("id", prop.owner_id).maybeSingle();
+    // the location goes with the owner's number: the customer arranges the visit with him directly
+    if (prop.map_url && !texts.some((t) => t.includes(prop.map_url))) outgoing.push({ type: "text", text: { preview_url: true, body: prop.map_url } });
     if (o.data?.phone) outgoing.push({ type: "text", text: { preview_url: false, body: digits(o.data.phone) } });
   }
 
