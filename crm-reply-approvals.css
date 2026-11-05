@@ -74,3 +74,5 @@
 .cn-dialog h3{margin:0 0 6px}.cn-ctx{margin:0 0 10px;opacity:.75;font-size:.9rem}
 .cn-dialog textarea{width:100%;box-sizing:border-box;border-radius:10px;padding:10px;font:inherit}
 .cn-actions{display:flex;gap:8px;margin-top:10px}.cn-chat-btn{font-size:.8rem;padding:4px 10px;margin-inline-start:auto}
+.voice-btn{margin-top:6px;min-width:44px}.voice-btn.on{background:#fde8e8;color:#9f1239;border-color:#fecdd3}
+.cn-apply,.rp-keep{display:flex;gap:6px;align-items:center;font-size:.9rem;margin:8px 0}

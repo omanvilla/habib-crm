@@ -12,19 +12,20 @@
       d=document.createElement('dialog');d.id='cnDialog';d.className='cn-dialog';
       d.innerHTML='<form method="dialog"><h3>ملاحظة لـ Claude</h3><p class="cn-ctx" id="cnCtx"></p>'
         +'<textarea id="cnText" rows="5" dir="auto" placeholder="مثلاً: الرد غلط لأن العميل يقصد الحيل مو الموالح، المفروض يسأله اي فيلا"></textarea>'
+        +'<label class="cn-apply"><input type="checkbox" id="cnApply" checked> العقل يطبقها على الردود الجاية على طول</label>'
         +'<div class="cn-actions"><button type="button" class="btn-primary" id="cnSave">إرسال</button><button type="button" class="btn-secondary" id="cnCancel">إلغاء</button></div></form>';
       document.body.append(d);
       byId('cnCancel').onclick=()=>d.close();
       byId('cnSave').onclick=async()=>{
         const note=byId('cnText').value.trim();if(!note){byId('cnText').focus();return;}
         const c=d._ctx||{},btn=byId('cnSave');btn.disabled=true;
-        const r=await supa.from('crm_owner_notes').insert({company_id:currentProfile.company_id,conversation_id:c.conversation_id||null,draft_id:c.draft_id||null,outreach_id:c.outreach_id||null,note,context:c.context||{}});
+        const r=await supa.from('crm_owner_notes').insert({company_id:currentProfile.company_id,conversation_id:c.conversation_id||null,draft_id:c.draft_id||null,outreach_id:c.outreach_id||null,note,apply_now:byId('cnApply').checked,context:c.context||{}});
         btn.disabled=false;
         if(r.error){toast('تعذر الحفظ: '+r.error.message,'error');return;}
-        d.close();toast('وصلت الملاحظة. قل لـ Claude: شوف الملاحظات','success');
+        d.close();toast(byId('cnApply').checked?'وصلت الملاحظة، والعقل بيطبقها من الرد الجاي':'وصلت الملاحظة','success');
       };
     }
-    d._ctx=ctx;byId('cnText').value='';byId('cnCtx').textContent=ctx.label||'';
+    d._ctx=ctx;byId('cnText').value='';byId('cnApply').checked=true;byId('cnCtx').textContent=ctx.label||'';
     d.showModal();setTimeout(()=>byId('cnText').focus(),50);
   }
   window.crmClaudeNote=dialog;

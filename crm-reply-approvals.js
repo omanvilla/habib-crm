@@ -197,7 +197,7 @@
   function draftCard(d){
     const a=d.analysis||{},trial=a.dry_run===true,ok24=within24(d);
     const name=d.client.name||d.conv.customer_name||'عميل',phone=d.client.phone||'';
-    return '<article class="rp-card" data-draft="'+esc(d.id)+'">'
+    return '<article class="rp-card" data-draft="'+esc(d.id)+'" data-conv="'+esc(d.conversation_id||'')+'">'
       +'<header><div><strong><bdi>'+esc(name)+'</bdi></strong>'+(phone?' <small dir="ltr">'+esc(phone)+'</small>':'')+'</div>'
       +'<div class="rp-chips"><span class="rp-chip route">'+esc(ROUTES[d.conv.route_key]||d.conv.route_key||'')+'</span>'+(a.category?'<span class="rp-chip">'+esc(CATS[a.category]||a.category)+'</span>':'')
       +(a.matched_rule_id?'<span class="rp-chip pinned">مطابق لرد مثبت</span>':'')
@@ -212,6 +212,7 @@
       +(a.owner_instruction?'<p class="rp-instr-done">انكتب حسب أمرك: <span dir="auto">'+esc(a.owner_instruction)+'</span></p>':'')+'</div>'
       +'<div class="rp-instr" hidden><label>أمر للذكاء الاصطناعي</label>'
       +'<textarea class="fta rp-instr-text" rows="2" dir="auto" placeholder="مثلاً: ارسل له تفاصيل العقار والمساحات / يبي شي ثاني في الصومحان اعرض عليه المتوفر"></textarea>'
+      +'<label class="rp-keep"><input type="checkbox" class="rp-keep-on" checked> العقل يتعلمها ويطبقها على الردود الجاية</label>'
       +'<div class="rp-actions"><button type="button" class="btn-primary" data-rp="instr-run">اكتب الرد من جديد</button><button type="button" class="btn-secondary" data-rp="instr-close">إلغاء</button></div></div>'
       +'<label class="rp-pin"><input type="checkbox" class="rp-pin-on"> ثبّت هذا الرد للمواقف المشابهة</label>'
       +'<input class="fi rp-pin-situation" hidden placeholder="وصف الموقف" value="'+esc([CATS[a.category]||'',a.intent||''].filter(Boolean).join(': '))+'">'
@@ -411,6 +412,10 @@
       const data=r.data||{};if(r.error||data.ok!==true){let detail=data;try{if(r.error&&r.error.context)detail=await r.error.context.json();}catch(_){}throw detail&&detail.error?detail:(r.error||data);}
       const d=state.drafts.find(x=>x.id===id);
       if(d){d.reply_messages=data.reply_messages||[];d.analysis=data.analysis||d.analysis;card.outerHTML=draftCard(d);}
+      // the same instruction teaches the agent for the next replies (crm_owner_notes → lessons in the brain)
+      if(card.querySelector('.rp-keep-on')?.checked!==false){
+        try{await supa.from('crm_owner_notes').insert({company_id:currentProfile.company_id,conversation_id:(d&&d.conversation_id)||card.dataset.conv||null,draft_id:id,note:instruction,apply_now:true,context:{source:'instruction'}});}catch(_){}
+      }
       toast('انكتب الرد من جديد، راجعه قبل الإرسال','success');
     }catch(e){err.textContent=errText(e);btn.disabled=false;btn.textContent='اكتب الرد من جديد';}
   }
