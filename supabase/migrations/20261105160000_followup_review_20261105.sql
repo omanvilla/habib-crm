@@ -1,0 +1,43 @@
+-- SQL65 (5 Nov 2026): every follow-up is read first. The AI reads the whole chat, then keeps it with a text written for
+-- this client, removes it (owner offering a property, moved to the other branch, topic closed), or saves what the client wants.
+-- The list shows only reviewed items, and only what the review marked as fitting goes out automatically.
+ALTER TABLE public.whatsapp_visit_followups ADD COLUMN IF NOT EXISTS reviewed_at timestamptz, ADD COLUMN IF NOT EXISTS review_reason text, ADD COLUMN IF NOT EXISTS auto_ok boolean NOT NULL DEFAULT false;
+ALTER TABLE public.whatsapp_outreach_queue ADD COLUMN IF NOT EXISTS reviewed_at timestamptz, ADD COLUMN IF NOT EXISTS review_reason text, ADD COLUMN IF NOT EXISTS auto_ok boolean NOT NULL DEFAULT false;
+
+CREATE OR REPLACE FUNCTION public.crm_followups_today()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE v_company uuid := public.my_company(); v_owner boolean := public.my_role() = 'owner';
+BEGIN
+  IF v_company IS NULL THEN RAISE EXCEPTION 'not_authorized' USING ERRCODE = '42501'; END IF;
+  RETURN jsonb_build_object(
+    'auto_on', coalesce((SELECT r.visit_followups_auto FROM public.whatsapp_automation_runtime r WHERE r.company_id = v_company), false),
+    'waiting_review', (SELECT count(*) FROM public.whatsapp_visit_followups f WHERE f.company_id = v_company AND f.status = 'awaiting_approval' AND f.reviewed_at IS NULL)
+                    + (SELECT count(*) FROM public.whatsapp_outreach_queue q WHERE q.company_id = v_company AND q.status = 'pending' AND q.kind = 'request_followup' AND NOT q.dry_run AND q.reviewed_at IS NULL),
+    'items', coalesce((SELECT jsonb_agg(x ORDER BY x.created_at) FROM (
+      SELECT DISTINCT ON (i.client_id) i.source, i.id, i.client_id, i.route_key, i.created_at, i.reason, i.text, i.template_name, i.has_chat,
+             c.name AS client, coalesce(c.phone_normalized, c.phone) AS phone, i.property,
+             public.crm_followup_auto_after(i.created_at) AS auto_after,
+             i.auto_ok AND i.has_chat AND EXISTS (SELECT 1 FROM public.whatsapp_template_registry t WHERE t.company_id = v_company AND t.route_key = i.route_key AND t.template_name = i.template_name
+                AND upper(t.status) = 'APPROVED' AND upper(t.category) = 'UTILITY') AS can_auto
+        FROM (
+          SELECT 'visit' AS source, 1 AS rank, f.id, f.client_id, f.route_key, f.created_at, coalesce(f.review_reason, 'متابعة بعد الزيارة') AS reason,
+                 coalesce(f.owner_text, f.body) AS text, f.template_name, f.conversation_id IS NOT NULL AS has_chat, p.title AS property, f.auto_ok
+            FROM public.whatsapp_visit_followups f
+            LEFT JOIN public.viewings v ON v.id = f.viewing_id LEFT JOIN public.properties p ON p.id = v.property_id
+           WHERE f.company_id = v_company AND f.status = 'awaiting_approval' AND f.reviewed_at IS NOT NULL
+          UNION ALL
+          SELECT 'request', 2, q.id, q.client_id, q.route_key, q.created_at, coalesce(q.review_reason, 'متابعة طلب'),
+                 coalesce(q.owner_text, (SELECT string_agg(m.value, ' ') FROM jsonb_array_elements_text(q.messages) m)), q.template_name, q.conversation_id IS NOT NULL, NULL, q.auto_ok
+            FROM public.whatsapp_outreach_queue q
+           WHERE q.company_id = v_company AND q.status = 'pending' AND q.kind = 'request_followup' AND NOT q.dry_run AND q.reviewed_at IS NOT NULL
+        ) i
+        JOIN public.clients c ON c.id = i.client_id
+       WHERE v_owner OR crm_repair_private.staff_can_access_branch(v_company, i.route_key)
+       ORDER BY i.client_id, i.rank, i.created_at) x), '[]'::jsonb));
+END
+$function$;

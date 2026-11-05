@@ -7,6 +7,17 @@ test('the button opens the client chat with the prepared text',()=>{
  assert(js.includes("'https://wa.me/'+d+'?text='+encodeURIComponent(text||'')"));
  assert.match(index,/crm-followups-today\.js\?v=/);
 });
+test('the button asks for WhatsApp Business on the phone',()=>{
+ assert(js.includes('package=com.whatsapp.w4b'));
+ assert(js.includes("'whatsapp-smb://send?phone='"));
+});
+test('nothing is on the list or sent before its chat is read; closed topics leave',()=>{
+ const review=fs.readFileSync('db/changes/65-followup-review.forward.sql','utf8');
+ assert(review.includes("f.status = 'awaiting_approval' AND f.reviewed_at IS NOT NULL"));
+ assert(fn.includes('if (!f.reviewed_at || !f.auto_ok || Date.now() < autoAfter(f.created_at)) continue;'));
+ assert(fn.includes('enum: ["followup", "skip", "wait_for_match"]'));
+ assert(fn.includes('[رسالة صوتية قديمة ما انقرت]'));
+});
 test('a message from a person takes the client off the list',()=>{
  assert(sql.includes("WHEN (new.direction = 'outbound' AND new.actor_type = 'human')"));
 });
