@@ -1,6 +1,20 @@
 # Habib CRM — current state
 
-Updated 2026-11-05. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
+Updated 2026-11-06. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
+
+## 6 November 2026 — owner private WhatsApp line (SQL68), merged, NOT yet live
+
+Main `1596e02` contains a third WhatsApp route `owner` («واتساب المالك», +96890944469). It is the owner's own number with its own Meta phone number id once linked (coexistence, featureType `whatsapp_business_app_onboarding`).
+
+- **Owner-only.** The route is forced to `owner_only_inbox=true` and assigned to the owner. `investment_link_is_private` treats `route_key='owner'` and anything that points to an owner-line conversation or message as private, so managers and agents never see the route, its conversations, messages, onboarding events or link activity (RLS, inbox, media, exports). The owner sees everything.
+- **Not investment.** The investment row, `a00_guard_investment_route`, `a01_shared_reception_route` and `resolve_shared_whatsapp_business_route` are unchanged. Investor classification never moves an owner-line conversation.
+- **Private capture only.** No client, request, inquiry, transcription or reply-agent draft on this line. The agent refuses `owner`. Replies come from his phone; echoes are stored.
+- **History import.** After an owner bind, `whatsapp-embedded-signup` asks Meta (`POST /{phone_id}/smb_app_data`, `smb_app_state_sync` then `history`; once each, within 24h). The webhook stores `history` chunks as owner-line messages with original timestamps (`channel_source='owner_history_import'`, not unread, idempotent on wamid, media placeholders upgraded in place). Error 2593109 (history sharing off) is logged to `whatsapp_onboarding_events`. `smb_app_state_sync` contacts are not stored.
+- **Linking.** «ربط / تحديث عبر Meta» on the owner card (Settings > routes), owner only; signup refuses any number other than +96890944469. Meta app fields `messages`, `history`, `smb_app_state_sync`, `smb_message_echoes` are already subscribed (v26.0).
+
+**Not done.** SQL68 (`20261106090000_owner_private_route_20261106`) is not applied: the apply was cancelled at the confirmation prompt. Until it is applied, the owner card does not render (no route row) and nothing changes for staff. Then deploy in this order: `whatsapp-webhook` (stub importing commit `1596e02`), `whatsapp-inbox`, `whatsapp-reply-agent` (index/brain/knowledge), `whatsapp-transcribe-backfill`, `whatsapp-embedded-signup`, `whatsapp-direct-bind`. Then the owner links the number from the card.
+
+**Verification.** `tests/owner-private-route.test.cjs` (31 synthetic handler tests) and `tests/owner-private-route-sql.sh` (SQL68 forward, re-apply and rollback on Postgres 16 with the live isolation functions copied, roles tested as owner, manager and agent). No live data was written.
 
 ## 5 November 2026 — audit fixes, owner type agent, visit presence, Instagram cards
 
