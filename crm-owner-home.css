@@ -1,0 +1,40 @@
+/* Owner home page: four sections. The old sections stay in the page, hidden until "قائمة العمل الكاملة". */
+#page-dash.coh-on:not(.coh-full-open)>.ops-dashboard-intro,
+#page-dash.coh-on:not(.coh-full-open)>#opsEmployeeTargets,
+#page-dash.coh-on:not(.coh-full-open)>#opsDailyWork{display:none!important}
+#page-dash.coh-on>#crmQuickVisits{display:none!important}
+.coh{display:grid;gap:14px;margin-bottom:14px}
+.coh[hidden]{display:none}
+.coh-sec{padding:16px!important;min-width:0}
+.coh-title{margin:0 0 12px;font-size:17px;font-weight:700}
+.coh-subhead{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin:14px 0 8px}
+.coh-subhead:first-child{margin-top:0}
+.coh-subhead h3{margin:0;font-size:14px;font-weight:700}
+.coh-subhead b,.coh-title b,.coh-info b,.coh-novideo b{color:#9a6b12}
+.coh-add,.coh-more{background:none;border:0;padding:6px 0;color:#9a6b12;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.coh-more{display:block;margin-top:6px}
+.coh-links{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin-bottom:6px}
+.coh-link{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px;padding:10px 14px;border:1px solid #eadfc6;border-radius:10px;background:#fbf7ec;font:inherit;font-size:14px;font-weight:600;color:inherit;cursor:pointer;text-align:start}
+.coh-link b{font-size:17px;color:#9a6b12}
+.coh-list{list-style:none;margin:0;padding:0}
+.coh-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid #efe7d6}
+.coh-row:first-child{border-top:0}
+.coh-info{flex:1 1 0;min-width:0;display:grid;gap:2px}
+.coh-info strong{font-size:14px;overflow-wrap:anywhere}
+.coh-info small{font-size:12px;color:#6f6552;overflow-wrap:anywhere}
+.coh-note{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.coh-late{color:#b3321f;font-weight:600}
+.coh-go{flex:0 0 auto;width:auto!important;white-space:nowrap}
+.coh-empty{margin:4px 0;font-size:13px;color:#6f6552}
+.coh-since{margin:-6px 0 10px;font-size:12px;color:#6f6552}
+.coh-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.coh-stat{display:grid;gap:2px;padding:10px 12px;border:1px solid #efe7d6;border-radius:10px;min-width:0}
+.coh-stat strong{font-size:22px;line-height:1.2;text-align:start}
+.coh-stat small{font-size:12px;color:#6f6552}
+.coh-novideo{margin-top:10px;font-size:13px}
+.coh-novideo p{margin:4px 0 0;color:#6f6552;overflow-wrap:anywhere}
+.coh-full{justify-self:start}
+#cohIg .ig-discovery-alert{margin:12px 0 0;padding:0;background:none;border:0;box-shadow:none;display:block}
+#cohIg .ig-discovery-alert[hidden]{display:none}
+#cohIg .ig-home-novideo{display:none}
+@media(max-width:600px){.coh-sec{padding:12px!important}.coh-row{flex-wrap:wrap}.coh-info{flex:1 1 100%}.coh-go{width:100%!important}}

@@ -30,7 +30,13 @@ Live on main (PRs #36, #37, #38). Database changes SQL55 to SQL59 are applied, e
 - `watchVisit` was tried read-only on 12 real messages. No real visit has been logged by it yet.
 - Screens were checked from the Barka account in the built-in browser. Owner-account screens have not been checked in a live session, because the Chrome extension was not connected.
 
-**Not done.** The new home page shape, deletion of unused items, and the utility wording for follow-up templates 2 to 4 all wait for the owner. Nothing was deleted.
+**Owner home (SQL60, PR #40).** The owner's page has four sections from `crm_owner_home`: decisions, problems, properties, short report. The old lists stay behind a button. Staff pages are unchanged, and a failed load keeps the old page. Visits with no result always show. The upcoming list leaves after the first visit with `created_via='whatsapp_ai'`.
+
+**Automatic visits and requests.** A client with several open requests made the visit save fail with `viewing_request_ambiguous`, which would also have stopped `watchVisit`. Trigger `crm_pick_viewing_request` now picks the closest request for `whatsapp_ai` and `system` visits. The manual form still asks.
+
+**Not done.**
+- `whatsapp-visit-templates` with the three v2 texts is in the repo but not deployed, because the deploy was refused. Follow-ups keep v1 until v2 is approved as UTILITY.
+- Deletion of unused items waits for the owner. Nothing was deleted.
 
 ## 1 November 2026 — deals by date, quick visit result
 
