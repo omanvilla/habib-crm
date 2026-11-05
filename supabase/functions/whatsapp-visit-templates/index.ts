@@ -1,6 +1,6 @@
 // Submits the four visit follow-up templates (SQL54) to Meta for the Barka and Muscat numbers,
 // or refreshes their approval status, and keeps whatsapp_template_registry in step.
-// Only these fixed texts can be created here (approved by the owner on 2 Nov 2026); nothing is
+// Only these fixed texts can be created here (approved by the owner on 2 Nov and 5 Nov 2026); nothing is
 // sent to customers. Called with the reply-agent secret (x-crm-agent), e.g. from SQL net.http_post.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -15,6 +15,10 @@ const TEMPLATES: Record<string, string> = {
   visit_followup_2_ar_v1: "اذا العقار ما ناسبك خبرني ايش اللي تدور عليه بالضبط عشان اشوف لك شي يناسبك",
   visit_followup_3_ar_v1: "لين الحين تدور على عقار ؟ اذا تحب برسلك المتوفر عندنا الحين",
   visit_followup_4_ar_v1: "اذا لين الحين ما حصلت اللي يناسبك خبرني وبشوف لك الجديد اول ما يتوفر",
+  // Meta rated versions 1 of steps 2 to 4 as MARKETING. These ask about the visit or request only (SQL60).
+  visit_followup_2_ar_v2: "بخصوص زيارتك الاخيرة للعقار هل عندك ملاحظة عليه ؟",
+  visit_followup_3_ar_v2: "بخصوص زيارتك الاخيرة للعقار هل وصلت لقرار ؟",
+  visit_followup_4_ar_v2: "نراجع طلبك المسجل عندنا هل طلبك لين الحين قائم ؟",
 };
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });

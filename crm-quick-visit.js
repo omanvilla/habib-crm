@@ -160,7 +160,7 @@
       if(r.error)throw r.error;if(!r.data||!r.data.ok)throw new Error('لم يؤكد الخادم حفظ الزيارة');
       if(typeof crmFinishSave==='function')crmFinishSave('mQuickVisit');
       dialog.close();toast('تم حفظ نتيجة الزيارة وتحديث الصفقة والمتابعة','success');
-      loadCard();[window.loadViewings,window.loadDeals].forEach(f=>{if(typeof f==='function')f();});
+      loadCard();if(window.crmOwnerHomeRefresh)window.crmOwnerHomeRefresh();[window.loadViewings,window.loadDeals].forEach(f=>{if(typeof f==='function')f();});
     }catch(e){err.textContent=errorText(e);}
     finally{button.disabled=false;}
   }

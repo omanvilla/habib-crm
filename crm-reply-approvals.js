@@ -510,6 +510,7 @@
   });
 
   // ---- badge and browser notification ----------------------------------------------
+  window.crmPendingReplies=countPending;
   async function updateBadge(){
     if(!isOwnerNow())return;
     const n=await countPending();if(n==null)return;
