@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { transcribeVoice } from "../_shared/voice.ts";
 // The brain and investor knowledge live in whatsapp_agent_prompts (synced from the repo by agent-prompt-sync),
 // so wording changes do not need a redeploy.
 
@@ -6,7 +7,6 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 const OPENAI_MODEL = Deno.env.get("REPLY_AGENT_MODEL") || Deno.env.get("OPENAI_MODEL") || "gpt-5.6-luna";
-const TRANSCRIBE_MODEL = Deno.env.get("OPENAI_TRANSCRIBE_MODEL") || "gpt-4o-mini-transcribe";
 const META_APP_SECRET = Deno.env.get("META_APP_SECRET") ?? "";
 const WHATSAPP_ACCESS_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN") ?? "";
 const GRAPH = Deno.env.get("META_GRAPH_VERSION") || "v25.0";
@@ -81,29 +81,11 @@ async function metaSend(tokens: string[], phoneId: string, to: string, payload: 
   throw new Error("meta_send_failed");
 }
 
-// Voice notes: download from WhatsApp and turn into text so the agent understands them.
-async function transcribe(tokens: string[], mediaId: string) {
-  for (const t of tokens) {
-    try {
-      const metaR = await fetch(`https://graph.facebook.com/${GRAPH}/${mediaId}`, { headers: { Authorization: `Bearer ${t}` } });
-      const meta = await metaR.json().catch(() => ({}));
-      if (!metaR.ok || !meta?.url) continue;
-      const fileR = await fetch(meta.url, { headers: { Authorization: `Bearer ${t}` } });
-      if (!fileR.ok) continue;
-      const blob = await fileR.blob();
-      const mime = meta.mime_type || blob.type || "audio/ogg";
-      const ext = mime.includes("mpeg") ? "mp3" : mime.includes("mp4") ? "m4a" : mime.includes("wav") ? "wav" : "ogg";
-      const form = new FormData();
-      form.append("file", blob, `voice.${ext}`);
-      form.append("model", TRANSCRIBE_MODEL);
-      form.append("language", "ar");
-      form.append("response_format", "json");
-      const tr = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", headers: { Authorization: `Bearer ${OPENAI_API_KEY}` }, body: form });
-      const p = await tr.json().catch(() => ({}));
-      if (tr.ok && p?.text) return short(p.text, 4000);
-    } catch (e) { console.error("[reply-agent] transcribe", String((e as any)?.message || e)); }
-  }
-  return null;
+// Voice notes: see ../_shared/voice.ts (full transcribe model + Omani vocabulary + context correction).
+async function saveVoice(id: string, v: { text: string; raw: string; model: string; unclear: boolean }) {
+  const cur = await db.from("whatsapp_messages").select("automation_result").eq("id", id).maybeSingle();
+  const ar = { ...((cur.data as any)?.automation_result || {}), voice: { raw: v.raw, model: v.model, unclear: v.unclear, at: new Date().toISOString() } };
+  await db.from("whatsapp_messages").update({ transcript: v.text, transcription_status: "completed", automation_result: ar }).eq("id", id);
 }
 
 // Customer photos and PDFs: the agent looks at them itself (a screenshot of our reel, a photo of a villa,
@@ -505,10 +487,12 @@ Deno.serve(async (req) => {
     // understand the latest voice notes
     const pendingAudio = history.filter((h: any) => h.direction === "inbound" && h.message_type === "audio" && !h.transcript && h.media_id).slice(-3);
     for (const a of pendingAudio) {
-      const text = await transcribe(tokens, a.media_id);
-      if (text) {
-        a.transcript = text;
-        await db.from("whatsapp_messages").update({ transcript: text, transcription_status: "completed" }).eq("id", a.id);
+      const ctx = history.filter((h: any) => String(h.message_timestamp) < String(a.message_timestamp)).slice(-8)
+        .map((h: any) => `${h.direction === "inbound" ? "العميل" : "المكتب"}: ${short(h.transcript || h.body || `[${h.message_type}]`, 300)}`).join("\n");
+      const v = await transcribeVoice(tokens, a.media_id, GRAPH, ctx);
+      if (v) {
+        a.transcript = v.unclear ? `${v.text} (الصوت مو واضح كامل)` : v.text;
+        await saveVoice(a.id, { ...v, text: a.transcript });
       }
     }
 
