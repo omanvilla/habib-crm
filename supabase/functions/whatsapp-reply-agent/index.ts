@@ -190,8 +190,11 @@ const schema = {
 // must not write links and the location goes through send_location.
 function publicText(v: unknown) {
   return String(v ?? "").replace(/https?:\/\/\S+/gi, "").replace(/\+?968[\s-]?\d{8}|\b[79]\d{7}\b/g, "")
-    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "").replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").trim();
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "").replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n")
+    // reel calls to action ("ارسل كلمة صومحان على الواتساب"، "علق"، "تابعنا") are for Instagram, not for a customer already on WhatsApp
+    .split("\n").filter((l) => !CTA_RE.test(l)).join("\n").replace(/#\S+/g, "").trim();
 }
+const CTA_RE = /(^|[\s،.:-])(ارسل|أرسل|ارسلوا|أرسلوا|اكتب|اكتبوا|ابعث|علق|علّق|كومنت|تابعنا|تابعونا|اضغط|للتواصل|التواصل|تواصل|تواصلوا)(?=$|[\s،.:])|الرابط في|البايو|في الخاص|\b(dm|comment|follow)\b/i;
 
 // Office titles carry owner names ("فيلا الرميس 59 سلطان"), so the agent only sees a neutral label.
 function propLine(p: any) {
