@@ -4,7 +4,7 @@ const BASE=Deno.env.get('SUPABASE_URL')||'';
 const KEY=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||'';
 const APP_SECRET=Deno.env.get('META_APP_SECRET')||'';
 const COMPANY=Deno.env.get('CRM_COMPANY_ID')||'';
-const VERSION='instagram-discovery-v3';
+const VERSION='instagram-discovery-v4';
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 class SafeError extends Error {constructor(public code:string){super(code);}}
 async function db(path:string,method='GET',body?:unknown){
@@ -118,6 +118,29 @@ async function refreshMetrics(companyId:string,connected:{a:any,token:string}[],
  }
  return {metrics_synced:synced,metrics_failed:failed};
 }
+// Ahmed (6 Nov): property reels are also posted on the area accounts (@omanvilla1 Barka, @omanvilla2 Muscat),
+// often as a collab with @omanvilla. Customers send those links on WhatsApp, so their posts go into the same
+// catalog and pass the same matching as our own feed. Read through business discovery with the connected
+// account's token (public fields only). A link already saved under another media id is left as it is.
+async function partnerMedia(a:any,token:string){
+ const partners=(await db('instagram_partner_accounts?select=username&company_id=eq.'+a.company_id+'&order=username')).map((r:any)=>String(r.username).toLowerCase()).filter((u:string)=>/^[a-z0-9._]{1,30}$/.test(u)&&u!==String(a.instagram_username||'').toLowerCase());
+ const out:any[]=[];
+ for(const username of partners){
+  try{
+   const d=await graphGet(a.instagram_user_id+'?fields='+encodeURIComponent('business_discovery.username('+username+'){media.limit(50){id,caption,permalink,media_type,media_product_type,timestamp,like_count,comments_count}}'),token);
+   for(const m of Array.isArray(d?.business_discovery?.media?.data)?d.business_discovery.media.data:[]){
+    if(!/^\d+$/.test(String(m.id||''))||!m.permalink||!m.timestamp)continue;
+    out.push({id:String(m.id),caption:m.caption||'',permalink:m.permalink,media_type:m.media_type,media_product_type:m.media_product_type,timestamp:m.timestamp,like_count:m.like_count??null,comments_count:m.comments_count??null,thumbnail_url:null});
+   }
+  }catch(error){if(error instanceof SafeError&&['meta_reconnect_required','meta_rate_limited'].includes(error.code))throw error;}
+ }
+ if(!out.length)return out;
+ const code=(u:string)=>(String(u).match(/instagram\.com\/(?:[^/]+\/)?(?:reels?|p|tv)\/([A-Za-z0-9_-]+)/i)||[])[1]||'';
+ const keys=[...new Set(out.map(m=>code(m.permalink)).filter(Boolean))];
+ const existing=keys.length?await db('instagram_media_catalog?select=link_key,instagram_media_id&company_id=eq.'+a.company_id+'&link_key=in.('+keys.map(k=>'"instagram:'+k+'"').join(',')+')'):[];
+ const owner=new Map(existing.map((r:any)=>[String(r.link_key).slice(10),String(r.instagram_media_id)]));
+ return out.filter(m=>{const k=code(m.permalink);return k&&(!owner.has(k)||owner.get(k)===m.id);});
+}
 async function runAccount(a:any,deadline:number){
  const state=await rpc('crm_instagram_claim',{p_account:a.id});if(!state)return {account_id:a.id,skipped:true};
  const lease=state.lease_id,where='instagram_discovery_state?account_id=eq.'+a.id+'&lease_id=eq.'+lease;
@@ -125,6 +148,11 @@ async function runAccount(a:any,deadline:number){
  try{
   const token=await tokenFor(a);
   const latest=await page(a,token,null,25);await rpc('crm_instagram_ingest',{p_account:a.id,p_lease:lease,p_media:latest.media});counts.fetched+=latest.media.length;
+  try{
+   const pm=await partnerMedia(a,token);
+   for(let i=0;i<pm.length;i+=100){await rpc('crm_instagram_ingest',{p_account:a.id,p_lease:lease,p_media:pm.slice(i,i+100)});}
+   counts.partner_fetched=pm.length;
+  }catch(error){if(error instanceof SafeError&&['meta_reconnect_required','meta_rate_limited'].includes(error.code))throw error;counts.partner_error=error instanceof SafeError?error.code:'partner_failed';}
   const staleFull=state.backfill_complete&&(!state.last_full_scan_at||Date.now()-Date.parse(state.last_full_scan_at)>86400000);
   if(!state.backfill_complete||staleFull){
    const history=await page(a,token,staleFull?null:state.backfill_cursor,100);
