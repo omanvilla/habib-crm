@@ -2,6 +2,20 @@
 
 Updated 2026-11-06. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 6 November 2026 — «أمر للذكاء الاصطناعي» on each daily follow-up (SQL72, PR #67), live
+
+- **What it does.** Each follow-up in «متابعات اليوم» has «أمر للذكاء الاصطناعي» (owner only; branch accounts do not see it). The instruction goes to `whatsapp-visit-followup-auto` with the owner's login. It reads the whole chat again with the instruction and either rewrites the text (shown before he sends, nothing is sent) or removes the client with the reason kept (`review_skip` / `review_wait_for_match`, so the client stays off until they write again). The day's automatic-send wait (`reviewed_at`) does not move.
+- **Where it is recorded.** On the follow-up: `owner_instruction`, `instructed_at` (`whatsapp_visit_followups` or `whatsapp_outreach_queue`). As a lesson: a `crm_owner_notes` row with `context.source='followup_instruction'` holding kind, follow-up id, client, branch, decision, result, reason, text before and text after. Lessons feed `whatsapp_agent_prompts.lessons`, which every follow-up review now reads (and the reply agent already did). The list shows «انكتبت حسب أمرك».
+- **Voice notes.** With an instruction the review does not wait for an untranscribed voice note; the owner writes what was said and the text follows his words.
+- **Test without writing.** `preview_instruction: {kind, id, instruction}` with the scheduler secret returns the decision and text and writes nothing. Tried on a real follow-up: the text changed to ask which area he wants after the site did not suit him.
+- **To answer "what happened with this client":** `select created_at, note, context from crm_owner_notes where context->>'source'='followup_instruction' and context->>'client_id'='<id>' order by created_at;`
+- **Deployed:** SQL72 applied; function stub pinned to `913251a`. Page checked as the owner at 375px: 40 follow-ups, each with the button, box opens with the mic, no sideways scroll. Not yet tried: a real instruction from the owner's phone.
+- **Rollback.** `db/changes/72-followup-owner-instruction.rollback.sql`, then redeploy the stub on `5ca14a1`.
+
+## 6 November 2026 — old voice notes are gone at Meta
+
+Our system never keeps a copy of a voice note: it has only Meta's media id (`media_id`), no Storage copy. On 6 Nov 40 failed notes from 14 to 26 Oct (7 of them in one client's chat from 25 Oct) were set back to retry and run through `whatsapp-transcribe-backfill`: all 40 answered `media_unavailable` from Meta with both keys. The ids touched are listed in `crm_repair_private.voice_retry_20261106`; all are back to `failed`. Since 28 Oct notes are transcribed on arrival (98 of 98 inbound up to 6 Nov). The only other copy is on the branch phone's WhatsApp Business app. For old notes, the owner's instruction on the follow-up is the way: he writes what was said.
+
 ## 6 November 2026 — owner private WhatsApp line (SQL68), merged, NOT yet live
 
 Main `1596e02` contains a third WhatsApp route `owner` («واتساب المالك», +96890944469). It is the owner's own number with its own Meta phone number id once linked (coexistence, featureType `whatsapp_business_app_onboarding`).
