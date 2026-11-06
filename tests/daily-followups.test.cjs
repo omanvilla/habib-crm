@@ -78,6 +78,14 @@ test('the optional rented units note is a reference for the follow-ups and has a
  assert(fn.includes('المؤجر حالياً'));
  assert(index.includes('crm-rented-units.js?v='));
 });
+test('the agent asks a name once, never guesses, and notes when it was not given',()=>{
+ const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
+ assert(brain.includes('اسأله عن اسمه مرة وحدة بس'));
+ assert(brain.includes('لا تناديه به ولا تخمن اسمه'));
+ assert(agent.includes('ما ذكر اسمه، الاسم المسجل من الواتساب مو اسمه الحقيقي'));
+ assert(agent.includes('"client_name_stated", "name_declined"]'));
+ assert(agent.includes('rental_terms,rented_units"'));
+});
 test('the agent carries on after a message from the list, and stays quiet after any other',()=>{
  assert(agent.includes('if (!review && staffInChat && !fromList)'));
 });
