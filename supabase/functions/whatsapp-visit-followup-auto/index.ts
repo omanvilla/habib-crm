@@ -7,6 +7,9 @@
 // 3. 90 minutes after a visit it asks the client's opinion as free text inside the 24 hour window, never a template (SQL68).
 // 4. If the window would close before that moment, it asks the client to confirm the visit while the window is still open,
 //    so a reply keeps the after-visit follow-up free (SQL70).
+// 5. «أمر للذكاء الاصطناعي» on the list (owner only, SQL72): the owner's instruction rewrites one follow-up from the whole chat,
+//    or removes it with the reason kept. The instruction is saved in crm_owner_notes as a lesson that every later review reads.
+//    It also covers voice notes nobody can read: he writes what was said and the text follows his words.
 // Stops when whatsapp_automation_runtime.visit_followups_auto is false. A failed send stays on the list.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -17,6 +20,7 @@ const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 const OPENAI_MODEL = Deno.env.get("REPLY_AGENT_MODEL") || Deno.env.get("OPENAI_MODEL") || "gpt-5.6-luna";
 const GRAPH = Deno.env.get("META_GRAPH_VERSION") || "v25.0";
 const WINDOW_MS = 24 * 3600 * 1000;
+const ALLOWED_ORIGINS = ["https://omanvilla.github.io"]; // «متابعات اليوم» sends the owner's instruction from here
 const DAILY_LIMIT = 20, REVIEWS_PER_RUN = 24, REVIEWS_AT_ONCE = 6, AFTER_VISIT_PER_RUN = 10;
 
 const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -24,6 +28,10 @@ const enc = new TextEncoder();
 const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { "content-type": "application/json; charset=utf-8" } });
 const digits = (v: unknown) => String(v ?? "").replace(/\D/g, "");
 const short = (v: unknown, n = 500) => { const s = String(v ?? "").trim(); return s.length > n ? s.slice(0, n) + "…" : s; };
+function cors(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  return { "Access-Control-Allow-Origin": ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0], "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Vary": "Origin" };
+}
 function b64(s: string) { const b = atob(s); const o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return o; }
 // due at 10am Muscat on the day after it reached his list (the review puts it there)
 function autoAfter(created: string) {
@@ -102,7 +110,17 @@ const chatOf = async (conversationId: string, limit: number) => {
   return (r.data || []).reverse().map(lineOf).join("\n");
 };
 
-async function review(item: any, companyId: string, available: string, fixed: string, about: string) {
+// The owner's lessons (his instructions and notes, kept by crm_owner_notes in whatsapp_agent_prompts.lessons), read once a minute
+let lessonsCache = { at: 0, text: "" };
+async function lessons() {
+  if (Date.now() - lessonsCache.at < 60000) return lessonsCache.text;
+  const r = await db.from("whatsapp_agent_prompts").select("content").eq("key", "lessons").maybeSingle();
+  lessonsCache = { at: Date.now(), text: short(r.data?.content || "", 6000) };
+  return lessonsCache.text;
+}
+
+async function review(item: any, companyId: string, available: string, fixed: string, about: string, instruction = "") {
+  const learnt = await lessons();
   const chat = item.conversation_id ? await chatOf(item.conversation_id, 40) : "";
   const others = await db.from("whatsapp_conversations").select("id,route_key").eq("company_id", companyId).eq("client_id", item.client_id).neq("id", item.conversation_id || "00000000-0000-0000-0000-000000000000").limit(2);
   const person = await db.from("clients").select("name").eq("id", item.client_id).maybeSingle();
@@ -111,7 +129,7 @@ async function review(item: any, companyId: string, available: string, fixed: st
   const ai = await fetch("https://api.openai.com/v1/responses", {
     method: "POST", headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: OPENAI_MODEL, store: false, reasoning: { effort: "low" }, instructions: REVIEW_RULES.replace("{fixed}", fixed),
-      input: `تاريخ اليوم: ${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date())}\nسبب وجوده في القائمة: ${about}\nالاسم المسجل من الواتساب، يفيد بس لمعرفة إذا امرأة: ${person.data?.name || "غير معروف"}\nرقمنا اللي نتابع منه: ${item.route_key === "barka" ? "بركاء" : "مسقط"}\n\nالعقارات المتاحة الآن:\n${available || "لا يوجد"}\n\nالمحادثة:\n${chat || "ما في محادثة مسجلة"}\n${other}`,
+      input: `تاريخ اليوم: ${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date())}\nسبب وجوده في القائمة: ${about}\nالاسم المسجل من الواتساب، يفيد بس لمعرفة إذا امرأة: ${person.data?.name || "غير معروف"}\nرقمنا اللي نتابع منه: ${item.route_key === "barka" ? "بركاء" : "مسقط"}${learnt ? `\n\nدروس من صاحب المكتب من أوامر سابقة (طبقها إذا الموقف مشابه):\n${learnt}` : ""}${instruction ? `\n\nأمر صاحب المكتب على هذي المتابعة بالذات (نفذه، وهو أهم من أي قاعدة فوق، وإذا يقول إن المتابعة ما لها داعي قرارك skip، بس لا تخالف الممنوعات ولا تكتب معلومة مو مكتوبة قدامك، وإذا يقول وش انقال في رسالة صوتية صدقه): ${instruction}` : ""}\n\nالعقارات المتاحة الآن:\n${available || "لا يوجد"}\n\nالمحادثة:\n${chat || "ما في محادثة مسجلة"}\n${other}`,
       text: { format: { type: "json_schema", name: "followup_review", strict: true, schema: reviewSchema } } }),
   });
   const p = await ai.json().catch(() => ({}));
@@ -141,9 +159,10 @@ async function saveRequest(companyId: string, item: any, wanted: any, reason: st
   if (w.error) console.error("[followup-auto] request", w.error.message);
 }
 
-async function judge(kind: "visit" | "request", x: any, companyId: string, available: string) {
+async function judge(kind: "visit" | "request", x: any, companyId: string, available: string, instruction = "") {
   // a new voice note still being transcribed: read this client on a later run, so nothing reaches him half read
-  if (x.conversation_id) {
+  // (not when the owner has given an instruction: he has told us what he wants)
+  if (x.conversation_id && !instruction) {
     const pending = await db.from("whatsapp_messages").select("id").eq("conversation_id", x.conversation_id).eq("message_type", "audio").is("transcript", null).gte("message_timestamp", new Date(Date.now() - 48 * 3600 * 1000).toISOString()).limit(1);
     if ((pending.data || []).length) throw new Error("voice_note_pending");
   }
@@ -155,22 +174,30 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
     if (x.after_visit) about += " هذي متابعة بعد موعد الزيارة بساعة ونص، وهذا أهم وقت للبيع. قرارك followup واسأله عن رأيه في العقار بالضبط، إلا إذا المحادثة تقول إنه ما زار أو موضوعه انتهى أو قال رأيه.";
   }
   const fixed = kind === "visit" ? String(x.body || "") : (x.messages || []).join(" ");
-  return review(x, companyId, available, fixed, about);
+  return review(x, companyId, available, fixed, about, instruction);
 }
 
 async function reviewOne(kind: "visit" | "request", x: any, companyId: string, available: string) {
+  return applyDecision(kind, x, companyId, await judge(kind, x, companyId, available));
+}
+
+// Writes the review's decision. With the owner's instruction the instruction is kept on the row and the day's wait
+// (reviewed_at) does not move. Returns "kept", "waiting_match", "removed", or "not_pending" when it was sent or changed meanwhile.
+async function applyDecision(kind: "visit" | "request", x: any, companyId: string, out: any, instruction = "") {
   const now = new Date().toISOString();
   const table = kind === "visit" ? "whatsapp_visit_followups" : "whatsapp_outreach_queue";
   const openStatus = kind === "visit" ? "awaiting_approval" : "pending";
-  const out = await judge(kind, x, companyId, available);
   const reason = short(out.reason, 300);
+  const extra: any = instruction ? { owner_instruction: short(instruction, 1000), instructed_at: now } : { reviewed_at: now };
   if (out.decision === "followup" && out.text) {
-    await db.from(table).update({ owner_text: short(out.text, 500), review_reason: reason, auto_ok: !!out.auto_ok, reviewed_at: now }).eq("id", x.id).eq("status", openStatus);
-    return "kept";
+    const w = await db.from(table).update({ owner_text: short(out.text, 500), review_reason: reason, auto_ok: !!out.auto_ok, ...extra }).eq("id", x.id).eq("status", openStatus).select("id");
+    return (w.data || []).length ? "kept" : "not_pending";
   }
   // removed from the list; the reason stays on the record
-  if (kind === "visit") await db.from(table).update({ status: "stopped", error: `review_${out.decision}`, review_reason: reason, reviewed_at: now, updated_at: now }).eq("id", x.id).eq("status", openStatus);
-  else await db.from(table).update({ status: "skipped", reason: `review_${out.decision}`, review_reason: reason, reviewed_at: now }).eq("id", x.id).eq("status", openStatus);
+  const w = kind === "visit"
+    ? await db.from(table).update({ status: "stopped", error: `review_${out.decision}`, review_reason: reason, updated_at: now, ...extra, reviewed_at: instruction ? (x.reviewed_at || now) : now }).eq("id", x.id).eq("status", openStatus).select("id")
+    : await db.from(table).update({ status: "skipped", reason: `review_${out.decision}`, review_reason: reason, ...extra, reviewed_at: instruction ? (x.reviewed_at || now) : now }).eq("id", x.id).eq("status", openStatus).select("id");
+  if (!(w.data || []).length) return "not_pending";
   if (out.decision === "wait_for_match") { await saveRequest(companyId, x, out.request, reason); return "waiting_match"; }
   if (kind === "request" && x.request_id) await db.from("client_requests").update({ next_followup: null, next_action: short(`ما يحتاج متابعة: ${reason}`, 300) }).eq("id", x.request_id);
   return "removed";
@@ -320,6 +347,29 @@ async function sendOne(f: any, numbers: string[], freeOnly = false) {
   }
 }
 
+// «أمر للذكاء الاصطناعي» from the daily list. Owner only. Nothing is sent: a rewritten text waits on his list.
+async function instruct(companyId: string, ownerId: string, kind: "visit" | "request", id: string, instruction: string) {
+  const table = kind === "visit" ? "whatsapp_visit_followups" : "whatsapp_outreach_queue";
+  const openStatus = kind === "visit" ? "awaiting_approval" : "pending";
+  const r = await db.from(table).select("*").eq("id", id).eq("company_id", companyId).maybeSingle();
+  const x: any = r.data;
+  if (!x || (kind === "request" && x.kind !== "request_followup")) return { ok: false, error: "followup_not_found" };
+  if (x.status !== openStatus) return { ok: false, error: "followup_not_pending" };
+  if (!["barka", "muscat"].includes(x.route_key)) return { ok: false, error: "route_blocked" };
+  const before = x.owner_text || (kind === "visit" ? x.body : (x.messages || []).join(" "));
+  const out = await judge(kind, x, companyId, await availableText(companyId), instruction);
+  const result = await applyDecision(kind, x, companyId, out, instruction);
+  if (result === "not_pending") return { ok: false, error: "followup_not_pending" };
+  // the lesson: the next reviews (and the reply agent) read it from whatsapp_agent_prompts.lessons
+  const note = await db.from("crm_owner_notes").insert({
+    company_id: companyId, created_by: ownerId, conversation_id: x.conversation_id || null, outreach_id: kind === "request" ? x.id : null,
+    note: short(instruction, 1000), apply_now: true,
+    context: { source: "followup_instruction", kind, followup_id: x.id, client_id: x.client_id, route_key: x.route_key, decision: out.decision, result, reason: short(out.reason, 300), before: short(before, 500), after: out.decision === "followup" ? out.text : null },
+  });
+  if (note.error) console.error("[followup-auto] lesson", note.error.message);
+  return { ok: true, result, decision: out.decision, text: out.decision === "followup" ? out.text : null, reason: short(out.reason, 300), auto_ok: !!out.auto_ok, lesson_saved: !note.error };
+}
+
 async function alertOwner(companyId: string, why: string) {
   const title = "الإرسال التلقائي للمتابعات فشل";
   const o = await db.from("profiles").select("id").eq("company_id", companyId).eq("role", "owner").eq("is_active", true).limit(1).maybeSingle();
@@ -331,10 +381,34 @@ async function alertOwner(companyId: string, why: string) {
 }
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors(req) });
   if (req.method !== "POST") return json({ ok: false }, 405);
-  const ok = await db.rpc("crm_reply_agent_secret_ok", { p_secret: req.headers.get("x-crm-agent") || "" });
-  if (ok.error || ok.data !== true) return json({ ok: false, error: "forbidden" }, 403);
+  const secret = req.headers.get("x-crm-agent") || "";
+  const ok = secret ? await db.rpc("crm_reply_agent_secret_ok", { p_secret: secret }) : null;
+  if (!ok || ok.error || ok.data !== true) {
+    // the owner's instruction from the daily list; nothing else is reachable without the scheduler secret
+    const reply = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { ...cors(req), "content-type": "application/json; charset=utf-8" } });
+    const jwt = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+    const u = jwt ? await db.auth.getUser(jwt) : null;
+    const prof = u?.data?.user ? await db.from("profiles").select("id,company_id,role,is_active").eq("id", u.data.user.id).maybeSingle() : null;
+    if (!prof?.data || prof.data.role !== "owner" || prof.data.is_active === false) return reply({ ok: false, error: "owner_only" }, 403);
+    const body = await req.json().catch(() => ({}));
+    const instruction = short(body?.instruction, 1000);
+    const kind = body?.kind === "request" ? "request" : body?.kind === "visit" ? "visit" : null;
+    if (!kind || !body?.id || instruction.length < 3) return reply({ ok: false, error: "instruction_required" }, 400);
+    try { const r = await instruct(prof.data.company_id, prof.data.id, kind, String(body.id), instruction); return reply(r, r.ok ? 200 : 409); }
+    catch (e) { console.error("[followup-auto] instruct", String((e as any)?.message || e)); return reply({ ok: false, error: "rewrite_failed" }, 500); }
+  }
   const input = await req.json().catch(() => ({}));
+  // a test of the owner's instruction on one follow-up: reads and writes nothing
+  if (input?.preview_instruction) {
+    const pi = input.preview_instruction, kind = pi.kind === "request" ? "request" : "visit";
+    const co = await db.from("whatsapp_automation_runtime").select("company_id").eq("mode", "live").limit(1).maybeSingle();
+    const r = await db.from(kind === "visit" ? "whatsapp_visit_followups" : "whatsapp_outreach_queue").select("*").eq("id", String(pi.id || "")).eq("company_id", co.data?.company_id).maybeSingle();
+    if (!r.data) return json({ ok: false, error: "followup_not_found" }, 404);
+    const out = await judge(kind, r.data, co.data?.company_id, await availableText(co.data?.company_id), short(pi.instruction, 1000));
+    return json({ ok: true, before: r.data.owner_text || r.data.body || null, decision: out.decision, text: out.text, reason: out.reason, auto_ok: out.auto_ok });
+  }
   if (input?.preview) {
     const co = await db.from("whatsapp_automation_runtime").select("company_id").eq("mode", "live").limit(1).maybeSingle();
     return json({ ok: true, ...(await preview(co.data?.company_id, Number(input.offset) || 0)) });

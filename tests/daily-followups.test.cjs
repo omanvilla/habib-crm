@@ -103,3 +103,21 @@ test('the agent asks a name once, never guesses, and notes when it was not given
 test('the agent carries on after a message from the list, and stays quiet after any other',()=>{
  assert(agent.includes('if (!review && staffInChat && !fromList)'));
 });
+test('owner instruction on a follow-up: owner only, rewrites from the whole chat, nothing sent, saved as a lesson',()=>{
+ const sql72=fs.readFileSync('db/changes/72-followup-owner-instruction.forward.sql','utf8');
+ const rb72=fs.readFileSync('db/changes/72-followup-owner-instruction.rollback.sql','utf8');
+ assert(sql72.includes('CASE WHEN v_owner THEN i.owner_instruction END'));
+ assert(rb72.includes('DROP COLUMN IF EXISTS owner_instruction')&&!rb72.split('ALTER TABLE')[0].includes('owner_instruction'));
+ const part=fn.slice(fn.indexOf('async function instruct('),fn.indexOf('async function alertOwner('));
+ assert(part.includes('await judge(kind, x, companyId, await availableText(companyId), instruction)'));
+ assert(part.includes('source: "followup_instruction"')&&part.includes('apply_now: true'));
+ assert(!part.includes('metaSend')&&!part.includes('sendOne'));
+ assert(fn.includes('prof.data.role !== "owner"'));
+ assert(fn.includes('if (x.conversation_id && !instruction)'));
+ assert(fn.includes('دروس من صاحب المكتب من أوامر سابقة'));
+ // removed by an instruction stays removed: same review_ markers as the review
+ const apply=fn.slice(fn.indexOf('async function applyDecision('),fn.indexOf('async function availableText('));
+ assert(apply.includes('error: `review_${out.decision}`')&&apply.includes('reason: `review_${out.decision}`'));
+ assert(js.includes("supa.functions.invoke('whatsapp-visit-followup-auto',{body:{kind:item.source,id:item.id,instruction}})"));
+ assert(js.includes('انكتبت حسب أمرك')&&js.includes('if(!isOwner())return'));
+});
