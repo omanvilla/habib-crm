@@ -142,8 +142,8 @@ test('visits are read from the conversation even when the agent stays quiet, and
   for(const why of ['agent_muted','human_handoff_open','client_paused','staff_replied','staff_active'])
     assert(agent.includes('{ await watch(); return fail("'+why+'"); }'),why);
   assert(agent.includes('if (review) return; try { const v = await watchVisit(msg)'),'trials never write visits');
-  assert(agent.includes('if (open.created_via !== "whatsapp_ai"'),'manual visits are not moved');
-  assert(agent.includes('if (!open || open.created_via !== "whatsapp_ai") return { ...out, applied: false, why: "nothing_to_cancel" }'),'manual visits are not cancelled');
+  assert(agent.includes('any change the client makes is saved at once, whoever recorded the visit'),'a client change moves any visit');
+  assert(agent.includes('if (!open) return { ...out, applied: false, why: "nothing_to_cancel" }'),'manual visits are not cancelled');
   assert.match(agent,/created_via: "ai", origin_whatsapp_message_id/);
 });
 

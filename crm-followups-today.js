@@ -18,7 +18,12 @@
     if(/iPhone|iPad|iPod/i.test(ua))return 'whatsapp-smb://send?phone='+d+'&text='+t;
     return waLink(d,text);
   };
-  const autoLine=i=>i.has_chat?'ينتظرك أنت، رسالتك من الجوال مجانية':'ما له محادثة عندنا، ينتظرك أنت';
+  const autoLine=i=>{
+    if(!data.auto_on)return 'الإرسال التلقائي موقف الحين';
+    if(!i.can_auto)return i.has_chat?'ما ينرسل تلقائي، ينتظرك أنت':'ما له محادثة عندنا، ينتظرك أنت';
+    const when=new Date(i.auto_after).toLocaleDateString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat',weekday:'long',day:'numeric',month:'numeric'});
+    return 'إذا ما أرسلت، ينرسل تلقائي '+when+' الساعة 10 الصبح';
+  };
   function host(){
     const page=byId('page-dash');if(!page)return null;
     let box=byId('crmFollowups');

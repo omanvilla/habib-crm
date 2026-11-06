@@ -34,8 +34,8 @@ test('90 minutes after a visit: free text only, and nothing if someone already w
  assert(sql.includes("li.last_in > now() - interval '23 hours 30 minutes'"));
  assert(sql.includes("li.last_in <= v.visit_at + interval '30 minutes'"));
  assert(sql.includes("m.actor_type = 'human' AND m.message_timestamp > v.visit_at + interval '30 minutes'"));
- assert(fn.includes('if (!service) return "window_closed";'));
- assert(fn.includes('await sendOne(f.data, numbers)'));
+ assert(fn.includes('if (freeOnly && !service) return "window_closed";'));
+ assert(fn.includes('await sendOne(f.data, numbers, true)'));
  assert(fn.includes('if (rt.visit_followups_auto) await afterVisit('));
 });
 test('a visit confirmation goes only inside the window, once, when a reply would still cover the visit',()=>{
@@ -60,13 +60,19 @@ test('a message from a person takes the client off the list',()=>{
 test('a branch account sees its own branch only',()=>{
  assert(sql.includes('WHERE v_owner OR crm_repair_private.staff_can_access_branch(v_company, i.route_key)'));
 });
-test('nothing goes out by itself before 10am the next day',()=>{
+test('it reaches his list first; nothing goes by itself before 10am the next day, at most 20 a day',()=>{
  assert(sql.includes("+ 1) + time '10:00'"));
+ assert(fn.includes('DAILY_LIMIT = 20'));
+ assert(js.includes("'إذا ما أرسلت، ينرسل تلقائي '"));
 });
-test('no paid template goes out by itself: it stays on his list; a failed send stays too',()=>{
- assert(!fn.includes('type: "template"'));
- assert(!fn.includes('status: "approved"'));
+test('marketing cost never goes out by itself, and a failed send stays on the list',()=>{
+ assert(fn.includes('if (!service && !utility) return "waits_for_utility_template";'));
  assert(fn.includes('status: "awaiting_approval", error: why'));
+});
+test('a client changing or putting off a visit updates it, keeping any notes',()=>{
+ assert(agent.includes('"cancelled", "postponed"]'));
+ assert(agent.includes('w = await db.from("viewings").update({ status: "postponed", notes: addNote() })'));
+ assert(agent.includes('الساعة ${String(v.viewing_time'));
 });
 test('a follow-up does not carry time words from an old chat',()=>{
  assert(fn.includes('لا تنقل كلمات وقت من كلام قديم'));
