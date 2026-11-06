@@ -489,7 +489,7 @@ Deno.serve(async (req) => {
     for (const a of pendingAudio) {
       const ctx = history.filter((h: any) => String(h.message_timestamp) < String(a.message_timestamp)).slice(-8)
         .map((h: any) => `${h.direction === "inbound" ? "العميل" : "المكتب"}: ${short(h.transcript || h.body || `[${h.message_type}]`, 300)}`).join("\n");
-      const v = await transcribeVoice(tokens, a.media_id, GRAPH, ctx);
+      const v = await transcribeVoice(tokens, a.media_id, GRAPH, ctx, (b, m) => db.storage.from("whatsapp-voice").upload(`${msg.company_id}/${a.media_id}`, b, { contentType: m, upsert: true }));
       if (v) {
         a.transcript = v.unclear ? `${v.text} (الصوت مو واضح كامل)` : v.text;
         await saveVoice(a.id, { ...v, text: a.transcript });

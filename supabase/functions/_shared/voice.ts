@@ -70,7 +70,7 @@ async function fixText(raw: string, context: string) {
 }
 
 /** Download a WhatsApp voice note with any of the tokens and return the text the agent should read. */
-export async function transcribeVoice(tokens: string[], mediaId: string, graph: string, context = ""): Promise<{ text: string; raw: string; model: string; unclear: boolean } | null> {
+export async function transcribeVoice(tokens: string[], mediaId: string, graph: string, context = "", onAudio?: (blob: Blob, mime: string) => Promise<unknown>): Promise<{ text: string; raw: string; model: string; unclear: boolean } | null> {
   if (!OPENAI_API_KEY) return null;
   for (const t of tokens) {
     try {
@@ -81,6 +81,8 @@ export async function transcribeVoice(tokens: string[], mediaId: string, graph: 
       if (!fileR.ok) continue;
       const blob = await fileR.blob();
       const mime = String(meta.mime_type || blob.type || "audio/ogg");
+      // keep a copy so the voice note still opens in the CRM after WhatsApp drops the file
+      if (onAudio) await onAudio(blob, mime.split(";")[0].trim()).catch((e) => console.error("[voice] cache", String((e as any)?.message || e).slice(0, 120)));
       const ext = mime.includes("mpeg") ? "mp3" : mime.includes("mp4") || mime.includes("m4a") ? "m4a" : mime.includes("wav") ? "wav" : mime.includes("webm") ? "webm" : "ogg";
       const lastOffice = context.split("\n").filter((l) => l.includes("المكتب:")).slice(-1)[0] || "";
       const prompt = VOICE_VOCAB + (lastOffice ? ` آخر رسالة من المكتب: ${lastOffice.replace(/^.*?المكتب:\s*/, "").slice(0, 200)}` : "");

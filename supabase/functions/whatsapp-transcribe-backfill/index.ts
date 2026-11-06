@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
   let done = 0, failed = 0;
   for (const m of rows.data || []) {
     const routeKey = (m as any).whatsapp_conversations?.route_key;
-    const v = await transcribeVoice(await routeTokens(m.company_id, routeKey), m.media_id, GRAPH, await contextFor(m.conversation_id, m.id));
+    const v = await transcribeVoice(await routeTokens(m.company_id, routeKey), m.media_id, GRAPH, await contextFor(m.conversation_id, m.id), (b, mime) => db.storage.from("whatsapp-voice").upload(`${m.company_id}/${m.media_id}`, b, { contentType: mime, upsert: true }));
     if (!v) {
       failed++;
       await db.from("whatsapp_messages").update({ transcription_status: "failed" }).eq("id", m.id);
