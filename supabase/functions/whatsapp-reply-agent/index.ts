@@ -146,6 +146,7 @@ async function reelCovers(companyId: string, propIds: string[]) {
 
 const IG_RE = /instagram\.com\/(?:reels?|p|tv)\/([A-Za-z0-9_-]+)/i;
 
+const NAME_NOT_GIVEN = "ما ذكر اسمه، الاسم المسجل من الواتساب مو اسمه الحقيقي";
 const schema = {
   type: "object", additionalProperties: false,
   properties: {
@@ -162,6 +163,8 @@ const schema = {
     viewing_time: { type: ["string", "null"] },
     handoff_reason: { type: ["string", "null"] },
     crm_note: { type: "string" },
+    client_name_stated: { type: ["string", "null"] },
+    name_declined: { type: "boolean" },
     matched_rule_id: { type: ["string", "null"] },
     alternatives: { type: "array", items: { type: "array", items: { type: "string" } } },
     close_other_branch: { type: "boolean" },
@@ -189,7 +192,7 @@ const schema = {
       required: ["request_type", "areas", "property_types", "budget_max", "bedrooms_min", "notes", "followup_in_days", "followup_note"],
     }] },
   },
-  required: ["reply_messages", "category", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives", "close_other_branch", "owner_offer", "request"],
+  required: ["reply_messages", "category", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives", "close_other_branch", "owner_offer", "request", "client_name_stated", "name_declined"],
 };
 
 // The marketing text (property description, or the longest reel caption for it) is what the office
@@ -208,7 +211,8 @@ function propLine(p: any) {
   const visit = { open: "مفتوح ويروح بروحه", lockbox: "صندوق مفتاح برمز", owner_lives: "المالك ساكن (يعطى رقم المالك)", office: "تنسيق منا (handoff)" }[p.visit_method as string] || "غير محدد (handoff للمعاينة)";
   const TERMS: Record<string, string> = { daily: "يومي", weekly: "أسبوعي", monthly: "شهري", "3m": "3 شهور", "6m": "6 شهور", yearly: "سنة" };
   const terms = p.listing_purpose === "rent" ? ` | مدة الإيجار المسموحة: ${(p.rental_terms || []).length ? (p.rental_terms as string[]).map((t) => TERMS[t] || t).join(" او ") : "غير محددة (handoff اذا سأل عن مدة قصيرة)"}` : "";
-  return `- id=${p.id} | ${name} | ${bits}${terms} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? " | اللوكيشن متوفر (action=send_location)" : " | اللوكيشن غير متوفر"} | الفرع: ${p.branch_key === "muscat" ? "مسقط (رقم 71770030)" : p.branch_key === "barka" ? "بركاء (رقم 92344273)" : "غير محدد"}${p.video ? ` | رابط الفيديو (ترسله إذا طلب فيديو): ${p.video}` : ""}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}${p.marketing ? `\n  وصف الإعلان: ${short(p.marketing, 1600)}` : ""}`;
+  const rented = p.rented_units ? ` | المؤجر حالياً: ${p.rented_units}` : "";
+  return `- id=${p.id} | ${name} | ${bits}${terms}${rented} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? " | اللوكيشن متوفر (action=send_location)" : " | اللوكيشن غير متوفر"} | الفرع: ${p.branch_key === "muscat" ? "مسقط (رقم 71770030)" : p.branch_key === "barka" ? "بركاء (رقم 92344273)" : "غير محدد"}${p.video ? ` | رابط الفيديو (ترسله إذا طلب فيديو): ${p.video}` : ""}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}${p.marketing ? `\n  وصف الإعلان: ${short(p.marketing, 1600)}` : ""}`;
 }
 
 async function notifyHandoff(companyId: string, conv: any, client: any, reason: string) {
@@ -376,7 +380,7 @@ Deno.serve(async (req) => {
     const [rtR, convR, clientR, routesR] = await Promise.all([
       db.from("whatsapp_automation_runtime").select("*").eq("company_id", msg.company_id).single(),
       db.from("whatsapp_conversations").select("*").eq("id", msg.conversation_id).single(),
-      db.from("clients").select("id,name,phone,phone_normalized,followup_suppressed").eq("id", msg.client_id).single(),
+      db.from("clients").select("id,name,phone,phone_normalized,followup_suppressed,notes").eq("id", msg.client_id).single(),
       db.from("company_lead_routes").select("route_key,whatsapp_number,meta_phone_number_id"),
     ]);
     const rt = rtR.data, conv = convR.data, client = clientR.data;
@@ -433,7 +437,7 @@ Deno.serve(async (req) => {
     const [histR, propsR, rulesR, priorR] = await Promise.all([
       db.from("whatsapp_messages").select("id,direction,message_type,body,transcript,media_id,actor_type,message_timestamp,matched_property_id,property_link_key,property_image_analysis")
         .eq("conversation_id", conv.id).lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(30),
-      db.from("properties").select("id,title,internal_name,type,area,wilayat,price,bedrooms,bathrooms,land_size,built_size,listing_purpose,public_details,description,map_url,visit_method,visit_instructions,lockbox_image_url,owner_id,branch_key,rental_terms")
+      db.from("properties").select("id,title,internal_name,type,area,wilayat,price,bedrooms,bathrooms,land_size,built_size,listing_purpose,public_details,description,map_url,visit_method,visit_instructions,lockbox_image_url,owner_id,branch_key,rental_terms,rented_units")
         .eq("company_id", msg.company_id).eq("status", "available").eq("archived", false),
       db.from("whatsapp_reply_rules").select("id,situation,approved_reply,category,auto_send,auto_match_regex").eq("company_id", msg.company_id).eq("active", true).order("created_at", { ascending: false }).limit(40),
       db.from("whatsapp_reply_drafts").select("analysis,status").eq("conversation_id", conv.id).in("status", ["sent", "approved", "edited"]),
@@ -533,9 +537,12 @@ Deno.serve(async (req) => {
       return `[${when}] ${who}: ${short(text, 700)}${extra}`;
     }).join("\n");
 
+    const askedName = await db.from("whatsapp_messages").select("id").eq("conversation_id", conv.id).eq("direction", "outbound").ilike("body", "%اسمك%").limit(1);
+    const nameAskedBefore = (askedName.data || []).length > 0 || String(client.notes || "").includes(NAME_NOT_GIVEN);
     const context = [
       `الوقت الحالي في عمان: ${omanNow()}`,
-      `اسم العميل في الواتساب: ${client.name || conv.customer_name || "غير معروف"}`,
+      `الاسم المسجل من الواتساب، مو دليل على اسمه الحقيقي: ${client.name || conv.customer_name || "غير معروف"}`,
+      `هل سألناه عن اسمه قبل: ${nameAskedBefore ? "نعم، لا تسأل مرة ثانية أبداً" : "لا"}`,
       `الرقم اللي كلمنا عليه: ${conv.route_key === "barka" ? "رقم بركاء" : "رقم مسقط"}`,
       `هل سألنا عن الميزانية قبل في هذه المحادثة: ${budgetAskedBefore ? "نعم، لا تسأل مرة ثانية أبداً" : "لا"}`,
       `ملخص سابق للعميل: ${conv.ai_summary || "لا يوجد"}`,
@@ -686,6 +693,15 @@ Deno.serve(async (req) => {
         await db.from("whatsapp_reply_drafts").update({ status: "superseded", superseded_at: new Date().toISOString(), approver_note: "العميل يكمل نفس الموضوع على الرقم الثاني" }).eq("conversation_id", otherConvId).eq("status", "pending");
         await db.from("whatsapp_outreach_queue").update({ status: "skipped", reason: "other_branch" }).eq("conversation_id", otherConvId).eq("status", "pending");
       } catch (_) { /* optional */ }
+    }
+    // the client said their name, or was asked once and did not: the note says the saved name is not their real one
+    if (!review && (out.client_name_stated || out.name_declined)) {
+      try {
+        const stated = String(out.client_name_stated || "").trim().slice(0, 60);
+        const notes = String(client.notes || "");
+        if (stated) await db.from("clients").update({ name: stated, notes: notes.replace(NAME_NOT_GIVEN, "").trim() || null }).eq("id", client.id);
+        else if (!notes.includes(NAME_NOT_GIVEN)) await db.from("clients").update({ notes: notes ? `${notes}\n${NAME_NOT_GIVEN}` : NAME_NOT_GIVEN }).eq("id", client.id);
+      } catch (e) { console.error("[reply-agent] client name", String((e as any)?.message || e)); }
     }
     // an owner who wants to sell is kept as an unlisted offer, so buyers looking for the same thing are found
     if (!review && out.category === "seller" && out.owner_offer && (out.owner_offer.area || out.owner_offer.wilayat)) {
