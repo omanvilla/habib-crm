@@ -28,6 +28,16 @@ test('silence after getting the details is not a reason to follow up; the previe
  assert(body.includes('.is("reason", null)'));
  assert(!body.includes('.update(')&&!body.includes('.insert('));
 });
+test('90 minutes after a visit: free text only, and nothing if someone already wrote',()=>{
+ const sql=fs.readFileSync('db/changes/68-followup-after-visit.forward.sql','utf8');
+ assert(sql.includes("<= now() - interval '90 minutes'"));
+ assert(sql.includes("li.last_in > now() - interval '23 hours 30 minutes'"));
+ assert(sql.includes("li.last_in <= v.visit_at + interval '30 minutes'"));
+ assert(sql.includes("m.actor_type = 'human' AND m.message_timestamp > v.visit_at + interval '30 minutes'"));
+ assert(fn.includes('if (freeOnly && !service) return "window_closed";'));
+ assert(fn.includes('await sendOne(f.data, numbers, true)'));
+ assert(fn.includes('if (rt.visit_followups_auto) await afterVisit('));
+});
 test('a client the review removed does not come back through another request',()=>{
  const sql=fs.readFileSync('db/changes/67-followup-removed-stay-removed.forward.sql','utf8');
  assert(sql.includes('BEFORE INSERT ON public.whatsapp_outreach_queue'));

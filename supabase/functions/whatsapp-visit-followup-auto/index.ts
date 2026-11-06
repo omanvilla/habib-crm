@@ -3,6 +3,7 @@
 //    from the branch phone, removes it (owner offering, moved to the other branch, topic closed), or saves what the client wants.
 // 2. What he has not sent by 10am the next day goes out by itself, 20 a day at most, only if the review says the fixed
 //    text fits: a UTILITY template, or free text inside the 24 hour window. MARKETING cost keeps waiting for him.
+// 3. 90 minutes after a visit it asks the client's opinion as free text inside the 24 hour window, never a template (SQL68).
 // Stops when whatsapp_automation_runtime.visit_followups_auto is false. A failed send stays on the list.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -13,7 +14,7 @@ const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 const OPENAI_MODEL = Deno.env.get("REPLY_AGENT_MODEL") || Deno.env.get("OPENAI_MODEL") || "gpt-5.6-luna";
 const GRAPH = Deno.env.get("META_GRAPH_VERSION") || "v25.0";
 const WINDOW_MS = 24 * 3600 * 1000;
-const DAILY_LIMIT = 20, REVIEWS_PER_RUN = 24, REVIEWS_AT_ONCE = 6;
+const DAILY_LIMIT = 20, REVIEWS_PER_RUN = 24, REVIEWS_AT_ONCE = 6, AFTER_VISIT_PER_RUN = 10;
 
 const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const enc = new TextEncoder();
@@ -66,7 +67,7 @@ const REVIEW_RULES = `أنت تراجع متابعة عميل لمكتب عقا�
 
 text (لـ followup بس): رسالة واحدة يرسلها صاحب المكتب بنفسه باللهجة العمانية البسيطة. إذا واضح من الاسم أو الكلام إنها امرأة خاطبها بالمؤنث. تبدأ بـ "السلام عليكم". سطر أو سطرين، خاصة بهذا العميل، وسؤال واحد ينتهي بـ " ؟". لا تكرر سؤال انجاب عليه. لا تخترع شي مو مكتوب. ممنوع: الفواصل والنقاط وعلامات التعجب، الأسعار إلا سعر عقار تعرضه، الوعود، كلمة هلا.
 reason: سطر قصير لصاحب المكتب يوضح وضع العميل، مثل "شاف فيلا الرميس وما عجبه الموقع".
-auto_ok: true بس إذا النص الثابت "${"{fixed}"}" مناسب لهذا العميل لو انرسل بدل text.
+auto_ok: true بس إذا النص الثابت "${"{fixed}"}" مناسب لهذا العميل لو انرسل بدل text. إذا العميل سأل سؤال وما جاه رد، auto_ok=false.
 request: اللي يبغاه العميل إذا واضح من كلامه، وإلا null. لا تكتب شي ما قاله.`;
 const reviewSchema = {
   type: "object", additionalProperties: false,
@@ -141,6 +142,7 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
     const v = await db.from("viewings").select("viewing_date,status,properties(type,area)").eq("id", x.viewing_id).maybeSingle();
     const pr: any = (v.data as any)?.properties;
     about = `متابعة بعد زيارة ${pr?.type || "عقار"} في ${pr?.area || "غير معروف"} يوم ${v.data?.viewing_date || "غير معروف"}. ${v.data?.status === "done" ? "الزيارة تمت" : "ما نعرف هل زار"}.`;
+    if (x.after_visit) about += " هذي متابعة بعد موعد الزيارة بساعة ونص، وهذا أهم وقت للبيع. قرارك followup واسأله عن رأيه في العقار بالضبط، إلا إذا المحادثة تقول إنه ما زار أو موضوعه انتهى أو قال رأيه.";
   }
   const fixed = kind === "visit" ? String(x.body || "") : (x.messages || []).join(" ");
   return review(x, companyId, available, fixed, about);
@@ -204,7 +206,28 @@ async function reviewAll(companyId: string, out: Record<string, number>) {
   }
 }
 
-async function sendOne(f: any, numbers: string[]) {
+// Free text only: if the window closed meanwhile it stays on the daily list and no template goes.
+async function afterVisit(companyId: string, numbers: string[], out: Record<string, number>) {
+  const q = await db.rpc("crm_queue_fast_visit_followups", { p_limit: AFTER_VISIT_PER_RUN });
+  if (q.error) { console.error("[followup-auto] after visit", q.error.message); return; }
+  const ids: string[] = (q.data || []);
+  if (!ids.length) return;
+  const available = await availableText(companyId);
+  for (const id of ids) {
+    try {
+      const x = await db.from("whatsapp_visit_followups").select("*").eq("id", id).single();
+      if (x.error || x.data.company_id !== companyId) continue;
+      const r = await reviewOne("visit", { ...x.data, after_visit: true }, companyId, available);
+      const k = `after_visit_${r}`; out[k] = (out[k] || 0) + 1;
+      if (r !== "kept") continue;
+      const f = await db.from("whatsapp_visit_followups").select("*").eq("id", id).single();
+      const s = await sendOne(f.data, numbers, true);
+      const k2 = `after_visit_${s}`; out[k2] = (out[k2] || 0) + 1;
+    } catch (e) { out.after_visit_failed = (out.after_visit_failed || 0) + 1; console.error("[followup-auto] after visit", String((e as any)?.message || e)); }
+  }
+}
+
+async function sendOne(f: any, numbers: string[], freeOnly = false) {
   const stop = async (status: string, why: string) => { await db.from("whatsapp_visit_followups").update({ status, error: why, updated_at: new Date().toISOString() }).eq("id", f.id).eq("status", "awaiting_approval"); return why; };
   const [convR, clientR, lastInR, tplR] = await Promise.all([
     db.from("whatsapp_conversations").select("*").eq("id", f.conversation_id).single(),
@@ -222,6 +245,7 @@ async function sendOne(f: any, numbers: string[]) {
   const lastIn = lastInR.data?.message_timestamp ? new Date(lastInR.data.message_timestamp).getTime() : 0;
   if (lastIn > new Date(f.created_at).getTime()) return stop("superseded", "client_wrote_after");
   const service = lastIn > 0 && Date.now() - lastIn < WINDOW_MS;
+  if (freeOnly && !service) return "window_closed";
   const tpl = tplR.data;
   const utility = String(tpl?.status || "").toUpperCase() === "APPROVED" && String(tpl?.category || "").toUpperCase() === "UTILITY";
   if (!service && !utility) return "waits_for_utility_template";
@@ -238,7 +262,7 @@ async function sendOne(f: any, numbers: string[]) {
       company_id: f.company_id, conversation_id: conv.id, client_id: f.client_id, whatsapp_message_id: wamid,
       direction: "outbound", message_type: service ? "text" : "template", sender_wa_id: digits(conv.meta_phone_number_id), recipient_wa_id: to,
       body, message_timestamp: now, delivery_status: "sent", actor_type: "automated", channel_source: "crm_followup",
-      raw_payload: { source: "visit_followup", followup_id: f.id, step: f.step, viewing_id: f.viewing_id, template_name: service ? null : f.template_name, auto: true },
+      raw_payload: { source: "visit_followup", followup_id: f.id, step: f.step, viewing_id: f.viewing_id, template_name: service ? null : f.template_name, auto: true, after_visit: freeOnly },
     });
     await db.from("whatsapp_visit_followups").update({ status: "sent", send_mode: service ? "service" : "template", sent_at: now, meta_message_id: wamid, decided_at: now, error: null, updated_at: now }).eq("id", f.id);
     await db.from("whatsapp_conversations").update({ last_message_at: now, last_outbound_at: now, updated_at: now }).eq("id", conv.id);
@@ -279,10 +303,11 @@ Deno.serve(async (req) => {
   const numbers = (routes.data || []).map((r: any) => digits(r.whatsapp_number)).filter(Boolean);
   for (const rt of rts.data || []) {
     if (rt.mode !== "live") continue;
+    if (rt.visit_followups_auto) await afterVisit(rt.company_id, numbers, out);
     await reviewAll(rt.company_id, out);
     if (!rt.visit_followups_auto) continue;
     const dayStart = new Date(`${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date())}T00:00:00+04:00`).toISOString();
-    const sentF = await db.from("whatsapp_visit_followups").select("id", { count: "exact", head: true }).eq("company_id", rt.company_id).in("send_mode", ["template", "service"]).gte("sent_at", dayStart);
+    const sentF = await db.from("whatsapp_visit_followups").select("id", { count: "exact", head: true }).eq("company_id", rt.company_id).eq("send_mode", "template").gte("sent_at", dayStart);
     const relQ = await db.from("whatsapp_outreach_queue").select("id", { count: "exact", head: true }).eq("company_id", rt.company_id).eq("kind", "request_followup").eq("reason", "auto_after_wait").gte("approved_at", dayStart);
     let room = DAILY_LIMIT - (sentF.count || 0) - (relQ.count || 0);
     const list = await db.from("whatsapp_visit_followups").select("*").eq("company_id", rt.company_id).eq("status", "awaiting_approval").order("due_at").limit(60);
