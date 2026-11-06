@@ -363,6 +363,8 @@ const resultSchema = {
   },
   required: ["result", "opinion", "reason", "new_date", "serious", "note", "confidence"],
 };
+const TYPE_AR: Record<string, string> = { house: "بيت", villa: "فيلا", apartment: "شقة", flat: "شقة", land: "أرض", building: "بناية", shop: "محل", office: "مكتب", farm: "مزرعة", chalet: "شاليه", warehouse: "مخزن" };
+const typeAr = (t: unknown) => TYPE_AR[String(t || "").toLowerCase()] || String(t || "عقار");
 const OPINION: Record<string, { feedback: string; outcome: string; liked: boolean | null }> = {
   liked: { feedback: "liked", outcome: "followup", liked: true },
   negotiate: { feedback: "wants_negotiate", outcome: "negotiation", liked: true },
@@ -379,7 +381,7 @@ async function judgeResult(v: any, today: string) {
   const ai = await fetch("https://api.openai.com/v1/responses", {
     method: "POST", headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: OPENAI_MODEL, store: false, reasoning: { effort: "low" }, instructions: RESULT_RULES,
-      input: `تاريخ اليوم: ${today}\nالزيارة: ${pr.type || "عقار"} في ${pr.area || "غير معروف"} يوم ${v.viewing_date}${v.viewing_time ? ` الساعة ${String(v.viewing_time).slice(0, 5)}` : ""}\n\nالمحادثة:\n${chat}`,
+      input: `تاريخ اليوم: ${today}\nالزيارة: ${typeAr(pr.type)} في ${pr.area || "غير معروف"} يوم ${v.viewing_date}${v.viewing_time ? ` الساعة ${String(v.viewing_time).slice(0, 5)}` : ""}\n\nالمحادثة:\n${chat}`,
       text: { format: { type: "json_schema", name: "visit_result", strict: true, schema: resultSchema } } }),
   });
   const p = await ai.json().catch(() => ({}));
@@ -433,7 +435,9 @@ async function visitResults(companyId: string, out: Record<string, number>) {
       const w = await db.from("viewings").update({ ...(patch || {}), ai_checked_at: now }).eq("id", v.id).eq("row_version", v.row_version).in("status", ["scheduled", "confirmed", "postponed"]);
       if (w.error) throw new Error(w.error.message);
       const k = patch ? `visit_result_${r.result}` : "visit_result_unclear"; out[k] = (out[k] || 0) + 1;
-      if (r.serious && r.confidence >= 0.6) { await alertSerious(companyId, v.client_id, (v as any).clients?.name, `${(v as any).properties?.type || "عقار"} في ${(v as any).properties?.area || ""}: ${r.note}`); out.serious_alert = (out.serious_alert || 0) + 1; }
+      // the follow-up for this visit on his list was written before the result: read it again with the result known
+      if (patch) await db.from("whatsapp_visit_followups").update({ reviewed_at: null }).eq("viewing_id", v.id).eq("status", "awaiting_approval");
+      if (r.serious && r.confidence >= 0.6) { await alertSerious(companyId, v.client_id, (v as any).clients?.name, `${typeAr((v as any).properties?.type)} في ${(v as any).properties?.area || ""}: ${r.note}`); out.serious_alert = (out.serious_alert || 0) + 1; }
     } catch (e) { out.visit_result_failed = (out.visit_result_failed || 0) + 1; console.error("[followup-auto] visit result", String((e as any)?.message || e)); }
   }
 }
