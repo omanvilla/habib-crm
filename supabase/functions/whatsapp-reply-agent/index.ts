@@ -11,6 +11,10 @@ const META_APP_SECRET = Deno.env.get("META_APP_SECRET") ?? "";
 const WHATSAPP_ACCESS_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN") ?? "";
 const GRAPH = Deno.env.get("META_GRAPH_VERSION") || "v25.0";
 const DEBOUNCE_MS = Number(Deno.env.get("REPLY_DEBOUNCE_MS") || 35000); // wait for the customer to finish typing (30 to 60 seconds)
+// Only these handoffs keep the agent out of the chat until Ahmed answers (negotiation, serious buyer, owner price study).
+// Any other handoff ("send photos", "call me", "not sure") no longer silences the agent: the next message is answered
+// and the open item stays on Ahmed's list.
+const HARD_HANDOFF = /^\s*(تفاوض|مشتري جاد|دراسة سعر)\s*:/;
 const STAFF_QUIET_HOURS = 2; // the last reply was typed by a person from the office in the last 2 hours → they are in the chat, stay out
 const ALLOWED_ORIGINS = ["https://omanvilla.github.io"]; // the approval screen asks for a rewrite from here
 
@@ -406,7 +410,8 @@ Deno.serve(async (req) => {
     if (staffNums.includes(to.slice(-8))) return fail("staff_number");
     if (!review && rt.mode === "test" && !(rt.allowed_customer_phones || []).map(digits).includes(to)) return fail("not_allowlisted");
     if (!(rt.allowed_routes || []).includes(conv.route_key)) return fail("route_blocked");
-    if (!review && conv.human_handoff_required) { await watch(); return fail("human_handoff_open"); }
+    const hardHandoff = !!conv.human_handoff_required && HARD_HANDOFF.test(String(conv.handoff_reason || ""));
+    if (!review && hardHandoff) { await watch(); return fail("human_handoff_open"); }
     if (!review && client.followup_suppressed) { await watch(); return fail("client_paused"); }
 
     // someone from the office already answered after this message → stay quiet
@@ -554,6 +559,7 @@ Deno.serve(async (req) => {
       `الرقم اللي كلمنا عليه: ${conv.route_key === "barka" ? "رقم بركاء" : "رقم مسقط"}`,
       `هل سألنا عن الميزانية قبل في هذه المحادثة: ${budgetAskedBefore ? "نعم، لا تسأل مرة ثانية أبداً" : "لا"}`,
       `ملخص سابق للعميل: ${conv.ai_summary || "لا يوجد"}`,
+      ...(conv.human_handoff_required && !hardHandoff ? [`موضوع محول لأحمد ولسا ما خلص (من ${String(conv.handoff_updated_at || "").slice(0, 16)}): ${conv.handoff_reason || ""}. أحمد بيكمل هذا الموضوع بنفسه. جاوب على الجديد في رسالة العميل عادي. واذا رسالته بس عن نفس الموضوع المحول (يستعجل أو يعيد نفس الطلب) لا تكرر "بشوف وارد عليك": reply_messages=[] و action=handoff`] : []),
       "",
       "العقارات المتاحة الآن (لا تعرض غيرها، ولا تذكر id للعميل):",
       props.map(propLine).join("\n") || "لا يوجد",
@@ -786,7 +792,8 @@ Deno.serve(async (req) => {
     const convPatch: any = { ai_summary: short(out.crm_note, 1500), last_automation_action: { scenario: "reply_agent_v1", action: out.action, at: now, category: out.category, source: out.source }, updated_at: now };
     if (out.action === "handoff") Object.assign(convPatch, { human_handoff_required: true, handoff_reason: short(out.handoff_reason || out.intent, 500), handoff_updated_at: now });
     await db.from("whatsapp_conversations").update(convPatch).eq("id", conv.id);
-    if (out.action === "handoff") await notifyHandoff(msg.company_id, conv, client, out.handoff_reason || out.crm_note || out.intent);
+    // an open handoff already on Ahmed's list does not alert him again unless it turned into negotiation / serious buyer / price study
+    if (out.action === "handoff" && (!conv.human_handoff_required || HARD_HANDOFF.test(String(out.handoff_reason || "")))) await notifyHandoff(msg.company_id, conv, client, out.handoff_reason || out.crm_note || out.intent);
     try {
       const flags: any = {};
       if (out.category === "buyer" || out.category === "tenant") flags.is_buyer = true;
