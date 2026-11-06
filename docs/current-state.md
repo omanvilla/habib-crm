@@ -14,7 +14,7 @@ Updated 2026-11-06. Read AGENTS.md. Latest owner instructions govern. Previous I
 
 ## 6 November 2026 — old voice notes are gone at Meta
 
-Our system never keeps a copy of a voice note: it has only Meta's media id (`media_id`), no Storage copy. On 6 Nov 40 failed notes from 14 to 26 Oct (7 of them in one client's chat from 25 Oct) were set back to retry and run through `whatsapp-transcribe-backfill`: all 40 answered `media_unavailable` from Meta with both keys. The ids touched are listed in `crm_repair_private.voice_retry_20261106`; all are back to `failed`. Since 28 Oct notes are transcribed on arrival (138 of 138 inbound). The only other copy is on the branch phone's WhatsApp Business app. For old notes, the owner's instruction on the follow-up is the way: he writes what was said.
+Our system never keeps a copy of a voice note: it has only Meta's media id (`media_id`), no Storage copy. On 6 Nov 40 failed notes from 14 to 26 Oct (7 of them in one client's chat from 25 Oct) were set back to retry and run through `whatsapp-transcribe-backfill`: all 40 answered `media_unavailable` from Meta with both keys. The ids touched are listed in `crm_repair_private.voice_retry_20261106`; all are back to `failed`. Since 28 Oct notes are transcribed on arrival (98 of 98 inbound up to 6 Nov). The only other copy is on the branch phone's WhatsApp Business app. For old notes, the owner's instruction on the follow-up is the way: he writes what was said.
 
 ## 6 November 2026 — owner private WhatsApp line (SQL68), merged, NOT yet live
 
