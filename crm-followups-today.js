@@ -1,14 +1,32 @@
 /* Daily follow-ups (5 November 2026). The owner opens the CRM on the branch phone, taps a client, and WhatsApp opens
  * that chat with the prepared text. He sends it, which is free, and the reply agent carries on when the client answers.
  * A message he sends takes the client off the list by itself. Whatever is left goes out automatically at 10am the next day.
- * Owner sees both branches; a branch account sees its own (crm_followups_today). */
+ * Owner sees both branches; a branch account sees its own (crm_followups_today).
+ * «أمر للذكاء الاصطناعي» (owner only, SQL72): his instruction goes to whatsapp-visit-followup-auto, which reads the whole chat
+ * again and rewrites the text, or removes the client with the reason kept. Nothing is sent; the new text waits here.
+ * The instruction is saved in crm_owner_notes as a lesson for the next reviews. */
 (function(){
   'use strict';
   const byId=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
   const toast=(m,t)=>{if(typeof showToast==='function')showToast(m,t);};
   const LABEL={barka:'بركاء',muscat:'مسقط'};
-  let data={items:[],auto_on:false},branch='all',seq=0;
+  let data={items:[],auto_on:false},branch='all',seq=0;const openInstr=new Set(),drafts=new Map();
+  const isOwner=()=>typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.role==='owner';
+  const ERR={followup_not_pending:'هذي المتابعة ما عادت في القائمة: انرسلت أو تغيرت',followup_not_found:'المتابعة ما عادت موجودة',owner_only:'الأوامر لصاحب الشركة بس',
+    instruction_required:'اكتب الأمر أولاً',rewrite_failed:'ما قدرت أعيد الكتابة الحين. جرب مرة ثانية',route_blocked:'هذي المتابعة مو على رقم بركاء أو مسقط'};
+  const errText=e=>{const raw=String(e&&(e.error||e.message)||e||'');for(const k of Object.keys(ERR))if(raw.includes(k))return ERR[k];return 'ما انحفظ: '+raw;};
+  const key=i=>i.source+':'+i.id;
+  const instrBox=i=>{
+    if(!isOwner())return '';
+    const k=key(i),open=openInstr.has(k);
+    return (i.owner_instruction?'<p class="cfu-instr-done">انكتبت حسب أمرك: <span dir="auto">'+esc(i.owner_instruction)+'</span></p>':'')
+      +'<div class="cfu-instr"'+(open?'':' hidden')+' data-k="'+esc(k)+'"><label for="cfuI-'+esc(i.id)+'">أمر للذكاء الاصطناعي</label>'
+      +'<textarea id="cfuI-'+esc(i.id)+'" class="fta cfu-instr-text" rows="2" dir="auto" placeholder="مثلاً: هذا زار وما عجبه الموقع اسأله عن المنطقة اللي يبغاها" data-k="'+esc(k)+'">'+esc(drafts.get(k)||'')+'</textarea>'
+      +'<small class="cfu-auto">يقرأ المحادثة كاملة ويكتب الرسالة من جديد، أو يشيل العميل إذا قلت ما لها داعي. الأمر ينحفظ درس للمراجعات الجاية. ما ينرسل شي.</small>'
+      +'<div class="cfu-actions"><button type="button" class="btn-primary" data-cfu="instr-run" data-k="'+esc(k)+'">اكتبها من جديد</button><button type="button" class="btn-secondary" data-cfu="instr-close" data-k="'+esc(k)+'">إلغاء</button></div>'
+      +'<div class="cfu-err" role="alert"></div></div>';
+  };
   try{branch=localStorage.getItem('crmFollowupsBranch')||'all';}catch{}
   const waLink=(phone,text)=>{const d=String(phone||'').replace(/\D/g,'');return d?'https://wa.me/'+d+'?text='+encodeURIComponent(text||''):'';};
   // Work numbers are on WhatsApp Business only, so the button asks for that app; other phones get the normal link.
@@ -43,7 +61,7 @@
     box.innerHTML='<h2 class="cfu-title">متابعات اليوم <b dir="ltr">'+all.length+'</b></h2><p class="cfu-hint">افتح الصفحة من جوال الفرع، واضغط «فتح المحادثة» وأرسل. العميل ينشال من القائمة لحاله.'+(waiting?' باقي <b dir="ltr">'+waiting+'</b> قيد القراءة.':'')+'</p><div class="cfu-tabs">'+tabs+'</div>'
       +(items.length?'<ul class="cfu-list">'+items.map(i=>{const url=businessLink(i.phone,i.text),other=waLink(i.phone,i.text);return '<li class="cfu-row"><div class="cfu-head"><strong>'+esc(i.client||'عميل')+'</strong><small>'+esc(LABEL[i.route_key]||i.route_key)+' · '+esc(i.reason)+(i.property?' · '+esc(i.property):'')+'</small></div>'
         +'<p class="cfu-text" dir="auto">'+esc(i.text)+'</p><small class="cfu-auto">'+esc(autoLine(i))+'</small>'
-        +'<div class="cfu-actions">'+(url?'<a class="btn-primary cfu-open" href="'+esc(url)+'" rel="noopener noreferrer">فتح المحادثة</a><a class="cfu-other" href="'+esc(other)+'" target="_blank" rel="noopener noreferrer">رابط عادي</a>':'<span class="cfu-auto">ما له رقم</span>')+'<button type="button" class="btn-secondary" data-cfu="done" data-id="'+esc(i.client_id)+'">أرسلتها</button></div></li>';}).join('')+'</ul>':'<p class="cfu-hint">ما في متابعات لهذا الفرع</p>');
+        +'<div class="cfu-actions">'+(url?'<a class="btn-primary cfu-open" href="'+esc(url)+'" rel="noopener noreferrer">فتح المحادثة</a><a class="cfu-other" href="'+esc(other)+'" target="_blank" rel="noopener noreferrer">رابط عادي</a>':'<span class="cfu-auto">ما له رقم</span>')+'<button type="button" class="btn-secondary" data-cfu="done" data-id="'+esc(i.client_id)+'">أرسلتها</button>'+(isOwner()?'<button type="button" class="btn-secondary" data-cfu="instr" data-k="'+esc(key(i))+'" aria-expanded="'+openInstr.has(key(i))+'">أمر للذكاء الاصطناعي</button>':'')+'</div>'+instrBox(i)+'</li>';}).join('')+'</ul>':'<p class="cfu-hint">ما في متابعات لهذا الفرع</p>');
   }
   async function load(){
     if(typeof supa==='undefined'||typeof currentProfile==='undefined'||!currentProfile)return;
@@ -51,11 +69,29 @@
     if(n!==seq||r.error||!r.data)return;
     data=r.data;render();
   }
+  async function rewrite(b){
+    const k=b.dataset.k,box=b.closest('.cfu-instr'),err=box.querySelector('.cfu-err'),ta=box.querySelector('.cfu-instr-text');
+    const item=(data.items||[]).find(i=>key(i)===k);if(!item)return;
+    const instruction=ta.value.trim();err.textContent='';
+    if(instruction.length<3){err.textContent='اكتب الأمر أولاً';return;}
+    b.disabled=true;b.textContent='يقرأ المحادثة ويكتب…';
+    try{
+      const r=await supa.functions.invoke('whatsapp-visit-followup-auto',{body:{kind:item.source,id:item.id,instruction}});
+      let d=r.data||{};if(r.error||d.ok!==true){try{if(r.error&&r.error.context)d=await r.error.context.json();}catch(_){}throw d&&d.error?d:(r.error||d);}
+      openInstr.delete(k);drafts.delete(k);
+      if(d.result==='kept'){Object.assign(item,{text:d.text,reason:d.reason,owner_instruction:instruction});render();toast('انكتبت حسب أمرك. راجعها قبل ما ترسل','success');}
+      else{toast((d.result==='waiting_match'?'انشال من القائمة وانحفظ طلبه: ':'انشال من القائمة: ')+(d.reason||''),'success');await load();}
+    }catch(e){err.textContent=errText(e);b.disabled=false;b.textContent='اكتبها من جديد';}
+  }
   document.addEventListener('click',e=>{
     const b=e.target.closest('[data-cfu]');if(!b)return;
+    if(b.dataset.cfu==='instr'){const k=b.dataset.k;if(openInstr.has(k))openInstr.delete(k);else openInstr.add(k);const box=b.closest('.cfu-row').querySelector('.cfu-instr');if(box){box.hidden=!openInstr.has(k);b.setAttribute('aria-expanded',String(!box.hidden));if(!box.hidden)box.querySelector('textarea').focus();}return;}
+    if(b.dataset.cfu==='instr-close'){openInstr.delete(b.dataset.k);const box=b.closest('.cfu-instr');box.hidden=true;const t=box.closest('.cfu-row').querySelector('[data-cfu="instr"]');if(t)t.setAttribute('aria-expanded','false');return;}
+    if(b.dataset.cfu==='instr-run'){rewrite(b);return;}
     if(b.dataset.cfu==='tab'){branch=b.dataset.v;try{localStorage.setItem('crmFollowupsBranch',branch);}catch{}render();}
     if(b.dataset.cfu==='done'){b.disabled=true;supa.rpc('crm_followup_mark_sent',{p_client:b.dataset.id}).then(r=>{if(r.error)throw r.error;return load();}).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});}
   });
+  document.addEventListener('input',e=>{const t=e.target;if(t&&t.classList&&t.classList.contains('cfu-instr-text'))drafts.set(t.dataset.k,t.value);});
   // Back from WhatsApp: the sent message has reached the system, so the list shrinks.
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&byId('page-dash')?.classList.contains('active'))setTimeout(()=>load().catch(()=>{}),2500);});
   window.crmFollowupsRefresh=()=>load().catch(()=>{});

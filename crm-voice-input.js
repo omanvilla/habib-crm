@@ -32,7 +32,7 @@
     btn.addEventListener('click',()=>{if(active&&active.btn===btn){active.rec.stop();return;}if(active){active.rec.stop();}start(btn,ta);});
     ta.insertAdjacentElement('afterend',btn);
   }
-  const scan=()=>document.querySelectorAll('#cnText,.rp-instr-text').forEach(attach);
+  const scan=()=>document.querySelectorAll('#cnText,.rp-instr-text,.cfu-instr-text').forEach(attach);
   new MutationObserver(scan).observe(document.body,{childList:true,subtree:true});scan();
   window.crmVoiceAttach=attach;
 })();

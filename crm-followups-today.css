@@ -20,4 +20,11 @@
 .cfu-open{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;text-decoration:none}
 .cfu-actions .btn-secondary{min-height:44px}
 .cfu-other{font-size:12px;color:#6f6552}
+.cfu-instr{display:grid;gap:6px;padding:10px;border:1px solid #eadfc6;border-radius:8px;background:#fff}
+.cfu-instr[hidden]{display:none}
+.cfu-instr label{font-size:13px;font-weight:700}
+.cfu-instr-text{width:100%;min-height:64px;font:inherit;font-size:14px;box-sizing:border-box}
+.cfu-instr-done{margin:0;font-size:12px;color:#2f6b3a;overflow-wrap:anywhere}
+.cfu-err{font-size:12px;color:#a33}
+.cfu-err:empty{display:none}
 @media(max-width:600px){.cfu{padding:12px!important}.cfu-open{flex:1}}
