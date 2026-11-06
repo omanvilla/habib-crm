@@ -12,6 +12,9 @@
 //    It also covers voice notes nobody can read: he writes what was said and the text follows his words.
 // 6. Owner's decision 6 Nov: a reviewed follow-up whose 24 hour window is still open goes out from the AI at once as free text
 //    (the review's own text for this client). He does not have to send it. Outside the window nothing changes.
+// 7. Owner's decision 6 Nov (SQL73): visit results are the AI's job. A past visit with no result (last 30 days) whose client
+//    has written since the last check is read from the chat; done / no_show / postponed / cancelled and the client's opinion
+//    are saved on the visit (sync_viewing_to_crm moves the deal). A serious buyer raises «🔥 مشتري جاد» for the owner.
 // Stops when whatsapp_automation_runtime.visit_followups_auto is false. A failed send stays on the list.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -339,6 +342,102 @@ async function sendQueueText(q: any, numbers: string[]) {
   }
 }
 
+const RESULT_RULES = `تقرأ محادثة واتساب لمكتب عقاري عن زيارة عقار فات موعدها، وتحدد وش صار. رجّع:
+result: done إذا العميل قال إنه زار أو شاف العقار، أو كلامه يبين إنه شافه (مثل "في خيارات وبعد ما قررنا" بعد سؤال عن الزيارة). no_show إذا قال إنه ما راح أو ما قدر يروح وما حدد موعد ثاني. postponed إذا قال بيروح في يوم ثاني. cancelled إذا قال ما يبغى يزور أو لقى شي ثاني قبل الزيارة. unknown إذا ما رد أو كلامه ما يوضح.
+opinion (لـ done بس، وإلا unknown): liked عجبه، negotiate يبغى يتفاوض أو سأل عن آخر سعر، hesitant يفكر أو متردد أو يشاور، disliked ما ناسبه، unknown ما قال.
+reason (لـ disliked بس، وإلا null): واحد من price location area room_layout design finishing parking financing found_other not_interested not_serious.
+new_date: لـ postponed إذا حدد يوم، بصيغة YYYY-MM-DD حسب تاريخ اليوم، وإلا null.
+serious: true بس إذا العميل جاد يبغى يشتري أو يستأجر الحين: عجبه وطلب يحجز أو يدفع عربون، أو سأل عن آخر سعر أو يبغى يتفاوض، أو طلب يقابل المالك أو يكلم صاحب المكتب عشان يكمل.
+note: سطر قصير بالعربي لصاحب المكتب عن اللي قاله العميل، بدون أسماء. لا تخترع شي مو مكتوب.
+confidence من 0 إلى 1.`;
+const resultSchema = {
+  type: "object", additionalProperties: false,
+  properties: {
+    result: { type: "string", enum: ["done", "no_show", "postponed", "cancelled", "unknown"] },
+    opinion: { type: "string", enum: ["liked", "negotiate", "hesitant", "disliked", "unknown"] },
+    reason: { type: ["string", "null"], enum: ["price", "location", "area", "room_layout", "design", "finishing", "parking", "financing", "found_other", "not_interested", "not_serious", null] },
+    new_date: { type: ["string", "null"] },
+    serious: { type: "boolean" },
+    note: { type: "string" },
+    confidence: { type: "number" },
+  },
+  required: ["result", "opinion", "reason", "new_date", "serious", "note", "confidence"],
+};
+const OPINION: Record<string, { feedback: string; outcome: string; liked: boolean | null }> = {
+  liked: { feedback: "liked", outcome: "followup", liked: true },
+  negotiate: { feedback: "wants_negotiate", outcome: "negotiation", liked: true },
+  hesitant: { feedback: "hesitant", outcome: "followup", liked: null },
+  disliked: { feedback: "disliked", outcome: "lost", liked: false },
+};
+
+async function judgeResult(v: any, today: string) {
+  const convs = await db.from("whatsapp_conversations").select("id,route_key").eq("company_id", v.company_id).eq("client_id", v.client_id).in("route_key", ["barka", "muscat"]).limit(2);
+  let chat = "";
+  for (const c of convs.data || []) chat += `${(convs.data || []).length > 1 ? `\nعلى رقم ${c.route_key === "barka" ? "بركاء" : "مسقط"}:\n` : ""}${await chatOf(c.id, 30)}\n`;
+  if (!chat.trim()) return null;
+  const pr: any = v.properties || {};
+  const ai = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST", headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: OPENAI_MODEL, store: false, reasoning: { effort: "low" }, instructions: RESULT_RULES,
+      input: `تاريخ اليوم: ${today}\nالزيارة: ${pr.type || "عقار"} في ${pr.area || "غير معروف"} يوم ${v.viewing_date}${v.viewing_time ? ` الساعة ${String(v.viewing_time).slice(0, 5)}` : ""}\n\nالمحادثة:\n${chat}`,
+      text: { format: { type: "json_schema", name: "visit_result", strict: true, schema: resultSchema } } }),
+  });
+  const p = await ai.json().catch(() => ({}));
+  if (!ai.ok) throw new Error(p?.error?.message || `openai_${ai.status}`);
+  return JSON.parse(p.output_text || p.output?.flatMap((x: any) => x?.content || []).find((x: any) => x?.type === "output_text")?.text || "{}");
+}
+
+async function alertSerious(companyId: string, clientId: string, name: string, body: string) {
+  const o = await db.from("profiles").select("id").eq("company_id", companyId).eq("role", "owner").eq("is_active", true).limit(1).maybeSingle();
+  if (!o.data) return;
+  const seen = await db.from("notifications").select("id").eq("user_id", o.data.id).eq("client_id", clientId).like("title", "🔥%").gte("created_at", new Date(Date.now() - 24 * 3600 * 1000).toISOString()).limit(1);
+  if ((seen.data || []).length) return;
+  await db.from("notifications").insert({ user_id: o.data.id, type: "whatsapp_handoff", is_read: false, client_id: clientId, link: "whatsapp", title: `🔥 مشتري جاد: ${name || "عميل"}`, body: short(body, 400) });
+}
+
+// Past visits with no result: the AI reads the chat when the client has written since the last check, and saves the result.
+async function visitResults(companyId: string, out: Record<string, number>) {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
+  const from = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const vs = await db.from("viewings").select("id,company_id,client_id,property_id,viewing_date,viewing_time,status,notes,ai_checked_at,row_version,properties(type,area),clients(name)")
+    .eq("company_id", companyId).eq("archived", false).in("status", ["scheduled", "confirmed", "postponed"]).lt("viewing_date", today).gte("viewing_date", from)
+    .order("viewing_date", { ascending: false }).limit(60);
+  let budget = AFTER_VISIT_PER_RUN;
+  for (const v of vs.data || []) {
+    if (budget <= 0) break;
+    // only when the client wrote after the visit day and after the last check
+    const since = [`${v.viewing_date}T00:00:00+04:00`, v.ai_checked_at].filter(Boolean).map((d: string) => new Date(d).getTime());
+    const convs = await db.from("whatsapp_conversations").select("id").eq("company_id", companyId).eq("client_id", v.client_id).in("route_key", ["barka", "muscat"]).limit(2);
+    const ids = (convs.data || []).map((c: any) => c.id);
+    if (!ids.length) continue;
+    const lastIn = await db.from("whatsapp_messages").select("message_timestamp").in("conversation_id", ids).eq("direction", "inbound").order("message_timestamp", { ascending: false }).limit(1).maybeSingle();
+    const at = lastIn.data?.message_timestamp ? new Date(lastIn.data.message_timestamp).getTime() : 0;
+    if (!at || at <= Math.max(...since)) continue;
+    budget--;
+    const now = new Date().toISOString();
+    try {
+      const r = await judgeResult(v, today);
+      if (!r) continue;
+      const stamp = `[الذكاء الاصطناعي ${today}] ${short(r.note, 300)}`;
+      const notes = [v.notes, stamp].filter(Boolean).join("\n").slice(0, 2000);
+      let patch: any = null;
+      if (r.confidence >= 0.75) {
+        if (r.result === "done") {
+          const o = OPINION[r.opinion];
+          patch = { status: "done", client_feedback: o?.feedback || null, liked: o ? o.liked : null, pipeline_outcome: o?.outcome || "followup",
+            rejection_reason: r.opinion === "disliked" ? (r.reason || null) : null, outcome_note: short(r.note, 500), notes };
+        } else if (r.result === "no_show") patch = { status: "no_show", attendance: "not_attended", notes };
+        else if (r.result === "cancelled") patch = { status: "cancelled", notes };
+        else if (r.result === "postponed") patch = /^\d{4}-\d{2}-\d{2}$/.test(r.new_date || "") && r.new_date >= today ? { status: "scheduled", viewing_date: r.new_date, notes } : { status: "postponed", notes };
+      }
+      const w = await db.from("viewings").update({ ...(patch || {}), ai_checked_at: now }).eq("id", v.id).eq("row_version", v.row_version).in("status", ["scheduled", "confirmed", "postponed"]);
+      if (w.error) throw new Error(w.error.message);
+      const k = patch ? `visit_result_${r.result}` : "visit_result_unclear"; out[k] = (out[k] || 0) + 1;
+      if (r.serious && r.confidence >= 0.6) { await alertSerious(companyId, v.client_id, (v as any).clients?.name, `${(v as any).properties?.type || "عقار"} في ${(v as any).properties?.area || ""}: ${r.note}`); out.serious_alert = (out.serious_alert || 0) + 1; }
+    } catch (e) { out.visit_result_failed = (out.visit_result_failed || 0) + 1; console.error("[followup-auto] visit result", String((e as any)?.message || e)); }
+  }
+}
+
 // "اليوم الساعة 4 العصر"; with no saved time only the day
 function visitWhen(date: string, time: string | null) {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
@@ -475,6 +574,14 @@ Deno.serve(async (req) => {
     catch (e) { console.error("[followup-auto] instruct", String((e as any)?.message || e)); return reply({ ok: false, error: "rewrite_failed" }, 500); }
   }
   const input = await req.json().catch(() => ({}));
+  // a test of the visit results: reads the chats of past visits with no result and writes nothing
+  if (input?.preview_results) {
+    const co = await db.from("whatsapp_automation_runtime").select("company_id").eq("mode", "live").limit(1).maybeSingle();
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
+    const vs = await db.from("viewings").select("id,company_id,client_id,viewing_date,viewing_time,status,properties(type,area),clients(name)").eq("company_id", co.data?.company_id).eq("archived", false).in("status", ["scheduled", "confirmed", "postponed"]).lt("viewing_date", today).order("viewing_date", { ascending: false }).range(Number(input.offset) || 0, (Number(input.offset) || 0) + 11);
+    const items = await Promise.all((vs.data || []).map(async (v: any) => { try { return { id: v.id, client: v.clients?.name, date: v.viewing_date, ...(await judgeResult(v, today)) }; } catch (e) { return { id: v.id, error: String((e as any)?.message || e) }; } }));
+    return json({ ok: true, items });
+  }
   // a test of the owner's instruction on one follow-up: reads and writes nothing
   if (input?.preview_instruction) {
     const pi = input.preview_instruction, kind = pi.kind === "request" ? "request" : "visit";
@@ -499,6 +606,7 @@ Deno.serve(async (req) => {
     if (rt.visit_followups_auto) await confirmBeforeVisit(rt.company_id, numbers, out);
     if (rt.visit_followups_auto) await afterVisit(rt.company_id, numbers, out);
     await reviewAll(rt.company_id, out);
+    await visitResults(rt.company_id, out);
     if (!rt.visit_followups_auto) continue;
     await sendInWindow(rt.company_id, numbers, out);
     const dayStart = new Date(`${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date())}T00:00:00+04:00`).toISOString();

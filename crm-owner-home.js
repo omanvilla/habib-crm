@@ -9,7 +9,7 @@
   const num=v=>Number(v||0).toLocaleString('en-US');
   const isOwner=()=>typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.role==='owner';
   const SHOWN=6;
-  let sequence=0,showAll=false;
+  let sequence=0,showAll=false,visitsOpen=false;
 
   function mount(){
     const page=byId('page-dash');if(!page)return null;
@@ -39,12 +39,19 @@
     if(pending)links.push(link('ردود تنتظر موافقتك',pending,'replies'));
     if(d.owner_leads_new)links.push(link('عروض ملاك جديدة هذا الأسبوع',d.owner_leads_new,'owner-leads'));
     const overdue=d.overdue||[],rows=showAll?overdue:overdue.slice(0,SHOWN);
+    // Owner's decision 6 Nov: visit results are the AI's job (it reads the chats and records them). They are a box he can open,
+    // not a decision. A serious buyer reaches him as «🔥 مشتري جاد» at the top of the page.
+    if(Number(d.overdue_total))links.push('<button type="button" class="coh-link" data-coh="visits" aria-expanded="'+visitsOpen+'"><span>زيارات يتابعها الذكاء الاصطناعي</span><b dir="ltr">'+num(d.overdue_total)+'</b></button>');
     // Upcoming visits stay here until the first visit logged by itself from WhatsApp proves the logging works.
     const upcoming=Number(d.auto_visits)>0?[]:(d.upcoming||[]);
     let h=links.length?'<div class="coh-links">'+links.join('')+'</div>':'';
-    h+='<div class="coh-subhead"><h3>زيارات تحتاج نتيجة <b dir="ltr">'+num(d.overdue_total)+'</b></h3><button type="button" class="coh-add" data-cqv="new">+ زيارة ما كانت مسجّلة</button></div>';
-    h+=overdue.length?'<ul class="coh-list">'+rows.map(v=>visitRow(v,true)).join('')+'</ul>':'<p class="coh-empty">كل الزيارات مسجلة نتيجتها</p>';
-    if(overdue.length>SHOWN)h+='<button type="button" class="coh-more" data-coh="more">'+(showAll?'عرض أقل':'عرض الكل ('+num(overdue.length)+')')+'</button>';
+    if(visitsOpen&&overdue.length){
+      h+='<div class="coh-subhead"><h3>زيارات فات موعدها بدون نتيجة</h3><button type="button" class="coh-add" data-cqv="new">+ زيارة ما كانت مسجّلة</button></div>'
+        +'<p class="coh-since">الذكاء الاصطناعي يسأل العميل ويسجل النتيجة لحاله أول ما يرد. تقدر تسجلها أنت إذا تعرفها</p>';
+      h+='<ul class="coh-list">'+rows.map(v=>visitRow(v,true)).join('')+'</ul>';
+      if(overdue.length>SHOWN)h+='<button type="button" class="coh-more" data-coh="more">'+(showAll?'عرض أقل':'عرض الكل ('+num(overdue.length)+')')+'</button>';
+    }
+    if(!links.length&&!upcoming.length)h+='<p class="coh-empty">ما في شي يحتاج قرارك الحين</p>';
     if(upcoming.length)h+='<div class="coh-subhead"><h3>زيارات خلال أسبوع <b dir="ltr">'+num(upcoming.length)+'</b></h3></div><ul class="coh-list">'+upcoming.map(v=>visitRow(v,false)).join('')+'</ul>';
     byId('cohDecide').innerHTML=h;
     // The Instagram cards keep their own code and buttons; only their place on the page changes.
@@ -93,6 +100,7 @@
     const b=e.target.closest('[data-coh]');if(!b)return;
     const act=b.dataset.coh;
     if(act==='more'){showAll=!showAll;render();}
+    else if(act==='visits'){visitsOpen=!visitsOpen;render();}
     else if(act==='full'){const page=byId('page-dash'),open=page.classList.toggle('coh-full-open');b.setAttribute('aria-expanded',String(open));b.textContent=open?'إخفاء قائمة العمل الكاملة':'قائمة العمل الكاملة';}
     else if(act==='twin-yes'||act==='twin-no'){
       b.disabled=true;
