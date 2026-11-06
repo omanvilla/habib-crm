@@ -130,3 +130,18 @@ test('inside the 24 hour window the AI sends the review text at once, free text 
  assert(part.includes('conv.agent_muted || conv.human_handoff_required'));
  assert(fn.includes('if (!rt.visit_followups_auto) continue;\n    await sendInWindow('));
 });
+test('visit results are the AI job: read from the chat, saved on the visit, a serious buyer alerts the owner',()=>{
+ const part=fn.slice(fn.indexOf('async function visitResults('),fn.indexOf('// "اليوم الساعة 4 العصر"'));
+ assert(part.includes('if (r.confidence >= 0.75)'));
+ assert(part.includes('.eq("row_version", v.row_version).in("status", ["scheduled", "confirmed", "postponed"])'));
+ assert(part.includes('ai_checked_at: now'));
+ assert(part.includes('if (!at || at <= Math.max(...since)) continue;'));
+ assert(!part.includes('metaSend'));
+ assert(fn.includes('pipeline_outcome: o?.outcome'));
+ assert(fn.includes('title: `🔥 مشتري جاد: ${name || "عميل"}`'));
+ const home=fs.readFileSync('crm-owner-home.js','utf8');
+ assert(home.includes('زيارات يتابعها الذكاء الاصطناعي')&&home.includes("if(visitsOpen&&overdue.length)"));
+ const hot=fs.readFileSync('crm-hot-alerts.js','utf8');
+ assert(hot.includes("/^(مشتري جاد|تفاوض|طلب اتصال)/")&&hot.includes("isOwner()"));
+ assert(index.includes('crm-hot-alerts.js?v='));
+});
