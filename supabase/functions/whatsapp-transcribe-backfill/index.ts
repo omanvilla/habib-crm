@@ -43,6 +43,36 @@ Deno.serve(async (req) => {
   const ok = secret ? await db.rpc("crm_reply_agent_secret_ok", { p_secret: secret }) : null;
   if (!ok || ok.error || ok.data !== true) return json({ ok: false, error: "forbidden" }, 403);
   const body = await req.json().catch(() => ({}));
+  // cache_days: keep a private copy of recent voice notes (sent and received) so they still open in the CRM
+  // after WhatsApp stops serving the file. Nothing is transcribed or sent in this mode.
+  if (Number(body?.cache_days) > 0) {
+    const since = new Date(Date.now() - Math.min(Number(body.cache_days), 30) * 864e5).toISOString();
+    const rows = await db.from("whatsapp_messages").select("id,company_id,media_id,whatsapp_conversations!inner(route_key)")
+      .eq("message_type", "audio").not("media_id", "is", null).neq("whatsapp_conversations.route_key", "owner")
+      .gte("message_timestamp", since).order("message_timestamp", { ascending: false }).limit(Math.min(Number(body?.limit) || 150, 300));
+    if (rows.error) return json({ ok: false, error: rows.error.message }, 500);
+    let cached = 0, had = 0, missing = 0;
+    for (const m of rows.data || []) {
+      const path = `${m.company_id}/${m.media_id}`;
+      const ex = await db.storage.from("whatsapp-voice").list(m.company_id, { search: String(m.media_id), limit: 1 });
+      if ((ex.data || []).some((f: any) => f.name === String(m.media_id))) { had++; continue; }
+      let ok = false;
+      for (const t of await routeTokens(m.company_id, (m as any).whatsapp_conversations?.route_key)) {
+        try {
+          const mr = await fetch(`https://graph.facebook.com/${GRAPH}/${m.media_id}`, { headers: { Authorization: `Bearer ${t}` } });
+          const meta = await mr.json().catch(() => ({}));
+          if (!mr.ok || !meta?.url) continue;
+          const fr = await fetch(meta.url, { headers: { Authorization: `Bearer ${t}` } });
+          if (!fr.ok) continue;
+          const mime = String(meta.mime_type || "audio/ogg").split(";")[0].trim();
+          const up = await db.storage.from("whatsapp-voice").upload(path, await fr.blob(), { contentType: mime, upsert: true });
+          if (!up.error) { ok = true; break; }
+        } catch (_) { /* next token */ }
+      }
+      if (ok) cached++; else missing++;
+    }
+    return json({ ok: true, picked: (rows.data || []).length, cached, had, missing });
+  }
   const limit = Math.min(Math.max(Number(body?.limit) || 20, 1), 40);
   const convIds: string[] = Array.isArray(body?.conversation_ids) ? body.conversation_ids.map(String).slice(0, 200) : [];
 
