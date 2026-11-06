@@ -34,8 +34,8 @@ test('90 minutes after a visit: free text only, and nothing if someone already w
  assert(sql.includes("li.last_in > now() - interval '23 hours 30 minutes'"));
  assert(sql.includes("li.last_in <= v.visit_at + interval '30 minutes'"));
  assert(sql.includes("m.actor_type = 'human' AND m.message_timestamp > v.visit_at + interval '30 minutes'"));
- assert(fn.includes('if (freeOnly && !service) return "window_closed";'));
- assert(fn.includes('await sendOne(f.data, numbers, true)'));
+ assert(fn.includes('if (!service) return "window_closed";'));
+ assert(fn.includes('await sendOne(f.data, numbers)'));
  assert(fn.includes('if (rt.visit_followups_auto) await afterVisit('));
 });
 test('a visit confirmation goes only inside the window, once, when a reply would still cover the visit',()=>{
@@ -60,13 +60,23 @@ test('a message from a person takes the client off the list',()=>{
 test('a branch account sees its own branch only',()=>{
  assert(sql.includes('WHERE v_owner OR crm_repair_private.staff_can_access_branch(v_company, i.route_key)'));
 });
-test('nothing goes out by itself before 10am the next day, and at most 20 a day',()=>{
+test('nothing goes out by itself before 10am the next day',()=>{
  assert(sql.includes("+ 1) + time '10:00'"));
- assert(fn.includes('DAILY_LIMIT = 20'));
 });
-test('marketing cost never goes out by itself, and a failed send stays on the list',()=>{
- assert(fn.includes('if (!service && !utility) return "waits_for_utility_template";'));
+test('no paid template goes out by itself: it stays on his list; a failed send stays too',()=>{
+ assert(!fn.includes('type: "template"'));
+ assert(!fn.includes('status: "approved"'));
  assert(fn.includes('status: "awaiting_approval", error: why'));
+});
+test('the whole voice note is read before a follow-up reaches him',()=>{
+ assert(fn.includes('short(body, 3000)'));
+ assert(fn.includes('throw new Error("voice_note_pending")'));
+});
+test('the optional rented units note is a reference for the follow-ups and has a place on the form',()=>{
+ const form=fs.readFileSync('crm-rented-units.js','utf8');
+ assert(form.includes("update({rented_units:"));
+ assert(fn.includes('المؤجر حالياً'));
+ assert(index.includes('crm-rented-units.js?v='));
 });
 test('the agent carries on after a message from the list, and stays quiet after any other',()=>{
  assert(agent.includes('if (!review && staffInChat && !fromList)'));
