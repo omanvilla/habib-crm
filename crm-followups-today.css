@@ -24,6 +24,7 @@
 .cfu-instr[hidden]{display:none}
 .cfu-instr label{font-size:13px;font-weight:700}
 .cfu-instr-text{width:100%;min-height:64px;font:inherit;font-size:14px;box-sizing:border-box}
+.cfu-instr .voice-btn{justify-self:start;width:auto!important;min-height:40px}
 .cfu-instr-done{margin:0;font-size:12px;color:#2f6b3a;overflow-wrap:anywhere}
 .cfu-err{font-size:12px;color:#a33}
 .cfu-err:empty{display:none}
