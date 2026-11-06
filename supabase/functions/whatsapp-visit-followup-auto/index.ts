@@ -191,7 +191,7 @@ async function preview(companyId: string, offset: number) {
   const items: any[] = [];
   for (let i = 0; i < jobs.length; i += REVIEWS_AT_ONCE) {
     await Promise.all(jobs.slice(i, i + REVIEWS_AT_ONCE).map(async ([kind, x]) => {
-      try { const r = await judge(kind, x, companyId, available); items.push({ kind, id: x.id, client: nameOf.get(x.client_id), route: x.route_key, decision: r.decision, reason: short(r.reason, 200), request: r.request }); }
+      try { const r = await judge(kind, x, companyId, available); items.push({ kind, id: x.id, client: nameOf.get(x.client_id), route: x.route_key, decision: r.decision, reason: short(r.reason, 200), text: r.text, request: r.request }); }
       catch (e) { items.push({ kind, id: x.id, client: nameOf.get(x.client_id), error: String((e as any)?.message || e) }); }
     }));
   }
