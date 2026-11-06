@@ -225,7 +225,7 @@ async function notifyHandoff(companyId: string, conv: any, client: any, reason: 
     if (!userId) return;
     await db.from("notifications").insert({
       user_id: userId, type: "whatsapp_handoff", is_read: false, client_id: client.id, link: "whatsapp",
-      title: `${/^طلب اتصال/.test(reason) ? "📞 طلب اتصال" : "محادثة تحتاجك"}: ${client.name || conv.customer_name || client.phone || "عميل"}`,
+      title: `${/^طلب اتصال/.test(reason) ? "📞 طلب اتصال" : /^(مشتري جاد|تفاوض)/.test(reason) ? "🔥 مشتري جاد" : "محادثة تحتاجك"}: ${client.name || conv.customer_name || client.phone || "عميل"}`,
       body: short(reason, 400),
     });
   } catch (e) { console.error("[reply-agent] notify", String((e as any)?.message || e)); }
