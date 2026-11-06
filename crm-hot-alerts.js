@@ -3,7 +3,9 @@
  * «فتح المحادثة» opens the client's chat in WhatsApp Business on the phone (like «متابعات اليوم»), not the CRM inbox.
  * Two sources: the owner's notifications (visit results write them), and chats the reply agent handed over as
  * «مشتري جاد» / «تفاوض» / «طلب اتصال» on either branch (Barka chats are assigned to the branch account, so their notification
- * does not reach him). «تم» on a chat is kept on this browser and comes back if the chat is handed over again. «فتح المحادثة» opens the
+ * does not reach him). «تم» on a chat is saved in the database (SQL74, crm_hot_alert_done → owner_alert_done_at), so it
+ * is gone on every device, and comes back if the chat is handed over again (handoff_updated_at later than it). Older «تم»
+ * kept on a browser (localStorage crmHotHidden) is moved to the database the first time it is seen. «فتح المحادثة» opens the
  * client's chat, «تم» marks it handled. A new one also shows a phone/desktop notification while the CRM is open.
  * Owner only; reads his own notifications (RLS). Checks every 45 seconds while the page is visible. */
 (function(){
@@ -55,11 +57,15 @@
         .eq('is_read',false).gte('created_at',since).order('created_at',{ascending:false}).limit(60);
       if(r.error)return;
       const list=(r.data||[]).filter(n=>/^(🔥|📞)/.test(String(n.title||''))).map(n=>({...n,kind:'n'}));
-      const c=await supa.from('whatsapp_conversations').select('id,client_id,customer_name,customer_wa_id,route_key,handoff_reason,updated_at,clients(name,phone,phone_normalized)')
+      const c=await supa.from('whatsapp_conversations').select('id,client_id,customer_name,customer_wa_id,route_key,handoff_reason,handoff_updated_at,owner_alert_done_at,updated_at,clients(name,phone,phone_normalized)')
         .eq('human_handoff_required',true).in('route_key',['barka','muscat']).gte('updated_at',since).order('updated_at',{ascending:false}).limit(80);
       for(const w of (c.error?[]:c.data||[])){
         const why=String(w.handoff_reason||'');if(!/^(مشتري جاد|تفاوض|طلب اتصال)/.test(why))continue;
-        const id='c-'+w.id+'-'+w.updated_at;if(hidden[id])continue;
+        const at=w.handoff_updated_at||w.updated_at;
+        if(w.owner_alert_done_at&&new Date(w.owner_alert_done_at)>=new Date(at))continue;
+        const old='c-'+w.id+'-'+w.updated_at;
+        if(hidden[old]){supa.rpc('crm_hot_alert_done',{p_conversation_id:w.id}).then(r=>{if(!r.error){delete hidden[old];saveHidden();}});continue;}
+        const id='c-'+w.id+'-'+at;
         if(list.some(n=>n.client_id&&n.client_id===w.client_id))continue;
         list.push({id,kind:'c',conversation_id:w.id,client_id:w.client_id,created_at:w.updated_at,phone:(w.clients&&(w.clients.phone_normalized||w.clients.phone))||w.customer_wa_id,
           title:(/^طلب اتصال/.test(why)?'📞 طلب اتصال':'🔥 مشتري جاد')+': '+((w.clients&&w.clients.name)||w.customer_name||'عميل')+' · '+(LABEL[w.route_key]||''),body:why});
@@ -82,7 +88,7 @@
     const b=e.target.closest('[data-cha]');if(!b)return;
     const n=items.find(x=>x.id===b.dataset.id);if(!n)return;
     if(b.dataset.cha==='open')openChat(n).catch(()=>toast('ما قدرت أفتح المحادثة','error'));
-    if(b.dataset.cha==='done'&&n.kind==='c'){hidden[n.id]=Date.now();saveHidden();items=items.filter(x=>x.id!==n.id);render();return;}
+    if(b.dataset.cha==='done'&&n.kind==='c'){b.disabled=true;supa.rpc('crm_hot_alert_done',{p_conversation_id:n.conversation_id}).then(r=>{if(r.error)throw r.error;items=items.filter(x=>x.id!==n.id);render();}).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});return;}
     if(b.dataset.cha==='done'){b.disabled=true;supa.from('notifications').update({is_read:true}).eq('id',n.id).then(r=>{if(r.error)throw r.error;items=items.filter(x=>x.id!==n.id);seen.delete(n.id);render();}).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});}
   });
   window.crmHotAlertsRefresh=()=>load().catch(()=>{});
