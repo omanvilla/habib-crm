@@ -38,6 +38,16 @@ test('90 minutes after a visit: free text only, and nothing if someone already w
  assert(fn.includes('await sendOne(f.data, numbers, true)'));
  assert(fn.includes('if (rt.visit_followups_auto) await afterVisit('));
 });
+test('a visit confirmation goes only inside the window, once, when a reply would still cover the visit',()=>{
+ const sql=fs.readFileSync('db/changes/70-visit-confirm.forward.sql','utf8');
+ assert(sql.includes("li.last_in + interval '24 hours' > now() + interval '10 minutes'"));
+ assert(sql.includes("li.last_in + interval '24 hours' < v.visit_at + interval '90 minutes'"));
+ assert(sql.includes("v.visit_at + interval '90 minutes' <= now() + interval '24 hours'"));
+ assert(sql.includes("m.raw_payload->>'source' = 'visit_confirm'"));
+ assert(fn.includes('await confirmBeforeVisit('));
+ const part=fn.slice(fn.indexOf('async function confirmBeforeVisit('),fn.indexOf('async function sendOne('));
+ assert(part.includes('type: "text"')&&!part.includes('type: "template"'));
+});
 test('a client the review removed does not come back through another request',()=>{
  const sql=fs.readFileSync('db/changes/67-followup-removed-stay-removed.forward.sql','utf8');
  assert(sql.includes('BEFORE INSERT ON public.whatsapp_outreach_queue'));

@@ -4,6 +4,8 @@
 // 2. What he has not sent by 10am the next day goes out by itself, 20 a day at most, only if the review says the fixed
 //    text fits: a UTILITY template, or free text inside the 24 hour window. MARKETING cost keeps waiting for him.
 // 3. 90 minutes after a visit it asks the client's opinion as free text inside the 24 hour window, never a template (SQL68).
+// 4. If the window would close before that moment, it asks the client to confirm the visit while the window is still open,
+//    so a reply keeps the after-visit follow-up free (SQL70).
 // Stops when whatsapp_automation_runtime.visit_followups_auto is false. A failed send stays on the list.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -227,6 +229,40 @@ async function afterVisit(companyId: string, numbers: string[], out: Record<stri
   }
 }
 
+// "اليوم الساعة 4 العصر"; with no saved time only the day
+function visitWhen(date: string, time: string | null) {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
+  const day = date === today ? "اليوم" : "بكرة";
+  if (!time) return day;
+  const [h, m] = time.split(":").map(Number);
+  const part = h < 12 ? "الصبح" : h < 15 ? "الظهر" : h < 18 ? "العصر" : h < 20 ? "المغرب" : "الليل";
+  const mins = m === 30 ? " ونص" : m ? `:${String(m).padStart(2, "0")}` : "";
+  return `${day} الساعة ${h % 12 || 12}${mins} ${part}`;
+}
+
+// Free text inside the window. One per visit: the message itself is the record.
+async function confirmBeforeVisit(companyId: string, numbers: string[], out: Record<string, number>) {
+  const c = await db.rpc("crm_visit_confirm_candidates");
+  if (c.error) { console.error("[followup-auto] confirm", c.error.message); return; }
+  for (const v of (c.data || []).filter((x: any) => x.company_id === companyId).slice(0, AFTER_VISIT_PER_RUN)) {
+    const to = digits(v.phone);
+    if (!to || numbers.includes(to)) continue;
+    const body = `السلام عليكم نأكد موعد زيارة العقار في ${v.area || "الموقع"} ${visitWhen(v.viewing_date, v.viewing_time)} ؟`;
+    const now = new Date().toISOString();
+    try {
+      const wamid = await metaSend(await routeTokens(companyId, v.route_key), digits(v.meta_phone_number_id), to, { type: "text", text: { preview_url: false, body } });
+      if (wamid) await db.from("whatsapp_messages").insert({
+        company_id: companyId, conversation_id: v.conversation_id, client_id: v.client_id, whatsapp_message_id: wamid,
+        direction: "outbound", message_type: "text", sender_wa_id: digits(v.meta_phone_number_id), recipient_wa_id: to,
+        body, message_timestamp: now, delivery_status: "sent", actor_type: "automated", channel_source: "crm_followup",
+        raw_payload: { source: "visit_confirm", viewing_id: v.viewing_id, auto: true },
+      });
+      await db.from("whatsapp_conversations").update({ last_message_at: now, last_outbound_at: now, updated_at: now }).eq("id", v.conversation_id);
+      out.confirm_sent = (out.confirm_sent || 0) + 1;
+    } catch (e) { out.confirm_failed = (out.confirm_failed || 0) + 1; console.error("[followup-auto] confirm", String((e as any)?.message || e)); }
+  }
+}
+
 async function sendOne(f: any, numbers: string[], freeOnly = false) {
   const stop = async (status: string, why: string) => { await db.from("whatsapp_visit_followups").update({ status, error: why, updated_at: new Date().toISOString() }).eq("id", f.id).eq("status", "awaiting_approval"); return why; };
   const [convR, clientR, lastInR, tplR] = await Promise.all([
@@ -303,6 +339,7 @@ Deno.serve(async (req) => {
   const numbers = (routes.data || []).map((r: any) => digits(r.whatsapp_number)).filter(Boolean);
   for (const rt of rts.data || []) {
     if (rt.mode !== "live") continue;
+    if (rt.visit_followups_auto) await confirmBeforeVisit(rt.company_id, numbers, out);
     if (rt.visit_followups_auto) await afterVisit(rt.company_id, numbers, out);
     await reviewAll(rt.company_id, out);
     if (!rt.visit_followups_auto) continue;
