@@ -68,6 +68,9 @@ test('no paid template goes out by itself: it stays on his list; a failed send s
  assert(!fn.includes('status: "approved"'));
  assert(fn.includes('status: "awaiting_approval", error: why'));
 });
+test('a follow-up does not carry time words from an old chat',()=>{
+ assert(fn.includes('لا تنقل كلمات وقت من كلام قديم'));
+});
 test('the whole voice note is read before a follow-up reaches him',()=>{
  assert(fn.includes('short(body, 3000)'));
  assert(fn.includes('throw new Error("voice_note_pending")'));
