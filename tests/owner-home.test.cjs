@@ -16,9 +16,9 @@ test('staff keep their page and a failed load keeps the old page',()=>{
  assert.match(js,/if\(!isOwner\(\)[^;]*;page\.classList\.remove\('coh-on'\);return;\}/);
  assert.match(js,/if\(home\.error\|\|!home\.data\)\{if\(!last\)\{box\.hidden=true;page\.classList\.remove\('coh-on'\);\}return;\}/);
 });
-test('upcoming visits leave only after the first visit logged by itself; visits without a result always stay',()=>{
+test('upcoming visits leave only after the first visit logged by itself; visits without a result stay one tap away (owner decision 6 Nov: the AI records them)',()=>{
  assert(js.includes("Number(d.auto_visits)>0?[]:(d.upcoming||[])"));
- assert(js.includes('زيارات تحتاج نتيجة'));
+ assert(js.includes('زيارات يتابعها الذكاء الاصطناعي')&&js.includes("data-coh=\"visits\""));
  assert(sql.includes("'auto_visits', (SELECT count(*) FROM public.viewings v WHERE v.company_id = v_company AND v.created_via = 'whatsapp_ai')"));
 });
 test('the home data is owner only',()=>{
