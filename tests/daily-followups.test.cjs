@@ -73,7 +73,7 @@ test('a follow-up does not carry time words from an old chat',()=>{
 });
 test('every follow-up starts with a greeting, on one line, and the review sees the saved name for feminine address',()=>{
  assert(fn.includes('if (out.text && !out.text.startsWith("السلام عليكم"))'));
- assert(fn.includes('.replace(/\s+/g, " ").trim() : null;'));
+ assert(fn.includes('.replace(/\\s+/g, " ").trim() : null;'));
  assert(fn.includes('يفيد بس لمعرفة إذا امرأة'));
 });
 test('the whole voice note is read before a follow-up reaches him',()=>{
