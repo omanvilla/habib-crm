@@ -2,6 +2,10 @@
 
 Updated 2026-11-06. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 6 November 2026 — follow-ups inside the 24 hour window go out from the AI (owner's decision)
+
+Each run (every 15 minutes, 9am to 9pm, when `visit_followups_auto` is on), a reviewed follow-up on his list whose chat had a client message in the last 24 hours is sent at once as free text (the review's text for this client), for visits and request follow-ups alike. It is not sent when an unread voice note is among the last 8 messages, the client wrote after it was prepared, the chat is muted or handed to a person, or the number is a company number. Free text does not count toward the 20 a day. Outside the window nothing changed. When this was added, no follow-up on the list was inside the window. Request follow-ups sent this way have `reason='auto_in_window'`, `send_mode='service'`.
+
 ## 6 November 2026 — «أمر للذكاء الاصطناعي» on each daily follow-up (SQL72, PR #67), live
 
 - **What it does.** Each follow-up in «متابعات اليوم» has «أمر للذكاء الاصطناعي» (owner only; branch accounts do not see it). The instruction goes to `whatsapp-visit-followup-auto` with the owner's login. It reads the whole chat again with the instruction and either rewrites the text (shown before he sends, nothing is sent) or removes the client with the reason kept (`review_skip` / `review_wait_for_match`, so the client stays off until they write again). The day's automatic-send wait (`reviewed_at`) does not move.

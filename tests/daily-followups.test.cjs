@@ -121,3 +121,12 @@ test('owner instruction on a follow-up: owner only, rewrites from the whole chat
  assert(js.includes("supa.functions.invoke('whatsapp-visit-followup-auto',{body:{kind:item.source,id:item.id,instruction}})"));
  assert(js.includes('انكتبت حسب أمرك')&&js.includes('if(!isOwner())return'));
 });
+test('inside the 24 hour window the AI sends the review text at once, free text only, not over an unread voice note',()=>{
+ const part=fn.slice(fn.indexOf('async function sendInWindow('),fn.indexOf('// "اليوم الساعة 4 العصر"'));
+ assert(part.includes('await sendOne(f, numbers, true)'));
+ assert(part.includes('type: "text"')&&!part.includes('type: "template"'));
+ assert(part.includes('if (await unreadVoiceNearEnd('));
+ assert(part.includes('numbers.includes(to)'));
+ assert(part.includes('conv.agent_muted || conv.human_handoff_required'));
+ assert(fn.includes('if (!rt.visit_followups_auto) continue;\n    await sendInWindow('));
+});
