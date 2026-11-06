@@ -154,3 +154,26 @@ test('the hot client alert opens the chat in WhatsApp Business',()=>{
  assert(hot.includes('package=com.whatsapp.w4b')&&hot.includes("'whatsapp-smb://send?phone='"));
  assert(hot.includes('class="btn-primary cha-open" href="'));
 });
+test('«تم» on a handed-over chat is saved in the database for every device (SQL74)',()=>{
+ const hot=fs.readFileSync('crm-hot-alerts.js','utf8');
+ assert(hot.includes("supa.rpc('crm_hot_alert_done',{p_conversation_id:n.conversation_id})"));
+ assert(hot.includes('if(w.owner_alert_done_at&&new Date(w.owner_alert_done_at)>=new Date(at))continue;'));
+ assert(!hot.includes('hidden[n.id]=Date.now()'));
+ const sql=fs.readFileSync('db/changes/74-hot-alert-done.forward.sql','utf8');
+ assert(sql.includes("public.my_role() IS DISTINCT FROM 'owner'")&&sql.includes('REVOKE ALL ON FUNCTION public.crm_hot_alert_done(uuid) FROM PUBLIC, anon;'));
+ assert.equal(sql,fs.readFileSync('supabase/migrations/20261106140000_hot_alert_done_20261106.sql','utf8'));
+});
+test('a visit follow-up asks the client about the property by name, never a generic «شفت العقار ؟»',()=>{
+ const pick=(start,end)=>{const a=fn.indexOf(start);assert(a>=0,start);return fn.slice(a,fn.indexOf(end,a)+end.length);};
+ const src=[pick('const TYPE_AR','\n'),pick('const typeAr','\n'),pick('function propertyName','\n}\n'),pick('const GENERIC_VISIT_Q','\n'),pick('function namedVisitQuestion','\n}\n')].join('\n')
+  .replace(/: Record<string, string>/,'').replace(/\((\w+): (?:any|unknown|string \| null|string)(?:, (\w+): (?:any|string))?\)/g,(m,a,b)=>'('+a+(b?', '+b:'')+')');
+ const {propertyName,namedVisitQuestion}=new Function(src+';return {propertyName,namedVisitQuestion};')();
+ const name=propertyName({type:'villa',area:'الرميس'});
+ assert.equal(name,'فيلا الرميس');
+ assert.equal(namedVisitQuestion('السلام عليكم بخصوص الزيارة قدرت تشوف العقار ؟',name),'السلام عليكم كيف لقيت فيلا الرميس ؟');
+ assert.equal(namedVisitQuestion('السلام عليكم قدرتي تشوفين العقار ؟',propertyName({type:'house',area:'الحيل الجنوبية'})),'السلام عليكم كيف لقيتي بيت الحيل الجنوبية ؟');
+ assert.equal(namedVisitQuestion('السلام عليكم كيف لقيت الفيلا في الهرم ؟','فيلا الهرم'),'السلام عليكم كيف لقيت الفيلا في الهرم ؟');
+ assert.equal(namedVisitQuestion('السلام عليكم قدرت تشوف العقار ؟',''),'السلام عليكم قدرت تشوف العقار ؟');
+ assert(fn.includes('if (kind === "visit") out.text = namedVisitQuestion(out.text, name);'));
+ assert(fn.includes('ممنوع سؤال عام مثل "قدرت تشوف العقار ؟"'));
+});

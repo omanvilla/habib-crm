@@ -172,14 +172,33 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
     if ((pending.data || []).length) throw new Error("voice_note_pending");
   }
   let about = "متابعة طلب: هل لين الحين يبحث";
+  let name = "";
   if (kind === "visit") {
     const v = await db.from("viewings").select("viewing_date,status,properties(type,area)").eq("id", x.viewing_id).maybeSingle();
     const pr: any = (v.data as any)?.properties;
-    about = `متابعة بعد زيارة ${pr?.type || "عقار"} في ${pr?.area || "غير معروف"} يوم ${v.data?.viewing_date || "غير معروف"}. ${v.data?.status === "done" ? "الزيارة تمت" : "ما نعرف هل زار"}.`;
-    if (x.after_visit) about += " هذي متابعة بعد موعد الزيارة بساعة ونص، وهذا أهم وقت للبيع. قرارك followup واسأله عن رأيه في العقار بالضبط، إلا إذا المحادثة تقول إنه ما زار أو موضوعه انتهى أو قال رأيه.";
+    name = propertyName(pr);
+    about = `متابعة بعد زيارة ${name || "عقار"} يوم ${v.data?.viewing_date || "غير معروف"}. ${v.data?.status === "done" ? "الزيارة تمت" : "ما نعرف هل زار"}.`;
+    if (name) about += ` اسم العقار للعميل: ${name}. إذا سؤالك عن الزيارة اسأله عن رأيه في ${name} بالاسم، مثل "كيف لقيت ${name} ؟". ممنوع سؤال عام مثل "قدرت تشوف العقار ؟" أو "شفت العقار ؟" أو "بخصوص الزيارة".`;
+    if (x.after_visit) about += " هذي متابعة بعد موعد الزيارة بساعة ونص، وهذا أهم وقت للبيع. قرارك followup واسأله عن رأيه في العقار بالاسم، إلا إذا المحادثة تقول إنه ما زار أو موضوعه انتهى أو قال رأيه.";
   }
   const fixed = kind === "visit" ? String(x.body || "") : (x.messages || []).join(" ");
-  return review(x, companyId, available, fixed, about, instruction);
+  const out = await review(x, companyId, available, fixed, about, instruction);
+  if (kind === "visit") out.text = namedVisitQuestion(out.text, name);
+  return out;
+}
+
+// The property as the client knows it: type and area ("فيلا الرميس"). The title is internal (owner names, numbers).
+function propertyName(pr: any) {
+  const area = String(pr?.area || "").trim();
+  return area ? `${typeAr(pr?.type)} ${area}` : "";
+}
+// Owner's rule 6 Nov: after a recorded visit the client is asked his opinion of the property by name, never a generic
+// "قدرت تشوف العقار ؟" / "بخصوص الزيارة". If the review still wrote one, it becomes "كيف لقيت <name> ؟".
+const GENERIC_VISIT_Q = /(تشوف|تشوفين|تشوفي|شفت|شفتي)\s+العقار|بخصوص\s+الزيارة|كيف\s+لقيت(ي)?\s+العقار/;
+function namedVisitQuestion(text: string | null, name: string) {
+  if (!text || !name || !GENERIC_VISIT_Q.test(text)) return text;
+  const she = /(قدرتي|شفتي|تشوفين|تشوفي|لقيتي)/.test(text);
+  return `السلام عليكم كيف لقيت${she ? "ي" : ""} ${name} ؟`;
 }
 
 async function reviewOne(kind: "visit" | "request", x: any, companyId: string, available: string) {
