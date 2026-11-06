@@ -108,6 +108,30 @@
     if(!preserveScroll)setTimeout(()=>{body.scrollTop=body.scrollHeight;},30);
   }
 
+  // iPhone Safari can't play WhatsApp voice notes (Ogg/Opus). They are decoded in the
+  // browser and played as WAV, so voice notes open on the phone the same as on the computer.
+  let oggDecoderMod=null;
+  function canPlayOgg(){try{const a=document.createElement('audio');return !!(a.canPlayType('audio/ogg; codecs="opus"')||'').replace('no','');}catch(_){return false;}}
+  function wavFromPcm(channels,rate){
+    const ch=channels.length,len=channels[0]?channels[0].length:0,buf=new ArrayBuffer(44+len*ch*2),v=new DataView(buf);
+    const w=(o,t)=>{for(let i=0;i<t.length;i++)v.setUint8(o+i,t.charCodeAt(i));};
+    w(0,'RIFF');v.setUint32(4,36+len*ch*2,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,ch,true);
+    v.setUint32(24,rate,true);v.setUint32(28,rate*ch*2,true);v.setUint16(32,ch*2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,len*ch*2,true);
+    let o=44;for(let i=0;i<len;i++)for(let c=0;c<ch;c++){const x=Math.max(-1,Math.min(1,channels[c][i]));v.setInt16(o,x<0?x*32768:x*32767,true);o+=2;}
+    return new Blob([buf],{type:'audio/wav'});
+  }
+  async function oggToWav(blob){
+    if(!oggDecoderMod)oggDecoderMod=await import('https://cdn.jsdelivr.net/npm/ogg-opus-decoder@1.7.5/+esm');
+    const dec=new oggDecoderMod.OggOpusDecoder();await dec.ready;
+    try{const r=await dec.decodeFile(new Uint8Array(await blob.arrayBuffer()));if(!r||!r.samplesDecoded)throw new Error('empty');return wavFromPcm(r.channelData,r.sampleRate);}
+    finally{try{dec.free();}catch(_){}}
+  }
+  async function playableAudio(item){
+    if(item.wav||!/^audio\/(ogg|opus)/.test(item.type||''))return item;
+    try{const wav=await oggToWav(await (await fetch(item.url)).blob());item.wav=true;item.url=URL.createObjectURL(wav);item.type='audio/wav';}catch(e){console.warn('[wa2] voice decode',e);}
+    return item;
+  }
+
   // Media are read through the inbox function (caller access is checked there).
   async function loadMedia(id){
     if(media.has(id))return media.get(id);
@@ -121,6 +145,7 @@
       const fallback={video:'video/mp4',audio:'audio/ogg',document:'application/octet-stream'}[message.message_type];
       const type=(r.response&&r.response.headers&&r.response.headers.get('x-media-type'))||(message.crm_media&&message.crm_media.mime_type)||fallback;
       const item={url:URL.createObjectURL(new Blob([r.data],{type})),type,filename:message.doc_name||(message.crm_media&&message.crm_media.filename)||null};
+      if(message.message_type==='audio'&&!canPlayOgg())await playableAudio(item);
       if(conversationId===waInboxActiveId)media.set(id,item);
       return item;
     }
@@ -136,7 +161,8 @@
     const box=document.querySelector('[data-wa2-media="'+CSS.escape(id)+'"]');if(!box||box.dataset.loaded)return;
     const kind=box.dataset.kind;box.dataset.loaded='1';
     if(kind==='image'||kind==='sticker'){box.innerHTML='<img src="'+item.url+'" alt="'+(kind==='sticker'?'ملصق':'صورة')+'" data-wa2-zoom="'+esc(id)+'">';}
-    else if(kind==='audio'){box.innerHTML='<audio controls preload="metadata" src="'+item.url+'"></audio>';}
+    else if(kind==='audio'){box.innerHTML='<audio controls preload="metadata" src="'+item.url+'"></audio>';
+      const au=box.querySelector('audio');if(au)au.addEventListener('error',async()=>{if(item.wav)return;await playableAudio(item);if(item.wav){au.src=item.url;au.load();}},{once:true});}
     else if(kind==='video'){box.innerHTML='<video controls preload="metadata" src="'+item.url+'"></video>';}
     else if(kind==='document'){const a=box.querySelector('.wa2-doc-open');if(a){a.textContent='فتح';}}
   }

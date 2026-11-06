@@ -8,6 +8,7 @@ const META_APP_SECRET = Deno.env.get("META_APP_SECRET") ?? "";
 const WHATSAPP_ACCESS_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN") ?? "";
 const META_GRAPH_VERSION = Deno.env.get("META_GRAPH_VERSION") || "v25.0";
 const MEDIA_MAX_BYTES = 10 * 1024 * 1024;
+const VOICE_BUCKET = "whatsapp-voice";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -203,20 +204,35 @@ Deno.serve(async (req) => {
       }
       if (WHATSAPP_ACCESS_TOKEN && !tokens.includes(WHATSAPP_ACCESS_TOKEN)) tokens.push(WHATSAPP_ACCESS_TOKEN);
       const STREAM_LIMIT = 100 * 1024 * 1024;
+      // Voice notes are kept in private storage the first time they open, so they still open
+      // after WhatsApp drops the file (30 days) or when a route token stops working.
+      const cachePath=`${companyId}/${String(message.data.media_id)}`;
+      if (kind==="audio") {
+        const cached=await admin.storage.from(VOICE_BUCKET).download(cachePath);
+        if (!cached.error && cached.data && cached.data.size>0)
+          return new Response(cached.data,{status:200,headers:{...corsHeaders,"Access-Control-Expose-Headers":"x-media-type","content-type":"application/octet-stream","x-media-type":cached.data.type&&cached.data.type!=="application/octet-stream"?cached.data.type:"audio/ogg","cache-control":"private, no-store"}});
+      }
+      const failures:string[]=[];
       for (const token of tokens) {
         const options = { headers: { Authorization: `Bearer ${token}` }, redirect: "error" as const };
         const mr = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/${encodeURIComponent(String(message.data.media_id))}`,{...options,signal:AbortSignal.timeout(10000)});
-        if (!mr.ok) { await mr.body?.cancel(); continue; }
+        if (!mr.ok) { failures.push(`meta_${mr.status}:${(await mr.text().catch(()=>"")).slice(0,140)}`); continue; }
         const metadata = JSON.parse(new TextDecoder().decode(await boundedBytes(mr,65536)));
         const mime = String(metadata?.mime_type || "").toLowerCase().split(";")[0].trim();
         if (!MEDIA_TYPES[kind]?.test(mime)) return json({ok:false,error:"unsupported_media_type"},415);
         if (Number(metadata?.file_size || 0) > STREAM_LIMIT) return json({ok:false,error:"media_size_limit",message:"الملف أكبر من 100 ميجابايت؛ افتحه من واتساب."},413);
         if (!allowedMediaUrl(String(metadata?.url || ""))) return json({ok:false,error:"untrusted_media_host"},502);
         const br = await fetch(String(metadata.url),{...options,signal:AbortSignal.timeout(120000)});
-        if (!br.ok || !br.body) { await br.body?.cancel(); continue; }
+        if (!br.ok || !br.body) { failures.push(`file_${br.status}`); await br.body?.cancel(); continue; }
+        if (kind==="audio") {
+          const bytes=await boundedBytes(br,MEDIA_LIMIT.audio);
+          await admin.storage.from(VOICE_BUCKET).upload(cachePath,new Blob([bytes],{type:mime}),{contentType:mime,upsert:true}).catch(()=>null);
+          return new Response(bytes,{status:200,headers:{...corsHeaders,"Access-Control-Expose-Headers":"x-media-type","content-type":"application/octet-stream","x-media-type":mime,"cache-control":"private, no-store"}});
+        }
         if (Number(br.headers.get("content-length")||0) > STREAM_LIMIT) { await br.body.cancel(); return json({ok:false,error:"media_size_limit"},413); }
         return new Response(br.body, { status: 200, headers: { ...corsHeaders, "Access-Control-Expose-Headers": "x-media-type", "content-type": "application/octet-stream", "x-media-type": mime, "cache-control": "private, no-store", ...(br.headers.get("content-length") ? { "content-length": String(br.headers.get("content-length")) } : {}) } });
       }
+      console.error("[media_stream] unavailable",JSON.stringify({message_id:messageId,kind,route:credentialRoute,tokens:tokens.length,failures}));
       return json({ok:false,error:"media_unavailable",message:"تعذر فتح المرفق من واتساب؛ الملفات الأقدم من 30 يومًا قد لا تكون متاحة."},502);
     }
 
