@@ -145,3 +145,7 @@ test('visit results are the AI job: read from the chat, saved on the visit, a se
  assert(hot.includes("/^(مشتري جاد|تفاوض|طلب اتصال)/")&&hot.includes("isOwner()"));
  assert(index.includes('crm-hot-alerts.js?v='));
 });
+test('a saved visit result sends the visit follow-up back to review; property types read in Arabic',()=>{
+ assert(fn.includes('if (patch) await db.from("whatsapp_visit_followups").update({ reviewed_at: null }).eq("viewing_id", v.id).eq("status", "awaiting_approval");'));
+ assert(fn.includes('house: "بيت"'));
+});
