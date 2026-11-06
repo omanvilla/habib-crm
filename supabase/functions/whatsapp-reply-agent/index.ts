@@ -638,7 +638,12 @@ Deno.serve(async (req) => {
       const priceKey = prop.price ? String(Math.round(Number(prop.price) / 1000)) : "";
       const sentAd = history.some((h: any) => h.direction === "outbound" && String(h.body || "").length > 250
         && (!priceKey || String(h.body).replace(/[,٬]/g, "").includes(priceKey)));
-      if (sentAd) texts = texts.filter((t) => t.length <= 250);
+      // Moe (6 Nov): a short summary went out and he asked for the full details "like the first one":
+      // when the customer asks for more / complete details, the full ad may go again.
+      let lastOutIdx = -1; history.forEach((h: any, i: number) => { if (h.direction === "outbound") lastOutIdx = i; });
+      const askedFull = history.slice(lastOutIdx + 1).some((h: any) => h.direction === "inbound"
+        && /تفاصيل|كامل|مختصر|ناقص|اكثر|أكثر|زياده|زيادة|مثل الاول|مثل الأول|details|more info/i.test(String(h.transcript || h.body || "")));
+      if (sentAd && !askedFull) texts = texts.filter((t) => t.length <= 250);
       // after the ad, always ask when they can visit (unless the action already books it)
       const hasAd = texts.some((t) => t.length > 250);
       const asksVisit = texts.some((t) => /تزور|الزيارة|زياره|تشوف/.test(t));
