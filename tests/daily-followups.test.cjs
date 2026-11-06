@@ -149,3 +149,8 @@ test('a saved visit result sends the visit follow-up back to review; property ty
  assert(fn.includes('if (patch) await db.from("whatsapp_visit_followups").update({ reviewed_at: null }).eq("viewing_id", v.id).eq("status", "awaiting_approval");'));
  assert(fn.includes('house: "بيت"'));
 });
+test('the hot client alert opens the chat in WhatsApp Business',()=>{
+ const hot=fs.readFileSync('crm-hot-alerts.js','utf8');
+ assert(hot.includes('package=com.whatsapp.w4b')&&hot.includes("'whatsapp-smb://send?phone='"));
+ assert(hot.includes('class="btn-primary cha-open" href="'));
+});
