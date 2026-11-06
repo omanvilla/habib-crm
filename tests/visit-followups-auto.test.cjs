@@ -3,8 +3,8 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const fn=fs.readFileSync('supabase/functions/whatsapp-visit-followup-auto/index.ts','utf8'),brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
 const sql=fs.readFileSync('db/changes/63-visit-followups-automatic.forward.sql','utf8');
 
-test('only a utility template or free text in the window goes out, so no marketing cost',()=>{
- assert(fn.includes('if (!service && !utility) return "waits_for_utility_template";'));
+test('only free text in the window goes out by itself',()=>{
+ assert(fn.includes('if (!service) return "window_closed";'));
 });
 test('company numbers never message each other, and paused or handed-over chats wait',()=>{
  assert(fn.includes('numbers.includes(to)'));
