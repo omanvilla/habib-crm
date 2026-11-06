@@ -274,3 +274,6 @@
 - أسئلة الراتب والتمويل ← تحويل لموظف.
 - التصوير ضروري قبل عرض أي عقار.
 - الوسيط أو المستثمر اللي يكلم بركاء ← نسجّل إن فرعه الصحيح مسقط.
+
+## 6 Nov 2026 — owner private line shelved
+Ahmed decided not to link +96890944469 (Meta holds the number in a portfolio we cannot see, error #3441038; support case 39735302326084565 left open). The `owner` route row was deleted from `company_lead_routes` (it had no conversations, events or credentials). SQL68 code/guards stay in place but are dormant: the owner card only renders when the row exists. Investors stay on the Muscat line as before. The owner's profile phone (90944469) is unchanged. Test WABA "Ahmed Habib" (+1 555-734-2702) created by a signup attempt remains in portfolio 862303320849933, unused.
