@@ -234,11 +234,11 @@ async function notifyHandoff(companyId: string, conv: any, client: any, reason: 
 // Visit watch: most visits are agreed in chats a person is handling, where the agent stays quiet, so visits are
 // read from the conversation on their own path instead of depending on the reply. A location request or
 // "I may pass by" is interest, not a visit. Manual visits are never moved or cancelled from here.
-const VISIT_HINT = /زيار|زور|معاين|اشوف|أشوف|بشوف|نشوف|شفت|شفنا|زرت|زرنا|بمر|بجي|بوصل|رحت|رحنا|موعد|اليوم|بكره|بكرة|باكر|عصر|الصبح|صباح|المغرب|الغي|ألغي|visit|view|tomorrow|today/i;
+const VISIT_HINT = /زيار|زور|معاين|اشوف|أشوف|بشوف|نشوف|شفت|شفنا|زرت|زرنا|بمر|بجي|بوصل|رحت|رحنا|موعد|اليوم|بكره|بكرة|باكر|عصر|الصبح|صباح|ظهر|المغرب|الليل|الساعة|الساعه|السبت|الأحد|الاحد|الاثنين|الثلاثاء|الاربعاء|الأربعاء|الخميس|الجمعة|الجمعه|نخليها|خلها|أجل|اجل|تأجيل|تاجيل|نغير|تغيير|ما اقدر|ما أقدر|ما بقدر|ما بجي|ما بيجي|الغي|ألغي|visit|view|tomorrow|today/i;
 const visitSchema = {
   type: "object", additionalProperties: false,
   properties: {
-    event: { type: "string", enum: ["none", "agreed", "done", "cancelled"] },
+    event: { type: "string", enum: ["none", "agreed", "done", "cancelled", "postponed"] },
     property_id: { type: ["string", "null"] },
     date: { type: ["string", "null"] },
     time: { type: ["string", "null"] },
@@ -248,7 +248,8 @@ const visitSchema = {
   required: ["event", "property_id", "date", "time", "confidence", "note"],
 };
 const VISIT_RULES = `تقرأ محادثة واتساب لمكتب عقاري وتحدد هل آخر رسائل العميل فيها حدث زيارة لعقار. رجّع واحد بس:
-- agreed: العميل حدد يوم يزور فيه عقار (حتى لو الوقت تقريبي مثل "بكره العصر")، أو اتفق معه المكتب على موعد.
+- agreed: العميل حدد يوم يزور فيه عقار (حتى لو الوقت تقريبي مثل "بكره العصر")، أو اتفق معه المكتب على موعد، أو غيّر موعد مسجل (اليوم أو الساعة) حتى لو كلامه مو أكيد مثل "نخليها 11". إذا غيّر الساعة بس، date هو يوم الموعد المسجل. وإذا له موعد مسجل واحد، property_id هو عقار هذا الموعد.
+- postponed: العميل قال يبغى يأجل الموعد المسجل وما حدد موعد جديد.
 - done: العميل قال إنه زار العقار أو شافه فعلاً.
 - cancelled: العميل قال إنه ما بيجي أو ألغى موعد متفق عليه.
 - none: أي شي ثاني. طلب اللوكيشن بدون يوم = none. "بمر" أو "بشوف" بدون يوم = none. سؤال "متى يناسبك" من المكتب بدون جواب = none. مقابلة مالك أو وسيط مع المكتب، أو مالك يعرض عقاره = none. موعد قديم فات وما تكلم عنه العميل الحين = none.
@@ -264,13 +265,13 @@ async function watchVisit(msg: any, dry = false) {
   if (!VISIT_HINT.test(lastIn)) return { event: "none", skipped: "no_hint" };
   const [propsR, openR] = await Promise.all([
     db.from("properties").select("id,type,area,price,bedrooms,land_size,listing_purpose").eq("company_id", msg.company_id).in("status", ["available", "reserved"]).eq("archived", false),
-    db.from("viewings").select("id,property_id,viewing_date,viewing_time,status,created_via").eq("client_id", msg.client_id).eq("archived", false).in("status", ["scheduled", "confirmed", "postponed"]),
+    db.from("viewings").select("id,property_id,viewing_date,viewing_time,status,created_via,notes").eq("client_id", msg.client_id).eq("archived", false).in("status", ["scheduled", "confirmed", "postponed"]),
   ]);
   const props = propsR.data || [];
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
   const input = [`تاريخ اليوم: ${today}`, "", "العقارات:",
     props.map((p: any) => `- id=${p.id} | ${p.type} ${p.listing_purpose === "rent" ? "للإيجار" : "للبيع"} | ${p.area} | ${Number(p.price || 0).toLocaleString("en-US")} | ${p.bedrooms || "?"} غرف | أرض ${p.land_size || "?"}م`).join("\n"),
-    "", "مواعيد مسجلة الحين لهذا العميل:", (openR.data || []).map((v: any) => `- ${v.property_id} يوم ${v.viewing_date}`).join("\n") || "لا يوجد",
+    "", "مواعيد مسجلة الحين لهذا العميل:", (openR.data || []).map((v: any) => `- ${v.property_id} يوم ${v.viewing_date} الساعة ${String(v.viewing_time || "غير محددة").slice(0, 5)}`).join("\n") || "لا يوجد",
     "", "المحادثة (الأقدم أولاً):",
     rows.map((h: any) => `[${String(h.message_timestamp).slice(0, 16)}] ${h.direction === "inbound" ? "العميل" : "المكتب"}: ${short(h.transcript || h.body || `[${h.message_type}]`, 400)}`).join("\n")].join("\n");
   const ai = await fetch("https://api.openai.com/v1/responses", {
@@ -281,17 +282,21 @@ async function watchVisit(msg: any, dry = false) {
   if (!ai.ok) throw new Error(p?.error?.message || `openai_${ai.status}`);
   const out = JSON.parse(p.output_text || p.output?.flatMap((x: any) => x?.content || []).find((x: any) => x?.type === "output_text")?.text || "{}");
   if (dry || out.event === "none" || !(out.confidence >= 0.7)) return { ...out, applied: false };
-  const prop = props.find((x: any) => x.id === out.property_id);
-  const open = (openR.data || []).find((v: any) => v.property_id === out.property_id) || (out.event !== "agreed" && !prop && (openR.data || []).length === 1 ? openR.data![0] : null);
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(out.date || "") ? out.date : null;
+  // one saved visit: a change with no clear property is about that visit
+  const only = (openR.data || []).length === 1 ? openR.data![0] : null;
+  const open = (openR.data || []).find((v: any) => v.property_id === out.property_id) || (!props.some((x: any) => x.id === out.property_id) ? only : null);
+  const prop = props.find((x: any) => x.id === (out.property_id || open?.property_id)) || props.find((x: any) => x.id === open?.property_id);
+  const addNote = () => [open?.notes, short(out.note, 500)].filter(Boolean).join("\n").slice(0, 1000);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(out.date || "") ? out.date : (open?.viewing_date || null);
   const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(out.time || "") ? out.time : null;
   const provenance = { created_via: "whatsapp_ai", source_whatsapp_message_id: msg.id, auto_confidence: out.confidence };
   let w: any = null;
   if (out.event === "agreed") {
-    if (!prop || !date || date < today) return { ...out, applied: false, why: "no_property_or_date" };
+    if ((!prop && !open) || !date || date < today) return { ...out, applied: false, why: "no_property_or_date" };
     if (open) {
-      if (open.created_via !== "whatsapp_ai" || (open.viewing_date === date && (!time || open.viewing_time?.slice(0, 5) === time))) return { ...out, applied: false, why: "already_recorded" };
-      w = await db.from("viewings").update({ viewing_date: date, viewing_time: time || open.viewing_time, status: "scheduled", notes: short(out.note, 1000) }).eq("id", open.id);
+      // owner's decision, 6 Nov: any change the client makes is saved at once, whoever recorded the visit
+      if (open.status !== "postponed" && open.viewing_date === date && (!time || open.viewing_time?.slice(0, 5) === time)) return { ...out, applied: false, why: "already_recorded" };
+      w = await db.from("viewings").update({ viewing_date: date, viewing_time: time || open.viewing_time, status: "scheduled", notes: addNote() }).eq("id", open.id);
     } else {
       w = await db.from("viewings").insert({ company_id: msg.company_id, client_id: msg.client_id, property_id: prop.id, viewing_date: date, viewing_time: time || "16:00", duration_minutes: 30, status: "scheduled", notes: short(out.note, 1000), ...provenance });
     }
@@ -300,8 +305,11 @@ async function watchVisit(msg: any, dry = false) {
     else if (prop) w = await db.from("viewings").insert({ company_id: msg.company_id, client_id: msg.client_id, property_id: prop.id, viewing_date: date && date <= today ? date : today, viewing_time: time, duration_minutes: 30, status: "done", notes: short(out.note, 1000), ...provenance });
     else return { ...out, applied: false, why: "no_property" };
   } else if (out.event === "cancelled") {
-    if (!open || open.created_via !== "whatsapp_ai") return { ...out, applied: false, why: "nothing_to_cancel" };
-    w = await db.from("viewings").update({ status: "cancelled" }).eq("id", open.id);
+    if (!open) return { ...out, applied: false, why: "nothing_to_cancel" };
+    w = await db.from("viewings").update({ status: "cancelled", notes: addNote() }).eq("id", open.id);
+  } else if (out.event === "postponed") {
+    if (!open) return { ...out, applied: false, why: "nothing_to_postpone" };
+    w = await db.from("viewings").update({ status: "postponed", notes: addNote() }).eq("id", open.id);
   }
   if (w?.error) throw new Error(w.error.message);
   return { ...out, applied: true };

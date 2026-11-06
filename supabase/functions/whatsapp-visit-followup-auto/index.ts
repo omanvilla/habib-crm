@@ -1,8 +1,9 @@
 // Daily follow-ups (owner's decisions, 5 Nov 2026). Called by cron with the reply-agent secret.
 // 1. Reads each waiting follow-up's whole chat, voice notes included. It either writes a text for this client to send
 //    from the branch phone, removes it (owner offering, moved to the other branch, topic closed), or saves what the client wants.
-// 2. Owner's decision, 6 Nov: this function never sends a paid template. What needs one stays on his list with the text
-//    ready, and he sends it from the branch phone. What he has not sent by 10am the next day goes only if it is still free.
+// 2. Owner's decision: everything reaches his list first and he sends it from the branch phone. What he has not sent by
+//    10am the day after it reached the list goes out by itself, 20 a day at most, if the review says the fixed text fits:
+//    a UTILITY template, or free text inside the 24 hour window. MARKETING cost keeps waiting for him.
 // 3. 90 minutes after a visit it asks the client's opinion as free text inside the 24 hour window, never a template (SQL68).
 // 4. If the window would close before that moment, it asks the client to confirm the visit while the window is still open,
 //    so a reply keeps the after-visit follow-up free (SQL70).
@@ -16,7 +17,7 @@ const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 const OPENAI_MODEL = Deno.env.get("REPLY_AGENT_MODEL") || Deno.env.get("OPENAI_MODEL") || "gpt-5.6-luna";
 const GRAPH = Deno.env.get("META_GRAPH_VERSION") || "v25.0";
 const WINDOW_MS = 24 * 3600 * 1000;
-const REVIEWS_PER_RUN = 24, REVIEWS_AT_ONCE = 6, AFTER_VISIT_PER_RUN = 10;
+const DAILY_LIMIT = 20, REVIEWS_PER_RUN = 24, REVIEWS_AT_ONCE = 6, AFTER_VISIT_PER_RUN = 10;
 
 const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const enc = new TextEncoder();
@@ -230,7 +231,7 @@ async function afterVisit(companyId: string, numbers: string[], out: Record<stri
       const k = `after_visit_${r}`; out[k] = (out[k] || 0) + 1;
       if (r !== "kept") continue;
       const f = await db.from("whatsapp_visit_followups").select("*").eq("id", id).single();
-      const s = await sendOne(f.data, numbers);
+      const s = await sendOne(f.data, numbers, true);
       const k2 = `after_visit_${s}`; out[k2] = (out[k2] || 0) + 1;
     } catch (e) { out.after_visit_failed = (out.after_visit_failed || 0) + 1; console.error("[followup-auto] after visit", String((e as any)?.message || e)); }
   }
@@ -270,13 +271,13 @@ async function confirmBeforeVisit(companyId: string, numbers: string[], out: Rec
   }
 }
 
-// Free text inside the 24 hour window only.
-async function sendOne(f: any, numbers: string[]) {
+async function sendOne(f: any, numbers: string[], freeOnly = false) {
   const stop = async (status: string, why: string) => { await db.from("whatsapp_visit_followups").update({ status, error: why, updated_at: new Date().toISOString() }).eq("id", f.id).eq("status", "awaiting_approval"); return why; };
-  const [convR, clientR, lastInR] = await Promise.all([
+  const [convR, clientR, lastInR, tplR] = await Promise.all([
     db.from("whatsapp_conversations").select("*").eq("id", f.conversation_id).single(),
     db.from("clients").select("id,phone,phone_normalized,followup_suppressed,archived").eq("id", f.client_id).single(),
     db.from("whatsapp_messages").select("message_timestamp").eq("conversation_id", f.conversation_id).eq("direction", "inbound").order("message_timestamp", { ascending: false }).limit(1).maybeSingle(),
+    db.from("whatsapp_template_registry").select("status,category").eq("company_id", f.company_id).eq("route_key", f.route_key).eq("template_name", f.template_name).maybeSingle(),
   ]);
   const conv = convR.data, client = clientR.data;
   if (!conv || !client) return "context_missing";
@@ -288,25 +289,30 @@ async function sendOne(f: any, numbers: string[]) {
   const lastIn = lastInR.data?.message_timestamp ? new Date(lastInR.data.message_timestamp).getTime() : 0;
   if (lastIn > new Date(f.created_at).getTime()) return stop("superseded", "client_wrote_after");
   const service = lastIn > 0 && Date.now() - lastIn < WINDOW_MS;
-  if (!service) return "window_closed";
+  if (freeOnly && !service) return "window_closed";
+  const tpl = tplR.data;
+  const utility = String(tpl?.status || "").toUpperCase() === "APPROVED" && String(tpl?.category || "").toUpperCase() === "UTILITY";
+  if (!service && !utility) return "waits_for_utility_template";
   const claim = await db.from("whatsapp_visit_followups").update({ status: "sending" }).eq("id", f.id).eq("status", "awaiting_approval").select("id").maybeSingle();
   if (claim.error || !claim.data) return "taken";
-  const body = f.owner_text || f.body;
-  const payload = { type: "text", text: { preview_url: false, body } };
+  const body = service ? (f.owner_text || f.body) : f.body;
+  const payload = service
+    ? { type: "text", text: { preview_url: false, body } }
+    : { type: "template", template: { name: f.template_name, language: { code: "ar" } } };
   const now = new Date().toISOString();
   try {
     const wamid = await metaSend(await routeTokens(f.company_id, f.route_key), digits(conv.meta_phone_number_id), to, payload);
     if (wamid) await db.from("whatsapp_messages").insert({
       company_id: f.company_id, conversation_id: conv.id, client_id: f.client_id, whatsapp_message_id: wamid,
-      direction: "outbound", message_type: "text", sender_wa_id: digits(conv.meta_phone_number_id), recipient_wa_id: to,
+      direction: "outbound", message_type: service ? "text" : "template", sender_wa_id: digits(conv.meta_phone_number_id), recipient_wa_id: to,
       body, message_timestamp: now, delivery_status: "sent", actor_type: "automated", channel_source: "crm_followup",
-      raw_payload: { source: "visit_followup", followup_id: f.id, step: f.step, viewing_id: f.viewing_id, auto: true },
+      raw_payload: { source: "visit_followup", followup_id: f.id, step: f.step, viewing_id: f.viewing_id, template_name: service ? null : f.template_name, auto: true, after_visit: freeOnly },
     });
-    await db.from("whatsapp_visit_followups").update({ status: "sent", send_mode: "service", sent_at: now, meta_message_id: wamid, decided_at: now, error: null, updated_at: now }).eq("id", f.id);
+    await db.from("whatsapp_visit_followups").update({ status: "sent", send_mode: service ? "service" : "template", sent_at: now, meta_message_id: wamid, decided_at: now, error: null, updated_at: now }).eq("id", f.id);
     await db.from("whatsapp_conversations").update({ last_message_at: now, last_outbound_at: now, updated_at: now }).eq("id", conv.id);
     return "sent";
   } catch (e) {
-    // stays on the list
+    // stays on the list; a billing problem must not lose the follow-up
     const why = short((e as any)?.message || e);
     await db.from("whatsapp_visit_followups").update({ status: "awaiting_approval", error: why, updated_at: now }).eq("id", f.id);
     await alertOwner(f.company_id, why);
@@ -321,7 +327,7 @@ async function alertOwner(companyId: string, why: string) {
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   const seen = await db.from("notifications").select("id").eq("user_id", o.data.id).eq("title", title).gte("created_at", since).limit(1);
   if ((seen.data || []).length) return;
-  await db.from("notifications").insert({ user_id: o.data.id, type: "system_alert", is_read: false, link: "dash", title, body: short(`المتابعة باقية في قائمتك. الرسالة: ${why}`, 400) });
+  await db.from("notifications").insert({ user_id: o.data.id, type: "system_alert", is_read: false, link: "dash", title, body: short(`تأكد من طريقة الدفع في Meta Billing Hub. الرسالة: ${why}`, 400) });
 }
 
 Deno.serve(async (req) => {
@@ -345,16 +351,32 @@ Deno.serve(async (req) => {
     if (rt.visit_followups_auto) await afterVisit(rt.company_id, numbers, out);
     await reviewAll(rt.company_id, out);
     if (!rt.visit_followups_auto) continue;
+    const dayStart = new Date(`${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date())}T00:00:00+04:00`).toISOString();
+    const sentF = await db.from("whatsapp_visit_followups").select("id", { count: "exact", head: true }).eq("company_id", rt.company_id).eq("send_mode", "template").gte("sent_at", dayStart);
+    const relQ = await db.from("whatsapp_outreach_queue").select("id", { count: "exact", head: true }).eq("company_id", rt.company_id).eq("kind", "request_followup").eq("reason", "auto_after_wait").gte("approved_at", dayStart);
+    let room = DAILY_LIMIT - (sentF.count || 0) - (relQ.count || 0);
     const list = await db.from("whatsapp_visit_followups").select("*").eq("company_id", rt.company_id).eq("status", "awaiting_approval").order("due_at").limit(60);
+    const waiting = new Set((list.data || []).map((f: any) => f.client_id));
     let failed = false;
     for (const f of list.data || []) {
-      if (failed) break;
-      // only what the review kept and said is safe to send without him
+      if (room <= 0 || failed) break;
+      // only what the review kept and said the fixed text fits
       if (!f.reviewed_at || !f.auto_ok || Date.now() < autoAfter(f.reviewed_at)) continue;
       const r = await sendOne(f, numbers);
       out[r] = (out[r] || 0) + 1;
       if (r === "failed") failed = true;
-      if (r === "sent") await new Promise((x) => setTimeout(x, 1500));
+      if (r === "sent") { room--; await new Promise((x) => setTimeout(x, 1500)); }
+    }
+    if (failed || room <= 0) continue;
+    // request follow-ups are sent by whatsapp-outreach once approved; only with an approved UTILITY template and a chat
+    const reg = await db.from("whatsapp_template_registry").select("route_key,template_name,status,category").eq("company_id", rt.company_id);
+    const usable = new Set((reg.data || []).filter((t: any) => String(t.status).toUpperCase() === "APPROVED" && String(t.category).toUpperCase() === "UTILITY").map((t: any) => `${t.route_key}|${t.template_name}`));
+    const qs = await db.from("whatsapp_outreach_queue").select("id,client_id,route_key,template_name,created_at,conversation_id,reviewed_at,auto_ok").eq("company_id", rt.company_id).eq("status", "pending").eq("kind", "request_followup").eq("dry_run", false).order("created_at").limit(60);
+    for (const q of qs.data || []) {
+      if (room <= 0) break;
+      if (!q.reviewed_at || !q.auto_ok || waiting.has(q.client_id) || !q.conversation_id || Date.now() < autoAfter(q.reviewed_at) || !usable.has(`${q.route_key}|${q.template_name}`)) continue;
+      await db.from("whatsapp_outreach_queue").update({ status: "approved", approved_at: new Date().toISOString(), reason: "auto_after_wait" }).eq("id", q.id).eq("status", "pending");
+      out.released = (out.released || 0) + 1; room--;
     }
   }
   return json({ ok: true, results: out });
