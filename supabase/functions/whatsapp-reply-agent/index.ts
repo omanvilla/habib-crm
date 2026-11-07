@@ -45,13 +45,15 @@ function omanNow() {
 // Make the text look typed by a person on a phone: no full stops, no commas,
 // no exclamation marks, " ؟" spacing like the office writes.
 function humanize(t: string) {
-  let s = String(t || "").replace(/\r/g, "");
+  // links are kept exactly as they are (7 Nov: "https://www instagram com/reel/..." did not open for the customer)
+  const urls: string[] = [];
+  let s = String(t || "").replace(/\r/g, "").replace(/https?:\/\/[^\s]+/gi, (u) => { urls.push(u.replace(/[.,،]+$/, "")); return `\u0001${urls.length - 1}\u0001`; });
   s = s.replace(/[“”«»"]/g, "").replace(/\s*[—–]\s*/g, " ").replace(/!+/g, "");
   s = s.replace(/(\D)\.(\s+|$)/g, "$1\n").replace(/(\D)\.(?=\S)/g, "$1 ");
   s = s.replace(/\s*[،,]\s*(?!\d)/g, " ");
   s = /[؀-ۿ]/.test(s) ? s.replace(/\s*[؟?]/g, " ؟") : s.replace(/\s*[؟?]/g, "?");
   s = s.replace(/[ \t]+/g, " ").split("\n").map((l) => l.trim()).filter(Boolean).join("\n");
-  return s.trim();
+  return s.replace(/\u0001(\d+)\u0001/g, (_, i) => urls[Number(i)] || "").trim();
 }
 
 async function routeTokens(companyId: string, routeKey: string) {
@@ -639,8 +641,12 @@ Deno.serve(async (req) => {
     // the ad text goes once per conversation: if a long office message about this property already went out, drop it
     if (prop) {
       const priceKey = prop.price ? String(Math.round(Number(prop.price) / 1000)) : "";
+      // same price is not enough (7 Nov: the Sowmhan 69 ad counted as the Shakhakheet 69 ad and the customer got nothing):
+      // the old ad must also name this property's area
+      const areaKey = String(prop.area || "").replace(/^(ولاية|بركاء|مسقط)\s+/, "").split(/\s+/)[0].replace(/^ال/, "");
       const sentAd = history.some((h: any) => h.direction === "outbound" && String(h.body || "").length > 250
-        && (!priceKey || String(h.body).replace(/[,٬]/g, "").includes(priceKey)));
+        && (!priceKey || String(h.body).replace(/[,٬]/g, "").includes(priceKey))
+        && (!areaKey || String(h.body).includes(areaKey)));
       // Moe (6 Nov): a short summary went out and he asked for the full details "like the first one":
       // when the customer asks for more / complete details, the full ad may go again.
       let lastOutIdx = -1; history.forEach((h: any, i: number) => { if (h.direction === "outbound") lastOutIdx = i; });
@@ -656,6 +662,18 @@ Deno.serve(async (req) => {
       const visitHandled = history.some((h: any) => h.direction === "outbound" && /تزور|زيار|المالك مباشرة|نسق مع المالك|\[contacts\]/.test(String(h.body || "") + (h.message_type === "contacts" ? "[contacts]" : "")));
       if (texts.length && !onlyClosing && !waitsBank && (hasAd || sentAd) && !asksVisit && out.action === "none" && !visitHandled) texts.push("متى يناسبك تزور ؟");
     }
+    // the visit question is its own message, never glued to the end of an ad (7 Nov, Ahmed)
+    texts = texts.flatMap((t) => {
+      const lines = t.split("\n");
+      const last = lines[lines.length - 1] || "";
+      return lines.length > 2 && /(تزور|تزورون|تزورين|الزيارة|تشوفه|تشوفها)\s*؟?\s*$/.test(last) && last.length < 90
+        ? [lines.slice(0, -1).join("\n"), last] : [t];
+    });
+    // one visit question is enough
+    let askedOnce = false;
+    texts = texts.filter((t) => { const q = t.length < 90 && /(تزور|تزورون|تزورين)\s*؟/.test(t); if (!q) return true; if (askedOnce) return false; askedOnce = true; return true; });
+    // keep the question even when there are two ads
+    if (texts.length > 3) { const q = texts.find((t) => t.length < 90 && /تزور/.test(t)); texts = q ? [...texts.filter((t) => t !== q).slice(0, 2), q] : texts.slice(0, 3); }
     out.reply_messages = texts.slice(0, 3);
     // a pinned reply only counts when the id is real
     const rule = (rulesR.data || []).find((r: any) => r.id === out.matched_rule_id) || null;
@@ -663,7 +681,7 @@ Deno.serve(async (req) => {
     out.variant_label = rule ? pickedVariant[rule.id].label : null;
     // other ways to say it, for the owner to pick from (investors)
     out.alternatives = (out.alternatives || []).map((a: string[]) => (a || []).map((t) => humanize(t)).filter(Boolean).slice(0, 3)).filter((a: string[]) => a.length).slice(0, 2);
-    let outgoing: any[] = out.reply_messages.map((t: string) => ({ type: "text", text: { preview_url: false, body: t } }));
+    let outgoing: any[] = out.reply_messages.map((t: string) => ({ type: "text", text: { preview_url: /https?:\/\//.test(t), body: t } }));
     
     if (out.action === "send_location" || out.action === "send_lockbox") {
       if (prop?.map_url) outgoing.push({ type: "text", text: { preview_url: true, body: prop.map_url } });
