@@ -168,7 +168,7 @@ Deno.serve(async (req) => {
   if (claim.error || !claim.data) return json({ ok: false, error: "draft_not_pending" }, 409);
 
   const analysis = draft.analysis || {};
-  const outgoing: any[] = texts.map((t) => ({ type: "text", text: { preview_url: false, body: t } }));
+  const outgoing: any[] = texts.map((t) => ({ type: "text", text: { preview_url: /https?:\/\//.test(t), body: t } }));
   let prop: any = null;
   if (analysis.property_id) {
     const p = await db.from("properties").select("id,map_url,lockbox_image_url,visit_method,owner_id,area").eq("id", analysis.property_id).maybeSingle();
