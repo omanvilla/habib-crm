@@ -250,7 +250,7 @@ async function notifyHandoff(companyId: string, conv: any, client: any, reason: 
 // Visit watch: most visits are agreed in chats a person is handling, where the agent stays quiet, so visits are
 // read from the conversation on their own path instead of depending on the reply. A location request or
 // "I may pass by" is interest, not a visit. Manual visits are never moved or cancelled from here.
-const VISIT_HINT = /زيار|زور|معاين|اشوف|أشوف|بشوف|نشوف|شفت|شفنا|زرت|زرنا|بمر|بجي|بوصل|رحت|رحنا|موعد|اليوم|بكره|بكرة|باكر|عصر|الصبح|صباح|ظهر|المغرب|الليل|الساعة|الساعه|السبت|الأحد|الاحد|الاثنين|الثلاثاء|الاربعاء|الأربعاء|الخميس|الجمعة|الجمعه|نخليها|خلها|أجل|اجل|تأجيل|تاجيل|نغير|تغيير|ما اقدر|ما أقدر|ما بقدر|ما بجي|ما بيجي|الغي|ألغي|visit|view|tomorrow|today/i;
+const VISIT_HINT = /زيار|زور|معاين|اشوف|أشوف|بشوف|نشوف|شفت|شفنا|زرت|زرنا|بمر|بجي|بوصل|رحت|رحنا|موعد|اليوم|بكره|بكرة|باكر|عصر|الصبح|صباح|ظهر|المغرب|الليل|الساعة|الساعه|السبت|الأحد|الاحد|الاثنين|الثلاثاء|الاربعاء|الأربعاء|الخميس|الجمعة|الجمعه|نخليها|خلها|أجل|اجل|تأجيل|تاجيل|نغير|تغيير|ما اقدر|ما أقدر|ما بقدر|ما بجي|ما بيجي|الغي|ألغي|الحين|الان|الآن|بروح|اروح|بنروح|بزور|نزور|طالع|وصلت|وصلنا|visit|view|tomorrow|today|now/i;
 const visitSchema = {
   type: "object", additionalProperties: false,
   properties: {
@@ -304,7 +304,10 @@ async function watchVisit(msg: any, dry = false) {
   const prop = props.find((x: any) => x.id === (out.property_id || open?.property_id)) || props.find((x: any) => x.id === open?.property_id);
   const addNote = () => [open?.notes, short(out.note, 500)].filter(Boolean).join("\n").slice(0, 1000);
   const date = /^\d{4}-\d{2}-\d{2}$/.test(out.date || "") ? out.date : (open?.viewing_date || null);
-  const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(out.time || "") ? out.time : null;
+  // "الحين" / "طالع" / "بروح الحين" (8 Nov, Ahmed): the visit is now, so it is recorded at the current Muscat time, not a guessed 16:00
+  const immediate = /(الحين|الان|الآن|طالع|وصلت|وصلنا)/.test(lastIn) && !/بكر|باكر|العصر|الصبح|المغرب|الظهر/.test(lastIn);
+  const nowHM = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Muscat", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+  const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(out.time || "") ? out.time : (out.event === "agreed" && immediate ? nowHM : null);
   const provenance = { created_via: "whatsapp_ai", source_whatsapp_message_id: msg.id, auto_confidence: out.confidence };
   let w: any = null;
   if (out.event === "agreed") {
@@ -876,9 +879,28 @@ Deno.serve(async (req) => {
     const now = new Date().toISOString();
     await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages, status: sentIds.length ? "sent" : "skipped", error: sentIds.length ? null : "no_reply_needed", sent_at: sentIds.length ? now : null }).eq("id", draftId);
 
+    // a location (or the owner's number) went out: the client is going to see the property, so the visit is recorded even when
+    // his time was vague ("الحين", "العصر") and the question after 1.5 h can follow (8 Nov, Ahmed)
+    if (sentIds.length && prop && !review && ["send_location", "send_owner_number", "send_lockbox"].includes(out.action)) {
+      try {
+        const todayM = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
+        const nowM = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Muscat", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+        const open = await db.from("viewings").select("id").eq("client_id", client.id).eq("property_id", prop.id).eq("archived", false).in("status", ["scheduled", "confirmed", "postponed", "done"]).gte("viewing_date", todayM).limit(1).maybeSingle();
+        if (!open.data) {
+          const vd = /^\d{4}-\d{2}-\d{2}$/.test(out.viewing_date || "") && out.viewing_date >= todayM ? out.viewing_date : todayM;
+          const vt = /^([01]\d|2[0-3]):[0-5]\d$/.test(out.viewing_time || "") ? out.viewing_time : (vd === todayM ? nowM : "16:00");
+          const w = await db.from("viewings").insert({ company_id: msg.company_id, client_id: client.id, property_id: prop.id, viewing_date: vd, viewing_time: vt, duration_minutes: 30, status: "scheduled", notes: "انرسل للعميل اللوكيشن، الوقت تقريبي", created_via: "whatsapp_ai", source_whatsapp_message_id: msg.id });
+          if (w.error) console.error("[reply-agent] location visit", w.error.message);
+        }
+      } catch (e) { console.error("[reply-agent] location visit", String((e as any)?.message || e)); }
+    }
     // keep the CRM up to date
     const convPatch: any = { ai_summary: short(out.crm_note, 1500), last_automation_action: { scenario: "reply_agent_v1", action: out.action, at: now, category: out.category, source: out.source }, updated_at: now };
     if (out.action === "handoff") Object.assign(convPatch, { human_handoff_required: true, handoff_reason: short(out.handoff_reason || out.intent, 500), handoff_updated_at: now });
+    // a handoff that only said "which property ?" is closed by the agent itself once it answers normally (8 Nov, Ahmed: it must not wait for him)
+    if (out.action !== "handoff" && sentIds.length && out.reply_messages.length && conv.human_handoff_required && /مو واضح|ما عرفنا|أي عقار|اي عقار|العقار.*(واضح|محدد)/.test(String(conv.handoff_reason || "")) && !HARD_HANDOFF.test(String(conv.handoff_reason || ""))) {
+      Object.assign(convPatch, { human_handoff_required: false, handoff_reason: null, handoff_updated_at: now });
+    }
     await db.from("whatsapp_conversations").update(convPatch).eq("id", conv.id);
     // an open handoff already on Ahmed's list does not alert him again unless it turned into negotiation / serious buyer / price study
     if (out.action === "handoff" && (!conv.human_handoff_required || HARD_HANDOFF.test(String(out.handoff_reason || "")))) await notifyHandoff(msg.company_id, conv, client, out.handoff_reason || out.crm_note || out.intent);
