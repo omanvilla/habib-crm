@@ -32,6 +32,15 @@ test('R6: a sold property gets "sold" plus the nearest available one; twins only
  assert(brain.includes('توين حقيقي'));
  assert(agent.includes('linkedSold'));
 });
+test('R9: investors and Muscat-area owners on the Barka number go to the Muscat number, nothing held',()=>{
+ assert(agent.includes('redirectToMuscat'));
+ assert(agent.includes('!redirectToMuscat && (["investor", "active_deal"]'));
+ assert(agent.includes('71770030'));
+ assert(brain.includes('هذا الرقم خاص لعقارات بركاء'));
+});
+test('R10: inherited property is declined politely',()=>{
+ assert(brain.includes('نعتذر منك احنا ما نستلم عقارات الورثة'));
+});
 test('the rules file keeps the change procedure',()=>{
  assert(rules.includes('اسأل أحمد قبل التعديل'));
 });

@@ -828,11 +828,21 @@ Deno.serve(async (req) => {
     }
     // a client who came from a project video is an investor, and his replies wait for the owner like any investor
     if (Object.values(reels).some((x: any) => x.project)) out.category = "investor";
+    // 8 Nov (Ahmed): investors and owners of Muscat-area properties who write to the Barka number are sent to the Muscat number (R9), nothing is held
+    const MUSCAT_AREAS = /(الحيل|الخوض|السيب|بوشر|العامرات|مطرح|قريات|المعبيلة|الموالح|مسقط|الأنصب|الانصب|مدينة السلطان)/;
+    const muscatOwner = out.category === "seller" && MUSCAT_AREAS.test(`${(out as any).owner_offer?.area || ""} ${(out as any).owner_offer?.wilayat || ""}`);
+    const redirectToMuscat = conv.route_key === "barka" && (out.category === "investor" || muscatOwner);
+    if (redirectToMuscat) {
+      const salam = (out.reply_messages || []).find((r: string) => /^وعليكم السلام/.test(String(r).trim()));
+      out.reply_messages = [...(salam ? [salam] : []), out.category === "investor" ? "الاستثمار والمشاريع تتابعها معنا على رقم مسقط 71770030 واتساب" : "عقارك تتابعه معنا على رقم مسقط 71770030 واتساب", "هذا الرقم خاص لعقارات بركاء"];
+      out.action = "none";
+      analysis.redirected_to_muscat = true;
+    }
     // live ("direct"): everything goes out on its own except investors and running deals, which wait for the owner
     out.reply_messages = (out.reply_messages || []).map((r: string) => arabicOnly(r));
     const projectNamed = await mentionsProject(msg.company_id, out.reply_messages);
     if (projectNamed) analysis.project_named = true;
-    const holdForOwner = rt.reply_agent_mode === "direct" && (["investor", "active_deal"].includes(out.category) || projectNamed);
+    const holdForOwner = rt.reply_agent_mode === "direct" && !redirectToMuscat && (["investor", "active_deal"].includes(out.category) || projectNamed);
     if (dry || holdForOwner || (rt.reply_agent_mode === "approval" && !autoSend)) {
       // nothing to say (closing words, the other branch handles it): no empty card in the approval screen
       const nothing = !dry && !out.reply_messages.length && out.action === "none";
