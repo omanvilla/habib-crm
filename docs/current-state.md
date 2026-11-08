@@ -431,3 +431,10 @@ Instagram discovery remains enabled every5minutes; old WhatsApp scheduled follow
 Fresh authenticated v17 end-to-end UI use, physical phones, new real media/location customer acceptance and actual outbound trial delivery are not certified by synthetic tests or unauthenticated startup. Existing Auth/Storage/Realtime/backup-restoration limits remain. This release has no audio/video interpretation or guarantee of identifying ambiguous screenshots. The owner can now trial wording safely before a separately verified real test-number rollout.
 
 Recovery: restore prior frontend and both prior WhatsApp shared modules before SQL34 rollback; keep legitimate request events and business records. The original candidate-reader definition is in `crm_repair_private.client34_catalog_backup`. See [release evidence and scope](client-whatsapp-20261021.md).
+
+## 8 November 2026 (night) — visits, owner documents, client behavior, UI (commit 8baffaf, agent v49, follow-up v20)
+- Reply agent: visit recorded for "going now" and when a location is sent; owner-documents rule (land: ownership + kroki + price in mind; villa: full details + kroki + ownership + completion certificate + maps/photos); name asked in first reply; handoff "which property?" closes itself; client behavior text injected (table `client_behavior`, 135 clients scored).
+- Follow-up: fast 1.5 h follow-up reaches clients who wrote after the visit; behavior text used in review().
+- UI: muted-brain banner is one compact line; «متابعات اليوم» collapsed by default; approvals screen filters dry drafts in SQL and loads last messages per chat in parallel.
+- Calendar: BuNasser visit to Dar Global (Opera House) tentatively Mon 9 Nov 11:00.
+- Still open: property-missing-details WhatsApp alert, land-study pricing-day alert, Al Noor meeting event + English message, staff numbers excluded from request/outreach generation, closing the 42 notes.
