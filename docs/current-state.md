@@ -2,6 +2,14 @@
 
 Updated 2026-11-06. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 8 November 2026 — Ahmed's chats stay his, no negotiation before a visit, fixed rules file (commits ad42d00, e564ac4)
+
+- **Why.** Tasnim (barka, 7 Nov): the agent carried on 30 s after Ahmed's typed reply (6 Nov rule), a pre-visit discount question became a «تفاوض» handoff, and the staff-reply trigger closed it. Ahmed's decisions are now [docs/agent-rules.md](agent-rules.md) R1–R5, with a mandatory change procedure (find conflicts, ask Ahmed first).
+- **Live.** SQL `owner_hold_visit_first_20261108` (`agent_returned_at`, `crm_chat_hold()`, hard handoffs not closed by staff replies; baseline: manual replies of the last 24 h count). Functions pinned to e564ac4: `whatsapp-reply-agent` (v46), `whatsapp-visit-followup-auto` (v19), `whatsapp-inbox` (v21). Brain synced at e564ac4. Inbox chat shows «🤫 العقل ساكن هنا» with «↩️ رجّعها للعقل»; «✓ تمت المعالجة» also hands the chat back.
+- **Dry run** (whatsapp-reply-agent-dryrun at ad42d00, brain from that commit, 20 chats incl. Tasnim's 7 Nov message): Tasnim now gets «شوفي البيت اول واذا ناسبك نتكلم في السعر» + «متى يناسبك تزورين ؟», no negotiation handoff. Dry drafts deleted afterwards. At publication 8 chats were held by R1, 6 by an open negotiation, 9 muted.
+- **Not done.** `whatsapp-outreach` has the R1 guard in the repo but was not redeployed (the live copy is inline and differs; every outreach row is owner-approved). Branch `claude/negotiation-hold-20261108` is superseded and was never deployed.
+- **Rollback.** Pin the three functions back to 0bdb7b9 / dab6b95, revert e564ac4 on main and re-run the prompt sync.
+
 ## 8 November 2026 — investor brain: rental income first (commit 47b62f1), live by prompt sync
 
 - **What changed.** `brain.ts` (قسم المستثمر) and `knowledge.ts` only; no function redeploy. Someone who wants monthly income is offered only a property in the list that has «المؤجر حالياً» (today: the Al Hail South house with two rented flats, OMR 200 a month on OMR 130,000), quoting the written figure with no yield percentage and no promise the rent continues. With no such property the agent says so and does not substitute an off-plan project, which pays no rent before handover (2027 to 2029 as announced). Small budget or no capital: said plainly, no financing or loan advice, handoff. A question about residency plus investment gets no promise, only "by the rules, in specific projects".
