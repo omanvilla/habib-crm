@@ -25,6 +25,8 @@
   .crm-filter-toggle{display:inline-flex!important;align-items:center;justify-content:center;width:100%;margin-top:8px;padding:9px 12px!important;font-size:13px!important}
   .crm-filter-target{grid-template-columns:1fr!important}
   .crm-filter-target:not(.crm-filters-open)>label:not(:first-child){display:none!important}
+  /* Ahmed 8 Nov: on the phone the active / sold / archived switch stays visible next to the search */
+  #opsPropertyFilters:not(.crm-filters-open)>label:has(#uiPropertyArchive){display:flex!important}
   #wsClientFilters:not(.crm-filters-open) .ui-advanced{display:none!important}
   #wsClientFilters,#opsPropertyFilters{padding:10px!important}
 

@@ -74,7 +74,8 @@
   await loadProjects();
   const [media,props,events,linked]=await Promise.all([
    recent?supa.from('instagram_media_catalog').select('id,permalink,caption,published_at,state,reason_code,property_id,updated_at,thumbnail_url').eq('company_id',company).eq('state','needs_review').gte('published_at',recentSince()).order('published_at',{ascending:false}).limit(12):{data:[]},
-   supa.from('crm_properties_access').select('id,title,area,type,bedrooms,bathrooms,land_size,built_size,status,archived,created_at').eq('company_id',company).eq('archived',false).in('status',['available','reserved']),
+   // Ahmed 8 Nov: a video can belong to a sold or archived property too (sold elsewhere, an old video)
+   supa.from('crm_properties_access').select('id,title,area,type,bedrooms,bathrooms,land_size,built_size,status,archived,created_at').eq('company_id',company),
    supa.from('property_marketing_events').select('property_id').eq('company_id',company),
    supa.from('instagram_media_catalog').select('property_id').eq('company_id',company).eq('state','linked')
   ]);
@@ -83,7 +84,10 @@
   homeRows=media.data||[];
   const list=props.data||[],withVideo=new Set([...(events.data||[]),...(linked.data||[])].map(x=>x.property_id));
   const cutoff=Date.now()-NO_VIDEO_DAYS*86400000;
-  const noVideo=list.filter(p=>p.status==='available'&&!withVideo.has(p.id)&&Date.parse(p.created_at)<cutoff);
+  const noVideo=list.filter(p=>p.status==='available'&&!p.archived&&!withVideo.has(p.id)&&Date.parse(p.created_at)<cutoff);
+  const tag=p=>p.status==='sold'?' · مباع':p.status==='reserved'?' · محجوز':p.archived?' · مؤرشف':'';
+  // available first, then sold / reserved / archived
+  list.sort((a,b)=>((a.status==='available'&&!a.archived)?0:1)-((b.status==='available'&&!b.archived)?0:1)||String(a.title||'').localeCompare(String(b.title||''),'ar'));
   banner.hidden=!failed&&!homeRows.length&&!noVideo.length;
   banner.innerHTML=(failed?'<div class="ig-home-line"><span>مزامنة Instagram تحتاج المراجعة</span><button class="btn-secondary" data-igd="open">فتح</button></div>':'')
    +homeRows.map(row=>{
@@ -91,7 +95,7 @@
     return '<article class="ig-home-card">'+(thumb?'<img src="'+escape(thumb)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<div class="ig-home-thumb">فيديو</div>')
      +'<div class="ig-home-body"><div class="ig-home-top"><strong>'+escape(reason[row.reason_code]||'بحاجة إلى مراجعة')+'</strong><span>'+escape(date(row.published_at))+'</span>'+(url?'<a href="'+escape(url)+'" target="_blank" rel="noopener noreferrer">فتح الفيديو ↗</a>':'')+'</div>'
      +'<p class="ig-home-caption">'+escape(row.caption||'بدون وصف')+'</p>'
-     +'<select class="fs" data-ig-property="'+escape(row.id)+'"><option value="">اختر العقار أو المشروع…</option>'+projectOptions(nearProject)+'<optgroup label="العقارات">'+list.map(p=>'<option value="'+escape(p.id)+'"'+(near&&near.id===p.id?' selected':'')+'>'+escape(p.title)+(near&&near.id===p.id?' · الأقرب':'')+'</option>').join('')+'</optgroup></select>'
+     +'<select class="fs" data-ig-property="'+escape(row.id)+'"><option value="">اختر العقار أو المشروع…</option>'+projectOptions(nearProject)+'<optgroup label="العقارات">'+list.map(p=>'<option value="'+escape(p.id)+'"'+(near&&near.id===p.id?' selected':'')+'>'+escape(p.title)+escape(tag(p))+(near&&near.id===p.id?' · الأقرب':'')+'</option>').join('')+'</optgroup></select>'
      +'<div class="ws-actions"><button class="btn-primary" data-igd="link" data-id="'+escape(row.id)+'">اربطه</button><button class="btn-secondary" data-igd="general" data-id="'+escape(row.id)+'">مو عقار</button></div></div></article>';
    }).join('')
    +(noVideo.length?'<div class="ig-home-line ig-home-novideo"><div><strong>عقارات متاحة من أكثر من '+NO_VIDEO_DAYS+' أيام بدون فيديو ('+number(noVideo.length)+')</strong><p>'+noVideo.map(p=>escape(p.title)).join(' · ')+'</p></div></div>':'');
