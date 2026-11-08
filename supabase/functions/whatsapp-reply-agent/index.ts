@@ -198,9 +198,28 @@ function publicText(v: unknown) {
 }
 const CTA_RE = /(^|[\s،.:-])(ارسل|أرسل|ارسلوا|أرسلوا|اكتب|اكتبوا|ابعث|علق|علّق|كومنت|تابعنا|تابعونا|اضغط|للتواصل|التواصل|تواصل|تواصلوا)(?=$|[\s،.:])|الرابط في|البايو|في الخاص|\b(dm|comment|follow)\b/i;
 
+// Internal type codes never reach the client (twin_villa went out in follow-ups, 7 Nov). Known codes become Arabic.
+const TYPE_AR: Record<string, string> = { house: "بيت", villa: "فيلا", twin_villa: "فيلا", "twin villa": "فيلا", apartment: "شقة", flat: "شقة", land: "أرض", land_residential: "أرض سكنية", land_commercial: "أرض تجارية", land_mixed: "أرض", building: "بناية", commercial_building: "مبنى تجاري", residential_building: "مبنى سكني", income_property: "عقار مؤجر", shop: "محل", office: "مكتب", farm: "مزرعة", chalet: "شاليه", resthouse: "استراحة", townhouse: "تاون هاوس", penthouse: "بنتهاوس", warehouse: "مخزن" };
+const typeAr = (t: unknown) => TYPE_AR[String(t || "").toLowerCase()] || (/[a-z]/i.test(String(t || "")) || !t ? "عقار" : String(t));
+function arabicOnly(s: string): string {
+  let x = String(s || "").replace(/\btwin[\s_-]*villa\b/gi, "فيلا");
+  for (const [k, v] of Object.entries(TYPE_AR)) x = x.replace(new RegExp(`\\b${k.replace(/_/g, "[\\s_]")}\\b`, "gi"), v);
+  return x.replace(/(فيلا\s+){2,}/g, "فيلا ");
+}
+// A reply that names a developer project waits for the owner, whatever the category (7 Nov: Wadi Zaha and AIDA prices went out on their own).
+let projectRe: { at: number; re: RegExp | null } = { at: 0, re: null };
+async function mentionsProject(companyId: string, texts: string[]): Promise<boolean> {
+  if (Date.now() - projectRe.at > 300000) {
+    const r = await db.from("investment_projects").select("name,aliases").eq("company_id", companyId).eq("archived", false);
+    const words = [...new Set((r.data || []).flatMap((p: any) => [p.name, ...(p.aliases || [])]).map((w: any) => String(w || "").trim()).filter((w: string) => w.length > 2)), "وادي زها", "الايكونيك", "الآيكونيك", "AIDA", "عايدة", "اليزن"].map((w) => String(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    projectRe = { at: Date.now(), re: words.length ? new RegExp(words.join("|"), "i") : null };
+  }
+  return !!projectRe.re && texts.some((x) => projectRe.re!.test(x));
+}
+
 // Office titles carry owner names ("فيلا الرميس 59 سلطان"), so the agent only sees a neutral label.
 function propLine(p: any) {
-  const name = `${p.type || "عقار"} ${p.listing_purpose === "rent" ? "للإيجار" : "للبيع"}`;
+  const name = `${typeAr(p.type)} ${p.listing_purpose === "rent" ? "للإيجار" : "للبيع"}`;
   const bits = [p.area, p.wilayat, p.price ? `${p.listing_purpose === "rent" ? "الإيجار " : ""}${Number(p.price).toLocaleString("en-US")} ريال` : "", p.bedrooms ? `${p.bedrooms} غرف` : "",
     p.land_size ? `أرض ${p.land_size}م` : "", p.built_size ? `بناء ${p.built_size}م` : ""].filter(Boolean).join("، ");
   const visit = { open: "مفتوح ويروح بروحه", lockbox: "صندوق مفتاح برمز", owner_lives: "المالك ساكن (يعطى رقم المالك)", office: "تنسيق منا (handoff)" }[p.visit_method as string] || "غير محدد (handoff للمعاينة)";
@@ -265,7 +284,7 @@ async function watchVisit(msg: any, dry = false) {
   const props = propsR.data || [];
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
   const input = [`تاريخ اليوم: ${today}`, "", "العقارات:",
-    props.map((p: any) => `- id=${p.id} | ${p.type} ${p.listing_purpose === "rent" ? "للإيجار" : "للبيع"} | ${p.area} | ${Number(p.price || 0).toLocaleString("en-US")} | ${p.bedrooms || "?"} غرف | أرض ${p.land_size || "?"}م`).join("\n"),
+    props.map((p: any) => `- id=${p.id} | ${typeAr(p.type)} ${p.listing_purpose === "rent" ? "للإيجار" : "للبيع"} | ${p.area} | ${Number(p.price || 0).toLocaleString("en-US")} | ${p.bedrooms || "?"} غرف | أرض ${p.land_size || "?"}م`).join("\n"),
     "", "مواعيد مسجلة الحين لهذا العميل:", (openR.data || []).map((v: any) => `- ${v.property_id} يوم ${v.viewing_date} الساعة ${String(v.viewing_time || "غير محددة").slice(0, 5)}`).join("\n") || "لا يوجد",
     "", "المحادثة (الأقدم أولاً):",
     rows.map((h: any) => `[${String(h.message_timestamp).slice(0, 16)}] ${h.direction === "inbound" ? "العميل" : "المكتب"}: ${short(h.transcript || h.body || `[${h.message_type}]`, 400)}`).join("\n")].join("\n");
@@ -528,7 +547,7 @@ Deno.serve(async (req) => {
     try {
       const sr = await db.from("properties").select("type,area,wilayat,price,status,title").eq("company_id", msg.company_id).in("status", ["sold", "reserved"])
         .eq("archived", false).gte("updated_at", new Date(Date.now() - 150 * 86400000).toISOString()).limit(40);
-      soldList = (sr.data || []).map((p: any) => `- ${p.type || "عقار"} | ${[p.area, p.wilayat].filter(Boolean).join("، ")} | ${p.price ? Number(p.price).toLocaleString("en-US") + " ريال" : ""} | ${p.status === "sold" ? "انباع" : "انحجز"}`).join("\n");
+      soldList = (sr.data || []).map((p: any) => `- ${typeAr(p.type)} | ${[p.area, p.wilayat].filter(Boolean).join("، ")} | ${p.price ? Number(p.price).toLocaleString("en-US") + " ريال" : ""} | ${p.status === "sold" ? "انباع" : "انحجز"}`).join("\n");
     } catch (_) { /* optional */ }
     // the same customer may be talking to the other branch number too
     let otherRoute = "";
@@ -608,7 +627,7 @@ Deno.serve(async (req) => {
       const covers = await reelCovers(msg.company_id, props.map((p: any) => p.id));
       coversSeen = Object.keys(covers).length;
       for (const p of props as any[]) if (covers[p.id]) {
-        parts.push({ type: "input_text", text: `غلاف ريل العقار id=${p.id} (${p.type || "عقار"} ${p.area || ""} ${p.price ? Math.round(Number(p.price) / 1000) + " الف" : ""}):` });
+        parts.push({ type: "input_text", text: `غلاف ريل العقار id=${p.id} (${typeAr(p.type)} ${p.area || ""} ${p.price ? Math.round(Number(p.price) / 1000) + " الف" : ""}):` });
         parts.push({ type: "input_image", image_url: covers[p.id], detail: "low" });
       }
     }
@@ -785,7 +804,10 @@ Deno.serve(async (req) => {
     // a client who came from a project video is an investor, and his replies wait for the owner like any investor
     if (Object.values(reels).some((x: any) => x.project)) out.category = "investor";
     // live ("direct"): everything goes out on its own except investors and running deals, which wait for the owner
-    const holdForOwner = rt.reply_agent_mode === "direct" && ["investor", "active_deal"].includes(out.category);
+    out.reply_messages = (out.reply_messages || []).map((r: string) => arabicOnly(r));
+    const projectNamed = await mentionsProject(msg.company_id, out.reply_messages);
+    if (projectNamed) analysis.project_named = true;
+    const holdForOwner = rt.reply_agent_mode === "direct" && (["investor", "active_deal"].includes(out.category) || projectNamed);
     if (dry || holdForOwner || (rt.reply_agent_mode === "approval" && !autoSend)) {
       // nothing to say (closing words, the other branch handles it): no empty card in the approval screen
       const nothing = !dry && !out.reply_messages.length && out.action === "none";

@@ -87,6 +87,8 @@ const REVIEW_RULES = `أنت تراجع متابعة عميل لمكتب عقا�
 - إذا تواصلنا معه أكثر من مرة في نفس الموضوع وما رد (حتى لو من أشهر): skip، ولا تكتب له مرة ثانية. نفس الحال في أي متابعة ثانية بنفس الوضع، بدون ما ينتظر أحمد.
 - مواضيع الاستثمار والإقامة والتملك الحر والعمل بعد الشراء: skip (تنتقل لمتابعة المستثمرين، مو للمتابعة العادية).
 - التبادل (عقار بعقار): skip، الموضوع غير مناسب.
+- ممنوع أي كلمة إنجليزية أو رمز برمجي (مثل twin_villa أو villa أو apartment) في النص لعميل يكتب بالعربي. اكتب العقار بالاسم اللي يعرفه العميل بالعربي (مثل "فيلا الشخاخيط") وبدون ذكر نوع غريب.
+- إذا ما في محادثة مسجلة للعميل (سجل قديم أو نموذج من الموقع وما كلمنا): decision=skip وreason "عميل بدون محادثة واتساب، يحتاج اتصال منك" بدون نص.
 - عميل زار البيت ولما سألناه ما أعطى جواب واضح: skip، لأنه إذا ناسبه برجع لنا.
 - لا نعد بصور داخلية لبيت ساكنين فيه (المالك ساكن).
 - عميل رد خلال أقل من 24 ساعة: القرار followup والنص جاهز يرسل مباشرة، مو للانتظار.
@@ -138,7 +140,7 @@ async function lessons() {
   return lessonsCache.text;
 }
 
-async function review(item: any, companyId: string, available: string, fixed: string, about: string, instruction = "") {
+async function review(item: any, companyId: string, available: string, fixed: string, about: string, instruction = "", current = "") {
   const learnt = await lessons();
   const chat = item.conversation_id ? await chatOf(item.conversation_id, 40) : "";
   const others = await db.from("whatsapp_conversations").select("id,route_key").eq("company_id", companyId).eq("client_id", item.client_id).neq("id", item.conversation_id || "00000000-0000-0000-0000-000000000000").limit(2);
@@ -148,7 +150,7 @@ async function review(item: any, companyId: string, available: string, fixed: st
   const ai = await fetch("https://api.openai.com/v1/responses", {
     method: "POST", headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: OPENAI_MODEL, store: false, reasoning: { effort: "low" }, instructions: REVIEW_RULES.replace("{fixed}", fixed),
-      input: `تاريخ اليوم: ${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date())}\nسبب وجوده في القائمة: ${about}\nالاسم المسجل من الواتساب، يفيد بس لمعرفة إذا امرأة: ${person.data?.name || "غير معروف"}\nرقمنا اللي نتابع منه: ${item.route_key === "barka" ? "بركاء" : "مسقط"}${learnt ? `\n\nدروس من صاحب المكتب من أوامر سابقة (طبقها إذا الموقف مشابه):\n${learnt}` : ""}${instruction ? `\n\nأمر صاحب المكتب على هذي المتابعة بالذات (نفذه، وهو أهم من أي قاعدة فوق، وإذا يقول إن المتابعة ما لها داعي قرارك skip، بس لا تخالف الممنوعات ولا تكتب معلومة مو مكتوبة قدامك، وإذا يقول وش انقال في رسالة صوتية صدقه): ${instruction}` : ""}\n\nالعقارات المتاحة الآن:\n${available || "لا يوجد"}\n\nالمحادثة:\n${chat || "ما في محادثة مسجلة"}\n${other}`,
+      input: `تاريخ اليوم: ${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date())}\nسبب وجوده في القائمة: ${about}\nالاسم المسجل من الواتساب، يفيد بس لمعرفة إذا امرأة: ${person.data?.name || "غير معروف"}\nرقمنا اللي نتابع منه: ${item.route_key === "barka" ? "بركاء" : "مسقط"}${learnt ? `\n\nدروس من صاحب المكتب من أوامر سابقة (طبقها إذا الموقف مشابه):\n${learnt}` : ""}${instruction ? `\n\nالنص الحالي للمتابعة (اللي يشوفه أحمد الحين): ${current || "لا يوجد"}\n\nأمر صاحب المكتب على هذي المتابعة (أهم من أي قاعدة فوق): ${instruction}\nكيف تفهم الأمر: أحمد يتكلم بلهجته وأحياناً بالصوت، فالأمر ممكن يجي غير مرتب. افهم قصده الحقيقي، ولا تنقل كلامه حرفياً ولا تلصقه في الرسالة. غالباً هو تصحيح للنص الحالي: (1) "بدل X اكتب Y" أو "لا تكتب X" يعني غيّر هذا الجزء بس وخل باقي النص مثل ما هو. (2) "لا تقول كذا قل كذا" يعني استبدل المعنى. (3) قاعدة عامة (مثل: لا تكتب كلمات إنجليزية لعميل عربي) طبقها على هذي الرسالة وعلى أي كلمة إنجليزية فيها. (4) تغيير الهدف (مثل: اسأله متى يناسبه يزور) اكتب النص من جديد. الناتج رسالة مرتبة بلهجة المكتب وبنفس القواعد الثابتة، مو نسخة من كلام أحمد. إذا يقول إن المتابعة ما لها داعي قرارك skip. لا تخالف الممنوعات ولا تكتب معلومة مو مكتوبة قدامك، وإذا يقول وش انقال في رسالة صوتية صدقه. في reason اكتب بسطر وش فهمت منه وش غيرت.` : ""}\n\nالعقارات المتاحة الآن:\n${available || "لا يوجد"}\n\nالمحادثة:\n${chat || "ما في محادثة مسجلة"}\n${other}`,
       text: { format: { type: "json_schema", name: "followup_review", strict: true, schema: reviewSchema } } }),
   });
   const p = await ai.json().catch(() => ({}));
@@ -157,6 +159,7 @@ async function review(item: any, companyId: string, available: string, fixed: st
   out.text = out.text ? String(out.text).replace(/[،,!]/g, " ").replace(/\.(\s|$)/g, "$1").replace(/\s*[؟?]/g, " ؟").replace(/\s+/g, " ").trim() : null;
   if (out.text) out.text = out.text.replace(/\s*عزيزتي\s*/g, " ").replace(/\s+/g, " ").trim();
   if (out.text && !out.text.startsWith("السلام عليكم")) out.text = `السلام عليكم ${out.text}`;
+  { const ar = arabicOnly(out.text); out.text = ar.text; if (ar.latin) { out.auto_ok = false; out.reason = short(`${out.reason} (فيه كلمة إنجليزية، راجعها قبل الإرسال)`, 300); } }
   // one question only
   if (out.text && out.text.includes("؟")) out.text = out.text.slice(0, out.text.indexOf("؟") + 1);
   // an unread voice note near the end means nobody knows what was said; he decides, never the automatic send
@@ -197,7 +200,7 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
     if (x.after_visit) about += " هذي متابعة بعد موعد الزيارة بساعة ونص، وهذا أهم وقت للبيع. قرارك followup واسأله عن رأيه في العقار بالاسم، إلا إذا المحادثة تقول إنه ما زار أو موضوعه انتهى أو قال رأيه.";
   }
   const fixed = kind === "visit" ? String(x.body || "") : (x.messages || []).join(" ");
-  const out = await review(x, companyId, available, fixed, about, instruction);
+  const out = await review(x, companyId, available, fixed, about, instruction, x.owner_text || fixed);
   if (kind === "visit") out.text = namedVisitQuestion(out.text, name);
   return out;
 }
@@ -244,7 +247,7 @@ async function applyDecision(kind: "visit" | "request", x: any, companyId: strin
 
 async function availableText(companyId: string) {
   const props = await db.from("properties").select("type,area,price,bedrooms,listing_purpose,public_details,rented_units").eq("company_id", companyId).eq("status", "available").eq("archived", false);
-  return (props.data || []).map((p: any) => `- ${p.type} ${p.listing_purpose === "rent" ? "للإيجار" : "للبيع"} في ${p.area} بـ ${Number(p.price || 0).toLocaleString("en-US")} ${p.bedrooms ? `${p.bedrooms} غرف` : ""}${p.rented_units ? ` | المؤجر حالياً: ${short(p.rented_units, 200)}` : ""}${p.public_details ? ` | التفاصيل: ${short(p.public_details, 700).replace(/\n+/g, " / ")}` : ""}`).join("\n");
+  return (props.data || []).map((p: any) => `- ${typeAr(p.type)} ${p.listing_purpose === "rent" ? "للإيجار" : "للبيع"} في ${p.area} بـ ${Number(p.price || 0).toLocaleString("en-US")} ${p.bedrooms ? `${p.bedrooms} غرف` : ""}${p.rented_units ? ` | المؤجر حالياً: ${short(p.rented_units, 200)}` : ""}${p.public_details ? ` | التفاصيل: ${short(p.public_details, 700).replace(/\n+/g, " / ")}` : ""}`).join("\n");
 }
 
 // Reads what is on the list again under the current rules and returns the decisions. Writes nothing.
@@ -397,8 +400,19 @@ const resultSchema = {
   },
   required: ["result", "opinion", "reason", "new_date", "serious", "note", "confidence"],
 };
-const TYPE_AR: Record<string, string> = { house: "بيت", villa: "فيلا", apartment: "شقة", flat: "شقة", land: "أرض", building: "بناية", shop: "محل", office: "مكتب", farm: "مزرعة", chalet: "شاليه", warehouse: "مخزن" };
-const typeAr = (t: unknown) => TYPE_AR[String(t || "").toLowerCase()] || String(t || "عقار");
+const TYPE_AR: Record<string, string> = { house: "بيت", villa: "فيلا", twin_villa: "فيلا", "twin villa": "فيلا", apartment: "شقة", flat: "شقة", land: "أرض", land_residential: "أرض سكنية", land_commercial: "أرض تجارية", land_mixed: "أرض", building: "بناية", commercial_building: "مبنى تجاري", residential_building: "مبنى سكني", income_property: "عقار مؤجر", shop: "محل", office: "مكتب", farm: "مزرعة", chalet: "شاليه", resthouse: "استراحة", townhouse: "تاون هاوس", penthouse: "بنتهاوس", warehouse: "مخزن" };
+// an internal type code must never reach a client: unknown English codes become "عقار"
+const typeAr = (t: unknown) => TYPE_AR[String(t || "").toLowerCase()] || (/[a-z]/i.test(String(t || "")) || !t ? "عقار" : String(t));
+// Owner's rule (8 Nov): no English words or codes in a text for an Arabic-writing client (twin_villa went out in follow-ups).
+// Known type codes become Arabic; anything else in Latin letters (not a link) is left for him to see and blocks the automatic send.
+function arabicOnly(text: string | null): { text: string | null; latin: boolean } {
+  if (!text) return { text, latin: false };
+  let s = text.replace(/\btwin[\s_-]*villa\b/gi, "فيلا");
+  for (const [k, v] of Object.entries(TYPE_AR)) s = s.replace(new RegExp(`\\b${k.replace(/_/g, "[\\s_]")}\\b`, "gi"), v);
+  s = s.replace(/(فيلا\s+){2,}/g, "فيلا ").replace(/\s+/g, " ").trim();
+  return { text: s, latin: /[A-Za-z]{2,}/.test(s.replace(/https?:\/\/\S+/g, "")) };
+}
+
 const OPINION: Record<string, { feedback: string; outcome: string; liked: boolean | null }> = {
   liked: { feedback: "liked", outcome: "followup", liked: true },
   negotiate: { feedback: "wants_negotiate", outcome: "negotiation", liked: true },
