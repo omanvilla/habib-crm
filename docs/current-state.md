@@ -2,6 +2,14 @@
 
 Updated 2026-11-06. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 8 November 2026 (evening) — R9 Muscat redirect, R10 heirs (commit 78026ba, agent v48)
+
+- **Why.** Ahmed's evening review of 42 chats (`crm_owner_notes`, kept in the project doc «أوامر-أحمد-8-نوفمبر-مساء»). Decisions of the first batch: investors and any investment question, and owners of Muscat-area properties, who write to the Barka number are sent to the Muscat number 71770030 with «هذا الرقم خاص لعقارات بركاء»; heirs' property is declined politely; location rule unchanged (property and time first, ask which property when unclear).
+- **Live.** `whatsapp-reply-agent` v48 pinned to 78026ba, brain synced (43,170 chars). The redirect text comes from the code (`redirectToMuscat` in `index.ts`), is sent at once (no hold), and names no project or figure. Muscat number: investors continue as before and wait for Ahmed.
+- **Dry run at 78026ba (6 real Barka chats).** Al Hail villa owner, an investment house under 50k, an Iraqi asking for residency, a Yazan price question, a farm for daily rental: all got the Muscat redirect. A Khawd+Barka buyer was not redirected (both areas). The heirs reply (R10) has no unprocessed sample; it is a brain rule only and still to be seen on a live message. Dry drafts deleted.
+- **Not done yet from the 42 notes:** visits that were never recorded (no follow-up after 1.5 h), documents for new owners (conflicts with the existing «no ownership papers at first» rule, waits for Ahmed), client behaviour and seriousness score, home screen tidy-up and slow approvals list, WhatsApp alert for missing property details, Barka/Muscat pricing day in the schedule, AIDA and Al Noor appointments.
+- **Rollback.** Pin `whatsapp-reply-agent` back to 378fc06, revert 78026ba, run the prompt sync.
+
 ## 8 November 2026 (afternoon) — archive on the phone, videos of sold properties, hot buyer WhatsApp alert (e15230a, b522710)
 
 - **Archive on the phone.** The «السجلات» switch (active / sold / archived) was behind the phone «الفلاتر» button; it now stays visible next to the search (`crm-simple-ui.css`). Checked on desktop that the label exists; not checked on a real phone.
