@@ -2,6 +2,12 @@
 
 Updated 2026-11-06. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 8 November 2026 — investor brain: rental income first (commit 47b62f1), live by prompt sync
+
+- **What changed.** `brain.ts` (قسم المستثمر) and `knowledge.ts` only; no function redeploy. Someone who wants monthly income is offered only a property in the list that has «المؤجر حالياً» (today: the Al Hail South house with two rented flats, OMR 200 a month on OMR 130,000), quoting the written figure with no yield percentage and no promise the rent continues. With no such property the agent says so and does not substitute an off-plan project, which pays no rent before handover (2027 to 2029 as announced). Small budget or no capital: said plainly, no financing or loan advice, handoff. A question about residency plus investment gets no promise, only "by the rules, in specific projects".
+- **Synced** with `agent-prompt-sync` at 47b62f1 (brain_base 40,525, knowledge 6,350 characters). Rollback: revert 47b62f1 on main and run the sync again.
+- **Dry run on the latest 20 investor chats** (own number excluded): 14 drafted and held (dry-run drafts are hidden from the approval screen and refuse to send), 5 already answered live, 1 muted. Project figures in `knowledge.ts` were NOT touched; the Wadi Zaha and Al Yazan numbers still differ from the 5 Nov market study and wait for Ahmed's update.
+
 ## 6 November 2026 — «تم» on a hot alert saved for every device; visit follow-ups name the property (SQL74)
 
 - **«تم» on a handed-over chat (SQL74, migration `hot_alert_done_20261106`).** It was kept in the browser only, so pressing it on the computer left it on the phone. Now «تم» calls `crm_hot_alert_done(conversation)` (owner only, `42501` for branch accounts, `P0002` for an unknown chat), which sets `whatsapp_conversations.owner_alert_done_at`. The alert is hidden while that time is at or after `handoff_updated_at`, so it comes back when the chat is handed over again. An older «تم» still in a browser is moved to the database the first time that browser loads. Trial in a rolled-back transaction: Barka refused, owner saved, unknown id refused.
