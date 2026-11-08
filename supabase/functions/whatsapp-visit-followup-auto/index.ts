@@ -311,6 +311,13 @@ async function unreadVoiceNearEnd(conversationId: string) {
   const r = await db.from("whatsapp_messages").select("message_type,transcript").eq("conversation_id", conversationId).order("message_timestamp", { ascending: false }).limit(8);
   return (r.data || []).some((m: any) => m.message_type === "audio" && !m.transcript);
 }
+// Ahmed (8 Nov): no follow-up to a customer or owner he answered by hand in the last 24 hours (he is handling the chat).
+async function staffTypedRecently(conversationId: string) {
+  const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const r = await db.from("whatsapp_messages").select("id").eq("conversation_id", conversationId).eq("direction", "outbound").eq("actor_type", "human").gte("message_timestamp", since).limit(1);
+  return (r.data || []).length > 0;
+}
+
 async function lastInbound(conversationId: string) {
   const r = await db.from("whatsapp_messages").select("message_timestamp").eq("conversation_id", conversationId).eq("direction", "inbound").order("message_timestamp", { ascending: false }).limit(1).maybeSingle();
   return r.data?.message_timestamp ? new Date(r.data.message_timestamp).getTime() : 0;
@@ -351,6 +358,7 @@ async function sendQueueText(q: any, numbers: string[]) {
   if (!to || numbers.includes(to)) return "company_number";
   if (!["barka", "muscat"].includes(conv.route_key) || conv.route_key !== q.route_key) return "route_blocked";
   if (client.followup_suppressed || client.archived || conv.agent_muted || conv.human_handoff_required) return "held";
+  if (await staffTypedRecently(conv.id)) return "held_staff_active";
   const lastIn = await lastInbound(conv.id);
   if (lastIn > new Date(q.created_at).getTime()) {
     await db.from("whatsapp_outreach_queue").update({ status: "skipped", reason: "client_wrote_after" }).eq("id", q.id).eq("status", "pending");
@@ -539,6 +547,7 @@ async function sendOne(f: any, numbers: string[], freeOnly = false) {
   if (!to || numbers.includes(to)) return stop("rejected", "company_number");
   if (!["barka", "muscat"].includes(conv.route_key) || conv.route_key !== f.route_key) return "route_blocked";
   if (client.followup_suppressed || client.archived || conv.agent_muted || conv.human_handoff_required) return "held";
+  if (await staffTypedRecently(conv.id)) return "held_staff_active";
   const lastIn = lastInR.data?.message_timestamp ? new Date(lastInR.data.message_timestamp).getTime() : 0;
   if (lastIn > new Date(f.created_at).getTime()) return stop("superseded", "client_wrote_after");
   const service = lastIn > 0 && Date.now() - lastIn < WINDOW_MS;

@@ -220,9 +220,14 @@ async function sendRows(ids?: string[]) {
     try {
       const [cl, cv] = await Promise.all([
         db.from("clients").select("phone,phone_normalized,followup_suppressed").eq("id", r.client_id).single(),
-        db.from("whatsapp_conversations").select("id,meta_phone_number_id,last_inbound_at,route_key").eq("id", r.conversation_id).single(),
+        db.from("whatsapp_conversations").select("id,meta_phone_number_id,last_inbound_at,route_key,agent_muted,human_handoff_required").eq("id", r.conversation_id).single(),
       ]);
       if (cl.data?.followup_suppressed) { await db.from("whatsapp_outreach_queue").update({ status: "skipped", reason: "client_paused" }).eq("id", r.id); continue; }
+      // Ahmed (8 Nov): nothing goes to a chat he is handling (negotiation handoff, muted, or he typed in the last 24 hours); it waits
+      if (cv.data?.agent_muted || cv.data?.human_handoff_required) continue;
+      const staff = await db.from("whatsapp_messages").select("id").eq("conversation_id", r.conversation_id).eq("direction", "outbound").eq("actor_type", "human")
+        .gte("message_timestamp", new Date(Date.now() - 24 * 3600 * 1000).toISOString()).limit(1);
+      if ((staff.data || []).length) continue;
       // the client wrote after this was queued: the reply agent / owner handles the live conversation instead
       if (cv.data?.last_inbound_at && new Date(cv.data.last_inbound_at).getTime() > new Date(r.created_at).getTime()) {
         await db.from("whatsapp_outreach_queue").update({ status: "skipped", reason: "client_wrote_after" }).eq("id", r.id); continue;

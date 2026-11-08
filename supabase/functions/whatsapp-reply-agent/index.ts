@@ -17,9 +17,9 @@ const DEBOUNCE_MS = Number(Deno.env.get("REPLY_DEBOUNCE_MS") || 35000); // wait 
 const HARD_HANDOFF = /^\s*(تفاوض|مشتري جاد|دراسة سعر)\s*:/;
 // Ahmed's strict rule (6 Nov): never promise the customer a reply ("بشوف وارد عليك"). Silence is better than a promise nobody keeps.
 const PROMISE_RE = /(بشوف|بأشوف|اشوف|أشوف|بتأكد|باتأكد|أتأكد|اتأكد|بأكد|باكد|أأكد|اأكد|بنسق|براجع|بسأل|بنشوف)[^\n]{0,40}(وارد|و ارد|وبرد|وأرد|وارجع|وبرجع|ونرد|ونرجع)\s*(لك|عليك|عليج|عليكم)|(برد|بارد|برجع|بنرد|بنرجع|بيرد)\s*(لك|عليك|عليج|عليكم)\s*(بعدين|بعد شوي|قريب)?\s*$/;
-// after Ahmed types in a chat, the agent gives him this long to answer the customer's next message himself, then carries on
-const STAFF_GRACE_MS = 30000;
-const STAFF_QUIET_HOURS = 2; // the last reply was typed by a person from the office in the last 2 hours → they are in the chat, stay out
+// Ahmed (8 Nov) replaces his 6 Nov rule: once a person from the office has typed in a chat (text or voice), the agent
+// stays out of it for 24 hours. A follow-up the owner sent from the daily list still hands the chat to the agent.
+const STAFF_QUIET_HOURS = 24;
 const ALLOWED_ORIGINS = ["https://omanvilla.github.io"]; // the approval screen asks for a rewrite from here
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -429,12 +429,13 @@ Deno.serve(async (req) => {
     const after = await db.from("whatsapp_messages").select("id").eq("conversation_id", conv.id).eq("direction", "outbound").eq("actor_type", "human")
       .gt("message_timestamp", msg.message_timestamp).limit(1);
     if (!review && (after.data || []).length) { await watch(); return fail("staff_replied"); }
-    // the office's last reply before this message was typed by a person a short while ago → they are in the chat.
-    // Once the agent has answered after them, or a couple of hours passed, the agent carries the conversation on.
+    // a person from the office typed in this chat in the last 24 hours (Ahmed 8 Nov) → they are handling it, stay out.
+    // Tasnim (7 Nov): Ahmed answered by hand, the customer replied a minute later and the agent asked her again.
+    const quietSince = new Date(new Date(msg.message_timestamp).getTime() - STAFF_QUIET_HOURS * 3600 * 1000).toISOString();
     const lastOut = await db.from("whatsapp_messages").select("actor_type,message_timestamp,message_type").eq("conversation_id", conv.id).eq("direction", "outbound")
+      .eq("actor_type", "human").gte("message_timestamp", quietSince)
       .lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(1).maybeSingle();
-    const staffInChat = lastOut.data?.actor_type === "human" &&
-      new Date(msg.message_timestamp).getTime() - new Date(lastOut.data.message_timestamp).getTime() < STAFF_QUIET_HOURS * 3600 * 1000;
+    const staffInChat = !!lastOut.data;
     // a follow-up the owner sent from the daily list hands the chat to the agent; any other message of his keeps it quiet
     let fromList = false;
     if (staffInChat) {
@@ -445,19 +446,7 @@ Deno.serve(async (req) => {
       ]);
       fromList = (lf.data || []).length > 0 || (lq.data || []).length > 0;
     }
-    // Ahmed's instruction (6 Nov): once he has stepped in and answered, the agent carries the chat on. It only waits
-    // a little so that, if he is still in the chat and answers this message himself, it stays quiet.
-    // A voice note from him means he is talking to the customer personally: then it keeps out as before.
-    if (!review && staffInChat && !fromList) {
-      if (lastOut.data?.message_type === "audio") { await watch(); return fail("staff_active"); }
-      await sleep(STAFF_GRACE_MS);
-      const [h2, n2] = await Promise.all([
-        db.from("whatsapp_messages").select("id").eq("conversation_id", conv.id).eq("direction", "outbound").eq("actor_type", "human").gt("message_timestamp", msg.message_timestamp).limit(1),
-        db.from("whatsapp_messages").select("id").eq("conversation_id", conv.id).eq("direction", "inbound").gt("message_timestamp", msg.message_timestamp).limit(1),
-      ]);
-      if ((h2.data || []).length) { await watch(); return fail("staff_replied"); }
-      if ((n2.data || []).length) return fail("superseded");
-    }
+    if (!review && staffInChat && !fromList) { await watch(); return fail("staff_active"); }
     await watch();
     // the owner of a property we list writes to us: Ahmed answers owners himself
     if (!review) {
