@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 // Ahmed's fixed reply-agent rules (docs/agent-rules.md). A change that breaks one of these must be asked first.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8');
@@ -6,7 +6,7 @@ const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','
 const fu=fs.readFileSync('supabase/functions/whatsapp-visit-followup-auto/index.ts','utf8');
 const outreach=fs.readFileSync('supabase/functions/whatsapp-outreach/index.ts','utf8');
 const inbox=fs.readFileSync('supabase/functions/whatsapp-inbox/index.ts','utf8');
-const sql=fs.readFileSync('db/changes/20261108_owner_hold_visit_first.sql','utf8');
+const sql=fs.readFileSync('db/changes/20261108_owner_hold_visit_first_APPLIED.sql','utf8');
 const rules=fs.readFileSync('docs/agent-rules.md','utf8');
 
 test('R1: a chat Ahmed typed in stays with him until he hands it back, for the agent and every follow-up',()=>{
