@@ -565,6 +565,10 @@ Deno.serve(async (req) => {
       let extra = "";
       if (reel) extra += ` {ريل من حسابنا. وصفه: ${short(reel.caption, 300).replace(/\n+/g, " / ")}${reel.property_id ? ` | عقار مرتبط: ${reel.property_id}` : ""}${reel.project ? ` | عن مشروع استثماري: ${reel.project.name}${reel.project.developer ? ` للمطور ${reel.project.developer}` : ""}` : ""}${(reel.propertyIds || []).length > 1 ? ` | نفس الفيديو لعقارات متطابقة: ${reel.propertyIds.join(" و ")}، إذا واحد راح اعرض الثاني المتوفر` : ""}}`;
       else if (key) extra += " {ريل ما عرفنا وصفه}";
+      // R6: say plainly when the property behind a reel or message was sold, so the sold rule applies (old reels of sold villas)
+      const soldOf = (id: any) => soldRows.find((s: any) => s.id === id);
+      const sold = soldOf(reel?.property_id) || soldOf(h.matched_property_id) || (reel?.propertyIds || []).map(soldOf).find(Boolean);
+      if (sold && !props.some((p: any) => p.id === reel?.property_id || p.id === h.matched_property_id)) extra += ` {هذا العقار ${sold.status === "reserved" ? "انحجز" : "انباع"}: ${typeAr(sold.type)} ${sold.area || ""} ${sold.price ? Math.round(Number(sold.price) / 1000) + " الف" : ""}. طبق قاعدة المباع واعرض أقرب متاح}`;
       if (h.matched_property_id) extra += ` {عقار مرتبط: ${h.matched_property_id}}`;
       if (h.property_image_analysis) extra += ` {تحليل الصورة: ${short(JSON.stringify(h.property_image_analysis), 300)}}`;
       const when = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Muscat", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(h.message_timestamp));
@@ -681,9 +685,12 @@ Deno.serve(async (req) => {
       // same price is not enough (7 Nov: the Sowmhan 69 ad counted as the Shakhakheet 69 ad and the customer got nothing):
       // the old ad must also name this property's area
       const areaKey = String(prop.area || "").replace(/^(ولاية|بركاء|مسقط)\s+/, "").split(/\s+/)[0].replace(/^ال/, "");
+      // and its land size (8 Nov: the sold Rumais 59 villa 300 m² ad counted as the ad of the Rumais 59 villa 305 m² offered instead)
+      const sizeKey = prop.land_size ? String(Math.round(Number(prop.land_size))) : "";
       const sentAd = history.some((h: any) => h.direction === "outbound" && String(h.body || "").length > 250
         && (!priceKey || String(h.body).replace(/[,٬]/g, "").includes(priceKey))
-        && (!areaKey || String(h.body).includes(areaKey)));
+        && (!areaKey || String(h.body).includes(areaKey))
+        && (!sizeKey || String(h.body).includes(sizeKey)));
       // Moe (6 Nov): a short summary went out and he asked for the full details "like the first one":
       // when the customer asks for more / complete details, the full ad may go again.
       let lastOutIdx = -1; history.forEach((h: any, i: number) => { if (h.direction === "outbound") lastOutIdx = i; });
