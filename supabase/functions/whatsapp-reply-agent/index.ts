@@ -539,8 +539,10 @@ Deno.serve(async (req) => {
     let soldList = "";
     let soldRows: any[] = [];
     try {
+      // newest first (8 Nov: with 55 sold rows and no order, a property sold today could miss the 40), archived ones included
+      // (a property sold elsewhere is often archived, and its old reels still bring questions)
       const sr = await db.from("properties").select("id,type,area,wilayat,price,status,title").eq("company_id", msg.company_id).in("status", ["sold", "reserved"])
-        .eq("archived", false).gte("updated_at", new Date(Date.now() - 150 * 86400000).toISOString()).limit(40);
+        .gte("updated_at", new Date(Date.now() - 150 * 86400000).toISOString()).order("updated_at", { ascending: false }).limit(40);
       soldRows = sr.data || [];
       soldList = (sr.data || []).map((p: any) => `- ${typeAr(p.type)} | ${[p.area, p.wilayat].filter(Boolean).join("، ")} | ${p.price ? Number(p.price).toLocaleString("en-US") + " ريال" : ""} | ${p.status === "sold" ? "انباع" : "انحجز"}`).join("\n");
     } catch (_) { /* optional */ }
