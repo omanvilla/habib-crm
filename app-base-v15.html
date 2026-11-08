@@ -4083,7 +4083,7 @@ async function previewWhatsAppImage(messageId,button){
 }
 async function clearWhatsAppHandoff(){
   if(!waInboxActiveConversation)return;
-  try{await waInboxInvoke({action:'clear_handoff',conversation_id:waInboxActiveConversation.id});waInboxActiveConversation.human_handoff_required=false;waInboxActiveConversation.handoff_reason=null;waInboxActiveConversation._hold=null;var row=waInboxConversations.find(x=>x.id===waInboxActiveConversation.id);if(row){row.human_handoff_required=false;row.handoff_reason=null}renderWhatsAppChat();renderWhatsAppConversations();showToast('✅ تم إنهاء تنبيه التدخل البشري','success')}catch(e){showToast('⚠️ '+e.message,'error')}
+  try{await waInboxInvoke({action:'clear_handoff',conversation_id:waInboxActiveConversation.id});waInboxActiveConversation.human_handoff_required=false;waInboxActiveConversation.handoff_reason=null;waInboxActiveConversation._hold=null;var row=waInboxConversations.find(x=>x.id===waInboxActiveConversation.id);if(row){row.human_handoff_required=false;row.handoff_reason=null}renderWhatsAppChat();renderWhatsAppConversations();showToast('✅ رجعت المحادثة للعقل','success')}catch(e){showToast('⚠️ '+e.message,'error')}
 }
 function renderWhatsAppChat(preserveScroll){
   const c=waInboxActiveConversation;if(!c)return;const cl=c.client||{};

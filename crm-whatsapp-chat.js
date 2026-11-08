@@ -357,6 +357,20 @@
       const strip=$('waClientStrip');if(strip)strip.style.display='none';
       const head=$('waChatHeader'),c=waInboxActiveConversation;
       if(head&&c&&!head.querySelector('.wa2-avatar')){const name=(c.client&&c.client.name)||c.customer_name||c.customer_phone||'؟';head.insertAdjacentHTML('afterbegin','<span class="wa2-avatar" aria-hidden="true">'+esc(String(name).trim().charAt(0)||'؟')+'</span>');}
+      // R1/R3 (Ahmed 8 Nov, docs/agent-rules.md): a handed-over chat, or one the agent stays out of because Ahmed typed in it,
+      // shows under the header with the button that hands it back to the agent (the old strip with «تمت المعالجة» is hidden).
+      let hold=$('wa2Hold');
+      const held=c&&(c.human_handoff_required||c._hold==='manual_reply'||c._hold==='muted'||c._hold==='negotiation');
+      if(!held||!head){if(hold)hold.remove();}
+      else{
+        if(!hold){hold=document.createElement('div');hold.id='wa2Hold';head.insertAdjacentElement('afterend',hold);}
+        const handoff=c.human_handoff_required||c._hold==='negotiation';
+        const why=handoff?'⚠️ <strong>محولة لك:</strong> '+esc(c.handoff_reason||'تحتاج تدخلك')+' · العقل ساكن لين تخلص'
+          :(c._hold==='muted'?'🤫 <strong>العقل مكتوم هنا:</strong> '+esc(c.agent_muted_reason||'')
+          :'🤫 <strong>العقل ساكن هنا:</strong> رديت بنفسك، فالرد الآلي والمتابعات ما يرسلون لين ترجّعها');
+        hold.setAttribute('style','display:flex;gap:8px;justify-content:space-between;align-items:center;padding:8px 12px;margin:0 0 6px;border-radius:9px;font-size:12px;'+(handoff?'background:#FFF1F2;border:1px solid #FECDD3;color:#9F1239':'background:#FFFBEB;border:1px solid #FDE68A;color:#92400E'));
+        hold.innerHTML='<span>'+why+'</span><button type="button" class="btn-secondary" style="padding:4px 10px;font-size:11px;white-space:nowrap" data-wa2-handback>'+(handoff?'✓ تمت المعالجة':'↩️ رجّعها للعقل')+'</button>';
+      }
     }catch(e){console.warn('[wa2]',e);}
     return result;
   };
@@ -372,6 +386,7 @@
     const c=t.closest('[data-wa2-copy]');if(c){const m=waInboxMessages.find(x=>x.id===c.dataset.wa2Copy);navigator.clipboard?.writeText(String(m?.body||m?.transcript||'')).then(()=>showToast('تم النسخ','success'));return;}
     const g=t.closest('[data-wa2-goto]');if(g){const row=document.querySelector('[data-wa2-row="'+CSS.escape(g.dataset.wa2Goto)+'"]');if(row){row.scrollIntoView({block:'center',behavior:'smooth'});row.classList.add('wa2-flash');setTimeout(()=>row.classList.remove('wa2-flash'),1600);}return;}
     const sb=t.closest('[data-wa2-strip]');if(sb){stripOpen=!stripOpen;const strip=$('waClientStrip');strip?.classList.toggle('collapsed',!stripOpen);sb.textContent=stripOpen?'إخفاء التفاصيل ▴':'تفاصيل الطلب والتنبيهات ▾';return;}
+    if(t.closest('[data-wa2-handback]')){if(typeof clearWhatsAppHandoff==='function')clearWhatsAppHandoff();return;}
     if(t.closest('[data-wa2-cancel-reply]')){setReply(null);return;}
     if(t.closest('[data-wa2-cancel-file]')){clearPending();return;}
     const em=t.closest('[data-wa2-emoji]');if(em){const ta=$('waInboxMessage');if(ta){const s=ta.selectionStart??ta.value.length,en=ta.selectionEnd??s;ta.value=ta.value.slice(0,s)+em.dataset.wa2Emoji+ta.value.slice(en);ta.focus();ta.selectionStart=ta.selectionEnd=s+em.dataset.wa2Emoji.length;autoGrow();syncButtons();}return;}
