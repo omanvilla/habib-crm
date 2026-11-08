@@ -48,12 +48,45 @@ async function metaText(tokens: string[], phoneId: string, to: string, body: str
   return { id: null, error: last || "no_token" };
 }
 
+// Ahmed 8 Nov (R8): every day, an hour before the 24-hour window of each company number would close, that number writes
+// «هلا» to Ahmed's private number, so he answers it (even a dot) and the window stays open for the hot buyer alerts.
+// The hour is counted from Ahmed's last message to that number, so it moves with him day by day. Runs every 15 minutes.
+// WhatsApp only renews the window when Ahmed's message reaches the number; the «هلا» is what reminds him in time.
+async function keepAlive(force = false) {
+  const out: any[] = [];
+  const routes = await db.from("company_lead_routes").select("company_id,route_key,meta_phone_number_id").in("route_key", ["barka", "muscat"]);
+  for (const rt of routes.data || []) {
+    const prof = await db.from("profiles").select("phone").eq("company_id", rt.company_id).eq("role", "owner").eq("is_active", true).limit(1).maybeSingle();
+    const raw = digits(prof.data?.phone), to = raw.length === 8 ? "968" + raw : raw;
+    if (!to) { out.push({ route: rt.route_key, skipped: "no_owner_phone" }); continue; }
+    const convs = await db.from("whatsapp_conversations").select("id").eq("company_id", rt.company_id).eq("route_key", rt.route_key).like("customer_wa_id", `%${to.slice(-8)}`);
+    const ids = (convs.data || []).map((c: any) => c.id);
+    const lastIn = ids.length ? await db.from("whatsapp_messages").select("message_timestamp").in("conversation_id", ids).eq("direction", "inbound").order("message_timestamp", { ascending: false }).limit(1).maybeSingle() : { data: null };
+    const last = lastIn.data?.message_timestamp ? new Date(lastIn.data.message_timestamp).getTime() : 0;
+    const now = Date.now(), closes = last + 24 * 3600 * 1000;
+    if (!last) { out.push({ route: rt.route_key, skipped: "ahmed_never_wrote" }); continue; }
+    const sent = await db.from("whatsapp_automation_events").select("id,status").eq("company_id", rt.company_id).eq("action_type", "owner_keepalive").contains("payload", { route_key: rt.route_key, window_from: new Date(last).toISOString() }).limit(5);
+    const already = (sent.data || []).some((e: any) => e.status === "applied");
+    if (!force && (already || now < closes - 3600 * 1000)) { out.push({ route: rt.route_key, waiting: true, closes_at: new Date(closes).toISOString(), already }); continue; }
+    if (!force && now >= closes) {
+      if (!(sent.data || []).length) await db.from("whatsapp_automation_events").insert({ company_id: rt.company_id, action_type: "owner_keepalive", status: "failed", reason: "window_closed: Ahmed did not answer the last «هلا»", payload: { route_key: rt.route_key, window_from: new Date(last).toISOString() } });
+      out.push({ route: rt.route_key, closed: true });
+      continue;
+    }
+    const r = await metaText(await routeTokens(rt.company_id, rt.route_key), digits(rt.meta_phone_number_id), to, "هلا");
+    await db.from("whatsapp_automation_events").insert({ company_id: rt.company_id, action_type: "owner_keepalive", status: r.id ? "applied" : "failed", applied_at: r.id ? new Date().toISOString() : null, reason: r.error ? short(r.error, 400) : "هلا", payload: { route_key: rt.route_key, window_from: new Date(last).toISOString(), closes_at: new Date(closes).toISOString(), meta_message_id: r.id, forced: force } });
+    out.push({ route: rt.route_key, sent: !!r.id, error: r.error });
+  }
+  return out;
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ ok: false }, 405);
   const secret = req.headers.get("x-crm-agent") || "";
   const ok = secret ? await db.rpc("crm_reply_agent_secret_ok", { p_secret: secret }) : null;
   if (!ok || ok.error || ok.data !== true) return json({ ok: false, error: "not_authorized" }, 403);
   const body = await req.json().catch(() => ({}));
+  if (body?.action === "keepalive") return json({ ok: true, routes: await keepAlive(body?.force === true) });
   const convId = String(body?.conversation_id || "");
   const test = body?.test === true;
   if (!convId) return json({ ok: false, error: "conversation_id_required" }, 400);
