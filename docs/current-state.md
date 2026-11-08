@@ -2,6 +2,13 @@
 
 Updated 2026-11-06. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 8 November 2026 (afternoon) — R6: a sold property gets the nearest available one (commit 378fc06, agent v47)
+
+- **CRM.** «فيلا الرميس 59 سلطان 2» (300/270) set `sold` (sold elsewhere, 8 Nov); «سلطان 1» (sold elsewhere before, was `available` + archived) set `sold`, still archived. The Rumais 59 villa 305/295 («هشام») is the one on offer. Marking Sultan 2 sold queued 11 «انحجزت / تحب تشوف خيارات ثانية ؟» notices, pending owner approval; Sultan 1 queued nothing new.
+- **Brain (synced at 378fc06).** Sold rule: «انباع» then the nearest available property (same branch/wilayat, area, type, price within 10k, size) with its ad and the visit question; specs question only when nothing is close. Twin rule only for identical sizes. Rumais 59 rule rewritten. «اول ما يتوفر» no longer precedes a sold-property alternative.
+- **Code.** Sold list newest first and including archived sold properties (with 51 sold in 150 days and `limit(40)` without order, a property sold today could be missing). Old reels / matched messages of a sold property are labelled sold in the transcript. The «said sold while available» guard skips chats about a really sold property. «Ad already sent» also needs the same land size.
+- **Dry run (4 real chats about Sultan 2: a message, an image, two October reels):** all answer «الفيلا اللي سألت عنها انباعت» + the Rumais 59 villa 305/295. Before the fixes two were handed over and two had «انباعت» stripped. Dry drafts deleted.
+
 ## 8 November 2026 — Ahmed's chats stay his, no negotiation before a visit, fixed rules file (commits ad42d00, e564ac4)
 
 - **Why.** Tasnim (barka, 7 Nov): the agent carried on 30 s after Ahmed's typed reply (6 Nov rule), a pre-visit discount question became a «تفاوض» handoff, and the staff-reply trigger closed it. Ahmed's decisions are now [docs/agent-rules.md](agent-rules.md) R1–R5, with a mandatory change procedure (find conflicts, ask Ahmed first).
