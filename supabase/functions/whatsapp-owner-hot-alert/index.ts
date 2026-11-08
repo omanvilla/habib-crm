@@ -73,8 +73,10 @@ Deno.serve(async (req) => {
 
   const routes = await db.from("company_lead_routes").select("route_key,whatsapp_number,meta_phone_number_id").eq("company_id", conv.company_id);
   const route = (routes.data || []).find((r: any) => r.route_key === conv.route_key);
-  const owner = (routes.data || []).find((r: any) => r.route_key === "owner");
-  const to = digits(owner?.whatsapp_number);
+  // Ahmed's private number: the owner's profile phone (8 digits get the Oman code)
+  const prof = await db.from("profiles").select("phone").eq("company_id", conv.company_id).eq("role", "owner").eq("is_active", true).limit(1).maybeSingle();
+  const raw = digits(prof.data?.phone);
+  const to = raw.length === 8 ? "968" + raw : raw;
   const phoneId = digits(route?.meta_phone_number_id || conv.meta_phone_number_id);
   if (!to || !phoneId) return json({ ok: false, error: "route_missing" }, 500);
 
