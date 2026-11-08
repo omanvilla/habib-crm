@@ -367,9 +367,9 @@
         const handoff=c.human_handoff_required||c._hold==='negotiation';
         const why=handoff?'⚠️ <strong>محولة لك:</strong> '+esc(c.handoff_reason||'تحتاج تدخلك')+' · العقل ساكن لين تخلص'
           :(c._hold==='muted'?'🤫 <strong>العقل مكتوم هنا:</strong> '+esc(c.agent_muted_reason||'')
-          :'🤫 <strong>العقل ساكن هنا:</strong> رديت بنفسك، فالرد الآلي والمتابعات ما يرسلون لين ترجّعها');
-        hold.setAttribute('style','display:flex;gap:8px;justify-content:space-between;align-items:center;padding:8px 12px;margin:0 0 6px;border-radius:9px;font-size:12px;'+(handoff?'background:#FFF1F2;border:1px solid #FECDD3;color:#9F1239':'background:#FFFBEB;border:1px solid #FDE68A;color:#92400E'));
-        hold.innerHTML='<span>'+why+'</span><button type="button" class="btn-secondary" style="padding:4px 10px;font-size:11px;white-space:nowrap" data-wa2-handback>'+(handoff?'✓ تمت المعالجة':'↩️ رجّعها للعقل')+'</button>';
+          :'🤫 العقل ساكن هنا');
+        hold.setAttribute('style','display:flex;gap:8px;justify-content:space-between;align-items:center;padding:3px 10px;margin:0 0 4px;border-radius:8px;font-size:11px;line-height:1.3;'+(handoff?'background:#FFF1F2;border:1px solid #FECDD3;color:#9F1239':'background:#FFFBEB;border:1px solid #FDE68A;color:#92400E'));
+        hold.innerHTML='<span>'+why+'</span><button type="button" class="btn-secondary" style="padding:2px 8px;font-size:11px;white-space:nowrap;min-height:0" title="رديت بنفسك، فالرد الآلي والمتابعات ما يرسلون لين ترجّعها" data-wa2-handback>'+(handoff?'✓ تمت المعالجة':'↩️ رجّعها للعقل')+'</button>';
       }
     }catch(e){console.warn('[wa2]',e);}
     return result;

@@ -579,11 +579,14 @@ Deno.serve(async (req) => {
     }).join("\n");
 
     const askedName = await db.from("whatsapp_messages").select("id").eq("conversation_id", conv.id).eq("direction", "outbound").ilike("body", "%اسمك%").limit(1);
+    let behaviorText = "";
+    try { const bh = await db.rpc("crm_client_behavior_text", { p_client: client.id }); if (!bh.error && bh.data) behaviorText = String(bh.data); } catch (_) { /* optional */ }
     const nameAskedBefore = (askedName.data || []).length > 0 || String(client.notes || "").includes(NAME_NOT_GIVEN);
     const context = [
       `الوقت الحالي في عمان: ${omanNow()}`,
       `الاسم المسجل من الواتساب، مو دليل على اسمه الحقيقي: ${client.name || conv.customer_name || "غير معروف"}`,
       `هل سألناه عن اسمه قبل: ${nameAskedBefore ? "نعم، لا تسأل مرة ثانية أبداً" : "لا"}`,
+      ...(behaviorText ? [behaviorText, "(استخدم سلوك العميل لتفهم جديته وتختار أسلوب الرد: لا تعامل المتجوّل مثل الساخن، ولا ترد على الكل بنفس الأسلوب)"] : []),
       `الرقم اللي كلمنا عليه: ${conv.route_key === "barka" ? "رقم بركاء" : "رقم مسقط"}`,
       `هل سألنا عن الميزانية قبل في هذه المحادثة: ${budgetAskedBefore ? "نعم، لا تسأل مرة ثانية أبداً" : "لا"}`,
       `ملخص سابق للعميل: ${conv.ai_summary || "لا يوجد"}`,

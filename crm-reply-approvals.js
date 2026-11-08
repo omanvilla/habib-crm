@@ -80,14 +80,14 @@
       +'<div class="rp-actions"><button type="button" class="btn-secondary" data-rp="lead-open">افتح المحادثة</button></div></section>').join('');
   }
   async function loadDrafts(){
-    const q=supa.from('whatsapp_reply_drafts').select('id,conversation_id,client_id,message_id,status,analysis,reply_messages,created_at').eq('status','pending').order('created_at',{ascending:false}).limit(40);
-    const r=await q;if(r.error)throw r.error;
+    const q=supa.from('whatsapp_reply_drafts').select('id,conversation_id,client_id,message_id,status,analysis,reply_messages,created_at').eq('status','pending');
+    const r=await (state.showTrials?q:q.or('analysis->>dry_run.is.null,analysis->>dry_run.neq.true')).order('created_at',{ascending:false}).limit(40);if(r.error)throw r.error;
     let rows=(r.data||[]).filter(d=>state.showTrials||!(d.analysis&&d.analysis.dry_run===true));
     const convIds=[...new Set(rows.map(d=>d.conversation_id))],clientIds=[...new Set(rows.map(d=>d.client_id).filter(Boolean))];
     const [convs,clients,msgs]=await Promise.all([
       convIds.length?supa.from('whatsapp_conversations').select('id,route_key,customer_name').in('id',convIds):{data:[]},
       clientIds.length?supa.from('clients').select('id,name,phone').in('id',clientIds):{data:[]},
-      convIds.length?supa.from('whatsapp_messages').select('conversation_id,direction,actor_type,message_type,body,transcript,message_timestamp').in('conversation_id',convIds).order('message_timestamp',{ascending:false}).limit(40*8):{data:[]}
+      Promise.all(convIds.map(id=>supa.from('whatsapp_messages').select('conversation_id,direction,actor_type,message_type,body,transcript,message_timestamp').eq('conversation_id',id).order('message_timestamp',{ascending:false}).limit(8))).then(a=>({data:a.flatMap(x=>x.data||[])}))
     ]);
     const cMap=new Map((convs.data||[]).map(x=>[x.id,x])),clMap=new Map((clients.data||[]).map(x=>[x.id,x]));
     rows.forEach(d=>{

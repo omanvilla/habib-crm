@@ -11,7 +11,7 @@
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
   const toast=(m,t)=>{if(typeof showToast==='function')showToast(m,t);};
   const LABEL={barka:'بركاء',muscat:'مسقط'};
-  let data={items:[],auto_on:false},branch='all',seq=0;const openInstr=new Set(),drafts=new Map();
+  let data={items:[],auto_on:false},branch='all',seq=0,open=false;const openInstr=new Set(),drafts=new Map();
   const isOwner=()=>typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.role==='owner';
   const ERR={followup_not_pending:'هذي المتابعة ما عادت في القائمة: انرسلت أو تغيرت',followup_not_found:'المتابعة ما عادت موجودة',owner_only:'الأوامر لصاحب الشركة بس',
     instruction_required:'اكتب الأمر أولاً',rewrite_failed:'ما قدرت أعيد الكتابة الحين. جرب مرة ثانية',route_blocked:'هذي المتابعة مو على رقم بركاء أو مسقط'};
@@ -58,7 +58,8 @@
     box.hidden=!all.length&&!waiting;
     if(!all.length){box.innerHTML=waiting?'<h2 class="cfu-title">متابعات اليوم</h2><p class="cfu-hint">جاري قراءة المحادثات، باقي <b dir="ltr">'+waiting+'</b>. تطلع هنا بعد المراجعة.</p>':'';return;}
     const tabs=[['all','الكل'],['barka','بركاء'],['muscat','مسقط']].map(([k,l])=>{const n=k==='all'?all.length:all.filter(i=>i.route_key===k).length;return '<button type="button" class="cfu-tab'+(branch===k?' on':'')+'" data-cfu="tab" data-v="'+k+'" aria-pressed="'+(branch===k)+'">'+l+' <b dir="ltr">'+n+'</b></button>';}).join('');
-    box.innerHTML='<h2 class="cfu-title">متابعات اليوم <b dir="ltr">'+all.length+'</b></h2><p class="cfu-hint">افتح الصفحة من جوال الفرع، واضغط «فتح المحادثة» وأرسل. العميل ينشال من القائمة لحاله.'+(waiting?' باقي <b dir="ltr">'+waiting+'</b> قيد القراءة.':'')+'</p><div class="cfu-tabs">'+tabs+'</div>'
+    if(!open){box.innerHTML='<h2 class="cfu-title"><button type="button" class="cfu-toggle" data-cfu="toggle" aria-expanded="false" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center">متابعات اليوم <b dir="ltr">'+all.length+'</b> <small>▾</small></button></h2>';return;}
+    box.innerHTML='<h2 class="cfu-title"><button type="button" class="cfu-toggle" data-cfu="toggle" aria-expanded="true" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center">متابعات اليوم <b dir="ltr">'+all.length+'</b> <small>▴</small></button></h2><p class="cfu-hint">افتح الصفحة من جوال الفرع، واضغط «فتح المحادثة» وأرسل. العميل ينشال من القائمة لحاله.'+(waiting?' باقي <b dir="ltr">'+waiting+'</b> قيد القراءة.':'')+'</p><div class="cfu-tabs">'+tabs+'</div>'
       +(items.length?'<ul class="cfu-list">'+items.map(i=>{const url=businessLink(i.phone,i.text),other=waLink(i.phone,i.text);return '<li class="cfu-row"><div class="cfu-head"><strong>'+esc(i.client||'عميل')+'</strong><small>'+esc(LABEL[i.route_key]||i.route_key)+' · '+esc(i.reason)+(i.property?' · '+esc(i.property):'')+'</small></div>'
         +'<p class="cfu-text" dir="auto">'+esc(i.text)+'</p><small class="cfu-auto">'+esc(autoLine(i))+'</small>'
         +'<div class="cfu-actions">'+(url?'<a class="btn-primary cfu-open" href="'+esc(url)+'" rel="noopener noreferrer">فتح المحادثة</a><a class="cfu-other" href="'+esc(other)+'" target="_blank" rel="noopener noreferrer">رابط عادي</a>':'<span class="cfu-auto">ما له رقم</span>')+'<button type="button" class="btn-secondary" data-cfu="done" data-id="'+esc(i.client_id)+'">أرسلتها</button>'+(isOwner()?'<button type="button" class="btn-secondary" data-cfu="instr" data-k="'+esc(key(i))+'" aria-expanded="'+openInstr.has(key(i))+'">أمر للذكاء الاصطناعي</button>':'')+'</div>'+instrBox(i)+'</li>';}).join('')+'</ul>':'<p class="cfu-hint">ما في متابعات لهذا الفرع</p>');
@@ -85,6 +86,7 @@
   }
   document.addEventListener('click',e=>{
     const b=e.target.closest('[data-cfu]');if(!b)return;
+    if(b.dataset.cfu==='toggle'){open=!open;render();return;}
     if(b.dataset.cfu==='instr'){const k=b.dataset.k;if(openInstr.has(k))openInstr.delete(k);else openInstr.add(k);const box=b.closest('.cfu-row').querySelector('.cfu-instr');if(box){box.hidden=!openInstr.has(k);b.setAttribute('aria-expanded',String(!box.hidden));if(!box.hidden)box.querySelector('textarea').focus();}return;}
     if(b.dataset.cfu==='instr-close'){openInstr.delete(b.dataset.k);const box=b.closest('.cfu-instr');box.hidden=true;const t=box.closest('.cfu-row').querySelector('[data-cfu="instr"]');if(t)t.setAttribute('aria-expanded','false');return;}
     if(b.dataset.cfu==='instr-run'){rewrite(b);return;}
