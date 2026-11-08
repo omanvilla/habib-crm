@@ -4011,6 +4011,8 @@ async function openWhatsAppConversation(id){
  waInboxActiveConversation=data.conversation||waInboxConversations.find(x=>x.id===id)||null;
  if(!waInboxActiveConversation)throw new Error('تعذر تحميل المحادثة');
  waInboxMessages=data.messages||[];waMessagesNextBefore=data.has_more?data.next_before:null;waReadThroughMessageId=data.read_through_message_id||null;
+  /* R1 (8 Nov): is the reply agent out of this chat because Ahmed took it? Shown as a banner with «رجّعها للعقل». */
+  {const holdConv=waInboxActiveConversation;waInboxInvoke({action:'chat_hold',conversation_id:id}).then(r=>{if(waInboxActiveConversation===holdConv){holdConv._hold=r&&r.hold||null;renderWhatsAppChat(true);}}).catch(()=>{});}
  waAutomationEvents=data.automation_events||[];waInboxRequests=data.requests||[];waInboxSelectedRequestId=null;
  const active=waInboxRequests.filter(r=>r.status==='active'||r.status==='paused');if(active.length===1)waInboxSelectedRequestId=active[0].id;
  if(data.client)waInboxActiveConversation.client=data.client;
@@ -4081,7 +4083,7 @@ async function previewWhatsAppImage(messageId,button){
 }
 async function clearWhatsAppHandoff(){
   if(!waInboxActiveConversation)return;
-  try{await waInboxInvoke({action:'clear_handoff',conversation_id:waInboxActiveConversation.id});waInboxActiveConversation.human_handoff_required=false;waInboxActiveConversation.handoff_reason=null;var row=waInboxConversations.find(x=>x.id===waInboxActiveConversation.id);if(row){row.human_handoff_required=false;row.handoff_reason=null}renderWhatsAppChat();renderWhatsAppConversations();showToast('✅ تم إنهاء تنبيه التدخل البشري','success')}catch(e){showToast('⚠️ '+e.message,'error')}
+  try{await waInboxInvoke({action:'clear_handoff',conversation_id:waInboxActiveConversation.id});waInboxActiveConversation.human_handoff_required=false;waInboxActiveConversation.handoff_reason=null;waInboxActiveConversation._hold=null;var row=waInboxConversations.find(x=>x.id===waInboxActiveConversation.id);if(row){row.human_handoff_required=false;row.handoff_reason=null}renderWhatsAppChat();renderWhatsAppConversations();showToast('✅ تم إنهاء تنبيه التدخل البشري','success')}catch(e){showToast('⚠️ '+e.message,'error')}
 }
 function renderWhatsAppChat(preserveScroll){
   const c=waInboxActiveConversation;if(!c)return;const cl=c.client||{};
@@ -4089,6 +4091,7 @@ function renderWhatsAppChat(preserveScroll){
   if(Number(c.unread_count||0)>0)head.insertAdjacentHTML('beforeend','<span title="فتح المحادثة داخل النظام لا يؤكد قراءتها في تطبيق واتساب" style="font-size:10px;color:#925c12">حالة القراءة في الهاتف غير متزامنة</span>');
   const strip=$('waClientStrip');strip.style.display='flex';let sh='';
   if(c.human_handoff_required){sh+='<div style="width:100%;background:#FFF1F2;border:1px solid #FECDD3;color:#9F1239;padding:8px 10px;border-radius:9px;margin-bottom:7px;display:flex;gap:8px;justify-content:space-between;align-items:center"><span>⚠️ <strong>يحتاج تدخل بشري:</strong> '+escapeHtml(c.handoff_reason||'مراجعة المحادثة واتخاذ إجراء')+'</span><button class="btn-secondary" style="padding:4px 8px;font-size:9px" onclick="clearWhatsAppHandoff()">✓ تمت المعالجة</button></div>';}
+  else if(c._hold==='manual_reply'||c._hold==='muted'){sh+='<div style="width:100%;background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;padding:8px 10px;border-radius:9px;margin-bottom:7px;display:flex;gap:8px;justify-content:space-between;align-items:center"><span>🤫 <strong>العقل ساكن هنا:</strong> '+(c._hold==='muted'?escapeHtml(c.agent_muted_reason||'مكتوم'):'رديت بنفسك، فالرد الآلي والمتابعات ما يرسلون لين ترجّعها')+'</span><button class="btn-secondary" style="padding:4px 8px;font-size:9px" onclick="clearWhatsAppHandoff()">↩️ رجّعها للعقل</button></div>';}
   sh+='<strong>اربط الرد بطلب:</strong> ';if(waInboxRequests.length){sh+=waInboxRequests.slice(0,8).map(r=>'<span class="wa-request-pill '+(r.id===waInboxSelectedRequestId?'selected':'')+'" onclick="selectWhatsAppRequest(\''+r.id+'\')">'+escapeHtml(waRequestSummary(r))+' · '+escapeHtml(requestStatusAr(r.status))+'</span>').join('')}else sh+='<span style="color:var(--sand-dark)">لا توجد طلبات مسجلة</span>';strip.innerHTML=sh;
   const body=$('waChatBody');if(!waInboxMessages.length){body.innerHTML='<div class="wa-empty-chat">لا توجد رسائل بعد.</div>'}else{body.innerHTML=(waMessagesNextBefore?'<button class="btn-secondary" onclick="loadOlderWhatsAppMessages()">عرض الرسائل الأقدم</button>':'')+waInboxMessages.map(m=>'<div class="wa-bubble '+(m.direction==='outbound'?'out':'in')+'">'+escapeHtml(waMessageText(m))+waAutomationBadge(m)+waImagePreviewButton(m)+'<span class="wa-msg-time">'+escapeHtml(waInboxTime(m.message_timestamp))+(m.direction==='outbound'&&m.delivery_status?' · '+escapeHtml(m.delivery_status):'')+'</span></div>').join('');if(!preserveScroll)setTimeout(()=>{body.scrollTop=body.scrollHeight},20)}
   $('waChatCompose').style.display='flex';

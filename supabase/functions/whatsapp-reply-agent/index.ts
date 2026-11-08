@@ -17,9 +17,11 @@ const DEBOUNCE_MS = Number(Deno.env.get("REPLY_DEBOUNCE_MS") || 35000); // wait 
 const HARD_HANDOFF = /^\s*(تفاوض|مشتري جاد|دراسة سعر)\s*:/;
 // Ahmed's strict rule (6 Nov): never promise the customer a reply ("بشوف وارد عليك"). Silence is better than a promise nobody keeps.
 const PROMISE_RE = /(بشوف|بأشوف|اشوف|أشوف|بتأكد|باتأكد|أتأكد|اتأكد|بأكد|باكد|أأكد|اأكد|بنسق|براجع|بسأل|بنشوف)[^\n]{0,40}(وارد|و ارد|وبرد|وأرد|وارجع|وبرجع|ونرد|ونرجع)\s*(لك|عليك|عليج|عليكم)|(برد|بارد|برجع|بنرد|بنرجع|بيرد)\s*(لك|عليك|عليج|عليكم)\s*(بعدين|بعد شوي|قريب)?\s*$/;
-// after Ahmed types in a chat, the agent gives him this long to answer the customer's next message himself, then carries on
-const STAFF_GRACE_MS = 30000;
-const STAFF_QUIET_HOURS = 2; // the last reply was typed by a person from the office in the last 2 hours → they are in the chat, stay out
+// R1 (Ahmed 8 Nov, docs/agent-rules.md): once a person from the office types in a chat, the agent stays out until Ahmed
+// hands it back from the inbox. Decided in SQL by crm_chat_hold() so the agent, follow-ups and inbox agree.
+// R2: no negotiation before the customer has visited that property: the agent books the visit instead.
+const NEGOTIATION_HANDOFF = /^\s*(تفاوض|مشتري جاد)\s*:/;
+const SAID_VISITED = /(زرت|زرنا|زرناه|زرناها|عاينت|عاينا|شفت البيت|شفت الفيلا|شفنا البيت|شفنا الفيلا|شفناه|شفناها|رحت شفت|رحنا شفنا|دخلت البيت|دخلنا)/;
 const ALLOWED_ORIGINS = ["https://omanvilla.github.io"]; // the approval screen asks for a rewrite from here
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -424,39 +426,14 @@ Deno.serve(async (req) => {
     if (!review && hardHandoff) { await watch(); return fail("human_handoff_open"); }
     if (!review && client.followup_suppressed) { await watch(); return fail("client_paused"); }
 
-    // someone from the office already answered after this message → stay quiet
-    // (an automated reply that went out while the customer was still typing does not count: this newer message still needs its answer)
-    const after = await db.from("whatsapp_messages").select("id").eq("conversation_id", conv.id).eq("direction", "outbound").eq("actor_type", "human")
-      .gt("message_timestamp", msg.message_timestamp).limit(1);
-    if (!review && (after.data || []).length) { await watch(); return fail("staff_replied"); }
-    // the office's last reply before this message was typed by a person a short while ago → they are in the chat.
-    // Once the agent has answered after them, or a couple of hours passed, the agent carries the conversation on.
-    const lastOut = await db.from("whatsapp_messages").select("actor_type,message_timestamp,message_type").eq("conversation_id", conv.id).eq("direction", "outbound")
-      .lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(1).maybeSingle();
-    const staffInChat = lastOut.data?.actor_type === "human" &&
-      new Date(msg.message_timestamp).getTime() - new Date(lastOut.data.message_timestamp).getTime() < STAFF_QUIET_HOURS * 3600 * 1000;
-    // a follow-up the owner sent from the daily list hands the chat to the agent; any other message of his keeps it quiet
-    let fromList = false;
-    if (staffInChat) {
-      const since = new Date(new Date(lastOut.data!.message_timestamp).getTime() - 2000).toISOString();
-      const [lf, lq] = await Promise.all([
-        db.from("whatsapp_visit_followups").select("id").eq("client_id", msg.client_id).eq("send_mode", "owner").gte("sent_at", since).limit(1),
-        db.from("whatsapp_outreach_queue").select("id").eq("client_id", msg.client_id).eq("reason", "owner_sent").gte("sent_at", since).limit(1),
-      ]);
-      fromList = (lf.data || []).length > 0 || (lq.data || []).length > 0;
-    }
-    // Ahmed's instruction (6 Nov): once he has stepped in and answered, the agent carries the chat on. It only waits
-    // a little so that, if he is still in the chat and answers this message himself, it stays quiet.
-    // A voice note from him means he is talking to the customer personally: then it keeps out as before.
-    if (!review && staffInChat && !fromList) {
-      if (lastOut.data?.message_type === "audio") { await watch(); return fail("staff_active"); }
-      await sleep(STAFF_GRACE_MS);
-      const [h2, n2] = await Promise.all([
-        db.from("whatsapp_messages").select("id").eq("conversation_id", conv.id).eq("direction", "outbound").eq("actor_type", "human").gt("message_timestamp", msg.message_timestamp).limit(1),
-        db.from("whatsapp_messages").select("id").eq("conversation_id", conv.id).eq("direction", "inbound").gt("message_timestamp", msg.message_timestamp).limit(1),
-      ]);
-      if ((h2.data || []).length) { await watch(); return fail("staff_replied"); }
-      if ((n2.data || []).length) return fail("superseded");
+    // R1: Ahmed (or anyone in the office) typed in this chat and has not handed it back → stay out (fails closed).
+    // Replaces the 6 Nov rule "carry on 30 seconds after Ahmed answers" that answered Tasnim mid-negotiation.
+    if (!review) {
+      const hold = await db.rpc("crm_chat_hold", { p_conversation: conv.id });
+      if (hold.error) { await watch(); return fail("hold_check_failed"); }
+      if (hold.data === "manual_reply") { await watch(); return fail("staff_active"); }
+      if (hold.data === "negotiation") { await watch(); return fail("human_handoff_open"); }
+      if (hold.data === "muted") { await watch(); return fail("agent_muted"); }
     }
     await watch();
     // the owner of a property we list writes to us: Ahmed answers owners himself
@@ -471,7 +448,7 @@ Deno.serve(async (req) => {
 
     const [histR, propsR, rulesR, priorR] = await Promise.all([
       db.from("whatsapp_messages").select("id,direction,message_type,body,transcript,media_id,actor_type,message_timestamp,matched_property_id,property_link_key,property_image_analysis")
-        .eq("conversation_id", conv.id).lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(30),
+        .eq("conversation_id", conv.id).lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(60),
       db.from("properties").select("id,title,internal_name,type,area,wilayat,price,bedrooms,bathrooms,land_size,built_size,listing_purpose,public_details,description,map_url,visit_method,visit_instructions,lockbox_image_url,owner_id,branch_key,rental_terms,rented_units")
         .eq("company_id", msg.company_id).eq("status", "available").eq("archived", false),
       db.from("whatsapp_reply_rules").select("id,situation,approved_reply,category,auto_send,auto_match_regex").eq("company_id", msg.company_id).eq("active", true).order("created_at", { ascending: false }).limit(40),
@@ -479,6 +456,15 @@ Deno.serve(async (req) => {
     ]);
     const history = (histR.data || []).reverse();
     const props = propsR.data || [];
+    // R2: the customer's visits, so the agent knows whether a price talk can start (only after a visit)
+    const visR = await db.from("viewings").select("property_id,viewing_date,status,properties(title,area,price)").eq("client_id", msg.client_id).eq("archived", false)
+      .order("viewing_date", { ascending: false }).limit(20);
+    const visits = visR.data || [];
+    const visitedIds = new Set<string>(visits.filter((v: any) => v.status === "done" && v.property_id).map((v: any) => v.property_id));
+    const VIS_AR: Record<string, string> = { done: "زارها", scheduled: "موعد محجوز", confirmed: "موعد مؤكد", postponed: "تأجلت", cancelled: "انلغت", no_show: "ما حضر" };
+    const visitsText = visits.length
+      ? visits.map((v: any) => `- ${v.properties?.title || v.properties?.area || "عقار"}${v.properties?.price ? ` (${Number(v.properties.price).toLocaleString("en-US")})` : ""} | ${v.viewing_date || ""} | ${VIS_AR[v.status] || v.status} | property_id=${v.property_id || ""}`).join("\n")
+      : "ما في أي زيارة مسجلة لهذا العميل";
     // the ad text for each property: its description, or else the longest caption of a reel about it
     const capR = props.length ? await db.from("instagram_media_catalog").select("property_id,caption,permalink,likes,comments").in("property_id", props.map((p: any) => p.id)) : { data: [] };
     for (const p of props as any[]) {
@@ -503,8 +489,15 @@ Deno.serve(async (req) => {
     }
     const budgetAskedBefore = (priorR.data || []).some((d: any) => d.analysis?.budget_asked_now === true);
     const tokens = await routeTokens(msg.company_id, conv.route_key);
-    const pr = await db.from("whatsapp_agent_prompts").select("key,content").in("key", ["brain", "knowledge"]);
-    const BRAIN = (pr.data || []).find((x: any) => x.key === "brain")?.content || "";
+    const pr = await db.from("whatsapp_agent_prompts").select("key,content").in("key", ["brain", "brain_base", "knowledge"]);
+    let BRAIN = (pr.data || []).find((x: any) => x.key === "brain")?.content || "";
+    // dry run only: try a brain from a repo commit (plus Ahmed's open CRM notes) before it goes live
+    if (dry && /^[0-9a-f]{40}$/.test(String(body?.brain_sha || ""))) {
+      const r = await fetch(`https://raw.githubusercontent.com/omanvilla/habib-crm/${body.brain_sha}/supabase/functions/whatsapp-reply-agent/brain.ts`);
+      const m = r.ok ? (await r.text()).match(/=\s*`([\s\S]*)`;?\s*$/) : null;
+      const base = (pr.data || []).find((x: any) => x.key === "brain_base")?.content || "";
+      if (m && m[1].length > 2000) BRAIN = m[1] + (base && BRAIN.startsWith(base) ? BRAIN.slice(base.length) : "");
+    }
     const INVESTOR_KNOWLEDGE = (pr.data || []).find((x: any) => x.key === "knowledge")?.content || "";
     if (BRAIN.length < 2000) return fail("prompt_missing", "failed");
 
@@ -583,6 +576,9 @@ Deno.serve(async (req) => {
       `الرقم اللي كلمنا عليه: ${conv.route_key === "barka" ? "رقم بركاء" : "رقم مسقط"}`,
       `هل سألنا عن الميزانية قبل في هذه المحادثة: ${budgetAskedBefore ? "نعم، لا تسأل مرة ثانية أبداً" : "لا"}`,
       `ملخص سابق للعميل: ${conv.ai_summary || "لا يوجد"}`,
+      "",
+      "زيارات العميل المسجلة في الـ CRM (التفاوض على السعر بس على عقار زاره فعلاً، هنا أو قال في المحادثة إنه زاره):",
+      visitsText,
       ...(conv.human_handoff_required && !hardHandoff ? [`موضوع محول لأحمد ولسا ما خلص (من ${String(conv.handoff_updated_at || "").slice(0, 16)}): ${conv.handoff_reason || ""}. أحمد بيكمل هذا الموضوع بنفسه. جاوب على الجديد في رسالة العميل عادي. واذا رسالته بس عن نفس الموضوع المحول (يستعجل أو يعيد نفس الطلب) لا تكرر "بشوف وارد عليك": reply_messages=[] و action=handoff`] : []),
       "",
       "العقارات المتاحة الآن (لا تعرض غيرها، ولا تذكر id للعميل):",
@@ -656,6 +652,17 @@ Deno.serve(async (req) => {
     if (linkedAvailable && texts.some((t) => SOLD_RE.test(t))) {
       texts = texts.filter((t) => !SOLD_RE.test(t));
       out.action = "handoff"; out.handoff_reason = "العقل كان بيقول العقار انباع وهو متوفر في الـ CRM، راجع المحادثة";
+    }
+    // R2 (Ahmed 8 Nov): no negotiation before the customer has visited that property. A discount / "last price" question
+    // before a visit gets "see it first" and the visit question; it is never handed to Ahmed as a negotiation (Tasnim, 7 Nov).
+    if (out.action === "handoff" && NEGOTIATION_HANDOFF.test(String(out.handoff_reason || ""))) {
+      const visitedThis = out.property_id ? visitedIds.has(out.property_id) : visitedIds.size > 0;
+      const saidVisited = history.some((h: any) => h.direction === "inbound" && SAID_VISITED.test(String(h.transcript || h.body || "")));
+      if (!visitedThis && !saidVisited) {
+        texts = ["شوف العقار أول واذا ناسبك نتكلم في السعر", "متى يناسبك تزور ؟"];
+        out.crm_note = short(`مهتم بالسعر قبل الزيارة: ${out.handoff_reason}`, 500);
+        out.action = "none"; out.handoff_reason = null; out.visit_first = true;
+      }
     }
     // the ad text goes once per conversation: if a long office message about this property already went out, drop it
     if (prop) {

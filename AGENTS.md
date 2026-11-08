@@ -4,6 +4,10 @@ Owner: Ahmed Habib Al Balushi. Use Arabic for owner-facing summaries. Repository
 
 Before changes read this file, `docs/current-state.md`, and [the detailed operating rules](docs/operating-rules-v15-20261021.md). Those business, account, financial, attribution, privacy and interface rules remain binding; they were moved verbatim to keep this entry point short. The explicit new Instagram authorization below supplements them. Latest owner instructions always take precedence.
 
+## Reply agent rules — 8 November 2026
+
+Before changing anything that decides what the reply agent or the follow-ups say or when they speak (`whatsapp-reply-agent` code or `brain.ts`, follow-up functions, handoff triggers), read [docs/agent-rules.md](docs/agent-rules.md) and follow its change procedure: look for conflicting rules in that file, in `brain.ts` and in Ahmed's open CRM notes, and **ask Ahmed before changing** when anything conflicts. Record every decision there and run its scenarios plus a dry run of the last 20 chats before publishing.
+
 ## Continuity, authorization and preservation
 
 Inspect actual main, review branches, pending edits, source, applied migrations/functions and published behavior. A branch is not a deployment. Ordinary implementation requests authorize meaningful tests and coordinated publication without repeated permission; respect audit-only/preview exceptions. Preserve other work and real history. No customer messages, social publishing, ads or paid upgrades merely because access exists. No fake production tokens, employee password changes, account reactivation or real customer test data. State exact verification limits and use reversible changes.

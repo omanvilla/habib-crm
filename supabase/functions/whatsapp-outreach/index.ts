@@ -223,6 +223,9 @@ async function sendRows(ids?: string[]) {
         db.from("whatsapp_conversations").select("id,meta_phone_number_id,last_inbound_at,route_key").eq("id", r.conversation_id).single(),
       ]);
       if (cl.data?.followup_suppressed) { await db.from("whatsapp_outreach_queue").update({ status: "skipped", reason: "client_paused" }).eq("id", r.id); continue; }
+      // R1/R3 (Ahmed 8 Nov): nothing goes to a chat Ahmed took or is negotiating in; the row waits until he hands it back
+      const hold = await db.rpc("crm_chat_hold", { p_conversation: r.conversation_id });
+      if (hold.error || hold.data) continue;
       // the client wrote after this was queued: the reply agent / owner handles the live conversation instead
       if (cv.data?.last_inbound_at && new Date(cv.data.last_inbound_at).getTime() > new Date(r.created_at).getTime()) {
         await db.from("whatsapp_outreach_queue").update({ status: "skipped", reason: "client_wrote_after" }).eq("id", r.id); continue;

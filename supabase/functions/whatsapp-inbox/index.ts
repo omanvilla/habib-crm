@@ -418,8 +418,17 @@ Deno.serve(async (req) => {
     if (action === "clear_handoff") {
       const conversationId=String(payload?.conversation_id||"").trim();if(!conversationId)return json({ok:false,error:"conversation_id_required"},400);
       const conversation=await getConversation(conversationId);if(!conversation)return json({ok:false,error:"conversation_not_found"},404);
-      const ur=await admin.from("whatsapp_conversations").update({human_handoff_required:false,handoff_reason:null,handoff_updated_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",conversationId).eq("company_id",companyId);if(ur.error)throw new Error(`clear_handoff_failed: ${ur.error.message}`);
+      // R1/R3 (Ahmed 8 Nov): «تمت المعالجة» / «رجّعها للعقل» is Ahmed handing the chat back to the reply agent
+      const nowIso=new Date().toISOString();
+      const ur=await admin.from("whatsapp_conversations").update({human_handoff_required:false,handoff_reason:null,handoff_updated_at:nowIso,agent_muted:false,agent_muted_reason:null,agent_returned_at:nowIso,updated_at:nowIso}).eq("id",conversationId).eq("company_id",companyId);if(ur.error)throw new Error(`clear_handoff_failed: ${ur.error.message}`);
       return json({ok:true});
+    }
+
+    if (action === "chat_hold") {
+      const conversationId=String(payload?.conversation_id||"").trim();if(!conversationId)return json({ok:false,error:"conversation_id_required"},400);
+      const conversation=await getConversation(conversationId);if(!conversation)return json({ok:false,error:"conversation_not_found"},404);
+      const h=await admin.rpc("crm_chat_hold",{p_conversation:conversationId});if(h.error)throw new Error(`chat_hold_failed: ${h.error.message}`);
+      return json({ok:true,hold:h.data||null});
     }
 
     return json({ok:false,error:"unknown_action"},400);
