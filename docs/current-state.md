@@ -438,3 +438,4 @@ Recovery: restore prior frontend and both prior WhatsApp shared modules before S
 - UI: muted-brain banner is one compact line; «متابعات اليوم» collapsed by default; approvals screen filters dry drafts in SQL and loads last messages per chat in parallel.
 - Calendar: BuNasser visit to Dar Global (Opera House) tentatively Mon 9 Nov 11:00.
 - Still open: property-missing-details WhatsApp alert, land-study pricing-day alert, Al Noor meeting event + English message, staff numbers excluded from request/outreach generation, closing the 42 notes.
+- (later that night, commit 2f2bdfe) Owner alerts: `whatsapp-owner-hot-alert` action `notify_owner`; cron `crm_property_alerts_run` (every 10 min) alerts on new properties with missing details and new land studies; `crm_properties_missing_details()` lists the backlog. Staff phones skipped in outreach/visit follow-ups (triggers). Unrecorded Shakhakheet visits of 7 Nov recorded retroactively. 21 of 42 notes closed (status done).

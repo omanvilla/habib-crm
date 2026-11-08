@@ -1,0 +1,3 @@
+-- 8 Nov 2026: staff and owner phones (profiles) never get generated follow-ups or outreach (Maram case).
+-- Trigger crm_repair_private.skip_staff_client() on whatsapp_outreach_queue and whatsapp_visit_followups (before insert returns null for staff phones).
+-- Applied via apply_migration skip_staff_followups_20261108.
