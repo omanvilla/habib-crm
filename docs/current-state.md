@@ -2,6 +2,13 @@
 
 Updated 2026-11-06. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 8 November 2026 (afternoon) — archive on the phone, videos of sold properties, hot buyer WhatsApp alert (e15230a, b522710)
+
+- **Archive on the phone.** The «السجلات» switch (active / sold / archived) was behind the phone «الفلاتر» button; it now stays visible next to the search (`crm-simple-ui.css`). Checked on desktop that the label exists; not checked on a real phone.
+- **Videos.** Today's reel `instagram:DfeJC4ICmTO` («الأولى انباعت، والتوين الثانية للحين متوفرة») linked to «فيلا الرميس 59 سلطان 2» through `instagram_decide` as Ahmed's decision (audited). The home «يحتاج قرارك» card now offers sold / reserved / archived properties too, tagged and after the available ones (the full list already did). The 241 older unlinked videos are mostly generic «تم البيع» captions; they need Ahmed to look, captions alone are not enough.
+- **R7 hot buyer alert.** Trigger `crm_owner_hot_alert` → `whatsapp-owner-hot-alert`: a «مشتري جاد» / «تفاوض» handoff on Barka or Muscat sends Ahmed's private number (owner profile phone) a text from that branch number: name, number, topic, wa.me link. Tested with a «تجربة» message from each number: both delivered (Meta 200). Works inside the 24 h window Ahmed opens daily with «هلا»; failures are recorded as `owner_hot_alert` events.
+- **Dry run.** Mohamed Al Harthy's 13:19 reel message now gets «الفيلا اللي سألت عنها في الرميس انباعت» + the 305/295 villa.
+
 ## 8 November 2026 (afternoon) — R6: a sold property gets the nearest available one (commit 378fc06, agent v47)
 
 - **CRM.** «فيلا الرميس 59 سلطان 2» (300/270) set `sold` (sold elsewhere, 8 Nov); «سلطان 1» (sold elsewhere before, was `available` + archived) set `sold`, still archived. The Rumais 59 villa 305/295 («هشام») is the one on offer. Marking Sultan 2 sold queued 11 «انحجزت / تحب تشوف خيارات ثانية ؟» notices, pending owner approval; Sultan 1 queued nothing new.
