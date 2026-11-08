@@ -87,6 +87,19 @@ Deno.serve(async (req) => {
   if (!ok || ok.error || ok.data !== true) return json({ ok: false, error: "not_authorized" }, 403);
   const body = await req.json().catch(() => ({}));
   if (body?.action === "keepalive") return json({ ok: true, routes: await keepAlive(body?.force === true) });
+  if (body?.action === "notify_owner") {
+    // Ahmed 8 Nov: plain alert text to his private number from the given branch number (missing property details, new land study).
+    const companyId = String(body?.company_id || ""), routeKey = body?.route_key === "barka" ? "barka" : "muscat", text = short(body?.text, 900);
+    if (!companyId || !text) return json({ ok: false, error: "company_and_text_required" }, 400);
+    const rts = await db.from("company_lead_routes").select("route_key,meta_phone_number_id").eq("company_id", companyId);
+    const rt = (rts.data || []).find((r: any) => r.route_key === routeKey);
+    const pf = await db.from("profiles").select("phone").eq("company_id", companyId).eq("role", "owner").eq("is_active", true).limit(1).maybeSingle();
+    const raw2 = digits(pf.data?.phone), to2 = raw2.length === 8 ? "968" + raw2 : raw2, pid = digits(rt?.meta_phone_number_id);
+    if (!to2 || !pid) return json({ ok: false, error: "route_missing" }, 500);
+    const sent = await metaText(await routeTokens(companyId, routeKey), pid, to2, text);
+    await db.from("whatsapp_automation_events").insert({ company_id: companyId, action_type: "owner_notify", status: sent.id ? "applied" : "failed", applied_at: sent.id ? new Date().toISOString() : null, reason: sent.error ? short(sent.error, 400) : String(body?.event_key || ""), payload: { route_key: routeKey, event_key: body?.event_key || null, to_owner: true, meta_message_id: sent.id } });
+    return json({ ok: !!sent.id, sent: !!sent.id, error: sent.error });
+  }
   const convId = String(body?.conversation_id || "");
   const test = body?.test === true;
   if (!convId) return json({ ok: false, error: "conversation_id_required" }, 400);
