@@ -27,6 +27,11 @@ test('R3: a negotiation handoff is not closed by a staff reply',()=>{
  assert(sql.includes('and not crm_repair_private.is_hard_handoff(c.handoff_reason)'));
  assert(sql.includes('and not crm_repair_private.is_hard_handoff(NEW.handoff_reason)'));
 });
+test('R6: a sold property gets "sold" plus the nearest available one; twins only when the sizes match',()=>{
+ assert(brain.includes('بعدها على طول اعرض أقرب عقار متاح للي سأل عنه'));
+ assert(brain.includes('توين حقيقي'));
+ assert(agent.includes('linkedSold'));
+});
 test('the rules file keeps the change procedure',()=>{
  assert(rules.includes('اسأل أحمد قبل التعديل'));
 });

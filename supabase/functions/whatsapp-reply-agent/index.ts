@@ -537,9 +537,11 @@ Deno.serve(async (req) => {
 
     // recently sold or booked: the agent must recognise them and answer with the sold rule, never offer them
     let soldList = "";
+    let soldRows: any[] = [];
     try {
-      const sr = await db.from("properties").select("type,area,wilayat,price,status,title").eq("company_id", msg.company_id).in("status", ["sold", "reserved"])
+      const sr = await db.from("properties").select("id,type,area,wilayat,price,status,title").eq("company_id", msg.company_id).in("status", ["sold", "reserved"])
         .eq("archived", false).gte("updated_at", new Date(Date.now() - 150 * 86400000).toISOString()).limit(40);
+      soldRows = sr.data || [];
       soldList = (sr.data || []).map((p: any) => `- ${typeAr(p.type)} | ${[p.area, p.wilayat].filter(Boolean).join("، ")} | ${p.price ? Number(p.price).toLocaleString("en-US") + " ريال" : ""} | ${p.status === "sold" ? "انباع" : "انحجز"}`).join("\n");
     } catch (_) { /* optional */ }
     // the same customer may be talking to the other branch number too
@@ -649,7 +651,14 @@ Deno.serve(async (req) => {
     // never tell a customer that a property is sold when the CRM still lists it as available
     const SOLD_RE = /ابتاع|انباع|انحجز|تم البيع|مباع/;
     const linkedAvailable = props.some((p: any) => p.id === out.property_id || history.some((h: any) => h.matched_property_id === p.id));
-    if (linkedAvailable && texts.some((t) => SOLD_RE.test(t))) {
+    // R6 (8 Nov): when the customer asked about a property that really was sold, "انباع" + the nearest available one is the
+    // right answer, even though the alternative is available: the guard is only for calling an available one sold.
+    const soldIds = new Set<string>(soldRows.map((s: any) => s.id));
+    const linkedSold = history.some((h: any) => soldIds.has(h.matched_property_id))
+      || Object.values(reels).some((r: any) => soldIds.has(r.property_id) || (r.propertyIds || []).some((id: string) => soldIds.has(id)))
+      || (!!prop && texts.some((t) => /بس عندنا/.test(t)) && soldRows.some((s: any) => s.type === prop.type
+        && String(s.area || "").replace(/^بركاء\s+/, "") === String(prop.area || "").replace(/^بركاء\s+/, "")));
+    if (linkedAvailable && !linkedSold && texts.some((t) => SOLD_RE.test(t))) {
       texts = texts.filter((t) => !SOLD_RE.test(t));
       out.action = "handoff"; out.handoff_reason = "العقل كان بيقول العقار انباع وهو متوفر في الـ CRM، راجع المحادثة";
     }
