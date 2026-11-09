@@ -46,6 +46,7 @@
     const page=byId('page-dash');if(!page)return null;
     let box=byId('crmFollowups');
     if(!box){box=document.createElement('section');box.id='crmFollowups';box.className='card cfu';box.hidden=true;}
+    if(box.closest('#cohSheetBody'))return box;
     const home=byId('crmOwnerHome'),header=page.querySelector('.page-header');
     if(home&&!home.hidden){if(box.parentNode!==home||home.firstChild!==box)home.prepend(box);}
     else if(header&&box.previousElementSibling!==header)header.after(box);
@@ -69,6 +70,7 @@
     const n=++seq,r=await supa.rpc('crm_followups_today');
     if(n!==seq||r.error||!r.data)return;
     data=r.data;render();
+    document.dispatchEvent(new Event('crm-followups-updated'));
   }
   async function rewrite(b){
     const k=b.dataset.k,box=b.closest('.cfu-instr'),err=box.querySelector('.cfu-err'),ta=box.querySelector('.cfu-instr-text');
@@ -96,6 +98,7 @@
   document.addEventListener('input',e=>{const t=e.target;if(t&&t.classList&&t.classList.contains('cfu-instr-text'))drafts.set(t.dataset.k,t.value);});
   // Back from WhatsApp: the sent message has reached the system, so the list shrinks.
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&byId('page-dash')?.classList.contains('active'))setTimeout(()=>load().catch(()=>{}),2500);});
+  window.crmFollowupsCount=()=>(data.items||[]).length;
   window.crmFollowupsRefresh=()=>load().catch(()=>{});
   const loadDash=window.loadDashboard;
   if(typeof loadDash==='function')window.loadDashboard=function(){const r=loadDash.apply(this,arguments);setTimeout(window.crmFollowupsRefresh,800);return r;};
