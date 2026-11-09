@@ -660,6 +660,14 @@ Deno.serve(async (req) => {
     if (budgetAskedBefore) texts = texts.filter((t) => !/ميزاني|في حدود كم|كم تقريب/.test(t));
     texts = texts.filter((t) => !/(الموظف|موظف)\s*(بيتواصل|يتواصل|بيرد|يرد)|بيتواصل معك الموظف|تم تحويل/.test(t));
     texts = texts.filter((t) => !PROMISE_RE.test(t));
+    // R14 (9 Nov): never send a line we already sent to this customer in the last 15 minutes (Amer Ali got "ارسل الكروكي" twice)
+    if (!review && texts.length) {
+      const recent = await db.from("whatsapp_messages").select("body").eq("conversation_id", conv.id).eq("direction", "outbound")
+        .gt("message_timestamp", new Date(Date.now() - 15 * 60 * 1000).toISOString()).limit(40);
+      const norm = (t: unknown) => String(t || "").replace(/[\s؟?.!،,]+/g, " ").trim();
+      const seen = new Set((recent.data || []).map((r: any) => norm(r.body)).filter(Boolean));
+      texts = texts.filter((t) => !seen.has(norm(t)));
+    }
     // never tell a customer that a property is sold when the CRM still lists it as available
     const SOLD_RE = /ابتاع|انباع|انحجز|تم البيع|مباع/;
     const linkedAvailable = props.some((p: any) => p.id === out.property_id || history.some((h: any) => h.matched_property_id === p.id));
