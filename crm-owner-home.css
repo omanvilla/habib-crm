@@ -94,3 +94,4 @@ body.coh-lock{overflow:hidden}
 #cohSheetBody>#crmFollowups{display:block!important;padding:0!important;border:0!important;box-shadow:none!important;background:none!important;backdrop-filter:none}
 #cohSheetBody>#crmFollowups[hidden]{display:none!important}
 #cohSheetBody .cfu-title{display:none}
+#page-dash.coh-on>#crmFollowups{display:none!important}
