@@ -455,47 +455,81 @@ async function alertSerious(companyId: string, clientId: string, name: string, b
   await db.from("notifications").insert({ user_id: o.data.id, type: "whatsapp_handoff", is_read: false, client_id: clientId, link: "whatsapp", title: `🔥 مشتري جاد: ${name || "عميل"}`, body: short(body, 400) });
 }
 
-// Past visits with no result: the AI reads the chat when the client has written since the last check, and saves the result.
+// Past visits with no result. Owner's rule 9 Nov: no visit stays open.
+// 1. The client wrote after the visit day: the AI reads the chat and saves the result (done / no_show / postponed / cancelled).
+// 2. Otherwise, or if the chat does not say: the property is sold or off the list -> «cancelled» with that reason (1 day after);
+//    nothing known 5 days after the visit -> «cancelled» with a note that no result was found, so nothing hangs open.
+// 3. A chat the owner holds himself (muted, he wrote by hand, negotiation) is never closed here; it shows on his list as held.
+const NO_RESULT_DAYS = 5;
 async function visitResults(companyId: string, out: Record<string, number>) {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
-  const from = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().slice(0, 10);
-  const vs = await db.from("viewings").select("id,company_id,client_id,property_id,viewing_date,viewing_time,status,notes,ai_checked_at,row_version,properties(type,area),clients(name)")
+  const from = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const vs = await db.from("viewings").select("id,company_id,client_id,property_id,viewing_date,viewing_time,status,notes,ai_checked_at,row_version,properties(type,area,status,archived),clients(name)")
     .eq("company_id", companyId).eq("archived", false).in("status", ["scheduled", "confirmed", "postponed"]).lt("viewing_date", today).gte("viewing_date", from)
-    .order("viewing_date", { ascending: false }).limit(60);
-  let budget = AFTER_VISIT_PER_RUN;
+    .order("viewing_date", { ascending: false }).limit(80);
+  let budget = AFTER_VISIT_PER_RUN * 2;
+  const dayMs = 24 * 3600 * 1000;
   for (const v of vs.data || []) {
-    if (budget <= 0) break;
-    // only when the client wrote after the visit day and after the last check
-    const since = [`${v.viewing_date}T00:00:00+04:00`, v.ai_checked_at].filter(Boolean).map((d: string) => new Date(d).getTime());
+    const now = new Date().toISOString();
+    const pr: any = (v as any).properties || {};
+    const daysOver = Math.floor((new Date(`${today}T00:00:00+04:00`).getTime() - new Date(`${v.viewing_date}T00:00:00+04:00`).getTime()) / dayMs);
     const convs = await db.from("whatsapp_conversations").select("id").eq("company_id", companyId).eq("client_id", v.client_id).in("route_key", ["barka", "muscat"]).limit(2);
     const ids = (convs.data || []).map((c: any) => c.id);
-    if (!ids.length) continue;
-    const lastIn = await db.from("whatsapp_messages").select("message_timestamp").in("conversation_id", ids).eq("direction", "inbound").order("message_timestamp", { ascending: false }).limit(1).maybeSingle();
-    const at = lastIn.data?.message_timestamp ? new Date(lastIn.data.message_timestamp).getTime() : 0;
-    if (!at || at <= Math.max(...since)) continue;
-    budget--;
-    const now = new Date().toISOString();
-    try {
-      const r = await judgeResult(v, today);
-      if (!r) continue;
-      const stamp = `[الذكاء الاصطناعي ${today}] ${short(r.note, 300)}`;
-      const notes = [v.notes, stamp].filter(Boolean).join("\n").slice(0, 2000);
-      let patch: any = null;
-      if (r.confidence >= 0.75) {
-        if (r.result === "done") {
-          const o = OPINION[r.opinion];
-          patch = { status: "done", client_feedback: o?.feedback || null, liked: o ? o.liked : null, pipeline_outcome: o?.outcome || "followup",
-            rejection_reason: r.opinion === "disliked" ? (r.reason || null) : null, outcome_note: short(r.note, 500), notes };
-        } else if (r.result === "no_show") patch = { status: "no_show", attendance: "not_attended", notes };
-        else if (r.result === "cancelled") patch = { status: "cancelled", notes };
-        else if (r.result === "postponed") patch = /^\d{4}-\d{2}-\d{2}$/.test(r.new_date || "") && r.new_date >= today ? { status: "scheduled", viewing_date: r.new_date, notes } : { status: "postponed", notes };
+    // the owner holds this chat: leave the visit as it is
+    let held = false;
+    let heldWhy = "";
+    for (const id of ids) { const h = await db.rpc("crm_chat_hold", { p_conversation: id }); if (h.data) { held = true; heldWhy = String(h.data); } }
+    if (held) {
+      out.visit_held_by_owner = (out.visit_held_by_owner || 0) + 1;
+      if (!String(v.notes || "").includes("[موقوفة عند أحمد]")) {
+        const why = heldWhy === "muted" ? "العقل موقوف عندك" : heldWhy === "negotiation" ? "العميل في تفاوض معك" : "أنت ترد على المحادثة بنفسك";
+        await db.from("viewings").update({ notes: [v.notes, `[موقوفة عند أحمد] ${today}: ${why}، الزيارة تنتظر نتيجتك`].filter(Boolean).join("\n").slice(0, 2000) }).eq("id", v.id);
       }
+      continue;
+    }
+    let patch: any = null, judged = false;
+    const since = [`${v.viewing_date}T00:00:00+04:00`, v.ai_checked_at].filter(Boolean).map((d: string) => new Date(d).getTime());
+    let at = 0;
+    if (ids.length) {
+      const lastIn = await db.from("whatsapp_messages").select("message_timestamp").in("conversation_id", ids).eq("direction", "inbound").order("message_timestamp", { ascending: false }).limit(1).maybeSingle();
+      at = lastIn.data?.message_timestamp ? new Date(lastIn.data.message_timestamp).getTime() : 0;
+    }
+    try {
+      if (at && at > Math.max(...since) && budget > 0) {
+        budget--; judged = true;
+        const r = await judgeResult(v, today);
+        if (r) {
+          const stamp = `[الذكاء الاصطناعي ${today}] ${short(r.note, 300)}`;
+          const notes = [v.notes, stamp].filter(Boolean).join("\n").slice(0, 2000);
+          if (r.confidence >= 0.75) {
+            if (r.result === "done") {
+              const o = OPINION[r.opinion];
+              patch = { status: "done", client_feedback: o?.feedback || null, liked: o ? o.liked : null, pipeline_outcome: o?.outcome || "followup",
+                rejection_reason: r.opinion === "disliked" ? (r.reason || null) : null, outcome_note: short(r.note, 500), notes };
+            } else if (r.result === "no_show") patch = { status: "no_show", attendance: "not_attended", notes };
+            else if (r.result === "cancelled") patch = { status: "cancelled", notes };
+            else if (r.result === "postponed") patch = /^\d{4}-\d{2}-\d{2}$/.test(r.new_date || "") && r.new_date >= today ? { status: "scheduled", viewing_date: r.new_date, notes } : { status: "postponed", notes };
+          }
+          if (r.serious && r.confidence >= 0.6) { await alertSerious(companyId, v.client_id, (v as any).clients?.name, `${typeAr(pr.type)} في ${pr.area || ""}: ${r.note}`); out.serious_alert = (out.serious_alert || 0) + 1; }
+          if (patch) out[`visit_result_${r.result}`] = (out[`visit_result_${r.result}`] || 0) + 1; else out.visit_result_unclear = (out.visit_result_unclear || 0) + 1;
+        }
+      }
+      // nothing found in the chat: close by rule so the visit does not stay open
+      if (!patch) {
+        const unavailable = ["sold", "withdrawn"].includes(pr.status) || pr.archived === true;
+        if (unavailable && daysOver >= 1) {
+          patch = { status: "cancelled", notes: [v.notes, `[الذكاء الاصطناعي ${today}] الزيارة ما صار لها نتيجة والعقار ${pr.status === "sold" ? "انباع" : "ما عاد متاح"}`].filter(Boolean).join("\n").slice(0, 2000) };
+          out.visit_closed_unavailable = (out.visit_closed_unavailable || 0) + 1;
+        } else if (daysOver >= NO_RESULT_DAYS) {
+          patch = { status: "cancelled", notes: [v.notes, `[الذكاء الاصطناعي ${today}] ما لقيت في المحادثة نتيجة للزيارة بعد ${daysOver} أيام، انغلقت بدون نتيجة`].filter(Boolean).join("\n").slice(0, 2000) };
+          out.visit_closed_no_result = (out.visit_closed_no_result || 0) + 1;
+        }
+      }
+      if (!patch && !judged) continue;
       const w = await db.from("viewings").update({ ...(patch || {}), ai_checked_at: now }).eq("id", v.id).eq("row_version", v.row_version).in("status", ["scheduled", "confirmed", "postponed"]);
       if (w.error) throw new Error(w.error.message);
-      const k = patch ? `visit_result_${r.result}` : "visit_result_unclear"; out[k] = (out[k] || 0) + 1;
       // the follow-up for this visit on his list was written before the result: read it again with the result known
       if (patch) await db.from("whatsapp_visit_followups").update({ reviewed_at: null }).eq("viewing_id", v.id).eq("status", "awaiting_approval");
-      if (r.serious && r.confidence >= 0.6) { await alertSerious(companyId, v.client_id, (v as any).clients?.name, `${typeAr((v as any).properties?.type)} في ${(v as any).properties?.area || ""}: ${r.note}`); out.serious_alert = (out.serious_alert || 0) + 1; }
     } catch (e) { out.visit_result_failed = (out.visit_result_failed || 0) + 1; console.error("[followup-auto] visit result", String((e as any)?.message || e)); }
   }
 }
