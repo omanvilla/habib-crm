@@ -848,7 +848,20 @@ Deno.serve(async (req) => {
     out.reply_messages = (out.reply_messages || []).map((r: string) => arabicOnly(r));
     const projectNamed = await mentionsProject(msg.company_id, out.reply_messages);
     if (projectNamed) analysis.project_named = true;
-    const holdForOwner = rt.reply_agent_mode === "direct" && !redirectToMuscat && (["investor", "active_deal"].includes(out.category) || projectNamed);
+    // 9 Nov (Ahmed): investors are answered by the agent too (anything it does not know comes back to him as a handoff); only running deals wait
+    const holdForOwner = rt.reply_agent_mode === "direct" && !redirectToMuscat && out.category === "active_deal";
+    // 9 Nov (Ahmed): a chat whose customer last wrote more than 24h ago cannot get free text. It goes to «متابعة اليوم» with the proposed text instead of the approval screen.
+    if (!review && !dry && !redirectToMuscat && (out.reply_messages || []).length) {
+      const li = await db.from("whatsapp_messages").select("message_timestamp").eq("conversation_id", conv.id).eq("direction", "inbound").order("message_timestamp", { ascending: false }).limit(1).maybeSingle();
+      const lastInMs = li.data?.message_timestamp ? new Date(li.data.message_timestamp).getTime() : 0;
+      if (lastInMs && Date.now() - lastInMs > 23.5 * 3600 * 1000) {
+        const q = await db.from("whatsapp_outreach_queue").insert({ company_id: msg.company_id, kind: "request_followup", conversation_id: conv.id, client_id: client.id, route_key: conv.route_key, messages: out.reply_messages, status: "pending", reason: "تعدّى 24 ساعة بدون رد: يحتاج رد منك", dry_run: false, summary: short(out.crm_note, 120), scheduled_for: new Date().toISOString(), auto_ok: false, reviewed_at: new Date().toISOString(), review_reason: "تعدّى 24 ساعة بدون رد: افتح المحادثة وارسل الرد المقترح بنفسك", owner_text: out.reply_messages.join("\n") });
+        if (!q.error) {
+          await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages, status: "skipped", error: "outside_24h" }).eq("id", draftId);
+          return json({ ok: true, ignored: "outside_24h_to_followups" });
+        }
+      }
+    }
     if (dry || holdForOwner || (rt.reply_agent_mode === "approval" && !autoSend)) {
       // nothing to say (closing words, the other branch handles it): no empty card in the approval screen
       const nothing = !dry && !out.reply_messages.length && out.action === "none";
