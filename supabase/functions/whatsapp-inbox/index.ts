@@ -424,6 +424,16 @@ Deno.serve(async (req) => {
       return json({ok:true});
     }
 
+    if (action === "mute_agent") {
+      // Ahmed 9 Nov: «وقّف العقل هنا» — the reply agent, visit follow-ups and outreach stay out of this chat until he hands it back
+      const conversationId=String(payload?.conversation_id||"").trim();if(!conversationId)return json({ok:false,error:"conversation_id_required"},400);
+      const conversation=await getConversation(conversationId);if(!conversation)return json({ok:false,error:"conversation_not_found"},404);
+      const nowIso=new Date().toISOString();
+      const reason=String(payload?.reason||"").trim().slice(0,200)||"أحمد أوقف العقل هنا وبيرد بنفسه";
+      const ur=await admin.from("whatsapp_conversations").update({agent_muted:true,agent_muted_reason:reason,updated_at:nowIso}).eq("id",conversationId).eq("company_id",companyId);if(ur.error)throw new Error(`mute_agent_failed: ${ur.error.message}`);
+      return json({ok:true});
+    }
+
     if (action === "chat_hold") {
       const conversationId=String(payload?.conversation_id||"").trim();if(!conversationId)return json({ok:false,error:"conversation_id_required"},400);
       const conversation=await getConversation(conversationId);if(!conversation)return json({ok:false,error:"conversation_not_found"},404);
