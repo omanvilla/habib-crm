@@ -455,3 +455,7 @@ Recovery: restore prior frontend and both prior WhatsApp shared modules before S
 - Drafts: 18 old drafts regenerated with the new rules; 8 stale drafts skipped, 6 chats flagged «ارجع ورد بنفسك». owner_with_ahmed skips for two owners restored to pending by hand (Ahmed asked the agent to continue).
 - Calendar: Al Noor meeting confirmed 16:30 (evening 19:30 event removed).
 - Open: note b498b41a (general 24h reminder), carousel/photos sending for rentals, A/B assignment.
+
+### 9 Nov 2026 (11:30, investors)
+- eeb5669: chats >23.5h since last inbound go to «متابعة اليوم» (outreach_queue request_followup) instead of drafts; function v51.
+- 97384b4: brain.ts section «مستشار المستثمر» (Ahmed's consultant prompt); investors answered directly; unknown -> handoff. Project doc: claude/برومت-مستشار-المستثمرين-العقل.md. Project info comes only from project files.
