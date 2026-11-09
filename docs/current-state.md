@@ -448,3 +448,10 @@ Recovery: restore prior frontend and both prior WhatsApp shared modules before S
 - `crm_followup_effect` view + `crm_followup_compare()` (owner only): reply rate by follow-up wording. Only the fixed visit question exists so far (31 sent, 74% replied within 24h).
 - Ahmed (58bf26f1) locked as wanderer; 2 unrealistic clients locked.
 - Open notes: 2 — 5f02bd2f (lockbox code photo for Ahmed Al-Shaer Sumhan villa needed from Ahmed) and b498b41a (pre-24h reminder only exists for visit follow-ups, not for general "I'll reply later").
+
+## 9 Nov 2026 (10:30–11:30, Ahmed notes)
+- Brain a8bdebe: new section «قواعد أحمد (9 نوفمبر)»: SHC vs Sultan Qaboos question, 0% down offer until 30 Nov (only allowed project number), freehold for any nationality in SHC, old Wadi Zahl apartments sold, Khawd/Falah villas and Al-Shaer villa unavailable («ما متوفره» not sold), owners: mortgage/occupied → apologise like heirs, rental owner flow (5% after viewing), monthly rent wording, brokers/CV silent, English follow-up for English clients. Knowledge: freehold line + 0% exception. Synced via agent-prompt-sync (brain_base 50,290).
+- Data: archived 3 Falah Khawd villas (kept sold one) and Al-Shaer Sumhan villa; cancelled today's 16:00 viewing on Khawd 120(2); 3 corrective outreach rows queued (pending approval).
+- Drafts: 18 old drafts regenerated with the new rules; 8 stale drafts skipped, 6 chats flagged «ارجع ورد بنفسك». owner_with_ahmed skips for two owners restored to pending by hand (Ahmed asked the agent to continue).
+- Calendar: Al Noor meeting confirmed 16:30 (evening 19:30 event removed).
+- Open: note b498b41a (general 24h reminder), carousel/photos sending for rentals, A/B assignment.
