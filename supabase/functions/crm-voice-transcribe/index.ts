@@ -1,11 +1,16 @@
 // The owner records a voice note in the CRM (a note for Claude, or an instruction to the reply agent)
 // and gets it back as text. Owner only; the audio is not stored.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { VOICE_VOCAB } from "../_shared/voice.ts";
 const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false, autoRefreshToken: false } });
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 const MODEL = Deno.env.get("OPENAI_TRANSCRIBE_MODEL_V2") || "gpt-4o-transcribe";
 const FALLBACK = "gpt-4o-mini-transcribe";
+const VOICE_VOCAB =
+  "رسالة صوتية على واتساب لمكتب عقاري في سلطنة عمان باللهجة العمانية. " +
+  "فيلا، بيت، منزل، أرض، شقة، كورنر، توين، طابقين، غرفة ماستر، مجلس، صالة، مطبخ، دورات مياه، ارتداد، " +
+  "مساحة الأرض، مساحة البناء، متر، ألف، ريال، معاينة، زيارة، لوكيشن، الكروكي، الملكية، صاحب العقار، تمويل، الإسكان، عربون. " +
+  "بركاء، الرميس، الصومحان الجنوبية، الصومحان الشمالية، الهرم، الشخاخيط، حي العزة، المريصي، الحرادي، نعمان، الفليج، العبر، " +
+  "السيب، الخوض، المعبيلة، الحيل الجنوبية، العامرات، بوشر، العذيبة، الموالح، الغبرة، مدينة السلطان قابوس، مسقط، المصنعة، السويق.";
 const ALLOWED_ORIGINS = ["https://omanvilla.github.io"];
 Deno.serve(async (req) => {
   const origin = req.headers.get("origin") || "";
