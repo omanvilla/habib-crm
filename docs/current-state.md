@@ -459,3 +459,8 @@ Recovery: restore prior frontend and both prior WhatsApp shared modules before S
 ### 9 Nov 2026 (11:30, investors)
 - eeb5669: chats >23.5h since last inbound go to «متابعة اليوم» (outreach_queue request_followup) instead of drafts; function v51.
 - 97384b4: brain.ts section «مستشار المستثمر» (Ahmed's consultant prompt); investors answered directly; unknown -> handoff. Project doc: claude/برومت-مستشار-المستثمرين-العقل.md. Project info comes only from project files.
+
+## 9 نوفمبر (بعد الظهر)
+- تفريغ صوتيات أحمد (gpt-4o-transcribe + قاموس)، لوحة «العقل موقوف عندهم»، زر «وقّف العقل هنا»، إعادة تصميم الرئيسية (بلاطات + نوافذ)، إغلاق صفقات الزيارة الراكدة بعد 90 يوم، إصلاح cron سلوك العملاء.
+- R13: whatsapp-visit-followup-auto مثبت على 1627292، يقفل الزيارات الفائتة (عقار منتهي / 5 أيام بدون نتيجة) ويكتب ملاحظة للمحادثات الموقوفة. أول تشغيل: 14 زيارة انقفلت، 9 باقية حديثة (1–4 أيام).
+
