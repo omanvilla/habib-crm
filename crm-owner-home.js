@@ -9,7 +9,8 @@
   const num=v=>Number(v||0).toLocaleString('en-US');
   const isOwner=()=>typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.role==='owner';
   const SHOWN=6;
-  let sequence=0,showAll=false,visitsOpen=false;
+  let sequence=0,showAll=false,visitsOpen=false,pausedOpen=false,pausedFilter='all',paused={items:[],total:0};
+  const KIND={negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرارك',muted:'مكتوم عنهم',manual_reply:'رديت بنفسك'};
 
   function mount(){
     const page=byId('page-dash');if(!page)return null;
@@ -17,7 +18,7 @@
     if(box)return box;
     box=document.createElement('div');box.id='crmOwnerHome';box.className='coh';box.hidden=true;
     box.innerHTML=''
-      +'<section class="card coh-sec"><h2 class="coh-title">يحتاج قرارك</h2><div id="cohDecide"></div><div id="cohTwins"></div><div id="cohIg"></div></section>'
+      +'<section class="card coh-sec"><h2 class="coh-title">يحتاج قرارك</h2><div id="cohDecide"></div><div id="cohPaused"></div><div id="cohTwins"></div><div id="cohIg"></div></section>'
       +'<section class="card coh-sec"><h2 class="coh-title">مشاكل</h2><div id="cohProblems"></div></section>'
       +'<section class="card coh-sec"><h2 class="coh-title">العقارات</h2><div id="cohProperties"></div></section>'
       +'<section class="card coh-sec"><h2 class="coh-title">تقرير قصير</h2><div id="cohReport"></div></section>'
@@ -37,6 +38,9 @@
   function drawDecide(d,pending){
     const links=[];
     if(pending)links.push(link('ردود تنتظر موافقتك',pending,'replies'));
+    const fu=byId('crmFollowups'),fuN=fu&&!fu.hidden?fu.querySelectorAll('.cfu-item,li').length:0;
+    if(fu&&!fu.hidden)links.push('<button type="button" class="coh-link" data-coh="followups"><span>متابعة اليوم</span><b dir="ltr">'+(fuN?num(fuN):'')+'</b></button>');
+    if(Number(paused.total))links.push('<button type="button" class="coh-link" data-coh="paused" aria-expanded="'+pausedOpen+'"><span>العقل موقوف عندهم</span><b dir="ltr">'+num(paused.total)+'</b></button>');
     if(d.owner_leads_new)links.push(link('عروض ملاك جديدة هذا الأسبوع',d.owner_leads_new,'owner-leads'));
     const overdue=d.overdue||[],rows=showAll?overdue:overdue.slice(0,SHOWN);
     // Owner's decision 6 Nov: visit results are the AI's job (it reads the chats and records them). They are a box he can open,
@@ -56,6 +60,21 @@
     byId('cohDecide').innerHTML=h;
     // The Instagram cards keep their own code and buttons; only their place on the page changes.
     const ig=byId('igDiscoveryAlert'),slot=byId('cohIg');if(ig&&slot&&ig.parentNode!==slot)slot.append(ig);
+  }
+  function drawPaused(){
+    const box=byId('cohPaused');if(!box)return;
+    if(!pausedOpen||!paused.items.length){box.innerHTML='';return;}
+    const counts={};paused.items.forEach(i=>{counts[i.kind]=(counts[i.kind]||0)+1;});
+    const tabs=[['all','الكل',paused.items.length]].concat(Object.keys(KIND).filter(k=>counts[k]).map(k=>[k,KIND[k],counts[k]]))
+      .map(([k,l,n])=>'<button type="button" class="cfu-tab'+(pausedFilter===k?' on':'')+'" data-coh="pfilter" data-v="'+k+'" aria-pressed="'+(pausedFilter===k)+'">'+esc(l)+' <b dir="ltr">'+n+'</b></button>').join('');
+    const rows=paused.items.filter(i=>pausedFilter==='all'||i.kind===pausedFilter).map(i=>
+      '<li class="coh-row coh-paused" data-conv="'+esc(i.conversation_id)+'"><div class="coh-info"><strong>'+esc(i.name||'عميل')+' <small>'+esc(KIND[i.kind]||'')+'</small></strong>'
+      +'<small class="coh-note">السبب: '+esc(i.reason)+'</small>'
+      +(i.last_message?'<small class="coh-note">آخر رسالة منه: <span dir="auto">'+esc(i.last_message)+'</span></small>':'')
+      +(i.summary?'<small class="coh-note">'+esc(i.summary)+'</small>':'')+'</div>'
+      +'<div class="coh-paused-actions"><button type="button" class="btn-secondary coh-go" data-coh="popen" data-id="'+esc(i.conversation_id)+'">افتح المحادثة</button>'
+      +'<button type="button" class="btn-primary coh-go" data-coh="presume" data-id="'+esc(i.conversation_id)+'">كمّل يا عقل</button></div></li>').join('');
+    box.innerHTML='<div class="coh-subhead"><h3>العقل موقوف عندهم</h3></div><div class="cfu-tabs coh-ptabs">'+tabs+'</div><ul class="coh-list">'+rows+'</ul>';
   }
   // Identical properties where a video is on one and not on the other. Nothing links before a yes.
   function drawTwins(groups){
@@ -84,7 +103,8 @@
     const page=byId('page-dash'),box=mount();if(!page||!box)return;
     if(!isOwner()||typeof supa==='undefined'){box.hidden=true;page.classList.remove('coh-on');return;}
     const seq=++sequence;
-    const [home,pending,twinGroups]=await Promise.all([supa.rpc('crm_owner_home'),typeof window.crmPendingReplies==='function'?window.crmPendingReplies().catch(()=>0):0,supa.rpc('crm_property_twins')]);
+    const [home,pending,twinGroups,pz]=await Promise.all([supa.rpc('crm_owner_home'),typeof window.crmPendingReplies==='function'?window.crmPendingReplies().catch(()=>0):0,supa.rpc('crm_property_twins'),supa.rpc('crm_paused_chats')]);
+    if(pz&&!pz.error&&pz.data)paused=pz.data;
     if(seq!==sequence)return;
     if(home.error||!home.data){if(!last){box.hidden=true;page.classList.remove('coh-on');}return;}
     last={data:home.data,pending:pending||0,twins:twinGroups&&!twinGroups.error?twinGroups.data:[]};
@@ -94,13 +114,22 @@
   function render(){
     if(!last)return;
     const d=last.data;
-    drawDecide(d,last.pending);drawTwins(last.twins);drawProblems(d.problems||[]);drawProperties(d.properties||{});drawReport(d.report||{});
+    drawDecide(d,last.pending);drawPaused();drawTwins(last.twins);drawProblems(d.problems||[]);drawProperties(d.properties||{});drawReport(d.report||{});
   }
   document.addEventListener('click',e=>{
     const b=e.target.closest('[data-coh]');if(!b)return;
     const act=b.dataset.coh;
     if(act==='more'){showAll=!showAll;render();}
     else if(act==='visits'){visitsOpen=!visitsOpen;render();}
+    else if(act==='paused'){pausedOpen=!pausedOpen;render();if(pausedOpen){const t=byId('cohPaused');if(t&&t.scrollIntoView)t.scrollIntoView({behavior:'smooth',block:'start'});}}
+    else if(act==='pfilter'){pausedFilter=b.dataset.v||'all';render();}
+    else if(act==='followups'){const f=byId('crmFollowups');if(f&&f.scrollIntoView)f.scrollIntoView({behavior:'smooth',block:'start'});}
+    else if(act==='popen'&&typeof navigate==='function'&&typeof openWhatsAppConversation==='function'){navigate('whatsapp',null);setTimeout(()=>openWhatsAppConversation(b.dataset.id),300);}
+    else if(act==='presume'&&typeof waInboxInvoke==='function'){
+      b.disabled=true;const id=b.dataset.id,toast=(m,t)=>{if(typeof showToast==='function')showToast(m,t);};
+      waInboxInvoke({action:'clear_handoff',conversation_id:id}).then(()=>{paused.items=paused.items.filter(i=>i.conversation_id!==id);paused.total=paused.items.length;render();toast('رجّعتها للعقل','success');})
+        .catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});
+    }
     else if(act==='full'){const page=byId('page-dash'),open=page.classList.toggle('coh-full-open');b.setAttribute('aria-expanded',String(open));b.textContent=open?'إخفاء قائمة العمل الكاملة':'قائمة العمل الكاملة';}
     else if(act==='twin-yes'||act==='twin-no'){
       b.disabled=true;

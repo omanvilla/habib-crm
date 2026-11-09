@@ -41,3 +41,11 @@
 #cohIg .ig-discovery-alert[hidden]{display:none}
 #cohIg .ig-home-novideo{display:none}
 @media(max-width:600px){.coh-sec{padding:12px!important}.coh-row{flex-wrap:wrap}.coh-info{flex:1 1 100%}.coh-go{width:100%!important}}
+
+/* Paused chats panel (9 Nov 2026) */
+.coh-ptabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.coh-paused{align-items:flex-start;flex-wrap:wrap}
+.coh-paused .coh-info small:first-of-type{margin-inline-start:6px;color:#9a6b12}
+.coh-paused-actions{display:flex;flex-wrap:wrap;gap:8px;flex:0 0 auto}
+.coh-paused-actions .coh-go{min-height:44px}
+@media(max-width:560px){.coh-paused-actions{width:100%}.coh-paused-actions .coh-go{flex:1 1 0}}
