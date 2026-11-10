@@ -322,14 +322,29 @@ test('R17: a residency answer that opens with a denial is replaced by the two fi
  const NEG=re('NEG_RESIDENCY_RE');
  for(const s of ['ما في قيمة عقار تضمن إقامة دائمة بشكل تلقائي','ما في عقار يضمن للمشتري إقامة دائمة','ما في إقامة','لا يوجد عقار يضمن الإقامة'])assert(NEG.test(s),s);
  for(const s of ['ما عندنا شقق للإقامة الفندقية','الشراء بـ 50 الف وفوق يعطي إقامة للمشتري وعائلته','ما متوفر حالياً'])assert(!NEG.test(s),s);
- assert(agent.includes('texts = texts.flatMap((t) => (NEG_RESIDENCY_RE.test(t) ? fixed : [t]))'));
+ assert(agent.includes('const badResidency = (t: string) => NEG_RESIDENCY_RE.test(t) || promisesResidency(t);'));
+ assert(agent.includes('texts.flatMap((t) => (badResidency(t) ? fixed : [t]))'));
  assert(agent.includes('في مدينة السلطان هيثم الشراء بـ 50 الف وفوق يعطي إقامة للمشتري وعائلته وتتجدد كل سنتين حسب الأنظمة'));
+});
+test('R17: a line that promises residency is dropped, or replaced when no 50,000 fact is left',()=>{
+ const W=re('RESIDENCY_WORD_RE'),P=re('RESIDENCY_PROMISE_RE'),J=re('RESIDENCY_WORK_RE');
+ const promises=(t)=>W.test(t)&&P.test(t)&&!J.test(t);
+ for(const s of ['الإقامة الدائمة ما لها سعر محدد ومضمونة بمجرد شراء العقار','بمجرد ما تشتري تاخذ الاقامة','الإقامة مضمونة 100%','تحصل على إقامة تلقائياً'])assert(promises(s),s);
+ for(const s of ['في مدينة السلطان هيثم الشراء بـ 50 الف وفوق يعطي إقامة للمشتري وعائلته وتتجدد كل سنتين حسب الأنظمة','والإقامة الذهبية من 200 الف وتتجدد كل 10 سنوات','إقامة مالك العقار ما تعطي حق العمل تلقائياً','السعر مضمون لين نهاية الشهر'])assert(!promises(s),s);
+ assert(agent.includes('const factsKept = kept.some((t) => RESIDENCY_WORD_RE.test(t) && /50|٥٠|خمسين/.test(t));'));
+ assert(agent.includes('texts = factsKept ? kept :'));
 });
 test('R15: a client named «أم ...» is flagged as a woman in the context',()=>{
  const F=re('FEMALE_KUNYA_RE');
  for(const s of ['ام راكان','أم محسن | ','عميل | ام سالم'])assert(F.test(s),s);
  for(const s of ['إمام سالم','عبدالله','سلامة | '])assert(!F.test(s),s);
  assert(agent.includes('العميلة امرأة (اسمها «أم ...»): خاطبها بالمؤنث'));
+});
+test('R15: «Om Muhsen» typed in Latin letters counts only when the customer writes in Arabic',()=>{
+ const L=re('FEMALE_KUNYA_LATIN_RE');
+ for(const s of ['Om Muhsen Almosawy | Om Muhsen Almosawy',' | Um Rakan🤍','Umm Ali | ','x | oum_salem'])assert(L.test(s),s);
+ for(const s of ['Omar Ali | ','Mohammed | ','Ahmed Umair | ','Om | '])assert(!L.test(s),s);
+ assert(agent.includes('&& history.some((h: any) => h.direction === "inbound" && /[ء-ي]/.test(String(h.body || ""))))'));
 });
 test('every map link in the chat says which property it belongs to and whether it is still available',()=>{
  assert(agent.includes('const mapNote = (text: string) => {'));

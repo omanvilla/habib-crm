@@ -26,6 +26,15 @@ const CALL_PROMISE_RE = /(بتصل|باتصل|بأتصل)\s*(عليك|عليج|�
 const NEGOTIATION_HANDOFF = /^\s*(تفاوض|مشتري جاد)\s*:/;
 // R15: a name that starts with «أم» / «ام» (Umm Rakan) is a woman
 const FEMALE_KUNYA_RE = /(^|[\s|،,(])(أم|ام|إم)\s+[ء-ي]{2,}/;
+// the same name typed in Latin letters («Om Muhsen», «Umm Ali»). «Om» is also an Indian man's name (Om Prakash), so the
+// Latin form only counts when the customer writes to us in Arabic.
+const FEMALE_KUNYA_LATIN_RE = /(^|[\s|,(])(umm|um|oum|omm|om)[\s_.-]+[a-z]{3,}/i;
+// R17 (dry run 10 Nov): a residency line must not promise it («الإقامة الدائمة ما لها سعر محدد ومضمونة بمجرد شراء العقار»).
+// A line about work rights («ما تعطي حق العمل تلقائياً») is the allowed knowledge line and stays.
+const RESIDENCY_WORD_RE = /(إقام|اقام)(ة|ه)/;
+const RESIDENCY_PROMISE_RE = /مضمون|نضمن|يضمن\s*لك|تضمن\s*لك|تلقائي|بمجرد|ما\s*(لها|له)\s*سعر|100\s*%/;
+const RESIDENCY_WORK_RE = /حق\s*العمل|الشغل|وزارة\s*العمل|تشتغل/;
+const promisesResidency = (t: string) => RESIDENCY_WORD_RE.test(t) && RESIDENCY_PROMISE_RE.test(t) && !RESIDENCY_WORK_RE.test(t);
 // R17: a residency answer that opens with a denial («ما في عقار يضمن إقامة», «ما في إقامة», «ما في قيمة عقار تضمن...»)
 const NEG_RESIDENCY_RE = /^\s*(ما\s*(في|فيه)\s*(عقار|قيمة|شي)[^\n]{0,30}(يضمن|تضمن|يعطي|تعطي)[^\n]{0,20}(إقامة|اقامة)|ما\s*(في|فيه)\s*(إقامة|اقامة)|(لا\s*يوجد|ما\s*عندنا)\s*(عقار)?[^\n]{0,20}(يضمن|تضمن)[^\n]{0,20}(إقامة|اقامة))/;
 const SAID_VISITED = /(زرت|زرنا|زرناه|زرناها|عاينت|عاينا|شفت البيت|شفت الفيلا|شفنا البيت|شفنا الفيلا|شفناه|شفناها|رحت شفت|رحنا شفنا|دخلت البيت|دخلنا)/;
@@ -749,7 +758,9 @@ Deno.serve(async (req) => {
       `الوقت الحالي في عمان: ${omanNow()}`,
       `الاسم المسجل من الواتساب، مو دليل على اسمه الحقيقي: ${client.name || conv.customer_name || "غير معروف"}`,
       // R15 (dry run 10 Nov: «أم راكان» was still answered in the masculine): «أم فلان» is a woman, say it plainly
-      ...(FEMALE_KUNYA_RE.test(`${client.name || ""} | ${conv.customer_name || ""}`) ? ["العميلة امرأة (اسمها «أم ...»): خاطبها بالمؤنث في كل الكلام (تقدرين، تشوفينه، يناسبك، متى يناسبك تزورين ؟)، R15"] : []),
+      ...(FEMALE_KUNYA_RE.test(`${client.name || ""} | ${conv.customer_name || ""}`)
+        || (FEMALE_KUNYA_LATIN_RE.test(`${client.name || ""} | ${conv.customer_name || ""}`)
+          && history.some((h: any) => h.direction === "inbound" && /[ء-ي]/.test(String(h.body || "")))) ? ["العميلة امرأة (اسمها «أم ...»): خاطبها بالمؤنث في كل الكلام (تقدرين، تشوفينه، يناسبك، متى يناسبك تزورين ؟)، R15"] : []),
       `هل سألناه عن اسمه قبل: ${nameAskedBefore ? "نعم، لا تسأل مرة ثانية أبداً" : "لا"}`,
       ...(behaviorText ? [behaviorText, "(استخدم سلوك العميل لتفهم جديته وتختار أسلوب الرد: لا تعامل المتجوّل مثل الساخن، ولا ترد على الكل بنفس الأسلوب)"] : []),
       `الرقم اللي كلمنا عليه: ${conv.route_key === "barka" ? "رقم بركاء" : "رقم مسقط"}`,
@@ -858,9 +869,14 @@ Deno.serve(async (req) => {
     texts = texts.filter((t) => !PROMISE_RE.test(t));
     // R17 (Ahmed 9 Nov) and the dry run of 10 Nov: a residency answer must not open with a denial. The model still wrote
     // «ما في قيمة عقار تضمن إقامة دائمة» once, so such a line is replaced by Ahmed's two fixed residency lines.
-    if (texts.some((t) => NEG_RESIDENCY_RE.test(t))) {
+    // A line that promises residency («مضمونة بمجرد شراء العقار») goes the same way; when the other lines already give
+    // the 50,000 fact it is only dropped.
+    const badResidency = (t: string) => NEG_RESIDENCY_RE.test(t) || promisesResidency(t);
+    if (texts.some(badResidency)) {
       const fixed = ["في مدينة السلطان هيثم الشراء بـ 50 الف وفوق يعطي إقامة للمشتري وعائلته وتتجدد كل سنتين حسب الأنظمة", "والإقامة الذهبية من 200 الف وتتجدد كل 10 سنوات"];
-      texts = texts.flatMap((t) => (NEG_RESIDENCY_RE.test(t) ? fixed : [t])).filter((t, i, a) => a.indexOf(t) === i);
+      const kept = texts.filter((t) => !badResidency(t));
+      const factsKept = kept.some((t) => RESIDENCY_WORD_RE.test(t) && /50|٥٠|خمسين/.test(t));
+      texts = factsKept ? kept : texts.flatMap((t) => (badResidency(t) ? fixed : [t])).filter((t, i, a) => a.indexOf(t) === i);
     }
     // R14 (9 Nov): never send a line we already sent to this customer in the last 15 minutes (Amer Ali got "ارسل الكروكي" twice)
     if (!review && texts.length) {
