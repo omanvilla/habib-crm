@@ -316,3 +316,28 @@ test('8: the dry-run copy never sends; an inline dry run claims no draft, writes
  assert(sha.includes('${body.brain_sha}/supabase/functions/whatsapp-reply-agent/knowledge.ts'));
  assert(sha.includes('if (mk && mk[1].length > 1000) INVESTOR_KNOWLEDGE = mk[1];'));
 });
+
+// Dry run of 10 Nov 2026 (39 real chats): four misses fixed in code before publishing.
+test('R17: a residency answer that opens with a denial is replaced by the two fixed residency lines',()=>{
+ const NEG=re('NEG_RESIDENCY_RE');
+ for(const s of ['ما في قيمة عقار تضمن إقامة دائمة بشكل تلقائي','ما في عقار يضمن للمشتري إقامة دائمة','ما في إقامة','لا يوجد عقار يضمن الإقامة'])assert(NEG.test(s),s);
+ for(const s of ['ما عندنا شقق للإقامة الفندقية','الشراء بـ 50 الف وفوق يعطي إقامة للمشتري وعائلته','ما متوفر حالياً'])assert(!NEG.test(s),s);
+ assert(agent.includes('texts = texts.flatMap((t) => (NEG_RESIDENCY_RE.test(t) ? fixed : [t]))'));
+ assert(agent.includes('في مدينة السلطان هيثم الشراء بـ 50 الف وفوق يعطي إقامة للمشتري وعائلته وتتجدد كل سنتين حسب الأنظمة'));
+});
+test('R15: a client named «أم ...» is flagged as a woman in the context',()=>{
+ const F=re('FEMALE_KUNYA_RE');
+ for(const s of ['ام راكان','أم محسن | ','عميل | ام سالم'])assert(F.test(s),s);
+ for(const s of ['إمام سالم','عبدالله','سلامة | '])assert(!F.test(s),s);
+ assert(agent.includes('العميلة امرأة (اسمها «أم ...»): خاطبها بالمؤنث'));
+});
+test('every map link in the chat says which property it belongs to and whether it is still available',()=>{
+ assert(agent.includes('const mapNote = (text: string) => {'));
+ assert(agent.includes('extra += mapNote(h.body);'));
+ assert(agent.includes('select("id,type,area,wilayat,price,status,title,map_url")'),'the sold list carries map_url');
+ assert(agent.includes('"id,type,area,wilayat,price,listing_purpose,status,archive_reason,map_url"'),'the no-longer-available list carries map_url');
+});
+test('a client who only answers «اسمك الكريم ؟» gets the next step, not silence',()=>{
+ const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
+ assert(brain.includes('إذا رده كان بس اسمه (جواب "اسمك الكريم ؟") وقبلها كان يسأل أو يبي تفاصيل: لا تسكت.'));
+});

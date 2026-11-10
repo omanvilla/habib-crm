@@ -150,7 +150,8 @@
   function refresh(){
     scheduled=false;observer.disconnect();
     try{clientFilters();simpleFilters();adapters.forEach(syncSelect);actionMenus();chrome();}
-    finally{observer.observe(document.body,{childList:true,subtree:true});}
+    // characterData too (10 Nov 2026): a count written into an existing text node («النشطة · 7») left the select at «· 0»
+    finally{observer.observe(document.body,{childList:true,subtree:true,characterData:true});}
   }
   function install(){
     document.body.classList.add('crm-design');

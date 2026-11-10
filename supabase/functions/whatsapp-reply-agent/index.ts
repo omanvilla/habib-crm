@@ -24,6 +24,10 @@ const CALL_PROMISE_RE = /(بتصل|باتصل|بأتصل)\s*(عليك|عليج|�
 // hands it back from the inbox. Decided in SQL by crm_chat_hold() so the agent, follow-ups and inbox agree.
 // R2: no negotiation before the customer has visited that property: the agent books the visit instead.
 const NEGOTIATION_HANDOFF = /^\s*(تفاوض|مشتري جاد)\s*:/;
+// R15: a name that starts with «أم» / «ام» (Umm Rakan) is a woman
+const FEMALE_KUNYA_RE = /(^|[\s|،,(])(أم|ام|إم)\s+[ء-ي]{2,}/;
+// R17: a residency answer that opens with a denial («ما في عقار يضمن إقامة», «ما في إقامة», «ما في قيمة عقار تضمن...»)
+const NEG_RESIDENCY_RE = /^\s*(ما\s*(في|فيه)\s*(عقار|قيمة|شي)[^\n]{0,30}(يضمن|تضمن|يعطي|تعطي)[^\n]{0,20}(إقامة|اقامة)|ما\s*(في|فيه)\s*(إقامة|اقامة)|(لا\s*يوجد|ما\s*عندنا)\s*(عقار)?[^\n]{0,20}(يضمن|تضمن)[^\n]{0,20}(إقامة|اقامة))/;
 const SAID_VISITED = /(زرت|زرنا|زرناه|زرناها|عاينت|عاينا|شفت البيت|شفت الفيلا|شفنا البيت|شفنا الفيلا|شفناه|شفناها|رحت شفت|رحنا شفنا|دخلت البيت|دخلنا)/;
 // R16 (9 Nov): our after-visit question («كيف لقيت…» / «قدرت تشوفه ؟» / «قدرتي تشوفينه ؟»), not a question about a video or photos
 const AFTER_VISIT_Q = /كيف\s*لقي|قدرت[يوا]*\s*تشوف/;
@@ -614,7 +618,7 @@ Deno.serve(async (req) => {
     try {
       // newest first (8 Nov: with 55 sold rows and no order, a property sold today could miss the 40), archived ones included
       // (a property sold elsewhere is often archived, and its old reels still bring questions)
-      const sr = await db.from("properties").select("id,type,area,wilayat,price,status,title").eq("company_id", msg.company_id).in("status", ["sold", "reserved"])
+      const sr = await db.from("properties").select("id,type,area,wilayat,price,status,title,map_url").eq("company_id", msg.company_id).in("status", ["sold", "reserved"])
         .gte("updated_at", new Date(Date.now() - 150 * 86400000).toISOString()).order("updated_at", { ascending: false }).limit(40);
       soldRows = sr.data || [];
       soldList = (sr.data || []).map((p: any) => `- ${typeAr(p.type)} | ${[p.area, p.wilayat].filter(Boolean).join("، ")} | ${p.price ? Number(p.price).toLocaleString("en-US") + " ريال" : ""} | ${p.status === "sold" ? "انباع" : "انحجز"}`).join("\n");
@@ -627,8 +631,8 @@ Deno.serve(async (req) => {
       const since = new Date(Date.now() - 150 * 86400000).toISOString();
       const goneQ = (cols: string) => db.from("properties").select(cols).eq("company_id", msg.company_id).eq("archived", true).in("status", ["withdrawn", "not_available"])
         .gte("archived_at", since).order("archived_at", { ascending: false }).limit(40);
-      let gr: any = await goneQ("id,type,area,wilayat,price,listing_purpose,status,archive_reason");
-      if (gr.error) gr = await goneQ("id,type,area,wilayat,price,listing_purpose,status");
+      let gr: any = await goneQ("id,type,area,wilayat,price,listing_purpose,status,archive_reason,map_url");
+      if (gr.error) gr = await goneQ("id,type,area,wilayat,price,listing_purpose,status,map_url");
       goneRows = ((gr.data || []) as any[]).filter((p: any) => !["duplicate", "test_record"].includes(String(p.archive_reason || "")));
       goneList = goneRows.map((p: any) => `- ${neutralLabel(p)} | ${ARCHIVE_REASON_AR[String(p.archive_reason || "")] || "ما عاد متوفر"}`).join("\n");
     } catch (_) { /* optional */ }
@@ -643,6 +647,18 @@ Deno.serve(async (req) => {
         otherRoute = `محادثة نفس العميل على الرقم الثاني (${oc.data.route_key === "barka" ? "بركاء" : "مسقط"}):\n` + (om.data || []).reverse().map((x: any) => `${x.direction === "inbound" ? "العميل" : "المكتب"}: ${short(x.transcript || x.body || `[${x.message_type}]`, 300)}`).join("\n");
       }
     } catch (_) { /* optional */ }
+    // Dry run 10 Nov: a buyer standing at the location we sent was told «انباعت، الموقع كان لها» although that map belonged to the
+    // available villa. Every map link in the chat now says which property it is and whether it is still available.
+    const mapKey = (u: any) => String(u || "").trim().split("?")[0].replace(/\/+$/, "");
+    const mapOwners: { key: string; label: string; state: string }[] = [];
+    for (const p of props as any[]) if (p.map_url) mapOwners.push({ key: mapKey(p.map_url), label: neutralLabel(p), state: "متوفر حالياً" });
+    for (const p of soldRows) if (p.map_url) mapOwners.push({ key: mapKey(p.map_url), label: neutralLabel(p), state: p.status === "reserved" ? "انحجز" : "انباع" });
+    for (const p of goneRows) if (p.map_url) mapOwners.push({ key: mapKey(p.map_url), label: neutralLabel(p), state: "ما عاد متوفر (مو مباع)" });
+    const mapNote = (text: string) => {
+      const links = String(text || "").match(/https?:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|(www\.)?google\.[a-z.]+\/maps)[^\s]*/gi) || [];
+      const hits = links.map((l) => mapOwners.find((o) => o.key && mapKey(l) === o.key)).filter(Boolean) as any[];
+      return hits.length ? ` {هذا اللوكيشن لعقار: ${hits.map((o) => `${o.label} — ${o.state}`).join(" / ")}}` : "";
+    };
     const transcript = history.map((h: any) => {
       const who = h.direction === "inbound" ? "العميل" : (h.actor_type === "human" ? "المكتب (شخص)" : "المكتب (رد سابق منك)");
       let text = h.transcript ? `[رسالة صوتية: ${h.transcript}]` : (h.body || (h.message_type === "audio" ? "[رسالة صوتية ما انفهمت]" : `[${h.message_type}]`));
@@ -659,6 +675,7 @@ Deno.serve(async (req) => {
       const goneOf = (id: any) => goneRows.find((s: any) => s.id === id);
       const gone = sold ? null : (goneOf(reel?.property_id) || goneOf(h.matched_property_id) || (reel?.propertyIds || []).map(goneOf).find(Boolean));
       if (gone && !props.some((p: any) => p.id === reel?.property_id || p.id === h.matched_property_id)) extra += ` {هذا العقار ما عاد متوفر (مو مباع): ${typeAr(gone.type)} ${gone.area || ""} ${gone.price ? Math.round(Number(gone.price) / 1000) + " الف" : ""}. قول ما متوفر حالياً ولا تقول انباع، واعرض أقرب متاح}`;
+      extra += mapNote(h.body);
       if (h.matched_property_id) extra += ` {عقار مرتبط: ${h.matched_property_id}}`;
       if (h.property_image_analysis) extra += ` {تحليل الصورة: ${short(JSON.stringify(h.property_image_analysis), 300)}}`;
       const when = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Muscat", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(h.message_timestamp));
@@ -731,6 +748,8 @@ Deno.serve(async (req) => {
     const context = [
       `الوقت الحالي في عمان: ${omanNow()}`,
       `الاسم المسجل من الواتساب، مو دليل على اسمه الحقيقي: ${client.name || conv.customer_name || "غير معروف"}`,
+      // R15 (dry run 10 Nov: «أم راكان» was still answered in the masculine): «أم فلان» is a woman, say it plainly
+      ...(FEMALE_KUNYA_RE.test(`${client.name || ""} | ${conv.customer_name || ""}`) ? ["العميلة امرأة (اسمها «أم ...»): خاطبها بالمؤنث في كل الكلام (تقدرين، تشوفينه، يناسبك، متى يناسبك تزورين ؟)، R15"] : []),
       `هل سألناه عن اسمه قبل: ${nameAskedBefore ? "نعم، لا تسأل مرة ثانية أبداً" : "لا"}`,
       ...(behaviorText ? [behaviorText, "(استخدم سلوك العميل لتفهم جديته وتختار أسلوب الرد: لا تعامل المتجوّل مثل الساخن، ولا ترد على الكل بنفس الأسلوب)"] : []),
       `الرقم اللي كلمنا عليه: ${conv.route_key === "barka" ? "رقم بركاء" : "رقم مسقط"}`,
@@ -837,6 +856,12 @@ Deno.serve(async (req) => {
     // R12: a call promise is taken out like any promise, and Ahmed gets the call request (below, after the pinned reply)
     const callPromised = texts.some((t) => CALL_PROMISE_RE.test(t));
     texts = texts.filter((t) => !PROMISE_RE.test(t));
+    // R17 (Ahmed 9 Nov) and the dry run of 10 Nov: a residency answer must not open with a denial. The model still wrote
+    // «ما في قيمة عقار تضمن إقامة دائمة» once, so such a line is replaced by Ahmed's two fixed residency lines.
+    if (texts.some((t) => NEG_RESIDENCY_RE.test(t))) {
+      const fixed = ["في مدينة السلطان هيثم الشراء بـ 50 الف وفوق يعطي إقامة للمشتري وعائلته وتتجدد كل سنتين حسب الأنظمة", "والإقامة الذهبية من 200 الف وتتجدد كل 10 سنوات"];
+      texts = texts.flatMap((t) => (NEG_RESIDENCY_RE.test(t) ? fixed : [t])).filter((t, i, a) => a.indexOf(t) === i);
+    }
     // R14 (9 Nov): never send a line we already sent to this customer in the last 15 minutes (Amer Ali got "ارسل الكروكي" twice)
     if (!review && texts.length) {
       const recent = await db.from("whatsapp_messages").select("body").eq("conversation_id", conv.id).eq("direction", "outbound")
