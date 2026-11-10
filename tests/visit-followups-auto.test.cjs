@@ -27,3 +27,103 @@ test('interior photos of an occupied home get the fixed reply after checking the
  assert(brain.includes('البيت حالياً مسكون عشان كذا ما صورناه من الداخل'));
  assert(brain.includes('"الزيارة: المالك ساكن"'));
 });
+// Ahmed 10 Nov (point 1): every visit result is recorded by the AI, also for a visit already saved "done" with no opinion.
+test('a visit recorded done with no opinion gets the client opinion only, never a new status',()=>{
+ const part=fn.slice(fn.indexOf('async function visitResults('),fn.indexOf('// "اليوم الساعة 4 العصر"'));
+ assert(fn.includes('OPINION_DAYS = 30'));
+ assert(part.includes('.eq("status", "done").is("client_feedback", null).is("pipeline_outcome", null)'));
+ assert(part.includes('for (const v of [...(vs.data || []), ...(ds.data || [])]) {'));
+ assert(part.includes('if (at && at > Math.max(...since) && budget > 0) {'),'read only when the client wrote after the visit day and the last check');
+ const donePatch=part.slice(part.indexOf('if (done) {'),part.indexOf('} else if (r.result === "done") {'));
+ assert(donePatch.includes('client_feedback: o.feedback')&&donePatch.includes('liked: o.liked')&&donePatch.includes('pipeline_outcome: o.outcome'));
+ assert(donePatch.includes('rejection_reason: r.opinion === "disliked"')&&donePatch.includes('outcome_note: short(r.note, 500), notes }'));
+ assert(!donePatch.includes('status:'),'the opinion only');
+ assert(part.includes('.eq("row_version", v.row_version).eq("status", "done").is("client_feedback", null)'),'an opinion saved by the office meanwhile is kept');
+ assert(part.includes('.eq("row_version", v.row_version).in("status", ["scheduled", "confirmed", "postponed"])'),'open visits as before');
+ assert(part.includes('if (!patch && !done) {'),'the R13 closing rules stay for open visits only');
+ assert(part.includes('if (done && writing) {')&&part.includes('update({ ai_checked_at: new Date().toISOString() })'),'a refused save is not re-read by the model every run');
+ assert(part.includes('if (held) {')&&part.includes('رأي العميل بعد الزيارة ينتظرك'));
+ assert(fn.includes('const r = again || await judgeResult(v, today, done);'));
+ assert(fn.includes('instructions: opinionOnly ? OPINION_RULES : RESULT_RULES')&&fn.includes('الزيارة مسجلة إنها تمت'));
+ assert(part.includes('if (done && (["sold", "withdrawn", "not_available"].includes(pr.status) || pr.archived === true)) continue;'),'a deal the property automation closed is not moved again');
+ assert(fn.includes('const doneOnly = input.preview_results === "done";'));
+});
+// Review 10 Nov (AGENTS.md deals rule): sync_viewing_to_crm moves the card from the opinion («negotiate» -> negotiation and
+// «disliked» -> lost on any card not closed, a booking too; «liked» reopens a lost card), so the AI writes one only while the
+// client's card is still at the visit and the property is available.
+test('an opinion is written only while the card is at the visit and the property is available',async()=>{
+ const a=fn.indexOf('const VISIT_STAGES');assert(a>=0);
+ const src=fn.slice(a,fn.indexOf('\n}\n',fn.indexOf('async function opinionBlocked'))+3).replace(/: any/g,'');
+ const fake=(cards,prop,cardsError)=>({from:()=>{const q={select:()=>q,eq:()=>q,limit:async()=>({data:cards,error:cardsError||null}),maybeSingle:async()=>({data:prop,error:null})};return q;}});
+ const gate=(cards,prop,err)=>new Function('db',src+';return opinionBlocked;')(fake(cards,prop,err))({company_id:'c',client_id:'k',property_id:'p'});
+ const free={status:'available',archived:false};
+ assert.equal(await gate([{stage:'visit'}],free),'');
+ assert.equal(await gate([{stage:'new'}],free),'');
+ assert.equal(await gate([],free),'','no card yet: the visit makes the one card');
+ assert.equal(await gate([{stage:'viewing_postponed'},{stage:'lost',merged_into_deal_id:'x'}],free),'','a merged duplicate does not count');
+ for(const stage of ['negotiation','deposit','awaiting_finance','finance_approved','awaiting_clearance','ownership_transfer','closed','commission_collected'])assert.equal(await gate([{stage}],free),'deal_moved_on',stage);
+ assert.equal(await gate([{stage:'visit'},{stage:'lost'}],free),'deal_lost','a card Ahmed or the property automation closed is not reopened');
+ assert.equal(await gate([{stage:'visit'}],{status:'reserved',archived:false}),'property_not_available');
+ assert.equal(await gate([{stage:'visit'}],{status:'available',archived:true}),'property_not_available');
+ assert.equal(await gate([{stage:'visit'}],free,{message:'boom'}),'check_failed','fails closed');
+ assert.equal(await gate([{stage:'visit'}],null),'check_failed');
+});
+test('the done-visit pass checks the card before reading and again before writing; an open visit keeps its result',()=>{
+ const part=fn.slice(fn.indexOf('async function visitResults('),fn.indexOf('// "اليوم الساعة 4 العصر"'));
+ // it waits for SQL77 and its 77b cleanup: before them an opinion could add a second card or stop 77b (a merged card exists after)
+ assert(part.includes('const merged = await db.from("deals").select("id").not("merged_into_deal_id", "is", null).limit(1);'));
+ assert(part.includes('const ds: any = opinionPass')&&part.includes(': { data: [] };'));
+ // before the chat is read, and before the held note («رأي العميل ينتظرك» is wrong for a booked deal)
+ assert(part.includes('if (done && !gates.has(key)) gates.set(key, await opinionBlocked(v));'));
+ const early=part.indexOf('if (done && gates.get(key)) {');
+ assert(early>0&&early<part.indexOf('if (held) {')&&early<part.indexOf('await judgeResult('));
+ // again just before the write; then only the check is stamped
+ const donePatch=part.slice(part.indexOf('if (done) {'),part.indexOf('} else if (r.result === "done") {'));
+ assert(donePatch.includes('if (patch && !again) {')&&donePatch.includes('const why = await opinionBlocked(v);')&&donePatch.includes('if (why) patch = null;'));
+ assert(donePatch.includes('if (why === "check_failed") throw new Error("deal_check_failed");'));
+ // an open visit is still closed done (R13), without the opinion when its card is past the visit or the property is not available
+ assert(part.includes('if (why && why !== "deal_lost") { o = undefined;')&&part.includes('rejection_reason: o && r.opinion === "disliked"'));
+ assert(fn.includes('...(doneOnly ? { left_to_ahmed: (await opinionBlocked(v)) || null } : {})'));
+});
+// R21 (Ahmed 10 Nov): «بشوف وبرد عليك» gets ONE light question before the 24 hour window closes, then space.
+test('R21: the words that start it, and a line the code would never send by itself',()=>{
+ const pick=(start,end)=>{const a=fn.indexOf(start);assert(a>=0,start);return fn.slice(a,fn.indexOf(end,a)+end.length);};
+ const src=[pick('const TYPE_AR','\n'),pick('function arabicOnly','\n}\n'),pick('const normAr','\n'),pick('const THINK_RE','\n'),pick('function thinkingText','\n}\n'),pick('const THINK_BAD','\n'),pick('function thinkingOk','\n}\n')].join('\n')
+  .replace(/: Record<string, string>/,'').replace('(text: string | null): { text: string | null; latin: boolean }','(text)').replace(/\((\w+): (?:unknown|string)\)/g,'($1)');
+ const {normAr,THINK_RE,thinkingText,thinkingOk}=new Function(src+';return {normAr,THINK_RE,thinkingText,thinkingOk};')();
+ const think=(s)=>THINK_RE.test(normAr(s));
+ assert.equal(normAr('إن شاء الله بَشُوف  وبَرُد عَلَيك يا أخي'),'ان شاء الله بشوف وبرد عليك يا اخي');
+ for(const s of ['أن شاءالله بشوف و برد عليك','بَشُوف وبَرُد عَلَيك','نعم شفتها بس بشوف الاهل وبرجع لك لو قررنا','برد عليك','بشوف وارد عليك','بشاور الأهل','بكلم الأهل وأخبرك','بفكر فيها','ان شاء الله أخبرك','بعطيك خبر','خلني افكر','بشوف اشاور فيها هل يناسبهن او لا'])assert(think(s),s);
+ for(const s of ['كم السعر ؟','متى أقدر أزور ؟','تمام شكراً','وين الموقع','السلام عليكم','عندي فكرة ثانية'])assert(!think(s),s);
+ // like every follow-up it starts with «السلام عليكم» (REVIEW_RULES); «هلا» is banned in follow-ups and Ahmed's note gave no wording
+ assert.equal(thinkingText('السلام عليكم، شاورت الأهل؟ ونبي نعرف'),'السلام عليكم شاورت الأهل ؟');
+ assert.equal(thinkingText('شاورت الأهل؟'),'السلام عليكم شاورت الأهل ؟','the greeting is added');
+ assert.equal(thinkingText('سلام عليكم شفت الموضوع؟'),'السلام عليكم شفت الموضوع ؟','never two greetings');
+ assert.equal(thinkingText(null),'');
+ assert(thinkingOk('السلام عليكم شاورت الأهل ؟')&&thinkingOk('السلام عليكم أحمد شفت الموضوع ؟')&&thinkingOk(thinkingText('فكرت في الموضوع ؟')));
+ for(const s of ['هلا شاورت الأهل ؟','السلام عليكم هلا شاورت الأهل ؟',thinkingText('هلا، شاورت الأهل؟'),thinkingText('هلا والله شفت الموضوع ؟'),'شاورت الأهل ؟','السلام عليكم شاورت الأهل','السلام عليكم ؟','السلام عليكم شاورت ؟',
+  'السلام عليكم السعر صار 57 ألف ؟','السلام عليكم خلني أتأكد وارد عليك ؟','السلام عليكم احجز لك قبل لا ينباع ؟','السلام عليكم did you decide ؟','السلام عليكم شفت وادي زها ؟'])assert(!thinkingOk(s),s);
+ const rules=fn.slice(fn.indexOf('const THINK_RULES'),fn.indexOf('const thinkSchema'));
+ assert(rules.includes('"السلام عليكم شاورت الأهل ؟"')&&!rules.includes('"هلا')&&rules.includes('وكلمة هلا'));
+});
+test('R21: once per chat, 18 to 23 hours after his last words, behind the same guards and send helper',()=>{
+ const part=fn.slice(fn.indexOf('async function thinkingFollowups('),fn.indexOf('const RESULT_RULES'));
+ assert(fn.includes('THINK_PER_RUN = 10, THINK_EVERY_DAYS = 14'));
+ assert(fn.includes('if (nowMs - lastAt < 18 * HOUR_MS || nowMs - lastAt > 23 * HOUR_MS) return null;'));
+ assert(fn.includes('m.channel_source !== "crm_reply_agent"'),'after his words only the reply agent answer to them');
+ assert(part.includes('q.status === "sent" || new Date(q.created_at).getTime() > moment.lastAt'),'once in 14 days, and one reading of this silence');
+ assert(part.includes('if (c.agent_muted || c.human_handoff_required) continue;'));
+ assert(part.includes('db.rpc("crm_chat_hold", { p_conversation: c.id })')&&part.includes('if (holdR.data) { skip("held_owner_chat"); continue; }'));
+ assert(part.includes('client.followup_suppressed || client.archived'));
+ assert(part.includes('numbers.includes(to)')&&part.includes('skip("staff_number")')&&part.includes('skip("property_owner")'));
+ assert(part.includes('.in("stage", ACTIVE_DEAL_STAGES)')&&part.includes('skip("other_followup_queued")'));
+ assert(part.includes('if (await unreadVoiceNearEnd(c.id))'));
+ assert(part.indexOf('if (dry) { items.push(')>0&&part.indexOf('if (dry) { items.push(')<part.indexOf('.insert('),'the preview inserts and sends nothing');
+ assert(part.includes('kind: "thinking_followup"')&&part.includes('await sendQueueText(ins.data, numbers)'));
+ assert(!part.includes('type: "template"')&&!part.includes('metaSend'));
+ assert(fn.includes('const claim = await db.from("whatsapp_outreach_queue").update({ status: "sent", reason: "auto_in_window" })'));
+ assert(fn.includes('source: thinking ? "thinking_followup" : "request_followup"'));
+ assert(fn.includes('update(thinking ? { status: "failed", error: why } : { status: "pending", reason: null, error: why })'));
+ assert(fn.includes('await sendInWindow(rt.company_id, numbers, out);\n    // R21')&&fn.includes('\n    await thinkingFollowups(rt.company_id, numbers, out);\n'),'after the visit_followups_auto switch, inside the sending hours');
+ assert(fn.includes('if (input?.preview_thinking) {')&&fn.includes('.filter(Boolean), {}, true);'));
+});

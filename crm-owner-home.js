@@ -44,7 +44,7 @@
     box=document.createElement('div');box.id='crmOwnerHome';box.className='coh';box.hidden=true;
     box.innerHTML='<section class="coh-hello" id="cohHello"></section>'
       +'<section class="coh-now" aria-labelledby="cohNowTitle"><h2 class="coh-h" id="cohNowTitle">المطلوب منك الآن</h2><div id="cohTiles" class="coh-tiles"></div></section>'
-      +'<section class="coh-quick" id="cohQuick"><div id="cohTwins"></div><div id="cohIg"></div></section>'
+      +'<section class="coh-quick" id="cohQuick"><div id="cohAuto"></div><div id="cohTwins"></div><div id="cohIg"></div></section>'
       +'<section class="card coh-sec" id="cohSummary"></section>'
       +'<button type="button" class="btn-secondary coh-full" data-coh="full" aria-expanded="false">قائمة العمل الكاملة</button>';
     const header=page.querySelector('.page-header');if(header)header.after(box);else page.prepend(box);
@@ -131,6 +131,25 @@
     if(fu&&fu.closest('#cohSheetBody')&&home)home.append(fu);
     s.hidden=true;sheetKind=null;document.body.classList.remove('coh-lock');
   }
+  /* System updates (10 Nov 2026): deals the system closed because a property was sold, withdrawn or archived
+   * (SQL77, type deal_auto_closed) and listing contracts that ended (SQL76, type property_archive). Nothing else in
+   * the CRM shows these notifications. «تم» marks one read (the owner's own notifications, RLS). */
+  let autoNotes=[];
+  const AUTO_TYPES=['deal_auto_closed','property_archive'];
+  function readAutoNotes(){
+    if(typeof currentUser==='undefined'||!currentUser)return Promise.resolve(null);
+    return supa.from('notifications').select('id,type,title,body,created_at').eq('user_id',currentUser.id).in('type',AUTO_TYPES)
+      .eq('is_read',false).order('created_at',{ascending:false}).limit(10).then(r=>r.error?null:(r.data||[]),()=>null);
+  }
+  function drawAuto(){
+    const slot=byId('cohAuto');if(!slot)return;
+    if(!autoNotes.length){slot.innerHTML='';return;}
+    const when=v=>{try{return new Date(v).toLocaleString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}catch(_){return '';}};
+    slot.innerHTML='<div class="card coh-sec"><div class="coh-subhead"><h3>تحديثات تلقائية من النظام <b dir="ltr">'+num(autoNotes.length)+'</b></h3></div><ul class="coh-list">'
+      +autoNotes.map(n=>'<li class="coh-row"><div class="coh-info"><strong>'+(n.type==='deal_auto_closed'?'🔒 ':'📦 ')+esc(n.title||'')+'</strong>'
+        +(n.body?'<details class="coh-novideo"><summary>'+esc(String(n.body).slice(0,90))+(String(n.body).length>90?'…':'')+'</summary><p>'+esc(n.body)+'</p></details>':'')
+        +'<small>'+esc(when(n.created_at))+'</small></div><button type="button" class="btn-secondary coh-go" data-coh="auto-done" data-id="'+esc(n.id)+'">تم</button></li>').join('')+'</ul></div>';
+  }
   function drawTwins(groups){
     const open=(groups||[]).filter(g=>!g.dismissed&&g.properties.some(p=>Number(p.videos)<Number(g.videos)));
     byId('cohTwins').innerHTML=open.length?'<div class="card coh-sec"><div class="coh-subhead"><h3>قرار سريع: عقارات بنفس المواصفات <b dir="ltr">'+num(open.length)+'</b></h3></div><ul class="coh-list">'+open.map(g=>'<li class="coh-twin"><strong>'+g.properties.map(p=>esc(p.title)).join(' · ')+'</strong><small>'+g.properties.map(p=>num(p.videos)+' فيديو').join(' · ')+'</small><p>تربط كل الفيديوهات على الكل ؟ أداء الفيديو واستفساراته تنحسب لكل عقار</p><div class="coh-twin-actions"><button type="button" class="btn-primary" data-coh="twin-yes" data-key="'+esc(g.key)+'">نعم اربطهم</button><button type="button" class="btn-secondary" data-coh="twin-no" data-key="'+esc(g.key)+'">لا مختلفين</button></div></li>').join('')+'</ul></div>':'';
@@ -160,6 +179,8 @@
       last={data:home.data,pending:pending||0,twins:twinGroups&&!twinGroups.error?twinGroups.data:[]};
       render();
       box.hidden=false;page.classList.add('coh-on');
+      // after the first draw, so the home never waits for it
+      readAutoNotes().then(list=>{if(seq!==sequence||list==null)return;autoNotes=list;drawAuto();});
     }finally{if(seq===sequence)releaseGate();}
   }
   function render(){
@@ -180,6 +201,11 @@
     else if(act==='presume'&&typeof waInboxInvoke==='function'){
       b.disabled=true;const id=b.dataset.id;
       waInboxInvoke({action:'clear_handoff',conversation_id:id}).then(()=>{paused.items=paused.items.filter(i=>i.conversation_id!==id);paused.total=paused.items.length;if(last)drawTiles(last.data,last.pending);drawSheet();toast('رجّعتها للعقل','success');})
+        .catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});
+    }
+    else if(act==='auto-done'){
+      b.disabled=true;const id=b.dataset.id;
+      supa.from('notifications').update({is_read:true}).eq('id',id).then(r=>{if(r.error)throw r.error;autoNotes=autoNotes.filter(n=>n.id!==id);drawAuto();})
         .catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});
     }
     else if(act==='twin-yes'||act==='twin-no'){

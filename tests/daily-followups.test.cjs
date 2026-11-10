@@ -81,6 +81,9 @@ test('every follow-up starts with a greeting, on one line, and the review sees t
  assert(fn.includes('if (out.text && !out.text.startsWith("السلام عليكم"))'));
  assert(fn.includes('.replace(/\\s+/g, " ").trim() : null;'));
  assert(fn.includes('يفيد بس لمعرفة إذا امرأة'));
+ // the R21 question too (review 10 Nov: its examples started with «هلا», which REVIEW_RULES bans in follow-ups)
+ assert(fn.includes('return s ? `السلام عليكم ${s}` : "";')&&fn.includes('s.startsWith("السلام عليكم") && s.endsWith("؟")'));
+ assert(fn.includes('الوعود، كلمة هلا.')&&fn.includes('(^|\\s)هلا+(\\s|$)'));
 });
 test('the whole voice note is read before a follow-up reaches him',()=>{
  assert(fn.includes('short(body, 3000)'));
@@ -183,4 +186,19 @@ test('a visit follow-up asks the client about the property by name, never a gene
  assert.equal(namedVisitQuestion('السلام عليكم قدرت تشوف العقار ؟',''),'السلام عليكم قدرت تشوف العقار ؟');
  assert(fn.includes('if (kind === "visit") out.text = namedVisitQuestion(out.text, name);'));
  assert(fn.includes('ممنوع سؤال عام مثل "قدرت تشوف العقار ؟"'));
+});
+// Audit 10 Nov: the lessons are stored oldest first, and the review kept the first 6,000 characters, so Ahmed's newest were cut.
+test('the follow-up review keeps the newest of Ahmed\'s lessons when they are long',()=>{
+ const a=fn.indexOf('function newestPart');assert(a>=0);
+ const src=fn.slice(a,fn.indexOf('\n}\n',a)+3).replace('(text: unknown, n = 6000)','(text, n = 6000)');
+ const newestPart=new Function(src+';return newestPart;')();
+ const lesson=(d,w,k)=>'- ['+d+'] '+w.repeat(k);
+ const newest='- [10/11] تابع اللي قال بشوف وبرد عليك';
+ const kept=newestPart([lesson('01/11','قديم ',800),lesson('05/11','وسط ',800),newest].join('\n'),6000);
+ assert(kept.endsWith(newest));
+ assert(kept.startsWith('…- [05/11]'),'starts at a whole lesson');
+ assert(!kept.includes('[01/11]')&&kept.length<=6001);
+ assert.equal(newestPart('  - [10/11] قصير  ',6000),'- [10/11] قصير');
+ assert(fn.includes('lessonsCache = { at: Date.now(), text: newestPart(r.data?.content, 6000) };'));
+ assert(!fn.includes('short(r.data?.content || "", 6000)'));
 });

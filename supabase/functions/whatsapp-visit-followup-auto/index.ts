@@ -15,6 +15,15 @@
 // 7. Owner's decision 6 Nov (SQL73): visit results are the AI's job. A past visit with no result (last 30 days) whose client
 //    has written since the last check is read from the chat; done / no_show / postponed / cancelled and the client's opinion
 //    are saved on the visit (sync_viewing_to_crm moves the deal). A serious buyer raises «🔥 مشتري جاد» for the owner.
+// 8. Ahmed 10 Nov (point 1): a visit already recorded done with no opinion (last 30 days) gets the client's opinion from the
+//    chat the same way (liked / hesitant / wants to negotiate / disliked and why). Only the opinion is written, never the status.
+//    AGENTS.md deals rule: an opinion is written only while the client's card is still at the visit and the property is
+//    available (opinionBlocked); a card at negotiation, a booking or later, or lost is Ahmed's. This pass starts only after
+//    SQL77 and its 77b cleanup (a merged card exists). Deploy: apply every 10 Nov SQL file first (76 -> 77 -> 77b -> 76b ->
+//    77c -> 78), and only then re-pin this function: an opinion or an R21 row written while 77b runs stops 77b.
+// 9. R21 (Ahmed 10 Nov): a client who said «بشوف وبرد عليك» / «بشوف الأهل وأرجع لك» and went quiet gets ONE light question
+//    before his 24 hour window closes, then space (once per chat in 14 days). Free text only. It starts with «السلام عليكم»
+//    like every follow-up, never «هلا».
 // Stops when whatsapp_automation_runtime.visit_followups_auto is false. A failed send stays on the list.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -136,8 +145,19 @@ let lessonsCache = { at: 0, text: "" };
 async function lessons() {
   if (Date.now() - lessonsCache.at < 60000) return lessonsCache.text;
   const r = await db.from("whatsapp_agent_prompts").select("content").eq("key", "lessons").maybeSingle();
-  lessonsCache = { at: Date.now(), text: short(r.data?.content || "", 6000) };
+  lessonsCache = { at: Date.now(), text: newestPart(r.data?.content, 6000) };
   return lessonsCache.text;
+}
+// The lessons are stored oldest first ("- [DD/MM] ..."), so a long text keeps its END: Ahmed's newest corrections were the part
+// cut before (audit 10 Nov). It starts at a whole lesson (or line) when one starts in the first half of what is kept.
+function newestPart(text: unknown, n = 6000) {
+  const s = String(text ?? "").trim();
+  if (s.length <= n) return s;
+  const tail = s.slice(-n);
+  const lesson = tail.indexOf("\n- [");
+  const line = tail.indexOf("\n");
+  const cut = lesson >= 0 && lesson < n / 2 ? lesson + 1 : line >= 0 && line < n / 2 ? line + 1 : 0;
+  return "…" + tail.slice(cut);
 }
 
 async function review(item: any, companyId: string, available: string, fixed: string, about: string, instruction = "", current = "") {
@@ -348,8 +368,9 @@ async function sendInWindow(companyId: string, numbers: string[], out: Record<st
   }
 }
 
-// Free text for a request follow-up inside the window. Same guards as sendOne.
+// Free text for a request follow-up inside the window. Same guards as sendOne. It also sends the R21 question (thinking_followup).
 async function sendQueueText(q: any, numbers: string[]) {
+  const thinking = q.kind === "thinking_followup";
   const [convR, clientR] = await Promise.all([
     db.from("whatsapp_conversations").select("*").eq("id", q.conversation_id).single(),
     db.from("clients").select("id,phone,phone_normalized,followup_suppressed,archived").eq("id", q.client_id).single(),
@@ -376,17 +397,193 @@ async function sendQueueText(q: any, numbers: string[]) {
       company_id: q.company_id, conversation_id: conv.id, client_id: q.client_id, whatsapp_message_id: wamid,
       direction: "outbound", message_type: "text", sender_wa_id: digits(conv.meta_phone_number_id), recipient_wa_id: to,
       body: q.owner_text, message_timestamp: now, delivery_status: "sent", actor_type: "automated", channel_source: "crm_followup",
-      raw_payload: { source: "request_followup", outreach_id: q.id, auto: true, in_window: true },
+      raw_payload: { source: thinking ? "thinking_followup" : "request_followup", outreach_id: q.id, auto: true, in_window: true },
     });
     await db.from("whatsapp_outreach_queue").update({ send_mode: "service", sent_at: now, approved_at: now, meta_message_id: wamid, error: null }).eq("id", q.id);
     await db.from("whatsapp_conversations").update({ last_message_at: now, last_outbound_at: now, updated_at: now }).eq("id", conv.id);
     return "sent";
   } catch (e) {
     const why = short((e as any)?.message || e);
-    await db.from("whatsapp_outreach_queue").update({ status: "pending", reason: null, error: why }).eq("id", q.id);
+    // a request follow-up goes back on his list; the light R21 question is not tried again (a pending row would show on his
+    // approvals list, and approving it there later could send it outside the moment it was written for)
+    await db.from("whatsapp_outreach_queue").update(thinking ? { status: "failed", error: why } : { status: "pending", reason: null, error: why }).eq("id", q.id);
     await alertOwner(q.company_id, why);
     return "failed";
   }
+}
+
+// R21 (Ahmed 10 Nov, docs/agent-rules.md): a client who said «بشوف وبرد عليك» / «بشوف الأهل وأرجع لك» and went quiet gets ONE
+// light question before his 24 hour window closes (18 to 23 hours after his last message), then space: once per chat in 14 days.
+// Never over a chat Ahmed holds (R1), a muted chat, an open handoff, a running deal, a reply waiting for Ahmed, a follow-up already
+// queued, an unread voice note, a company or staff number, an owner of a listed property or a paused client. The model writes the
+// line or says it is not that case; the code refuses a number, a promise, pressure, «هلا» or English. Free text only, never a
+// template. Like every follow-up (REVIEW_RULES) it starts with «السلام عليكم»; «هلا» is banned in follow-ups.
+const THINK_PER_RUN = 10, THINK_EVERY_DAYS = 14, HOUR_MS = 3600 * 1000;
+const ACTIVE_DEAL_STAGES = ["negotiation", "deposit", "awaiting_finance", "finance_approved", "awaiting_clearance", "ownership_transfer"];
+// Arabic written either way: harakat and tatweel dropped, أ إ آ ٱ -> ا, ى -> ي, ة -> ه
+const normAr = (s: unknown) => String(s ?? "").replace(/[\u064B-\u065F\u0670\u0640]/g, "").replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/\s+/g, " ");
+// «بشوف وبرد عليك» and close ways of saying it, on normAr text: برد/ارد عليك، برجع لك، بشوف وارد، بشاور، بشوف الاهل، بكلم الاهل،
+// بفكر، بخبرك، بعطيك خبر، بعلمك، بكلمك، بتواصل معك، خلني افكر، عطني وقت. The model still decides if it is really that case.
+const THINK_RE = /(ب|ا|ن|بن)(رد|رجع)\s*(عليك|عليكم|لك|لكم)|(ب|ا|ن|بن)شوف\s*و\s*(ب|ا|ن|بن)?(رد|رجع|خبر|كلم|قول)|(ب|ا|ن|بن)(شاور|ستشير)|(ب|ا|ن|بن)(شوف|كلم|سال|شاور|تاكد من)\s*(ال)?(اهل|عايله|مدام|زوج|والد)|(ب|ا|ن|بن)فكر|(ب|ا|ن|بن)خبر(ك|كم)|(ب|ا|ن|بن)?عطي(ك|كم)\s*خبر|(ب|ا|ن|بن)علم(ك|كم)|(ب|ا|ن|بن)كلم(ك|كم)|(ب|ا|ن|بن)تواصل\s*مع|خلني\s*(اشوف|افكر|اشاور|اراجع)|(اعطني|عطني|عطوني)\s*(وقت|فرصه)|امهلني/;
+const THINK_RULES = `تكتب متابعة خفيفة وحدة لعميل مكتب عقاري في عمان (رقم بركاء أو رقم مسقط). آخر كلام العميل فيه إنه بيشوف أو بيشاور أهله أو بيفكر وبيرد علينا، وفات حوالي يوم وما رد، ونافذة الواتساب قربت تتسكر. قرار أحمد (R21): سؤال خفيف واحد بس قبل ما تتسكر النافذة، وبعدها نعطيه مساحة.
+اقرأ المحادثة كاملة وقرر:
+- send=true بس إذا العميل فعلاً قال إنه بيفكر أو بيشاور أو بيشوف موضوع عقار أو عرض أرسلناه له وبيرجع لنا، والكلام واقف عنده.
+- send=false إذا: كلامه عن وقت زيارة أو وصول (مثل "بخبرك متى أوصل")، أو هو مالك أو وسيط يعرض عقار، أو موضوعه انتهى أو قال ما يبغى أو لقى شي، أو عنده سؤال ما انجاب، أو فيه تفاوض أو حجز أو صفقة شغالة أو طلب اتصال أو اجتماع، أو مو واضح وش يقصد.
+text (لـ send=true بس، وإلا null): سطر واحد قصير باللهجة العمانية يبدأ بـ "السلام عليكم" مثل كل المتابعات، وبعده سؤال خفيف واحد عن اللي قال إنه بيسويه، ينتهي بـ " ؟". مثل "السلام عليكم شاورت الأهل ؟" أو "السلام عليكم شفت الموضوع ؟" أو "السلام عليكم فكرت في الموضوع ؟"، وإذا تعرف اسمه "السلام عليكم <اسمه> شاورت الأهل ؟". بدون ضغط ولا استعجال، بدون وعد، بدون أي سعر أو رقم، بدون معلومة أو عرض جديد، ولا تسمّي العقار ولا أي مشروع. لا تناديه باسم إلا إذا قاله بنفسه في المحادثة أو المكتب ناداه به (اسم الواتساب مو دليل). المؤنث بس إذا الاسم أنثوي واضح أو "أم فلان" أو العميلة تكتب بالمؤنث، غير كذا مذكر. ممنوع الفواصل والنقاط وعلامات التعجب والكلمات الإنجليزية وكلمة هلا.
+reason: سطر قصير لصاحب المكتب عن قرارك.`;
+const thinkSchema = {
+  type: "object", additionalProperties: false,
+  properties: { send: { type: "boolean" }, text: { type: ["string", "null"] }, reason: { type: "string" } },
+  required: ["send", "text", "reason"],
+};
+// one short line and one question, in Ahmed's punctuation: no commas, full stops or exclamation marks, a space before ؟
+function thinkingText(t: unknown) {
+  let s = String(t ?? "").replace(/[،,!.]/g, " ").replace(/\s*[؟?]/g, " ؟").replace(/\s+/g, " ").trim();
+  if (s.includes("؟")) s = s.slice(0, s.indexOf("؟") + 1);
+  // it starts with «السلام عليكم» like every follow-up (a greeting the model wrote itself is not doubled)
+  s = s.replace(/^(ال)?سلام\s*عليكم\s*/, "");
+  return s ? `السلام عليكم ${s}` : "";
+}
+// what the code never sends by itself (on normAr text): a number or a price, the word hala (banned in follow-ups, REVIEW_RULES),
+// a promise (R5, R12), pressure, the unreleased projects (R18), English
+const THINK_BAD = /[0-9\u0660-\u0669\u06F0-\u06F9]|(^|\s)(الف|ريال)(\s|$)|(^|\s)هلا+(\s|$)|اتصل|بتصل|نتصل|بكلمك|ارد عليك|برد عليك|برجع لك|ارجع لك|بخبرك|اتاكد|بتاكد|نتاكد|بسرعه|اخر فرصه|ينباع|ينحجز|احجز|تحجز|نحجز|عربون|خصم|يروح عليك|وادي/;
+// the greeting, then a real question of two words at least
+function thinkingOk(s: string) {
+  const ask = String(s || "").replace(/^السلام عليكم/, "").replace("؟", "").trim();
+  return !!s && s.startsWith("السلام عليكم") && s.endsWith("؟") && ask.split(" ").filter(Boolean).length >= 2 && s.length <= 90 && !THINK_BAD.test(normAr(s)) && !arabicOnly(s).latin;
+}
+
+// The client's last words: his last message 18 to 23 hours ago and after it only the reply agent's own answer (within 15 minutes);
+// «بشوف وبرد عليك» in what he wrote in the half hour up to it; and the office or the agent had written to him before he said it.
+async function thinkingMoment(conversationId: string, nowMs: number) {
+  const r = await db.from("whatsapp_messages").select("direction,actor_type,channel_source,body,transcript,message_timestamp").eq("conversation_id", conversationId).order("message_timestamp", { ascending: false }).limit(12);
+  const ms: any[] = r.data || [];
+  const li = ms.findIndex((m: any) => m.direction === "inbound");
+  if (li < 0) return null;
+  const lastAt = new Date(ms[li].message_timestamp).getTime();
+  if (nowMs - lastAt < 18 * HOUR_MS || nowMs - lastAt > 23 * HOUR_MS) return null;
+  // a person, a follow-up or a later message after his last words: not this case
+  if (ms.slice(0, li).some((m: any) => m.direction !== "outbound" || m.actor_type !== "automated" || m.channel_source !== "crm_reply_agent" || new Date(m.message_timestamp).getTime() - lastAt > 15 * 60000)) return null;
+  let ti = -1;
+  for (let i = li; i < ms.length; i++) {
+    if (lastAt - new Date(ms[i].message_timestamp).getTime() > 30 * 60000) break;
+    if (ms[i].direction === "inbound" && THINK_RE.test(normAr(`${ms[i].body || ""} ${ms[i].transcript || ""}`))) ti = i;
+  }
+  if (ti < 0) return null;
+  let answered = ms.slice(ti + 1).some((m: any) => m.direction === "outbound");
+  if (!answered && ms.length === 12) {
+    const o = await db.from("whatsapp_messages").select("id").eq("conversation_id", conversationId).eq("direction", "outbound").lt("message_timestamp", ms[ti].message_timestamp).limit(1);
+    answered = (o.data || []).length > 0;
+  }
+  return answered ? { lastAt } : null;
+}
+
+// Owners of a listed property (available or reserved) are answered by Ahmed himself, as in the reply agent.
+async function listedOwnerPhones(companyId: string) {
+  const [ow, lp] = await Promise.all([
+    db.from("owners").select("id,phone").eq("company_id", companyId).limit(2000),
+    db.from("properties").select("owner_id").eq("company_id", companyId).in("status", ["available", "reserved"]).eq("archived", false).limit(2000),
+  ]);
+  const listed = new Set((lp.data || []).map((p: any) => p.owner_id));
+  return (ow.data || []).filter((o: any) => listed.has(o.id)).map((o: any) => digits(o.phone).slice(-8)).filter((x: string) => x.length === 8);
+}
+
+async function judgeThinking(c: any, name: string, today: string) {
+  const chat = await chatOf(c.id, 30);
+  const ai = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST", headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: OPENAI_MODEL, store: false, reasoning: { effort: "low" }, instructions: THINK_RULES,
+      input: `تاريخ اليوم: ${today}\nرقمنا: ${c.route_key === "barka" ? "بركاء" : "مسقط"}\nالاسم المسجل من الواتساب، يفيد بس لمعرفة إذا امرأة: ${name || "غير معروف"}\n\nالمحادثة:\n${chat}`,
+      text: { format: { type: "json_schema", name: "thinking_followup", strict: true, schema: thinkSchema } } }),
+  });
+  const p = await ai.json().catch(() => ({}));
+  if (!ai.ok) throw new Error(p?.error?.message || `openai_${ai.status}`);
+  return JSON.parse(p.output_text || p.output?.flatMap((x: any) => x?.content || []).find((x: any) => x?.type === "output_text")?.text || "{}");
+}
+
+// Once a run, after the other sends. dry (preview_thinking) reads and writes the line, but inserts and sends nothing.
+async function thinkingFollowups(companyId: string, numbers: string[], out: Record<string, number>, dry = false) {
+  const items: any[] = [];
+  const nowMs = Date.now();
+  const cs = await db.from("whatsapp_conversations").select("id,client_id,route_key,agent_muted,human_handoff_required")
+    .eq("company_id", companyId).in("route_key", ["barka", "muscat"]).not("client_id", "is", null)
+    .gte("last_inbound_at", new Date(nowMs - 23 * HOUR_MS).toISOString()).lte("last_inbound_at", new Date(nowMs - 18 * HOUR_MS).toISOString())
+    .order("last_inbound_at", { ascending: true }).limit(100);
+  if (cs.error) { console.error("[followup-auto] thinking", cs.error.message); return items; }
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
+  const since = new Date(nowMs - THINK_EVERY_DAYS * 24 * HOUR_MS).toISOString();
+  const seenClients = new Set<string>();
+  let staff: string[] | null = null, owners: string[] | null = null, budget = THINK_PER_RUN;
+  for (const c of cs.data || []) {
+    if (budget <= 0) break;
+    // muted or an open handoff (hard or not): the chat is Ahmed's
+    if (c.agent_muted || c.human_handoff_required) continue;
+    const skip = (why: string) => { out[`thinking_${why}`] = (out[`thinking_${why}`] || 0) + 1; if (dry) items.push({ conversation_id: c.id, skipped: why }); };
+    try {
+      const moment = await thinkingMoment(c.id, nowMs);
+      if (!moment) continue;
+      if (seenClients.has(c.client_id)) { skip("same_client"); continue; }
+      const lastIso = new Date(moment.lastAt).toISOString();
+      const [clientR, holdR, visitQ, queueQ, prevQ, dealQ, draftQ, tierR, elsewhereQ] = await Promise.all([
+        db.from("clients").select("id,name,phone,phone_normalized,followup_suppressed,archived").eq("id", c.client_id).maybeSingle(),
+        db.rpc("crm_chat_hold", { p_conversation: c.id }),
+        db.from("whatsapp_visit_followups").select("id").eq("client_id", c.client_id).in("status", ["awaiting_approval", "sending"]).limit(1),
+        db.from("whatsapp_outreach_queue").select("id").eq("client_id", c.client_id).in("status", ["pending", "approved"]).eq("dry_run", false).limit(1),
+        db.from("whatsapp_outreach_queue").select("status,created_at").eq("conversation_id", c.id).eq("kind", "thinking_followup").gte("created_at", since),
+        db.from("deals").select("id").eq("client_id", c.client_id).in("stage", ACTIVE_DEAL_STAGES).limit(1),
+        db.from("whatsapp_reply_drafts").select("analysis").eq("conversation_id", c.id).eq("status", "pending").limit(5),
+        db.from("client_behavior").select("tier").eq("client_id", c.client_id).maybeSingle(),
+        db.from("whatsapp_conversations").select("id").eq("client_id", c.client_id).neq("id", c.id).gt("last_inbound_at", lastIso).limit(1),
+      ]);
+      if ([clientR, holdR, visitQ, queueQ, prevQ, dealQ, draftQ, tierR, elsewhereQ].some((x: any) => x.error)) { skip("check_failed"); continue; }
+      const client: any = clientR.data;
+      if (!client || client.followup_suppressed || client.archived || tierR.data?.tier === "unrealistic") { skip("paused_client"); continue; }
+      const to = digits(client.phone_normalized || client.phone);
+      if (!to || numbers.includes(to)) { skip("company_number"); continue; }
+      if (!staff) staff = ((await db.from("profiles").select("phone").eq("company_id", companyId)).data || []).map((p: any) => digits(p.phone).slice(-8)).filter((x: string) => x.length === 8);
+      if (staff.includes(to.slice(-8))) { skip("staff_number"); continue; }
+      if (!owners) owners = await listedOwnerPhones(companyId);
+      if (owners.includes(to.slice(-8))) { skip("property_owner"); continue; }
+      if (holdR.data) { skip("held_owner_chat"); continue; }
+      if ((dealQ.data || []).length || (draftQ.data || []).some((d: any) => !d.analysis?.dry_run)) { skip("with_ahmed"); continue; }
+      if ((visitQ.data || []).length || (queueQ.data || []).length) { skip("other_followup_queued"); continue; }
+      // once per chat in 14 days, and this silence is read once
+      if ((prevQ.data || []).some((q: any) => q.status === "sent" || new Date(q.created_at).getTime() > moment.lastAt)) { skip("done_before"); continue; }
+      if ((elsewhereQ.data || []).length) { skip("active_on_other_number"); continue; }
+      if (await unreadVoiceNearEnd(c.id)) { skip("voice_wait"); continue; }
+      budget--;
+      seenClients.add(c.client_id);
+      const r = await judgeThinking(c, client.name, today);
+      const text = r?.send ? thinkingText(r.text) : "";
+      const ok = !!text && thinkingOk(text);
+      if (dry) { items.push({ conversation_id: c.id, send: !!r?.send, ok, text: text || null, reason: short(r?.reason, 300) }); continue; }
+      // he wrote while the line was being written: the reply agent has the live chat
+      if ((await lastInbound(c.id)) > moment.lastAt) { skip("client_wrote"); continue; }
+      const now = new Date().toISOString();
+      const row = { company_id: companyId, kind: "thinking_followup", conversation_id: c.id, client_id: c.client_id, route_key: c.route_key, review_reason: short(r?.reason, 300), reviewed_at: now, dry_run: false };
+      if (!ok) {
+        // not that case, or the line broke a rule: kept as skipped so this silence is not read again
+        await db.from("whatsapp_outreach_queue").insert({ ...row, messages: [], owner_text: text || null, status: "skipped", reason: r?.send ? "thinking_text_refused" : "thinking_not_needed" });
+        skip(r?.send ? "text_refused" : "not_needed");
+        continue;
+      }
+      const ins = await db.from("whatsapp_outreach_queue").insert({ ...row, messages: [text], owner_text: text, summary: "متابعة «بشوف وبرد عليك» (R21)", auto_ok: true, status: "pending" }).select("*").maybeSingle();
+      if (ins.error || !ins.data) { skip("not_queued"); continue; }
+      // two runs at once: only the first row for this silence goes out
+      const first = await db.from("whatsapp_outreach_queue").select("id").eq("conversation_id", c.id).eq("kind", "thinking_followup").gt("created_at", lastIso).order("created_at", { ascending: true }).limit(1).maybeSingle();
+      if (first.data?.id !== ins.data.id) {
+        await db.from("whatsapp_outreach_queue").update({ status: "skipped", reason: "thinking_duplicate" }).eq("id", ins.data.id).eq("status", "pending");
+        skip("duplicate");
+        continue;
+      }
+      const s = await sendQueueText(ins.data, numbers);
+      // a guard stopped it at the last moment: the row leaves the queue instead of waiting on a list
+      if (!["sent", "failed", "superseded", "taken"].includes(s)) await db.from("whatsapp_outreach_queue").update({ status: "skipped", reason: `thinking_${s}` }).eq("id", ins.data.id).eq("status", "pending");
+      out[`thinking_${s}`] = (out[`thinking_${s}`] || 0) + 1;
+      if (s === "failed") break;
+    } catch (e) { out.thinking_error = (out.thinking_error || 0) + 1; console.error("[followup-auto] thinking", String((e as any)?.message || e)); }
+  }
+  return items;
 }
 
 const RESULT_RULES = `تقرأ محادثة واتساب لمكتب عقاري عن زيارة عقار فات موعدها، وتحدد وش صار. رجّع:
@@ -410,6 +607,24 @@ const resultSchema = {
   },
   required: ["result", "opinion", "reason", "new_date", "serious", "note", "confidence"],
 };
+// Ahmed 10 Nov (point 1): a visit already recorded done is read for the client's opinion only; its status stays as it is
+const OPINION_RULES = `تقرأ محادثة واتساب لمكتب عقاري عن عقار زاره العميل (الزيارة مسجلة إنها تمت)، وتحدد رأي العميل في هذا العقار بالذات من كلامه هو. رجّع:
+opinion: liked عجبه أو ناسبه، negotiate يبغى يتفاوض أو سأل عن آخر سعر، hesitant يفكر أو متردد أو يشاور، disliked ما ناسبه، unknown ما قال رأيه أو كلامه عن عقار ثاني أو مو واضح.
+reason (لـ disliked بس، وإلا null): واحد من price location area room_layout design finishing parking financing found_other not_interested not_serious.
+serious: true بس إذا العميل جاد يبغى يشتري أو يستأجر الحين: عجبه وطلب يحجز أو يدفع عربون، أو سأل عن آخر سعر أو يبغى يتفاوض، أو طلب يقابل المالك أو يكلم صاحب المكتب عشان يكمل.
+note: سطر قصير بالعربي لصاحب المكتب عن رأي العميل، بدون أسماء. لا تخترع شي مو مكتوب.
+confidence من 0 إلى 1.`;
+const opinionSchema = {
+  type: "object", additionalProperties: false,
+  properties: {
+    opinion: { type: "string", enum: ["liked", "negotiate", "hesitant", "disliked", "unknown"] },
+    reason: { type: ["string", "null"], enum: ["price", "location", "area", "room_layout", "design", "finishing", "parking", "financing", "found_other", "not_interested", "not_serious", null] },
+    serious: { type: "boolean" },
+    note: { type: "string" },
+    confidence: { type: "number" },
+  },
+  required: ["opinion", "reason", "serious", "note", "confidence"],
+};
 const TYPE_AR: Record<string, string> = { house: "بيت", villa: "فيلا", twin_villa: "فيلا", "twin villa": "فيلا", apartment: "شقة", flat: "شقة", land: "أرض", land_residential: "أرض سكنية", land_commercial: "أرض تجارية", land_mixed: "أرض", building: "بناية", commercial_building: "مبنى تجاري", residential_building: "مبنى سكني", income_property: "عقار مؤجر", shop: "محل", office: "مكتب", farm: "مزرعة", chalet: "شاليه", resthouse: "استراحة", townhouse: "تاون هاوس", penthouse: "بنتهاوس", warehouse: "مخزن" };
 // an internal type code must never reach a client: unknown English codes become "عقار"
 const typeAr = (t: unknown) => TYPE_AR[String(t || "").toLowerCase()] || (/[a-z]/i.test(String(t || "")) || !t ? "عقار" : String(t));
@@ -430,7 +645,8 @@ const OPINION: Record<string, { feedback: string; outcome: string; liked: boolea
   disliked: { feedback: "disliked", outcome: "lost", liked: false },
 };
 
-async function judgeResult(v: any, today: string) {
+// opinionOnly: a visit recorded done, read for the client's opinion only (OPINION_RULES)
+async function judgeResult(v: any, today: string, opinionOnly = false) {
   const convs = await db.from("whatsapp_conversations").select("id,route_key").eq("company_id", v.company_id).eq("client_id", v.client_id).in("route_key", ["barka", "muscat"]).limit(2);
   let chat = "";
   for (const c of convs.data || []) chat += `${(convs.data || []).length > 1 ? `\nعلى رقم ${c.route_key === "barka" ? "بركاء" : "مسقط"}:\n` : ""}${await chatOf(c.id, 30)}\n`;
@@ -438,9 +654,9 @@ async function judgeResult(v: any, today: string) {
   const pr: any = v.properties || {};
   const ai = await fetch("https://api.openai.com/v1/responses", {
     method: "POST", headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: OPENAI_MODEL, store: false, reasoning: { effort: "low" }, instructions: RESULT_RULES,
-      input: `تاريخ اليوم: ${today}\nالزيارة: ${typeAr(pr.type)} في ${pr.area || "غير معروف"} يوم ${v.viewing_date}${v.viewing_time ? ` الساعة ${String(v.viewing_time).slice(0, 5)}` : ""}\n\nالمحادثة:\n${chat}`,
-      text: { format: { type: "json_schema", name: "visit_result", strict: true, schema: resultSchema } } }),
+    body: JSON.stringify({ model: OPENAI_MODEL, store: false, reasoning: { effort: "low" }, instructions: opinionOnly ? OPINION_RULES : RESULT_RULES,
+      input: `تاريخ اليوم: ${today}\nالزيارة: ${typeAr(pr.type)} في ${pr.area || "غير معروف"} يوم ${v.viewing_date}${v.viewing_time ? ` الساعة ${String(v.viewing_time).slice(0, 5)}` : ""}${opinionOnly ? " (تمت)" : ""}\n\nالمحادثة:\n${chat}`,
+      text: { format: { type: "json_schema", name: opinionOnly ? "visit_opinion" : "visit_result", strict: true, schema: opinionOnly ? opinionSchema : resultSchema } } }),
   });
   const p = await ai.json().catch(() => ({}));
   if (!ai.ok) throw new Error(p?.error?.message || `openai_${ai.status}`);
@@ -460,18 +676,71 @@ async function alertSerious(companyId: string, clientId: string, name: string, b
 // 2. Otherwise, or if the chat does not say: the property is sold or off the list -> «cancelled» with that reason (1 day after);
 //    nothing known 5 days after the visit -> «cancelled» with a note that no result was found, so nothing hangs open.
 // 3. A chat the owner holds himself (muted, he wrote by hand, negotiation) is never closed here; it shows on his list as held.
-const NO_RESULT_DAYS = 5;
+// 4. Ahmed 10 Nov (point 1): a visit already recorded done with no opinion (last 30 days: the agent's visit watcher, the office or a
+//    repair saved "done" only) is read the same way when the client wrote after the visit day and the last check, for his opinion
+//    only (liked / hesitant / wants to negotiate / disliked and why). Its status never changes and nothing closes it; unclear only
+//    stamps the check; held chats get the same note. Repeated visits of one property are read once a run and saved on each.
+// 5. AGENTS.md deals rule (review 10 Nov): an opinion is written only while the client's card is still at the visit
+//    (opinionBlocked). A done visit whose card moved on (negotiation, a booking or later, a sale, lost) or whose property is
+//    reserved is not read at all; an open visit is still closed with its result, but without the opinion when the card is
+//    past the visit or the property is not available. The done-visit pass starts only once SQL77 and its 77b cleanup are
+//    applied (a merged card exists): before 77 an opinion could add a second card, and before 77b it would change a card
+//    that 77b checks, which stops that migration.
+const NO_RESULT_DAYS = 5, OPINION_DAYS = 30;
+const opinionSince = () => new Date(Date.now() - OPINION_DAYS * 24 * 3600 * 1000).toISOString().slice(0, 10);
+// sync_viewing_to_crm moves this client's card of the property from the visit's opinion: «negotiate» sets negotiation and
+// «disliked» sets lost on any card that is not closed (a booking too: lost cancels it), and «liked» / «hesitant» reopens a lost
+// card and clears Ahmed's reason and dates. So the AI writes an opinion only when the property is available and every card of
+// this client+property (merged duplicates aside) is new, a viewing_* stage or visit. Returns "" when it may, otherwise why it
+// is left to Ahmed. Fails closed ("check_failed"). deals is read with * so this also works before SQL77 adds merged_into_deal_id.
+const VISIT_STAGES = ["new", "viewing_scheduled", "viewing_no_show", "viewing_cancelled", "viewing_postponed", "visit"];
+async function opinionBlocked(v: any) {
+  try {
+    const [cards, prop] = await Promise.all([
+      db.from("deals").select("*").eq("company_id", v.company_id).eq("client_id", v.client_id).eq("property_id", v.property_id).limit(50),
+      db.from("properties").select("status,archived").eq("id", v.property_id).maybeSingle(),
+    ]);
+    if (cards.error || prop.error || !prop.data) return "check_failed";
+    if (prop.data.status !== "available" || prop.data.archived === true) return "property_not_available";
+    const live = (cards.data || []).filter((d: any) => !d.merged_into_deal_id);
+    if (live.some((d: any) => d.stage === "lost")) return "deal_lost";
+    if (live.some((d: any) => !VISIT_STAGES.includes(d.stage))) return "deal_moved_on";
+    return "";
+  } catch (_) {
+    return "check_failed";
+  }
+}
 async function visitResults(companyId: string, out: Record<string, number>) {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
   const from = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString().slice(0, 10);
   const vs = await db.from("viewings").select("id,company_id,client_id,property_id,viewing_date,viewing_time,status,notes,ai_checked_at,row_version,properties(type,area,status,archived),clients(name)")
     .eq("company_id", companyId).eq("archived", false).in("status", ["scheduled", "confirmed", "postponed"]).lt("viewing_date", today).gte("viewing_date", from)
     .order("viewing_date", { ascending: false }).limit(80);
+  // the done-visit pass waits for SQL77 and its 77b cleanup (point 5): 77b leaves merged cards and nothing removes them
+  const merged = await db.from("deals").select("id").not("merged_into_deal_id", "is", null).limit(1);
+  const opinionPass = !merged.error && (merged.data || []).length > 0;
+  if (!opinionPass) out.visit_opinion_waits_sql77b = 1;
+  const ds: any = opinionPass
+    ? await db.from("viewings").select("id,company_id,client_id,property_id,viewing_date,viewing_time,status,notes,ai_checked_at,row_version,properties(type,area,status,archived),clients(name)")
+      .eq("company_id", companyId).eq("archived", false).eq("status", "done").is("client_feedback", null).is("pipeline_outcome", null).lte("viewing_date", today).gte("viewing_date", opinionSince())
+      .order("viewing_date", { ascending: false }).limit(60)
+    : { data: [] };
   let budget = AFTER_VISIT_PER_RUN * 2;
   const dayMs = 24 * 3600 * 1000;
-  for (const v of vs.data || []) {
+  const opinions = new Map<string, any>();
+  // per client+property, once a run: "" when an opinion may be written, otherwise why it is left to Ahmed (opinionBlocked)
+  const gates = new Map<string, string>();
+  for (const v of [...(vs.data || []), ...(ds.data || [])]) {
     const now = new Date().toISOString();
+    const done = v.status === "done";
     const pr: any = (v as any).properties || {};
+    // a done visit of a property sold or off the list: the property automation closed its deal (Ahmed 10 Nov, point 2) and an
+    // opinion written now would move that deal again (sync_viewing_to_crm reopens a lost card), so it is left as it is
+    if (done && (["sold", "withdrawn", "not_available"].includes(pr.status) || pr.archived === true)) continue;
+    // a done visit whose card is past the visit or lost, or whose property is reserved, is Ahmed's: not read, nothing written
+    const key = `${v.client_id}|${v.property_id}`;
+    if (done && !gates.has(key)) gates.set(key, await opinionBlocked(v));
+    if (done && gates.get(key)) { const k = `visit_opinion_left_${gates.get(key)}`; out[k] = (out[k] || 0) + 1; continue; }
     const daysOver = Math.floor((new Date(`${today}T00:00:00+04:00`).getTime() - new Date(`${v.viewing_date}T00:00:00+04:00`).getTime()) / dayMs);
     const convs = await db.from("whatsapp_conversations").select("id").eq("company_id", companyId).eq("client_id", v.client_id).in("route_key", ["barka", "muscat"]).limit(2);
     const ids = (convs.data || []).map((c: any) => c.id);
@@ -483,11 +752,11 @@ async function visitResults(companyId: string, out: Record<string, number>) {
       out.visit_held_by_owner = (out.visit_held_by_owner || 0) + 1;
       if (!String(v.notes || "").includes("[موقوفة عند أحمد]")) {
         const why = heldWhy === "muted" ? "العقل موقوف عندك" : heldWhy === "negotiation" ? "العميل في تفاوض معك" : "أنت ترد على المحادثة بنفسك";
-        await db.from("viewings").update({ notes: [v.notes, `[موقوفة عند أحمد] ${today}: ${why}، الزيارة تنتظر نتيجتك`].filter(Boolean).join("\n").slice(0, 2000) }).eq("id", v.id);
+        await db.from("viewings").update({ notes: [v.notes, `[موقوفة عند أحمد] ${today}: ${why}، ${done ? "رأي العميل بعد الزيارة ينتظرك" : "الزيارة تنتظر نتيجتك"}`].filter(Boolean).join("\n").slice(0, 2000) }).eq("id", v.id);
       }
       continue;
     }
-    let patch: any = null, judged = false;
+    let patch: any = null, judged = false, writing = false;
     const since = [`${v.viewing_date}T00:00:00+04:00`, v.ai_checked_at].filter(Boolean).map((d: string) => new Date(d).getTime());
     let at = 0;
     if (ids.length) {
@@ -496,26 +765,49 @@ async function visitResults(companyId: string, out: Record<string, number>) {
     }
     try {
       if (at && at > Math.max(...since) && budget > 0) {
-        budget--; judged = true;
-        const r = await judgeResult(v, today);
+        // repeated visits of one property (the visit watcher saved some twice): the opinion is read once a run, saved on each
+        const again = done ? opinions.get(key) : undefined;
+        if (!again) budget--;
+        judged = true;
+        const r = again || await judgeResult(v, today, done);
+        if (done && r) opinions.set(key, r);
         if (r) {
           const stamp = `[الذكاء الاصطناعي ${today}] ${short(r.note, 300)}`;
           const notes = [v.notes, stamp].filter(Boolean).join("\n").slice(0, 2000);
           if (r.confidence >= 0.75) {
-            if (r.result === "done") {
+            if (done) {
+              // recorded done: the opinion only, never the status
               const o = OPINION[r.opinion];
+              if (o) patch = { client_feedback: o.feedback, liked: o.liked, pipeline_outcome: o.outcome, rejection_reason: r.opinion === "disliked" ? (r.reason || null) : null, outcome_note: short(r.note, 500), notes };
+              // read the card again just before the write: it may have moved while the chat was read (Ahmed booked it). Then only
+              // the check is stamped; repeated visits of this property in this run follow the same answer.
+              if (patch && !again) {
+                const why = await opinionBlocked(v);
+                if (why) gates.set(key, why);
+                if (why === "check_failed") throw new Error("deal_check_failed");
+                if (why) patch = null;
+              }
+            } else if (r.result === "done") {
+              // a card past the visit (negotiation, a booking or later) or a property not available: the visit is closed done and
+              // its opinion is left to Ahmed, so the deal never moves. A lost card is left as before: any status write reopens it
+              // in sync_viewing_to_crm (deals-sql guards that), and «disliked» at least keeps it lost.
+              let o: any = OPINION[r.opinion];
+              const why = o ? await opinionBlocked(v) : "";
+              if (why === "check_failed") throw new Error("deal_check_failed");
+              if (why && why !== "deal_lost") { o = undefined; out[`visit_opinion_left_${why}`] = (out[`visit_opinion_left_${why}`] || 0) + 1; }
               patch = { status: "done", client_feedback: o?.feedback || null, liked: o ? o.liked : null, pipeline_outcome: o?.outcome || "followup",
-                rejection_reason: r.opinion === "disliked" ? (r.reason || null) : null, outcome_note: short(r.note, 500), notes };
+                rejection_reason: o && r.opinion === "disliked" ? (r.reason || null) : null, outcome_note: short(r.note, 500), notes };
             } else if (r.result === "no_show") patch = { status: "no_show", attendance: "not_attended", notes };
             else if (r.result === "cancelled") patch = { status: "cancelled", notes };
             else if (r.result === "postponed") patch = /^\d{4}-\d{2}-\d{2}$/.test(r.new_date || "") && r.new_date >= today ? { status: "scheduled", viewing_date: r.new_date, notes } : { status: "postponed", notes };
           }
-          if (r.serious && r.confidence >= 0.6) { await alertSerious(companyId, v.client_id, (v as any).clients?.name, `${typeAr(pr.type)} في ${pr.area || ""}: ${r.note}`); out.serious_alert = (out.serious_alert || 0) + 1; }
-          if (patch) out[`visit_result_${r.result}`] = (out[`visit_result_${r.result}`] || 0) + 1; else out.visit_result_unclear = (out.visit_result_unclear || 0) + 1;
+          if (r.serious && r.confidence >= 0.6 && !again) { await alertSerious(companyId, v.client_id, (v as any).clients?.name, `${typeAr(pr.type)} في ${pr.area || ""}: ${r.note}`); out.serious_alert = (out.serious_alert || 0) + 1; }
+          if (done) { const k = patch ? `visit_opinion_${r.opinion}` : gates.get(key) ? `visit_opinion_left_${gates.get(key)}` : "visit_opinion_unclear"; out[k] = (out[k] || 0) + 1; }
+          else if (patch) out[`visit_result_${r.result}`] = (out[`visit_result_${r.result}`] || 0) + 1; else out.visit_result_unclear = (out.visit_result_unclear || 0) + 1;
         }
       }
-      // nothing found in the chat: close by rule so the visit does not stay open
-      if (!patch) {
+      // nothing found in the chat: close by rule so the visit does not stay open (open visits only: a done visit keeps its status)
+      if (!patch && !done) {
         const unavailable = ["sold", "withdrawn"].includes(pr.status) || pr.archived === true;
         if (unavailable && daysOver >= 1) {
           patch = { status: "cancelled", notes: [v.notes, `[الذكاء الاصطناعي ${today}] الزيارة ما صار لها نتيجة والعقار ${pr.status === "sold" ? "انباع" : "ما عاد متاح"}`].filter(Boolean).join("\n").slice(0, 2000) };
@@ -526,11 +818,20 @@ async function visitResults(companyId: string, out: Record<string, number>) {
         }
       }
       if (!patch && !judged) continue;
-      const w = await db.from("viewings").update({ ...(patch || {}), ai_checked_at: now }).eq("id", v.id).eq("row_version", v.row_version).in("status", ["scheduled", "confirmed", "postponed"]);
+      // a done visit: written only while it is still done with no opinion (the office may have saved one meanwhile)
+      writing = true;
+      const w = done
+        ? await db.from("viewings").update({ ...(patch || {}), ai_checked_at: now }).eq("id", v.id).eq("row_version", v.row_version).eq("status", "done").is("client_feedback", null)
+        : await db.from("viewings").update({ ...(patch || {}), ai_checked_at: now }).eq("id", v.id).eq("row_version", v.row_version).in("status", ["scheduled", "confirmed", "postponed"]);
       if (w.error) throw new Error(w.error.message);
       // the follow-up for this visit on his list was written before the result: read it again with the result known
       if (patch) await db.from("whatsapp_visit_followups").update({ reviewed_at: null }).eq("viewing_id", v.id).eq("status", "awaiting_approval");
-    } catch (e) { out.visit_result_failed = (out.visit_result_failed || 0) + 1; console.error("[followup-auto] visit result", String((e as any)?.message || e)); }
+    } catch (e) {
+      out.visit_result_failed = (out.visit_result_failed || 0) + 1; console.error("[followup-auto] visit result", String((e as any)?.message || e));
+      // a done visit whose opinion was read but could not be saved (the deal sync can refuse a visit, e.g. viewing_request_ambiguous):
+      // the check is stamped (a column the sync does not watch) so the same chat is not read again every run, only when he writes
+      if (done && writing) { try { await db.from("viewings").update({ ai_checked_at: new Date().toISOString() }).eq("id", v.id).eq("status", "done").is("client_feedback", null); } catch (_) { /* read again next run */ } }
+    }
   }
 }
 
@@ -672,11 +973,22 @@ Deno.serve(async (req) => {
   }
   const input = await req.json().catch(() => ({}));
   // a test of the visit results: reads the chats of past visits with no result and writes nothing
+  // (preview_results: "done" reads the visits recorded done with no opinion, for the opinion only; left_to_ahmed says why the
+  // run would not write it: the card moved past the visit or is lost, or the property is not available)
   if (input?.preview_results) {
     const co = await db.from("whatsapp_automation_runtime").select("company_id").eq("mode", "live").limit(1).maybeSingle();
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
-    const vs = await db.from("viewings").select("id,company_id,client_id,viewing_date,viewing_time,status,properties(type,area),clients(name)").eq("company_id", co.data?.company_id).eq("archived", false).in("status", ["scheduled", "confirmed", "postponed"]).lt("viewing_date", today).order("viewing_date", { ascending: false }).range(Number(input.offset) || 0, (Number(input.offset) || 0) + 11);
-    const items = await Promise.all((vs.data || []).map(async (v: any) => { try { return { id: v.id, client: v.clients?.name, date: v.viewing_date, ...(await judgeResult(v, today)) }; } catch (e) { return { id: v.id, error: String((e as any)?.message || e) }; } }));
+    const doneOnly = input.preview_results === "done";
+    const base = db.from("viewings").select("id,company_id,client_id,property_id,viewing_date,viewing_time,status,properties(type,area),clients(name)").eq("company_id", co.data?.company_id).eq("archived", false);
+    const vs = await (doneOnly ? base.eq("status", "done").is("client_feedback", null).is("pipeline_outcome", null).gte("viewing_date", opinionSince()) : base.in("status", ["scheduled", "confirmed", "postponed"]).lt("viewing_date", today)).order("viewing_date", { ascending: false }).range(Number(input.offset) || 0, (Number(input.offset) || 0) + 11);
+    const items = await Promise.all((vs.data || []).map(async (v: any) => { try { return { id: v.id, client: v.clients?.name, date: v.viewing_date, ...(doneOnly ? { left_to_ahmed: (await opinionBlocked(v)) || null } : {}), ...(await judgeResult(v, today, doneOnly)) }; } catch (e) { return { id: v.id, error: String((e as any)?.message || e) }; } }));
+    return json({ ok: true, items });
+  }
+  // a test of R21: finds the «بشوف وبرد عليك» chats and writes the question; inserts and sends nothing
+  if (input?.preview_thinking) {
+    const co = await db.from("whatsapp_automation_runtime").select("company_id").eq("mode", "live").limit(1).maybeSingle();
+    const lines = await db.from("company_lead_routes").select("whatsapp_number");
+    const items = await thinkingFollowups(co.data?.company_id, (lines.data || []).map((r: any) => digits(r.whatsapp_number)).filter(Boolean), {}, true);
     return json({ ok: true, items });
   }
   // a test of the owner's instruction on one follow-up: reads and writes nothing
@@ -706,6 +1018,8 @@ Deno.serve(async (req) => {
     await visitResults(rt.company_id, out);
     if (!rt.visit_followups_auto) continue;
     await sendInWindow(rt.company_id, numbers, out);
+    // R21: one light question to a «بشوف وبرد عليك» client before his window closes (never to a client on the daily list)
+    await thinkingFollowups(rt.company_id, numbers, out);
     const dayStart = new Date(`${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date())}T00:00:00+04:00`).toISOString();
     const sentF = await db.from("whatsapp_visit_followups").select("id", { count: "exact", head: true }).eq("company_id", rt.company_id).eq("send_mode", "template").gte("sent_at", dayStart);
     const relQ = await db.from("whatsapp_outreach_queue").select("id", { count: "exact", head: true }).eq("company_id", rt.company_id).eq("kind", "request_followup").eq("reason", "auto_after_wait").gte("approved_at", dayStart);

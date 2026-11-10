@@ -11,7 +11,8 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const META_APP_SECRET = Deno.env.get("META_APP_SECRET") ?? "";
 const WHATSAPP_ACCESS_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN") ?? "";
 const GRAPH = Deno.env.get("META_GRAPH_VERSION") || "v25.0";
-const HOT = /^\s*(مشتري جاد|تفاوض)\s*:/;
+// R19 (10 Nov): a meeting the agent booked («اجتماع:») also reaches Ahmed; it is a soft handoff, the agent keeps answering.
+const HOT = /^\s*(مشتري جاد|تفاوض|اجتماع)\s*:/;
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const enc = new TextEncoder();
@@ -130,15 +131,16 @@ Deno.serve(async (req) => {
   const phone = digits(cl.data?.phone_normalized || cl.data?.phone || conv.customer_phone || conv.customer_wa_id);
   const name = cl.data?.name || conv.customer_name || "عميل";
   const branch = conv.route_key === "barka" ? "بركاء" : "مسقط";
-  const reason = String(conv.handoff_reason || "").replace(/^\s*(مشتري جاد|تفاوض)\s*:\s*/, "");
-  const kind = /^\s*تفاوض/.test(String(conv.handoff_reason || "")) ? "يبي يتفاوض" : "مشتري جاد";
+  const reason = String(conv.handoff_reason || "").replace(/^\s*(مشتري جاد|تفاوض|اجتماع)\s*:\s*/, "");
+  const meeting = /^\s*اجتماع/.test(String(conv.handoff_reason || ""));
+  const kind = meeting ? "اجتماع" : /^\s*تفاوض/.test(String(conv.handoff_reason || "")) ? "يبي يتفاوض" : "مشتري جاد";
   const text = [
-    `${test ? "🧪 تجربة تنبيه\n" : ""}🔥 عميل ساخن (${kind}) · ${branch}`,
+    `${test ? "🧪 تجربة تنبيه\n" : ""}${meeting ? "📅 اجتماع انحجز" : `🔥 عميل ساخن (${kind})`} · ${branch}`,
     `الاسم: ${name}`,
     `الرقم: ${phone}`,
-    reason ? `الموضوع: ${short(reason, 300)}` : "",
+    reason ? `${meeting ? "الموعد" : "الموضوع"}: ${short(reason, 300)}` : "",
     `افتح المحادثة: https://wa.me/${phone}`,
-    "العقل ساكن في محادثته لين ترد عليه",
+    meeting ? "العقل يكمل يرد على أسئلته لين الموعد" : "العقل ساكن في محادثته لين ترد عليه",
   ].filter(Boolean).join("\n");
 
   const r = await metaText(await routeTokens(conv.company_id, conv.route_key), phoneId, to, text);

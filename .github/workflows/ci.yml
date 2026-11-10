@@ -6,7 +6,8 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    # claude/** : work branches are tested before they are merged into main (Pages publishes main only)
+    branches: [main, 'claude/**']
 permissions:
   contents: read
 concurrency:

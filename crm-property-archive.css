@@ -1,0 +1,63 @@
+/* Property archive / restore dialogs and archived labels (crm-property-archive.js, 10 Nov 2026). */
+.cpa-dialog{position:fixed;inset:0;margin:auto;box-sizing:border-box;width:min(520px,calc(100% - 24px));max-width:calc(100vw - 24px);height:fit-content;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;border:0;border-radius:16px;padding:0;background:#fff;color:#1f3a30;box-shadow:0 20px 50px rgba(15,40,30,.25)}
+.cpa-dialog::backdrop{background:rgba(15,30,25,.42)}
+.cpa-dialog [hidden]{display:none!important}
+.cpa-dialog *{box-sizing:border-box}
+.cpa-form{display:grid;gap:12px;margin:0;padding:18px 18px 16px;min-width:0}
+.cpa-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;min-width:0}
+.cpa-head h3{margin:0;font-size:17px;line-height:1.5;color:#1f4d3a;overflow-wrap:anywhere}
+.cpa-x{all:unset;box-sizing:border-box;cursor:pointer;flex:0 0 34px;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border-radius:9px;font-size:21px;line-height:1;color:#5c6f65}
+.cpa-x:hover{background:#eef4f0}
+.cpa-x:focus-visible{outline:2px solid #27624a;outline-offset:1px}
+.cpa-prop{margin:-6px 0 0;font-size:13px;color:#4f665a;line-height:1.7;overflow-wrap:anywhere}
+.cpa-checks{display:grid;gap:8px;min-width:0}
+.cpa-note,.cpa-ok,.cpa-warn,.cpa-block,.cpa-hint{margin:0;font-size:12.5px;line-height:1.8;overflow-wrap:anywhere}
+.cpa-note{color:#4f665a}
+.cpa-ok{color:#1d6b43}
+.cpa-warn,.cpa-hint{padding:9px 11px;border-radius:10px;background:#fff7e6;border:1px solid #f1d9a6;color:#6f4d0e}
+.cpa-hint{white-space:pre-line}
+.cpa-block{padding:9px 11px;border-radius:10px;background:#fdecea;border:1px solid #f5c2bc;color:#9b1c13}
+.cpa-reasons{margin:0;padding:0;border:0;min-width:0}
+.cpa-reasons legend{padding:0;margin:0 0 6px;font-size:12.5px;font-weight:700;color:#2f4a3e}
+.cpa-list{display:grid;gap:6px;min-width:0}
+.cpa-choice{display:flex;align-items:flex-start;gap:9px;min-width:0;padding:9px 11px;border:1px solid #dfe8e3;border-radius:10px;background:#fff;cursor:pointer}
+.cpa-choice:hover{border-color:#b9cfc2}
+.cpa-choice.is-on{border-color:#27624a;background:#f1f8f4}
+.cpa-choice input{flex:0 0 auto;width:18px;height:18px;margin:3px 0 0;accent-color:#27624a}
+.cpa-choice span{display:grid;gap:1px;min-width:0}
+.cpa-choice strong{font-size:13.5px;font-weight:600;color:#1f3a30;overflow-wrap:anywhere}
+.cpa-choice small{font-size:11.5px;color:#6b7f74;overflow-wrap:anywhere}
+.cpa-field{display:grid;gap:5px;min-width:0}
+.cpa-field>span{font-size:12.5px;font-weight:600;color:#2f4a3e}
+.cpa-field input,.cpa-field textarea{width:100%;max-width:100%;min-width:0}
+.cpa-field textarea{min-height:64px;resize:vertical}
+.cpa-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-width:0}
+.cpa-check{display:flex;align-items:flex-start;gap:9px;min-width:0;font-size:13px;line-height:1.7;color:#1f3a30;cursor:pointer}
+.cpa-check input{flex:0 0 auto;width:18px;height:18px;margin:3px 0 0;accent-color:#27624a}
+.cpa-check span{min-width:0;overflow-wrap:anywhere}
+.cpa-error{margin:0;padding:8px 11px;border-radius:10px;background:#fdecea;color:#b42318;font-size:12.5px;line-height:1.7;overflow-wrap:anywhere}
+.cpa-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-start}
+.cpa-actions button{width:auto!important;min-width:120px;max-width:100%;white-space:normal}
+.cpa-dialog[data-busy="1"] .cpa-actions button{cursor:progress}
+
+/* Archived status chip in the property grid (desktop rows and phone cards) */
+.ops-status.cpa-archived-chip,.mobile-status-chip.cpa-archived-chip{background:#f3efe6!important;color:#6b5a3e!important}
+
+/* Archive / relisted banner under the property details header */
+.cpa-banner{display:grid;gap:6px;margin:0 0 12px;padding:11px 13px;border-radius:12px;border:1px solid #e6dcc7;background:#fbf8f1;color:#5a4a2e;font-size:13px;line-height:1.8;min-width:0;overflow-wrap:anywhere}
+.cpa-banner p{margin:0}
+.cpa-banner strong{color:#3f3220}
+.cpa-banner-note{white-space:pre-wrap;color:#6b5a3e}
+.cpa-banner-actions{display:flex;flex-wrap:wrap;gap:6px}
+.cpa-banner-actions button{width:auto!important}
+.cpa-banner.cpa-relisted{background:#f1f8f4;border-color:#cfe3d7;color:#24533f}
+
+@media (max-width:640px){
+  .ops-status.cpa-archived-chip{white-space:normal;overflow-wrap:anywhere}
+}
+@media (max-width:480px){
+  .cpa-dialog{width:calc(100% - 16px);max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);border-radius:14px}
+  .cpa-form{padding:14px 14px 12px;gap:11px}
+  .cpa-row{grid-template-columns:minmax(0,1fr)}
+  .cpa-actions button{flex:1 1 0;min-width:0}
+}

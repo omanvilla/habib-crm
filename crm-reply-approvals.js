@@ -116,7 +116,7 @@
   // messages the office starts (whatsapp-outreach): request follow-ups, "انحجزت" notices, new listings
   const OUT_KINDS={request_followup:'متابعة طلب',property_sold:'عقار انحجز',new_listing:'عقار جديد يناسبه'};
   async function loadOutreach(){
-    const q=await supa.from('whatsapp_outreach_queue').select('id,kind,step,client_id,conversation_id,route_key,messages,send_mode,summary,error,created_at,property_id').eq('status','pending').eq('dry_run',false).neq('kind','request_followup').order('created_at',{ascending:true}).limit(60);
+    const q=await supa.from('whatsapp_outreach_queue').select('id,kind,step,client_id,conversation_id,route_key,messages,send_mode,summary,error,created_at,property_id').eq('status','pending').eq('dry_run',false).neq('kind','request_followup').neq('kind','thinking_followup').order('created_at',{ascending:true}).limit(60);
     const rows=q.error?[]:(q.data||[]);
     const cIds=[...new Set(rows.map(x=>x.client_id))];
     const cl=cIds.length?await supa.from('clients').select('id,name,phone').in('id',cIds):{data:[]};
@@ -183,7 +183,7 @@
     const r=await supa.from('whatsapp_reply_drafts').select('id,analysis',{count:'exact'}).eq('status','pending').limit(200);
     if(r.error)return null;
     // follow-ups live in "متابعات اليوم" on the home page, so they do not count here
-    const o=await supa.from('whatsapp_outreach_queue').select('id',{count:'exact',head:true}).eq('status','pending').eq('dry_run',false).neq('kind','request_followup');
+    const o=await supa.from('whatsapp_outreach_queue').select('id',{count:'exact',head:true}).eq('status','pending').eq('dry_run',false).neq('kind','request_followup').neq('kind','thinking_followup');
     return (r.data||[]).filter(d=>!(d.analysis&&d.analysis.dry_run===true)).length+(o.error?0:(o.count||0));
   }
 

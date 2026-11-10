@@ -16,12 +16,21 @@ const DEBOUNCE_MS = Number(Deno.env.get("REPLY_DEBOUNCE_MS") || 35000); // wait 
 // and the open item stays on Ahmed's list.
 const HARD_HANDOFF = /^\s*(تفاوض|مشتري جاد|دراسة سعر)\s*:/;
 // Ahmed's strict rule (6 Nov): never promise the customer a reply ("بشوف وارد عليك"). Silence is better than a promise nobody keeps.
-const PROMISE_RE = /(بشوف|بأشوف|اشوف|أشوف|بتأكد|باتأكد|أتأكد|اتأكد|بأكد|باكد|أأكد|اأكد|بنسق|براجع|بسأل|بنشوف)[^\n]{0,40}(وارد|و ارد|وبرد|وأرد|وارجع|وبرجع|ونرد|ونرجع)\s*(لك|عليك|عليج|عليكم)|(برد|بارد|برجع|بنرد|بنرجع|بيرد)\s*(لك|عليك|عليج|عليكم)\s*(بعدين|بعد شوي|قريب)?\s*$/;
+// R12 (9 Nov, in code 10 Nov): first-person call promises too ("بتصل عليك", "بكلمك"). The one allowed sentence is R12's third-person
+// "اول ما يفضى يتصل فيك", which none of these match; "اول ما يتوفر بتواصل معك" is not a call promise and stays.
+const PROMISE_RE = /(بشوف|بأشوف|اشوف|أشوف|بتأكد|باتأكد|أتأكد|اتأكد|بأكد|باكد|أأكد|اأكد|بنسق|براجع|بسأل|بنشوف)[^\n]{0,40}(وارد|و ارد|وبرد|وأرد|وارجع|وبرجع|ونرد|ونرجع)\s*(لك|عليك|عليج|عليكم)|(برد|بارد|برجع|بنرد|بنرجع|بيرد)\s*(لك|عليك|عليج|عليكم)\s*(بعدين|بعد شوي|قريب)?\s*$|(بتصل|باتصل|بأتصل)\s*(عليك|عليج|عليكم|فيك|فيج|فيكم)|بكلمك|بكلمج|بكلمكم|(ا|أ)تصل\s*(عليك|عليج|عليكم)|بتواصل\s*(معك|معج|معكم)\s*بالاتصال/;
+const CALL_PROMISE_RE = /(بتصل|باتصل|بأتصل)\s*(عليك|عليج|عليكم|فيك|فيج|فيكم)|بكلمك|بكلمج|بكلمكم|(ا|أ)تصل\s*(عليك|عليج|عليكم)|بتواصل\s*(معك|معج|معكم)\s*بالاتصال/;
 // R1 (Ahmed 8 Nov, docs/agent-rules.md): once a person from the office types in a chat, the agent stays out until Ahmed
 // hands it back from the inbox. Decided in SQL by crm_chat_hold() so the agent, follow-ups and inbox agree.
 // R2: no negotiation before the customer has visited that property: the agent books the visit instead.
 const NEGOTIATION_HANDOFF = /^\s*(تفاوض|مشتري جاد)\s*:/;
 const SAID_VISITED = /(زرت|زرنا|زرناه|زرناها|عاينت|عاينا|شفت البيت|شفت الفيلا|شفنا البيت|شفنا الفيلا|شفناه|شفناها|رحت شفت|رحنا شفنا|دخلت البيت|دخلنا)/;
+// R16 (9 Nov): our after-visit question («كيف لقيت…» / «قدرت تشوفه ؟» / «قدرتي تشوفينه ؟»), not a question about a video or photos
+const AFTER_VISIT_Q = /كيف\s*لقي|قدرت[يوا]*\s*تشوف/;
+const NOT_A_VISIT_Q = /فيديو|الصور|صور البيت|صور الفيلا|الرابط|الريل|الاعلان|الإعلان/;
+// R10 / R20 (8 and 10 Nov): an owner is declined politely (heirs, occupied, mortgaged); this reply always goes out.
+// A bare «نعتذر منك» (sorry for the delay) is not a decline.
+const DECLINE_RE = /ما\s*(نقدر\s*)?(نستلم|نقبل|نتعامل\s*مع)|(نعتذر|المعذر[هة])[^\n]{0,40}(ورث|مرهون|مسكون|ساكنين)/;
 const ALLOWED_ORIGINS = ["https://omanvilla.github.io"]; // the approval screen asks for a rewrite from here
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -152,7 +161,7 @@ const schema = {
     budget: { type: ["string", "null"] },
     area: { type: ["string", "null"] },
     property_id: { type: ["string", "null"] },
-    action: { type: "string", enum: ["none", "send_location", "send_owner_number", "send_lockbox", "book_viewing", "handoff"] },
+    action: { type: "string", enum: ["none", "send_location", "send_owner_number", "send_lockbox", "book_viewing", "book_meeting", "handoff"] },
     viewing_date: { type: ["string", "null"] },
     viewing_time: { type: ["string", "null"] },
     handoff_reason: { type: ["string", "null"] },
@@ -185,8 +194,21 @@ const schema = {
       },
       required: ["request_type", "areas", "property_types", "budget_max", "bedrooms_min", "notes", "followup_in_days", "followup_note"],
     }] },
+    // R22 (Ahmed 10 Nov): how serious the client is, judged every turn from his history and this chat
+    seriousness: { type: "string", enum: ["strong", "possible", "weak", "unknown"] },
+    seriousness_reason: { type: "string" },
+    // R19 (Ahmed 10 Nov): the meeting the client fixed (office in Mawaleh, online, or the developer's office)
+    meeting: { anyOf: [{ type: "null" }, {
+      type: "object", additionalProperties: false,
+      properties: {
+        place: { type: "string", enum: ["office", "online", "developer"] },
+        date: { type: ["string", "null"] },
+        time: { type: ["string", "null"] },
+      },
+      required: ["place", "date", "time"],
+    }] },
   },
-  required: ["reply_messages", "category", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives", "close_other_branch", "owner_offer", "request", "client_name_stated", "name_declined"],
+  required: ["reply_messages", "category", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives", "close_other_branch", "owner_offer", "request", "seriousness", "seriousness_reason", "meeting", "client_name_stated", "name_declined"],
 };
 
 // The marketing text (property description, or the longest reel caption for it) is what the office
@@ -204,10 +226,20 @@ const CTA_RE = /(^|[\s،.:-])(ارسل|أرسل|ارسلوا|أرسلوا|اكت
 const TYPE_AR: Record<string, string> = { house: "بيت", villa: "فيلا", twin_villa: "فيلا", "twin villa": "فيلا", apartment: "شقة", flat: "شقة", land: "أرض", land_residential: "أرض سكنية", land_commercial: "أرض تجارية", land_mixed: "أرض", building: "بناية", commercial_building: "مبنى تجاري", residential_building: "مبنى سكني", income_property: "عقار مؤجر", shop: "محل", office: "مكتب", farm: "مزرعة", chalet: "شاليه", resthouse: "استراحة", townhouse: "تاون هاوس", penthouse: "بنتهاوس", warehouse: "مخزن" };
 const typeAr = (t: unknown) => TYPE_AR[String(t || "").toLowerCase()] || (/[a-z]/i.test(String(t || "")) || !t ? "عقار" : String(t));
 function arabicOnly(s: string): string {
-  let x = String(s || "").replace(/\btwin[\s_-]*villa\b/gi, "فيلا");
+  const t = String(s || "");
+  // 10 Nov: this text is now really sent. An English reply to an English-speaking client stays English ("see the apartment first"),
+  // and links stay exactly as they are (a reel code or a map link can hold "-land-" or "villa")
+  if (!/[؀-ۿ]/.test(t)) return t;
+  return t.split(/(https?:\/\/\S+)/i).map((part, i) => (i % 2 ? part : arabicWords(part))).join("");
+}
+function arabicWords(s: string): string {
+  let x = s.replace(/\btwin[\s_-]*villa\b/gi, "فيلا");
   for (const [k, v] of Object.entries(TYPE_AR)) x = x.replace(new RegExp(`\\b${k.replace(/_/g, "[\\s_]")}\\b`, "gi"), v);
   return x.replace(/(فيلا\s+){2,}/g, "فيلا ");
 }
+// Contract A (10 Nov): property_archive_reasons labels. Only withdrawn / not_available rows reach the agent's "no longer available" list.
+const ARCHIVE_REASON_AR: Record<string, string> = { contract_expired: "انتهى عقد التسويق", owner_withdrew: "المالك سحب العقار", sold_by_owner: "المالك باعه بنفسه أو عن طريق غيرنا", sold_by_us: "انباع عن طريقنا", rented: "انأجر", duplicate: "سجل مكرر", test_record: "سجل تجريبي أو خطأ إدخال", other: "سبب آخر", unrecorded: "سبب الأرشفة غير مسجل" };
+const DEAL_STAGE_AR: Record<string, string> = { new: "جديدة", viewing_scheduled: "موعد زيارة", viewing_no_show: "ما حضر الزيارة", viewing_cancelled: "الزيارة انلغت", viewing_postponed: "الزيارة تأجلت", visit: "زار العقار", negotiation: "تفاوض", deposit: "عربون", awaiting_finance: "ينتظر التمويل", finance_approved: "التمويل انوافق", awaiting_clearance: "ينتظر المخالصة", ownership_transfer: "نقل الملكية" };
 // A reply that names a developer project waits for the owner, whatever the category (7 Nov: Wadi Zaha and AIDA prices went out on their own).
 let projectRe: { at: number; re: RegExp | null } = { at: 0, re: null };
 async function mentionsProject(companyId: string, texts: string[]): Promise<boolean> {
@@ -230,10 +262,23 @@ function propLine(p: any) {
   const rented = p.rented_units ? ` | المؤجر حالياً: ${p.rented_units}` : "";
   return `- id=${p.id} | ${name} | ${bits}${terms}${rented} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? " | اللوكيشن متوفر (action=send_location)" : " | اللوكيشن غير متوفر"} | الفرع: ${p.branch_key === "muscat" ? "مسقط (رقم 71770030)" : p.branch_key === "barka" ? "بركاء (رقم 92344273)" : "غير محدد"}${p.video ? ` | رابط الفيديو (ترسله إذا طلب فيديو): ${p.video}` : ""}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}${p.marketing ? `\n  وصف الإعلان: ${short(p.marketing, 1600)}` : ""}`;
 }
+// The same neutral label (type, area, price) for visits, deals and properties no longer available: never the office title
+function neutralLabel(p: any) {
+  if (!p) return "عقار";
+  return [`${typeAr(p.type)} ${p.listing_purpose === "rent" ? "للإيجار" : "للبيع"}`, [p.area, p.wilayat].filter(Boolean).join("، "),
+    p.price ? `${Number(p.price).toLocaleString("en-US")} ريال` : ""].filter(Boolean).join(" | ");
+}
 
-async function notifyHandoff(companyId: string, conv: any, client: any, reason: string) {
+async function notifyHandoff(companyId: string, conv: any, client: any, reason: string, toOwner = false) {
   try {
-    let userId = conv.assigned_to || null;
+    // 10 Nov: a booked meeting (R19) is Ahmed's own step, so it goes to the active owner whoever holds the chat (Barka chats sit
+    // with the Barka agent). Any other handoff goes to the chat's assignee only while that account is active (352 chats still sit
+    // on a retired account), otherwise to the owner
+    let userId = toOwner ? null : (conv.assigned_to || null);
+    if (userId) {
+      const a = await db.from("profiles").select("is_active").eq("id", userId).eq("company_id", companyId).maybeSingle();
+      if (a.data?.is_active !== true) userId = null;
+    }
     if (!userId) {
       const o = await db.from("profiles").select("id").eq("company_id", companyId).eq("role", "owner").eq("is_active", true).limit(1).maybeSingle();
       userId = o.data?.id || null;
@@ -241,7 +286,7 @@ async function notifyHandoff(companyId: string, conv: any, client: any, reason: 
     if (!userId) return;
     await db.from("notifications").insert({
       user_id: userId, type: "whatsapp_handoff", is_read: false, client_id: client.id, link: "whatsapp",
-      title: `${/^طلب اتصال/.test(reason) ? "📞 طلب اتصال" : /^(مشتري جاد|تفاوض)/.test(reason) ? "🔥 مشتري جاد" : "محادثة تحتاجك"}: ${client.name || conv.customer_name || client.phone || "عميل"}`,
+      title: `${/^طلب اتصال/.test(reason) ? "📞 طلب اتصال" : /^(مشتري جاد|تفاوض)/.test(reason) ? "🔥 مشتري جاد" : /^اجتماع/.test(reason) ? "📅 اجتماع" : "محادثة تحتاجك"}: ${client.name || conv.customer_name || client.phone || "عميل"}`,
       body: short(reason, 400),
     });
   } catch (e) { console.error("[reply-agent] notify", String((e as any)?.message || e)); }
@@ -321,7 +366,14 @@ async function watchVisit(msg: any, dry = false) {
     }
   } else if (out.event === "done") {
     if (open) w = await db.from("viewings").update({ status: "done" }).eq("id", open.id);
-    else if (prop) w = await db.from("viewings").insert({ company_id: msg.company_id, client_id: msg.client_id, property_id: prop.id, viewing_date: date && date <= today ? date : today, viewing_time: time, duration_minutes: 30, status: "done", notes: short(out.note, 1000), ...provenance });
+    else if (prop) {
+      // one real visit, one done viewing (Ahmed 10 Nov): "زرته" said again a few minutes later inserted 3 done viewings and a second deal card (7 Nov)
+      const since14 = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date(Date.now() - 14 * 86400000));
+      const seen = await db.from("viewings").select("id").eq("client_id", msg.client_id).eq("property_id", prop.id).eq("archived", false).eq("status", "done").gte("viewing_date", since14).limit(1);
+      if (seen.error) throw new Error(seen.error.message);
+      if ((seen.data || []).length) return { ...out, applied: false, why: "already_recorded" };
+      w = await db.from("viewings").insert({ company_id: msg.company_id, client_id: msg.client_id, property_id: prop.id, viewing_date: date && date <= today ? date : today, viewing_time: time, duration_minutes: 30, status: "done", notes: short(out.note, 1000), ...provenance });
+    }
     else return { ...out, applied: false, why: "no_property" };
   } else if (out.event === "cancelled") {
     if (!open) return { ...out, applied: false, why: "nothing_to_cancel" };
@@ -341,7 +393,11 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ ok: false }, 405);
   const body = await req.json().catch(() => ({}));
   let message_id = body?.message_id;
-  let dry = body?.dry_run === true; // review only: never sends, never touches the CRM
+  // the dry-run copy (whatsapp-reply-agent-dryrun) runs this same code: it can never send, even when the body leaves out dry_run (10 Nov)
+  let forcedDry = false;
+  try { forcedDry = new URL(req.url).pathname.includes("reply-agent-dryrun"); } catch (_) { forcedDry = String(req.url || "").includes("reply-agent-dryrun"); }
+  // review only: never sends, never touches the CRM. An inline request is always a dry run, even when dry_run is left out
+  let dry = body?.dry_run === true || body?.inline === true || forcedDry;
   // redo: the owner, from the approval screen, asks for a waiting draft to be rewritten following
   // their instruction ("ارسل له تفاصيل العقار"). The new reply replaces the draft and still waits for approval.
   let redo: { draftId: string; instruction: string } | null = null;
@@ -359,9 +415,12 @@ Deno.serve(async (req) => {
     if (d.data.status !== "pending") return json({ ok: false, error: "draft_not_pending" }, 409);
     redo = { draftId: d.data.id, instruction };
     message_id = d.data.message_id;
-    dry = d.data.analysis?.dry_run === true;
+    dry = forcedDry || d.data.analysis?.dry_run === true;
   }
   if (!message_id) return json({ ok: false, error: "message_id_required" }, 400);
+  // inline dry run (10 Nov): {dry_run:true, inline:true, message_id, brain_sha?} claims no draft and writes nothing (reads only), so it
+  // also works on a message that already has a real draft; the answer comes back in the HTTP response
+  const inline = !redo && dry && body?.inline === true;
 
   const m = await db.from("whatsapp_messages").select("id,company_id,conversation_id,client_id,direction,message_timestamp").eq("id", message_id).single();
   if (m.error || m.data.direction !== "inbound") return json({ ok: true, ignored: "not_inbound" });
@@ -393,21 +452,21 @@ Deno.serve(async (req) => {
     }
   }
 
-  let draftId: string;
+  let draftId = "";
   if (redo) draftId = redo.draftId;
-  else {
+  else if (!inline) {
     const claim = await db.from("whatsapp_reply_drafts").insert({ company_id: msg.company_id, conversation_id: msg.conversation_id, message_id: msg.id, client_id: msg.client_id, status: "pending", analysis: dry ? { dry_run: true } : {} }).select("id").single();
     if (claim.error) return json({ ok: true, ignored: "already_processed" });
     draftId = claim.data.id;
   }
-  // a failed rewrite leaves the owner's waiting draft as it was
-  const fail = async (why: string, status = "skipped") => { if (!redo) await db.from("whatsapp_reply_drafts").update({ status, error: why }).eq("id", draftId); return json({ ok: !redo, ignored: why, error: redo ? why : undefined }); };
+  // a failed rewrite leaves the owner's waiting draft as it was; an inline dry run has no draft to mark
+  const fail = async (why: string, status = "skipped") => { if (!redo && !inline) await db.from("whatsapp_reply_drafts").update({ status, error: why }).eq("id", draftId); return json({ ok: !redo, ignored: why, error: redo ? why : undefined, ...(inline ? { inline: true } : {}) }); };
 
   try {
     const [rtR, convR, clientR, routesR] = await Promise.all([
       db.from("whatsapp_automation_runtime").select("*").eq("company_id", msg.company_id).single(),
       db.from("whatsapp_conversations").select("*").eq("id", msg.conversation_id).single(),
-      db.from("clients").select("id,name,phone,phone_normalized,followup_suppressed,notes").eq("id", msg.client_id).single(),
+      db.from("clients").select("id,name,phone,phone_normalized,followup_suppressed,notes,budget_min,budget_max,payment_method,purchase_timing").eq("id", msg.client_id).single(),
       db.from("company_lead_routes").select("route_key,whatsapp_number,meta_phone_number_id"),
     ]);
     const rt = rtR.data, conv = convR.data, client = clientR.data;
@@ -459,15 +518,21 @@ Deno.serve(async (req) => {
     ]);
     const history = (histR.data || []).reverse();
     const props = propsR.data || [];
-    // R2: the customer's visits, so the agent knows whether a price talk can start (only after a visit)
-    const visR = await db.from("viewings").select("property_id,viewing_date,status,properties(title,area,price)").eq("client_id", msg.client_id).eq("archived", false)
+    // R2: the customer's visits, so the agent knows whether a price talk can start (only after a visit).
+    // Listed by a neutral label (type, area, price): the office title carries the owner's name (10 Nov)
+    const visR = await db.from("viewings").select("property_id,viewing_date,viewing_time,status,properties(type,area,wilayat,price,listing_purpose)").eq("client_id", msg.client_id).eq("archived", false)
       .order("viewing_date", { ascending: false }).limit(20);
     const visits = visR.data || [];
     const visitedIds = new Set<string>(visits.filter((v: any) => v.status === "done" && v.property_id).map((v: any) => v.property_id));
     const VIS_AR: Record<string, string> = { done: "زارها", scheduled: "موعد محجوز", confirmed: "موعد مؤكد", postponed: "تأجلت", cancelled: "انلغت", no_show: "ما حضر" };
     const visitsText = visits.length
-      ? visits.map((v: any) => `- ${v.properties?.title || v.properties?.area || "عقار"}${v.properties?.price ? ` (${Number(v.properties.price).toLocaleString("en-US")})` : ""} | ${v.viewing_date || ""} | ${VIS_AR[v.status] || v.status} | property_id=${v.property_id || ""}`).join("\n")
+      ? visits.map((v: any) => `- ${neutralLabel(v.properties)} | ${v.viewing_date || ""}${v.viewing_time ? ` ${String(v.viewing_time).slice(0, 5)}` : ""} | ${VIS_AR[v.status] || v.status} | property_id=${v.property_id || ""}`).join("\n")
       : "ما في أي زيارة مسجلة لهذا العميل";
+    // R16: a booked visit whose day (and hour, when there is one) has passed counts as seen
+    const dayM = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
+    const hmM = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Muscat", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+    const visitPassed = (v: any) => ["scheduled", "confirmed"].includes(v.status) && !!v.viewing_date
+      && (v.viewing_date < dayM || (v.viewing_date === dayM && !!v.viewing_time && String(v.viewing_time).slice(0, 5) <= hmM));
     // the ad text for each property: its description, or else the longest caption of a reel about it
     const capR = props.length ? await db.from("instagram_media_catalog").select("property_id,caption,permalink,likes,comments").in("property_id", props.map((p: any) => p.id)) : { data: [] };
     for (const p of props as any[]) {
@@ -494,14 +559,18 @@ Deno.serve(async (req) => {
     const tokens = await routeTokens(msg.company_id, conv.route_key);
     const pr = await db.from("whatsapp_agent_prompts").select("key,content").in("key", ["brain", "brain_base", "knowledge"]);
     let BRAIN = (pr.data || []).find((x: any) => x.key === "brain")?.content || "";
-    // dry run only: try a brain from a repo commit (plus Ahmed's open CRM notes) before it goes live
+    let INVESTOR_KNOWLEDGE = (pr.data || []).find((x: any) => x.key === "knowledge")?.content || "";
+    // dry run only: try a brain from a repo commit (plus Ahmed's open CRM notes) before it goes live. The same commit's
+    // knowledge.ts goes with it (10 Nov): R18's figures live there, and agent-prompt-sync publishes the two files together
     if (dry && /^[0-9a-f]{40}$/.test(String(body?.brain_sha || ""))) {
       const r = await fetch(`https://raw.githubusercontent.com/omanvilla/habib-crm/${body.brain_sha}/supabase/functions/whatsapp-reply-agent/brain.ts`);
       const m = r.ok ? (await r.text()).match(/=\s*`([\s\S]*)`;?\s*$/) : null;
       const base = (pr.data || []).find((x: any) => x.key === "brain_base")?.content || "";
       if (m && m[1].length > 2000) BRAIN = m[1] + (base && BRAIN.startsWith(base) ? BRAIN.slice(base.length) : "");
+      const rk = await fetch(`https://raw.githubusercontent.com/omanvilla/habib-crm/${body.brain_sha}/supabase/functions/whatsapp-reply-agent/knowledge.ts`);
+      const mk = rk.ok ? (await rk.text()).match(/=\s*`([\s\S]*)`;?\s*$/) : null;
+      if (mk && mk[1].length > 1000) INVESTOR_KNOWLEDGE = mk[1];
     }
-    const INVESTOR_KNOWLEDGE = (pr.data || []).find((x: any) => x.key === "knowledge")?.content || "";
     if (BRAIN.length < 2000) return fail("prompt_missing", "failed");
 
     // understand the latest voice notes
@@ -509,10 +578,11 @@ Deno.serve(async (req) => {
     for (const a of pendingAudio) {
       const ctx = history.filter((h: any) => String(h.message_timestamp) < String(a.message_timestamp)).slice(-8)
         .map((h: any) => `${h.direction === "inbound" ? "العميل" : "المكتب"}: ${short(h.transcript || h.body || `[${h.message_type}]`, 300)}`).join("\n");
-      const v = await transcribeVoice(tokens, a.media_id, GRAPH, ctx, (b, m) => db.storage.from("whatsapp-voice").upload(`${msg.company_id}/${a.media_id}`, b, { contentType: m, upsert: true }));
+      // an inline dry run reads the voice note but keeps neither the transcript nor the audio copy
+      const v = await transcribeVoice(tokens, a.media_id, GRAPH, ctx, inline ? undefined : (b, m) => db.storage.from("whatsapp-voice").upload(`${msg.company_id}/${a.media_id}`, b, { contentType: m, upsert: true }));
       if (v) {
         a.transcript = v.unclear ? `${v.text} (الصوت مو واضح كامل)` : v.text;
-        await saveVoice(a.id, { ...v, text: a.transcript });
+        if (!inline) await saveVoice(a.id, { ...v, text: a.transcript });
       }
     }
 
@@ -549,6 +619,19 @@ Deno.serve(async (req) => {
       soldRows = sr.data || [];
       soldList = (sr.data || []).map((p: any) => `- ${typeAr(p.type)} | ${[p.area, p.wilayat].filter(Boolean).join("، ")} | ${p.price ? Number(p.price).toLocaleString("en-US") + " ريال" : ""} | ${p.status === "sold" ? "انباع" : "انحجز"}`).join("\n");
     } catch (_) { /* optional */ }
+    // R24 (Ahmed 10 Nov): archived but not sold (withdrawn, contract ended, rented...) in the last 150 days: "ما متوفر حالياً", never "انباع".
+    // Duplicate and test records are left out. Before the archive reasons exist (contract A) the same rows are read without them.
+    let goneList = "";
+    let goneRows: any[] = [];
+    try {
+      const since = new Date(Date.now() - 150 * 86400000).toISOString();
+      const goneQ = (cols: string) => db.from("properties").select(cols).eq("company_id", msg.company_id).eq("archived", true).in("status", ["withdrawn", "not_available"])
+        .gte("archived_at", since).order("archived_at", { ascending: false }).limit(40);
+      let gr: any = await goneQ("id,type,area,wilayat,price,listing_purpose,status,archive_reason");
+      if (gr.error) gr = await goneQ("id,type,area,wilayat,price,listing_purpose,status");
+      goneRows = ((gr.data || []) as any[]).filter((p: any) => !["duplicate", "test_record"].includes(String(p.archive_reason || "")));
+      goneList = goneRows.map((p: any) => `- ${neutralLabel(p)} | ${ARCHIVE_REASON_AR[String(p.archive_reason || "")] || "ما عاد متوفر"}`).join("\n");
+    } catch (_) { /* optional */ }
     // the same customer may be talking to the other branch number too
     let otherRoute = "";
     let otherConvId: string | null = null;
@@ -572,6 +655,10 @@ Deno.serve(async (req) => {
       const soldOf = (id: any) => soldRows.find((s: any) => s.id === id);
       const sold = soldOf(reel?.property_id) || soldOf(h.matched_property_id) || (reel?.propertyIds || []).map(soldOf).find(Boolean);
       if (sold && !props.some((p: any) => p.id === reel?.property_id || p.id === h.matched_property_id)) extra += ` {هذا العقار ${sold.status === "reserved" ? "انحجز" : "انباع"}: ${typeAr(sold.type)} ${sold.area || ""} ${sold.price ? Math.round(Number(sold.price) / 1000) + " الف" : ""}. طبق قاعدة المباع واعرض أقرب متاح}`;
+      // R24: archived without being sold (withdrawn, contract ended): no longer available, and never called sold
+      const goneOf = (id: any) => goneRows.find((s: any) => s.id === id);
+      const gone = sold ? null : (goneOf(reel?.property_id) || goneOf(h.matched_property_id) || (reel?.propertyIds || []).map(goneOf).find(Boolean));
+      if (gone && !props.some((p: any) => p.id === reel?.property_id || p.id === h.matched_property_id)) extra += ` {هذا العقار ما عاد متوفر (مو مباع): ${typeAr(gone.type)} ${gone.area || ""} ${gone.price ? Math.round(Number(gone.price) / 1000) + " الف" : ""}. قول ما متوفر حالياً ولا تقول انباع، واعرض أقرب متاح}`;
       if (h.matched_property_id) extra += ` {عقار مرتبط: ${h.matched_property_id}}`;
       if (h.property_image_analysis) extra += ` {تحليل الصورة: ${short(JSON.stringify(h.property_image_analysis), 300)}}`;
       const when = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Muscat", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(h.message_timestamp));
@@ -580,8 +667,67 @@ Deno.serve(async (req) => {
 
     const askedName = await db.from("whatsapp_messages").select("id").eq("conversation_id", conv.id).eq("direction", "outbound").ilike("body", "%اسمك%").limit(1);
     let behaviorText = "";
-    try { const bh = await db.rpc("crm_client_behavior_text", { p_client: client.id }); if (!bh.error && bh.data) behaviorText = String(bh.data); } catch (_) { /* optional */ }
+    try {
+      if (inline) {
+        // crm_client_behavior_text recomputes and saves the row; an inline dry run reads the saved one in the same wording
+        const cb = await db.from("client_behavior").select("tier_ar,score,approach,facts").eq("client_id", client.id).maybeSingle();
+        const f: any = cb.data?.facts || {};
+        if (cb.data) behaviorText = `سلوك العميل (محسوب من سجله): ${cb.data.tier_ar ?? ""} | درجة ${cb.data.score ?? ""} من 100\nله ${f.first_contact_days ?? ""} يوم يتواصل، كتب في ${f.active_days ?? ""} يوم مختلف، سأل عن ${f.properties_asked ?? ""} عقار، زار ${f.visits_done ?? ""} (${f.properties_visited ?? ""} عقار مختلف)\nأسلوب التعامل: ${cb.data.approach ?? ""}`;
+      } else { const bh = await db.rpc("crm_client_behavior_text", { p_client: client.id }); if (!bh.error && bh.data) behaviorText = String(bh.data); }
+    } catch (_) { /* optional */ }
     const nameAskedBefore = (askedName.data || []).length > 0 || String(client.notes || "").includes(NAME_NOT_GIVEN);
+    // «ملف العميل» (contract C, 10 Nov): what we already know, so the agent guides instead of asking again: his open request, the budget,
+    // payment and timing on his card, his open deals (neutral label and stage) and the agent's own notes from earlier turns.
+    // Branch isolation: the other number's request stays out (a branch-free 'general' request shows on both numbers), and an
+    // investment request (route_key or branch_key 'investment', SQL18) and the deals on it only show on the Muscat number.
+    // A query that fails adds no line: the agent is never told "nothing" when we simply could not read it.
+    const REQ_AR: Record<string, string> = { buyer: "شراء", tenant: "إيجار", seller: "بيع عقاره", landlord: "تأجير عقاره", consultation: "استشارة", investor: "استثمار" };
+    const PAY_AR: Record<string, string> = { cash: "كاش", bank_ready: "تمويل بنك جاهز", needs_finance: "يحتاج تمويل", not_sure: "مو متأكد", unclear: "غير واضح" };
+    const TIMING_AR: Record<string, string> = { immediate: "على طول", this_week: "هذا الأسبوع", this_month: "هذا الشهر", "3_months": "خلال 3 شهور", just_looking: "يتفرج بس", not_sure: "مو متأكد" };
+    const SERIOUS_AR: Record<string, string> = { strong: "جاد", possible: "محتمل", weak: "ضعيف", unknown: "غير واضح" };
+    const money = (n: any) => `${Number(n).toLocaleString("en-US")} ريال`;
+    const range = (lo: any, hi: any) => (hi ? `${lo ? `من ${money(lo)} ` : ""}لين ${money(hi)}` : "");
+    const profile: string[] = [];
+    const invReq = (r: any) => r.route_key === "investment" || r.branch_key === "investment";
+    const hiddenReqIds = new Set<string>();
+    let reqsRead = false;
+    try {
+      const reqR = await db.from("client_requests").select("id,status,request_type,preferred_areas,preferred_area,property_types,property_type,budget_min,budget_max,bedrooms_min,notes,route_key,branch_key")
+        .eq("client_id", client.id).order("updated_at", { ascending: false }).limit(30);
+      if (reqR.error) throw new Error(reqR.error.message);
+      const allReqs = (reqR.data || []) as any[];
+      for (const r of allReqs) if (invReq(r) && conv.route_key !== "muscat") hiddenReqIds.add(r.id);
+      reqsRead = true;
+      const reqs = allReqs.filter((r: any) => r.status === "active" && !hiddenReqIds.has(r.id)
+        && (invReq(r) || !r.route_key || r.route_key === "general" || r.route_key === conv.route_key)).slice(0, 2);
+      for (const r of reqs) {
+        const areas = (r.preferred_areas || []).length ? r.preferred_areas : (r.preferred_area ? [r.preferred_area] : []);
+        const types = ((r.property_types || []).length ? r.property_types : (r.property_type ? [r.property_type] : [])).map((t: any) => typeAr(t));
+        profile.push(`- الطلب المفتوح: ${REQ_AR[r.request_type] || r.request_type || "غير محدد"} | المناطق: ${areas.join("، ") || "غير محددة"} | النوع: ${types.join("، ") || "غير محدد"} | الميزانية: ${range(r.budget_min, r.budget_max) || "غير معروفة"} | الغرف: ${r.bedrooms_min ? `${r.bedrooms_min} وفوق` : "غير محددة"}${r.notes ? ` | ملاحظات: ${short(String(r.notes).replace(/\+?968[\s-]?\d{8}|\b[79]\d{7}\b/g, ""), 300).replace(/\n+/g, " / ")}` : ""}`);
+      }
+      if (!reqs.length) profile.push("- الطلب المفتوح: ما في طلب مسجل");
+    } catch (_) { /* optional */ }
+    const card = [range(client.budget_min, client.budget_max) ? `الميزانية ${range(client.budget_min, client.budget_max)}` : "",
+      client.payment_method ? `الدفع: ${PAY_AR[client.payment_method] || client.payment_method}` : "",
+      client.purchase_timing ? `متى يشتري: ${TIMING_AR[client.purchase_timing] || client.purchase_timing}` : ""].filter(Boolean);
+    profile.push(`- من بطاقة العميل: ${card.join(" | ") || "ما في ميزانية ولا طريقة دفع مسجلة"}`);
+    try {
+      // merged duplicate cards (contract B) never show; before merged_into_deal_id exists the same deals are read without it
+      const dealQ = (cols: string) => db.from("deals").select(cols).eq("company_id", msg.company_id).eq("client_id", client.id)
+        .not("stage", "in", "(lost,closed,commission_collected)").order("updated_at", { ascending: false }).limit(10);
+      let dr: any = await dealQ("id,stage,property_id,request_id,merged_into_deal_id,properties(type,area,wilayat,price,listing_purpose,branch_key)");
+      if (dr.error) dr = await dealQ("id,stage,property_id,request_id,properties(type,area,wilayat,price,listing_purpose,branch_key)");
+      if (dr.error) throw new Error(dr.error.message);
+      // off the Muscat number a deal on a request we could not read stays out (it may be an investment one)
+      const openDeals = ((dr.data || []) as any[]).filter((d: any) => !d.merged_into_deal_id && !hiddenReqIds.has(d.request_id)
+        && (conv.route_key === "muscat" || ((reqsRead || !d.request_id) && d.properties?.branch_key !== "investment")));
+      profile.push(openDeals.length
+        ? `- صفقاته المفتوحة: ${openDeals.map((d: any) => `${neutralLabel(d.properties)} (المرحلة: ${DEAL_STAGE_AR[d.stage] || d.stage}) property_id=${d.property_id || ""}`).join(" / ")}`
+        : "- صفقاته المفتوحة: ما في");
+    } catch (_) { /* optional */ }
+    // the agent's own memory (agent_note, never overwritten by the webhook); before it exists, the conversation summary
+    profile.push(`- ملاحظات العقل السابقة عن العميل: ${short(conv.agent_note || conv.ai_summary || "لا يوجد", 1500)}`);
+    if (conv.agent_seriousness) profile.push(`- تقييمك السابق لجديته: ${SERIOUS_AR[conv.agent_seriousness] || conv.agent_seriousness}${conv.agent_seriousness_reason ? ` (${short(conv.agent_seriousness_reason, 200)})` : ""}`);
     const context = [
       `الوقت الحالي في عمان: ${omanNow()}`,
       `الاسم المسجل من الواتساب، مو دليل على اسمه الحقيقي: ${client.name || conv.customer_name || "غير معروف"}`,
@@ -589,17 +735,24 @@ Deno.serve(async (req) => {
       ...(behaviorText ? [behaviorText, "(استخدم سلوك العميل لتفهم جديته وتختار أسلوب الرد: لا تعامل المتجوّل مثل الساخن، ولا ترد على الكل بنفس الأسلوب)"] : []),
       `الرقم اللي كلمنا عليه: ${conv.route_key === "barka" ? "رقم بركاء" : "رقم مسقط"}`,
       `هل سألنا عن الميزانية قبل في هذه المحادثة: ${budgetAskedBefore ? "نعم، لا تسأل مرة ثانية أبداً" : "لا"}`,
-      `ملخص سابق للعميل: ${conv.ai_summary || "لا يوجد"}`,
+      "",
+      "ملف العميل:",
+      ...profile,
       "",
       "زيارات العميل المسجلة في الـ CRM (التفاوض على السعر بس على عقار زاره فعلاً، هنا أو قال في المحادثة إنه زاره):",
       visitsText,
-      ...(conv.human_handoff_required && !hardHandoff ? [`موضوع محول لأحمد ولسا ما خلص (من ${String(conv.handoff_updated_at || "").slice(0, 16)}): ${conv.handoff_reason || ""}. أحمد بيكمل هذا الموضوع بنفسه. جاوب على الجديد في رسالة العميل عادي. واذا رسالته بس عن نفس الموضوع المحول (يستعجل أو يعيد نفس الطلب) لا تكرر "بشوف وارد عليك": reply_messages=[] و action=handoff`] : []),
+      // R23 (10 Nov): an open soft handoff (a booked «اجتماع:» meeting, a photo or appointment request) never silences the agent by itself
+      ...(conv.human_handoff_required && !hardHandoff ? [`موضوع محول لأحمد ولسا ما خلص (من ${String(conv.handoff_updated_at || "").slice(0, 16)}): ${conv.handoff_reason || ""}. أحمد بيكمل هذا الموضوع بنفسه وهو عنده في القائمة، وهذا التحويل ما يسكّتك (R23): رد على رسالة العميل عادي. إذا سأل عن نفس الموضوع اعطه اللي تقدر عليه بدون وعد (رد قصير، معلومة مكتوبة قدامك، أو سؤال يكمل مثل "متى يناسبك ؟"). إذا الموضوع "اجتماع:" فالموعد محجوز: أكد له اليوم والساعة إذا سأل وجاوب أسئلته البسيطة و action=none، وإذا غيّر الموعد book_meeting بالموعد الجديد. action=handoff بس إذا طلب شي جديد لازم أحمد يسويه. تسكت (reply_messages=[] و action=none) بس في حالات R23، أو إذا يستعجل أو يعيد طلب ما يقدر عليه غير أحمد (موعد ينتظر تأكيده، اتصال، معلومة مو مكتوبة قدامك) وانت رديت عليه فيه قبل`] : []),
       "",
       "العقارات المتاحة الآن (لا تعرض غيرها، ولا تذكر id للعميل):",
       props.map(propLine).join("\n") || "لا يوجد",
       "",
       "عقارات انباعت او انحجزت مؤخراً (لا تعرضها، واذا العميل سأل عنها طبق قاعدة المباع):",
       soldList || "لا يوجد",
+      "",
+      "عقارات ما عادت متوفرة (مو مباعة):",
+      "(انسحبت او خلص عقدها او ما عادت متاحة. لا تعرضها، واذا العميل سأل عن واحد منها قول ما متوفر حالياً بدون ما تقول انباع وبدون السبب، واعرض أقرب متاح مثل قاعدة المباع)",
+      goneList || "لا يوجد",
       "",
       "معلومات المستثمرين:",
       INVESTOR_KNOWLEDGE,
@@ -653,12 +806,36 @@ Deno.serve(async (req) => {
     const aiP = await ai.json().catch(() => ({}));
     if (!ai.ok) throw new Error(aiP?.error?.message || `openai_${ai.status}`);
     const out = JSON.parse(aiP.output_text || aiP.output?.flatMap((x: any) => x?.content || []).find((x: any) => x?.type === "output_text")?.text || "{}");
+    // R19 (Ahmed 10 Nov): a meeting is booked only once the client fixed both the day and the hour (and not in the past); then the
+    // agent answers and Ahmed gets a soft handoff «اجتماع: …» with a task for that day. Without both it keeps asking (action none).
+    // A plain handoff the model labelled «اجتماع:» is read the same way, so Ahmed never gets a meeting alert without a day and an hour.
+    const MEETING_PLACE: Record<string, string> = { office: "مكتب الموالح", online: "اونلاين", developer: "مكتب المطور" };
+    // the meeting this chat already booked (an open «اجتماع:» handoff): booking the same one again («تمام» after it) alerts nobody
+    const openMeeting = !!conv.human_handoff_required && /^\s*اجتماع\s*:/.test(String(conv.handoff_reason || "")) ? String(conv.handoff_reason) : "";
+    if (out.action === "book_meeting" || (out.action === "handoff" && /^\s*اجتماع\s*:/.test(String(out.handoff_reason || "")))) {
+      const mt = out.meeting || null;
+      // "16:00", "9:30" and "16:00:00" are the same kind of hour; it is kept as HH:MM
+      const hm = String(mt?.time || "").trim().match(/^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/);
+      if (mt && hm) mt.time = `${hm[1].padStart(2, "0")}:${hm[2]}`;
+      const dated = !!mt && !!hm && /^\d{4}-\d{2}-\d{2}$/.test(String(mt.date || "")) && String(mt.date) >= dayM;
+      // the topic is what the model wrote after «اجتماع:» (else its intent); the fixed part comes first for Ahmed
+      const topic = String(out.handoff_reason || "").replace(/^\s*اجتماع\s*:\s*/, "").trim() || String(out.intent || out.crm_note || "");
+      if (dated && MEETING_PLACE[mt.place]) {
+        out.action = "book_meeting";
+        const slot = `${MEETING_PLACE[mt.place]} ${mt.date} ${mt.time}`;
+        if (openMeeting.includes(slot)) { out.handoff_reason = openMeeting; out.meeting_already_booked = true; }
+        else out.handoff_reason = short(`اجتماع: ${client.name || conv.customer_name || "عميل"} ${slot} ${short(topic, 120)}`, 300);
+      } else if (out.action === "book_meeting") { out.action = "none"; out.handoff_reason = null; out.meeting_waits = true; }
+      else out.handoff_reason = openMeeting || short(`طلب اجتماع بدون موعد: ${topic}`, 300);
+    }
 
     // the agent may only touch properties that are really available
     const prop = props.find((p: any) => p.id === out.property_id) || null;
     let texts: string[] = (out.reply_messages || []).map((t: string) => humanize(t)).filter(Boolean);
     if (budgetAskedBefore) texts = texts.filter((t) => !/ميزاني|في حدود كم|كم تقريب/.test(t));
     texts = texts.filter((t) => !/(الموظف|موظف)\s*(بيتواصل|يتواصل|بيرد|يرد)|بيتواصل معك الموظف|تم تحويل/.test(t));
+    // R12: a call promise is taken out like any promise, and Ahmed gets the call request (below, after the pinned reply)
+    const callPromised = texts.some((t) => CALL_PROMISE_RE.test(t));
     texts = texts.filter((t) => !PROMISE_RE.test(t));
     // R14 (9 Nov): never send a line we already sent to this customer in the last 15 minutes (Amer Ali got "ارسل الكروكي" twice)
     if (!review && texts.length) {
@@ -684,14 +861,42 @@ Deno.serve(async (req) => {
     }
     // R2 (Ahmed 8 Nov): no negotiation before the customer has visited that property. A discount / "last price" question
     // before a visit gets "see it first" and the visit question; it is never handed to Ahmed as a negotiation (Tasnim, 7 Nov).
+    // R16 (9 Nov, in code 10 Nov): he has seen it when our last message was the after-visit question («كيف لقيت…» / «قدرت تشوف…»),
+    // or its booked visit time has passed, or its location or its owner's number went out in this chat. Then the model's
+    // تفاوض / مشتري جاد handoff stays as written (Abdullah, 9 Nov: told "see it first" after his visit).
+    const r16Seen = async (pid: string | null): Promise<string | null> => {
+      let lastOut: any = null;
+      for (const h of history) if (h.direction === "outbound") lastOut = h;
+      const lastBody = String(lastOut?.body || "");
+      if (AFTER_VISIT_Q.test(lastBody) && !NOT_A_VISIT_Q.test(lastBody)) return "رد على سؤال بعد الزيارة";
+      if (visits.some((v: any) => (!pid || v.property_id === pid) && visitPassed(v))) return "موعد زيارته فات";
+      const sent = history.filter((h: any) => h.direction === "outbound").map((h: any) => String(h.body || ""));
+      if (!sent.length) return null;
+      let cands: any[] = pid ? props.filter((p: any) => p.id === pid) : props;
+      if (pid && !cands.length) {
+        const one = await db.from("properties").select("id,map_url,owner_id").eq("company_id", msg.company_id).eq("id", pid).maybeSingle();
+        if (one.data) cands = [one.data];
+      }
+      if (cands.some((p: any) => p.map_url && sent.some((b) => b.includes(p.map_url)))) return "انرسل له اللوكيشن";
+      const ownerIds = [...new Set(cands.map((p: any) => p.owner_id).filter(Boolean))];
+      if (ownerIds.length) {
+        const ow = await db.from("owners").select("phone").in("id", ownerIds);
+        const nums = (ow.data || []).map((o: any) => digits(o.phone).slice(-8)).filter((x: string) => x.length === 8);
+        const runs = sent.flatMap((b) => b.replace(/[\s-]/g, "").match(/\d{8,}/g) || []);
+        if (nums.some((n: string) => runs.some((r: string) => r.endsWith(n)))) return "انرسل له رقم صاحب العقار";
+      }
+      return null;
+    };
     if (out.action === "handoff" && NEGOTIATION_HANDOFF.test(String(out.handoff_reason || ""))) {
       const visitedThis = out.property_id ? visitedIds.has(out.property_id) : visitedIds.size > 0;
       const saidVisited = history.some((h: any) => h.direction === "inbound" && SAID_VISITED.test(String(h.transcript || h.body || "")));
-      if (!visitedThis && !saidVisited) {
+      const r16 = visitedThis || saidVisited ? null : await r16Seen(out.property_id || null);
+      if (!visitedThis && !saidVisited && !r16) {
         texts = ["شوف العقار أول واذا ناسبك نتكلم في السعر", "متى يناسبك تزور ؟"];
-        out.crm_note = short(`مهتم بالسعر قبل الزيارة: ${out.handoff_reason}`, 500);
+        // crm_note is the agent's memory now (agent_note): the marker goes on top, the running note stays
+        out.crm_note = short(`مهتم بالسعر قبل الزيارة: ${out.handoff_reason}${out.crm_note ? `\n${out.crm_note}` : ""}`, 1500);
         out.action = "none"; out.handoff_reason = null; out.visit_first = true;
-      }
+      } else if (r16) out.r16_seen = r16;
     }
     // the ad text goes once per conversation: if a long office message about this property already went out, drop it
     if (prop) {
@@ -739,22 +944,24 @@ Deno.serve(async (req) => {
     out.variant_label = rule ? pickedVariant[rule.id].label : null;
     // other ways to say it, for the owner to pick from (investors)
     out.alternatives = (out.alternatives || []).map((a: string[]) => (a || []).map((t) => humanize(t)).filter(Boolean).slice(0, 3)).filter((a: string[]) => a.length).slice(0, 2);
-    let outgoing: any[] = out.reply_messages.map((t: string) => ({ type: "text", text: { preview_url: /https?:\/\//.test(t), body: t } }));
-    
+    // the location, lockbox photo and owner's number go after the text; the list that is really sent is built further down
+    // from the FINAL reply (after the R9 redirect and arabicOnly), so what the draft records is what the customer gets (10 Nov)
+    const actionMsgs: any[] = [];
+
     if (out.action === "send_location" || out.action === "send_lockbox") {
-      if (prop?.map_url) outgoing.push({ type: "text", text: { preview_url: true, body: prop.map_url } });
+      if (prop?.map_url) actionMsgs.push({ type: "text", text: { preview_url: true, body: prop.map_url } });
       else { out.action = "handoff"; out.handoff_reason = "العميل يبي يزور واللوكيشن غير مسجل للعقار"; }
     }
     if (out.action === "send_lockbox") {
-      if (prop?.lockbox_image_url) outgoing.push({ type: "image", image: { link: prop.lockbox_image_url } });
+      if (prop?.lockbox_image_url) actionMsgs.push({ type: "image", image: { link: prop.lockbox_image_url } });
       else { out.action = "handoff"; out.handoff_reason = "معاينة بصندوق مفتاح وصورة الرمز غير مرفوعة"; }
     }
     if (out.action === "send_owner_number") {
       if (prop?.visit_method === "owner_lives" && prop.owner_id) {
         const o = await db.from("owners").select("phone").eq("id", prop.owner_id).maybeSingle();
         // the location goes with the owner's number: the customer arranges the visit with him directly
-        if (prop.map_url) outgoing.push({ type: "text", text: { preview_url: true, body: prop.map_url } });
-        if (o.data?.phone) outgoing.push({ type: "text", text: { preview_url: false, body: digits(o.data.phone) } });
+        if (prop.map_url) actionMsgs.push({ type: "text", text: { preview_url: true, body: prop.map_url } });
+        if (o.data?.phone) actionMsgs.push({ type: "text", text: { preview_url: false, body: digits(o.data.phone) } });
         else { out.action = "handoff"; out.handoff_reason = "رقم المالك غير مسجل"; }
       } else { out.action = "handoff"; out.handoff_reason = "طلب معاينة تحتاج تنسيق"; }
     }
@@ -776,15 +983,17 @@ Deno.serve(async (req) => {
         const re = new RegExp(rule.auto_match_regex, "i");
         ruleAuto = texts2.length > 0 && (rule.auto_match_regex.startsWith("^") ? texts2.every((t: string) => re.test(t)) : texts2.some((t: string) => re.test(t)));
       } catch (_) { ruleAuto = false; }
-      if (ruleAuto) {
-        out.reply_messages = String(pickedVariant[rule.id].reply).split("\n").map((t) => t.trim()).filter(Boolean).slice(0, 3);
-        outgoing = out.reply_messages.map((t: string) => ({ type: "text", text: { preview_url: false, body: t } }));
-      }
+      // the pinned wording is sent as it is, with no link preview (the send list is rebuilt from it below)
+      if (ruleAuto) out.reply_messages = String(pickedVariant[rule.id].reply).split("\n").map((t) => t.trim()).filter(Boolean).slice(0, 3);
     }
     if (out.reply_messages.some((t: string) => PROMISE_RE.test(t))) {
       out.reply_messages = out.reply_messages.filter((t: string) => !PROMISE_RE.test(t));
-      outgoing = outgoing.filter((m: any) => !(m.type === "text" && PROMISE_RE.test(String(m.text?.body || ""))));
       if (out.action === "none") { out.action = "handoff"; out.handoff_reason ||= short(out.intent || out.crm_note, 300); }
+    }
+    // R12: the call promise that was taken out reaches Ahmed as a call request, never as silence
+    if (callPromised && out.action === "none") {
+      out.action = "handoff";
+      out.handoff_reason = /^\s*طلب اتصال/.test(String(out.handoff_reason || "")) ? out.handoff_reason : `طلب اتصال: ${short(out.intent || out.crm_note, 280)}`;
     }
     const autoSend = !review && rt.reply_agent_mode === "approval" && !!rule && out.reply_messages.length > 0 && !staleNone
       && ["none", "handoff"].includes(out.action) && (ruleAuto || (rt.auto_send_categories || []).includes(out.category));
@@ -831,35 +1040,89 @@ Deno.serve(async (req) => {
       if (!(u.data || []).length) return json({ ok: false, error: "draft_not_pending" }, 409);
       return json({ ok: true, status: "rewritten", reply_messages: out.reply_messages, action: out.action, analysis });
     }
-    // an owner Ahmed is already handling himself (he wrote to him in this chat, or a price study is under way): the agent stays out
-    const ownerWithAhmed = out.category === "seller" && (
-      history.some((h: any) => h.direction === "outbound" && h.actor_type === "human") ||
-      (priorR.data || []).some((d: any) => /^دراسة سعر/.test(String(d.analysis?.handoff_reason || ""))));
+    // the agent's own memory (contract C, 10 Nov): its running note and its read of the client's seriousness, kept apart from ai_summary
+    // (the webhook overwrites that with a one-message summary). Live runs only, and only the columns that exist (agent-sql adds them).
+    if (!review) {
+      try {
+        const mem: any = {};
+        // an empty note never wipes what the agent already knows about the client
+        if ("agent_note" in conv && String(out.crm_note || "").trim()) mem.agent_note = short(out.crm_note, 1500);
+        if ("agent_seriousness" in conv) mem.agent_seriousness = ["strong", "possible", "weak", "unknown"].includes(out.seriousness) ? out.seriousness : "unknown";
+        if ("agent_seriousness_reason" in conv) mem.agent_seriousness_reason = short(out.seriousness_reason, 300) || null;
+        if ("agent_profile_at" in conv) mem.agent_profile_at = new Date().toISOString();
+        if (Object.keys(mem).length) {
+          const mw = await db.from("whatsapp_conversations").update(mem).eq("id", conv.id);
+          if (mw.error) console.error("[reply-agent] memory", mw.error.message);
+        }
+      } catch (e) { console.error("[reply-agent] memory", String((e as any)?.message || e)); }
+    }
+    // an owner Ahmed is handling himself: he typed in this chat after it was last handed back to the agent, within the last 72 hours,
+    // or a price study for him is open (10 Nov: an old typed message or an old price study silenced the chat for good, note f229cffe).
+    // The polite declines (heirs, occupied, mortgaged: R10 / R20) always go out.
+    const backAt = Math.max(conv.agent_returned_at ? new Date(conv.agent_returned_at).getTime() : 0, Date.now() - 72 * 3600 * 1000);
+    const ahmedTyped = history.some((h: any) => h.direction === "outbound" && h.actor_type === "human" && new Date(h.message_timestamp).getTime() > backAt);
+    const priceStudyOpen = !!conv.human_handoff_required && /^\s*دراسة سعر\s*:/.test(String(conv.handoff_reason || ""));
+    const declining = out.reply_messages.some((t: string) => DECLINE_RE.test(t));
+    const ownerWithAhmed = out.category === "seller" && !declining && (ahmedTyped || priceStudyOpen);
     analysis.owner_with_ahmed = ownerWithAhmed;
     if (!review && ownerWithAhmed) {
       await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages, status: "skipped", error: "owner_with_ahmed" }).eq("id", draftId);
       return json({ ok: true, ignored: "owner_with_ahmed" });
     }
-    // a client who came from a project video is an investor, and his replies wait for the owner like any investor
-    if (Object.values(reels).some((x: any) => x.project)) out.category = "investor";
+    // a client who just came from a project video (a project reel among the messages being answered) is an investor (R9).
+    // 10 Nov: an old project reel further up no longer turns a later Barka listing question into the redirect, now that the
+    // redirect is really sent (once per chat)
+    let burstFrom = 0;
+    history.forEach((h: any, i: number) => { if (h.direction === "outbound") burstFrom = i + 1; });
+    const reelKeyOf = (h: any) => String(h.property_link_key || "") || ((String(h.body || "").match(IG_RE) || [])[1] ? `instagram:${String(h.body).match(IG_RE)![1]}` : "");
+    if (history.slice(burstFrom).some((h: any) => h.direction === "inbound" && reels[reelKeyOf(h)]?.project)) { out.category = "investor"; analysis.project_reel_investor = true; }
     // 8 Nov (Ahmed): investors and owners of Muscat-area properties who write to the Barka number are sent to the Muscat number (R9), nothing is held
     const MUSCAT_AREAS = /(الحيل|الخوض|السيب|بوشر|العامرات|مطرح|قريات|المعبيلة|الموالح|مسقط|الأنصب|الانصب|مدينة السلطان)/;
     const muscatOwner = out.category === "seller" && MUSCAT_AREAS.test(`${(out as any).owner_offer?.area || ""} ${(out as any).owner_offer?.wilayat || ""}`);
     const redirectToMuscat = conv.route_key === "barka" && (out.category === "investor" || muscatOwner);
     if (redirectToMuscat) {
       const salam = (out.reply_messages || []).find((r: string) => /^وعليكم السلام/.test(String(r).trim()));
-      out.reply_messages = [...(salam ? [salam] : []), out.category === "investor" ? "الاستثمار والمشاريع تتابعها معنا على رقم مسقط 71770030 واتساب" : "عقارك تتابعه معنا على رقم مسقط 71770030 واتساب", "هذا الرقم خاص لعقارات بركاء"];
-      out.action = "none";
+      const line = out.category === "investor" ? "الاستثمار والمشاريع تتابعها معنا على رقم مسقط 71770030 واتساب" : "عقارك تتابعه معنا على رقم مسقط 71770030 واتساب";
+      // once per chat (10 Nov), counted from this line only: the brain's «طلبك / هذا العقار تتابعه معنا على رقم مسقط» lines are about a request
+      // or a listing (most Barka chats that already have the Muscat number got one of those), so they never stand in for this line
+      const lineRe = out.category === "investor" ? /الاستثمار والمشاريع\s*تتابعها\s*معنا\s*على\s*رقم\s*مسقط/ : /عقارك\s*تتابعه\s*معنا\s*على\s*رقم\s*مسقط/;
+      const lineOut = history.filter((h: any) => h.direction === "outbound" && lineRe.test(String(h.body || "")));
+      const redirectSent = lineOut.length > 0;
+      const lineRecent = lineOut.some((h: any) => Date.now() - new Date(h.message_timestamp).getTime() < 15 * 60 * 1000);
+      const redirectLines = [...(salam ? [salam] : []), line, "هذا الرقم خاص لعقارات بركاء"];
+      // R23: a handoff the model chose for negotiation, a serious buyer, a price study or a call request stays as it is, its silence too
+      const why = String(out.handoff_reason || "");
+      const keepHandoff = out.action === "handoff" && (HARD_HANDOFF.test(why) || /^\s*طلب اتصال/.test(why));
+      if (!keepHandoff && !redirectSent) out.reply_messages = redirectLines;
+      // otherwise the model's own reply goes (after the line the brain answers and reminds once, and «تمام» gets nothing), but never a
+      // project or a figure on the Barka number (R9): such a reply becomes the line again, unless it went out in the last 15 minutes (R14)
+      else if (out.reply_messages.length && (out.reply_messages.some((t: string) => /[0-9٠-٩]/.test(t.replace(/71770030|92344273/g, "")))
+        || await mentionsProject(msg.company_id, out.reply_messages))) out.reply_messages = !redirectSent ? redirectLines : lineRecent ? [] : [line];
+      // a question after the line that the model left unanswered gets the line again as the reminder, at most once in 15 minutes
+      else if (!out.reply_messages.length && !keepHandoff && !lineRecent
+        && history.slice(burstFrom).some((h: any) => h.direction === "inbound" && /[؟?]/.test(String(h.transcript || h.body || "")))) out.reply_messages = [line];
+      // the first redirect closes the topic here (action none); after it, a handoff the model chose stays so Ahmed is told: no silent dead end
+      if (!keepHandoff && (!redirectSent || out.action !== "handoff")) out.action = "none";
       analysis.redirected_to_muscat = true;
+      if (redirectSent) analysis.redirect_already_sent = true;
+      if (keepHandoff) analysis.redirect_kept_handoff = true;
     }
-    // live ("direct"): everything goes out on its own except investors and running deals, which wait for the owner
+    // no English type codes reach the customer (links are left as they are)
     out.reply_messages = (out.reply_messages || []).map((r: string) => arabicOnly(r));
+    // the draft records the final reply, action and category: whatsapp-reply-send adds the location / owner number from
+    // analysis.action when a held draft is approved, so a redirected customer must not get the property location after it
+    Object.assign(analysis, { reply_messages: out.reply_messages, action: out.action, category: out.category });
+    // 1 (10 Nov): the send list is rebuilt from the FINAL reply, so the R9 redirect and the arabicOnly text are what really goes out
+    // (9 Nov: the redirect was recorded in the draft but never sent). The location / lockbox / owner's number follow the text,
+    // except after a redirect (that customer is not booked here).
+    const outgoing: any[] = [...out.reply_messages.map((t: string) => ({ type: "text", text: { preview_url: !ruleAuto && /https?:\/\//.test(t), body: t } })), ...(redirectToMuscat ? [] : actionMsgs)];
     const projectNamed = await mentionsProject(msg.company_id, out.reply_messages);
     if (projectNamed) analysis.project_named = true;
     // 9 Nov (Ahmed): investors are answered by the agent too (anything it does not know comes back to him as a handoff); only running deals wait
     const holdForOwner = rt.reply_agent_mode === "direct" && !redirectToMuscat && out.category === "active_deal";
     // 9 Nov (Ahmed): a chat whose customer last wrote more than 24h ago cannot get free text. It goes to «متابعة اليوم» with the proposed text instead of the approval screen.
-    if (!review && !dry && !redirectToMuscat && (out.reply_messages || []).length) {
+    // 10 Nov: the R9 redirect is really sent now, so it follows the same rule (Meta refuses free text after 24h)
+    if (!review && !dry && (out.reply_messages || []).length) {
       const li = await db.from("whatsapp_messages").select("message_timestamp").eq("conversation_id", conv.id).eq("direction", "inbound").order("message_timestamp", { ascending: false }).limit(1).maybeSingle();
       const lastInMs = li.data?.message_timestamp ? new Date(li.data.message_timestamp).getTime() : 0;
       if (lastInMs && Date.now() - lastInMs > 23.5 * 3600 * 1000) {
@@ -869,6 +1132,13 @@ Deno.serve(async (req) => {
           return json({ ok: true, ignored: "outside_24h_to_followups" });
         }
       }
+    }
+    // inline dry run: the answer and what would be sent come back here, nothing is written (the owner's number is masked).
+    // forced_dry shows whether the dry-run copy recognised itself from its URL (true there, false on the live function)
+    if (inline) {
+      const send_preview = outgoing.map((m: any) => m.type === "text" ? (/^\d{8,}$/.test(String(m.text.body)) ? "[رقم صاحب العقار]" : m.text.body) : "[صورة صندوق المفتاح]");
+      return json({ ok: true, inline: true, forced_dry: forcedDry, reply_messages: out.reply_messages, action: out.action, handoff_reason: out.handoff_reason ?? null, category: out.category,
+        seriousness: out.seriousness ?? "unknown", seriousness_reason: out.seriousness_reason ?? "", meeting: out.meeting ?? null, crm_note: out.crm_note ?? "", send_preview, analysis });
     }
     if (dry || holdForOwner || (rt.reply_agent_mode === "approval" && !autoSend)) {
       // nothing to say (closing words, the other branch handles it): no empty card in the approval screen
@@ -920,14 +1190,26 @@ Deno.serve(async (req) => {
     }
     // keep the CRM up to date
     const convPatch: any = { ai_summary: short(out.crm_note, 1500), last_automation_action: { scenario: "reply_agent_v1", action: out.action, at: now, category: out.category, source: out.source }, updated_at: now };
-    if (out.action === "handoff") Object.assign(convPatch, { human_handoff_required: true, handoff_reason: short(out.handoff_reason || out.intent, 500), handoff_updated_at: now });
+    // R19: a booked meeting is a soft handoff «اجتماع: …» (Ahmed is alerted, the agent keeps answering simple questions)
+    const meetingBooked = out.action === "book_meeting" && /^\s*اجتماع\s*:/.test(String(out.handoff_reason || ""));
+    if (out.action === "handoff" || meetingBooked) Object.assign(convPatch, { human_handoff_required: true, handoff_reason: short(out.handoff_reason || out.intent, 500), handoff_updated_at: now });
     // a handoff that only said "which property ?" is closed by the agent itself once it answers normally (8 Nov, Ahmed: it must not wait for him)
-    if (out.action !== "handoff" && sentIds.length && out.reply_messages.length && conv.human_handoff_required && /مو واضح|ما عرفنا|أي عقار|اي عقار|العقار.*(واضح|محدد)/.test(String(conv.handoff_reason || "")) && !HARD_HANDOFF.test(String(conv.handoff_reason || ""))) {
+    if (out.action !== "handoff" && !meetingBooked && sentIds.length && out.reply_messages.length && conv.human_handoff_required && /مو واضح|ما عرفنا|أي عقار|اي عقار|العقار.*(واضح|محدد)/.test(String(conv.handoff_reason || "")) && !HARD_HANDOFF.test(String(conv.handoff_reason || ""))) {
       Object.assign(convPatch, { human_handoff_required: false, handoff_reason: null, handoff_updated_at: now });
     }
     await db.from("whatsapp_conversations").update(convPatch).eq("id", conv.id);
     // an open handoff already on Ahmed's list does not alert him again unless it turned into negotiation / serious buyer / price study
     if (out.action === "handoff" && (!conv.human_handoff_required || HARD_HANDOFF.test(String(out.handoff_reason || "")))) await notifyHandoff(msg.company_id, conv, client, out.handoff_reason || out.crm_note || out.intent);
+    // a booked meeting reaches Ahmed once, with a task on the meeting day (like the price study task); the same slot again does not.
+    // The alert goes to the owner himself, not to whoever holds the chat (a retired account, or a branch agent: investment is owner-only)
+    if (meetingBooked && !out.meeting_already_booked) {
+      await notifyHandoff(msg.company_id, conv, client, out.handoff_reason, true);
+      try {
+        const o = await db.from("profiles").select("id").eq("company_id", msg.company_id).eq("role", "owner").eq("is_active", true).limit(1).maybeSingle();
+        const open = await db.from("tasks").select("id").eq("client_id", client.id).ilike("title", "اجتماع%").eq("due_date", out.meeting.date).eq("done", false).limit(1);
+        if (!(open.data || []).length) await db.from("tasks").insert({ company_id: msg.company_id, user_id: o.data?.id || null, client_id: client.id, title: short(out.handoff_reason, 200), notes: short(out.crm_note, 1000), due_date: out.meeting.date, done: false });
+      } catch (e) { console.error("[reply-agent] meeting task", String((e as any)?.message || e)); }
+    }
     try {
       const flags: any = {};
       if (out.category === "buyer" || out.category === "tenant") flags.is_buyer = true;
@@ -964,7 +1246,7 @@ Deno.serve(async (req) => {
     return json({ ok: true, sent: sentIds.length, action: out.action });
   } catch (e) {
     const why = short((e as any)?.message || e, 800);
-    if (!redo) await db.from("whatsapp_reply_drafts").update({ status: "failed", error: why }).eq("id", draftId);
+    if (!redo && !inline) await db.from("whatsapp_reply_drafts").update({ status: "failed", error: why }).eq("id", draftId);
     // the customer got no answer: Ahmed has to know
     if (!review) {
       try {

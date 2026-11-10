@@ -7,6 +7,7 @@
  * is gone on every device, and comes back if the chat is handed over again (handoff_updated_at later than it). Older «تم»
  * kept on a browser (localStorage crmHotHidden) is moved to the database the first time it is seen. «فتح المحادثة» opens the
  * client's chat, «تم» marks it handled. A new one also shows a phone/desktop notification while the CRM is open.
+ * 10 Nov 2026 (R19): a meeting the reply agent booked (handoff «اجتماع: ...») shows here too, labelled «📅 اجتماع».
  * Owner only; reads his own notifications (RLS). Checks every 45 seconds while the page is visible. */
 (function(){
   'use strict';
@@ -56,11 +57,11 @@
       const r=await supa.from('notifications').select('id,title,body,client_id,created_at').eq('user_id',currentUser.id).eq('type','whatsapp_handoff')
         .eq('is_read',false).gte('created_at',since).order('created_at',{ascending:false}).limit(60);
       if(r.error)return;
-      const list=(r.data||[]).filter(n=>/^(🔥|📞)/.test(String(n.title||''))).map(n=>({...n,kind:'n'}));
+      const list=(r.data||[]).filter(n=>/^(🔥|📞|📅)/.test(String(n.title||''))).map(n=>({...n,kind:'n'}));
       const c=await supa.from('whatsapp_conversations').select('id,client_id,customer_name,customer_wa_id,route_key,handoff_reason,handoff_updated_at,owner_alert_done_at,updated_at,clients(name,phone,phone_normalized)')
         .eq('human_handoff_required',true).in('route_key',['barka','muscat']).gte('updated_at',since).order('updated_at',{ascending:false}).limit(80);
       for(const w of (c.error?[]:c.data||[])){
-        const why=String(w.handoff_reason||'');if(!/^(مشتري جاد|تفاوض|طلب اتصال)/.test(why))continue;
+        const why=String(w.handoff_reason||'');if(!/^(مشتري جاد|تفاوض|طلب اتصال)/.test(why)&&!/^\s*اجتماع/.test(why))continue;
         const at=w.handoff_updated_at||w.updated_at;
         if(w.owner_alert_done_at&&new Date(w.owner_alert_done_at)>=new Date(at))continue;
         const old='c-'+w.id+'-'+w.updated_at;
@@ -68,7 +69,7 @@
         const id='c-'+w.id+'-'+at;
         if(list.some(n=>n.client_id&&n.client_id===w.client_id))continue;
         list.push({id,kind:'c',conversation_id:w.id,client_id:w.client_id,created_at:w.updated_at,phone:(w.clients&&(w.clients.phone_normalized||w.clients.phone))||w.customer_wa_id,
-          title:(/^طلب اتصال/.test(why)?'📞 طلب اتصال':'🔥 مشتري جاد')+': '+((w.clients&&w.clients.name)||w.customer_name||'عميل')+' · '+(LABEL[w.route_key]||''),body:why});
+          title:(/^طلب اتصال/.test(why)?'📞 طلب اتصال':/^\s*اجتماع/.test(why)?'📅 اجتماع':'🔥 مشتري جاد')+': '+((w.clients&&w.clients.name)||w.customer_name||'عميل')+' · '+(LABEL[w.route_key]||''),body:why});
       }
       const need=[...new Set(list.filter(n=>!n.phone&&n.client_id).map(n=>n.client_id))];
       if(need.length){const p=await supa.from('clients').select('id,phone,phone_normalized').in('id',need);const m=new Map((p.data||[]).map(x=>[x.id,x.phone_normalized||x.phone]));list.forEach(n=>{if(!n.phone&&n.client_id)n.phone=m.get(n.client_id)||'';});}
