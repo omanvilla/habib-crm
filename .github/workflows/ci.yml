@@ -34,8 +34,14 @@ jobs:
         if: failure()
         run: echo "::error title=Failing tests::$(grep '✖' test-output.txt | sed 's/^ *//' | sort -u | head -60 | tr '\n' '|')"
       - name: Security regressions
+        id: security
         if: success() || failure()
-        run: node tests/security-regressions.cjs
+        run: |
+          set -o pipefail
+          node tests/security-regressions.cjs 2>&1 | tee security-output.txt
+      - name: Show the security regression that failed
+        if: failure() && steps.security.outcome == 'failure'
+        run: echo "::error title=Security regression::after $(grep '^PASS' security-output.txt | tail -1 | cut -c1-200) | $(grep -v '^PASS' security-output.txt | head -8 | tr '\n' '|' | cut -c1-1500)"
   owner-route-sql:
     # SQL68 on a synthetic copy of the live owner-only isolation catalog.
     runs-on: ubuntu-latest

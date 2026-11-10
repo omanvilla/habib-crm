@@ -100,8 +100,11 @@ test('the agent asks a name once, never guesses, and notes when it was not given
  assert(agent.includes('"client_name_stated", "name_declined"]'));
  assert(agent.includes('rental_terms,rented_units"'));
 });
-test('the agent carries on after a message from the list, and stays quiet after any other',()=>{
- assert(agent.includes('if (!review && staffInChat && !fromList)'));
+// R1 (8 Nov): the 30-second rule is gone; crm_chat_hold() decides, and a follow-up sent from the daily list does not count.
+test('the agent stays quiet after a typed office message until handed back (R1)',()=>{
+ assert(agent.includes('const hold = await db.rpc("crm_chat_hold", { p_conversation: conv.id });'));
+ assert(agent.includes('if (hold.data === "manual_reply") { await watch(); return fail("staff_active"); }'));
+ assert(agent.includes('if (hold.error) { await watch(); return fail("hold_check_failed"); }'),'fails closed');
 });
 test('owner instruction on a follow-up: owner only, rewrites from the whole chat, nothing sent, saved as a lesson',()=>{
  const sql72=fs.readFileSync('db/changes/72-followup-owner-instruction.forward.sql','utf8');
@@ -135,12 +138,16 @@ test('visit results are the AI job: read from the chat, saved on the visit, a se
  assert(part.includes('if (r.confidence >= 0.75)'));
  assert(part.includes('.eq("row_version", v.row_version).in("status", ["scheduled", "confirmed", "postponed"])'));
  assert(part.includes('ai_checked_at: now'));
- assert(part.includes('if (!at || at <= Math.max(...since)) continue;'));
+ assert(part.includes('if (at && at > Math.max(...since) && budget > 0) {'),'the chat is read only when the client wrote after the visit and the last check');
+ // R13 (9 Nov): no visit stays open; a chat held by Ahmed is noted and left open
+ assert(part.includes('[موقوفة عند أحمد]')&&part.includes('if (held) {'));
+ assert(part.includes('["sold", "withdrawn"].includes(pr.status) || pr.archived === true'));
+ assert(part.includes('} else if (daysOver >= NO_RESULT_DAYS) {'));
  assert(!part.includes('metaSend'));
  assert(fn.includes('pipeline_outcome: o?.outcome'));
  assert(fn.includes('title: `🔥 مشتري جاد: ${name || "عميل"}`'));
  const home=fs.readFileSync('crm-owner-home.js','utf8');
- assert(home.includes('زيارات يتابعها الذكاء الاصطناعي')&&home.includes("if(visitsOpen&&overdue.length)"));
+ assert(home.includes('زيارات يتابعها الذكاء الاصطناعي')&&home.includes("if(Number(d.overdue_total))"));
  const hot=fs.readFileSync('crm-hot-alerts.js','utf8');
  assert(hot.includes("/^(مشتري جاد|تفاوض|طلب اتصال)/")&&hot.includes("isOwner()"));
  assert(index.includes('crm-hot-alerts.js?v='));

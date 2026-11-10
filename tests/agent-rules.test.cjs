@@ -34,7 +34,9 @@ test('R6: a sold property gets "sold" plus the nearest available one; twins only
 });
 test('R9: investors and Muscat-area owners on the Barka number go to the Muscat number, nothing held',()=>{
  assert(agent.includes('redirectToMuscat'));
- assert(agent.includes('!redirectToMuscat && (["investor", "active_deal"]'));
+ // Since eeb5669 (9 Nov) only running deals wait for the owner; investors on the Muscat number are answered directly.
+ // R9 in docs/agent-rules.md still says their replies wait for Ahmed: open question recorded there (10 Nov).
+ assert(agent.includes('!redirectToMuscat && out.category === "active_deal"'));
  assert(agent.includes('71770030'));
  assert(brain.includes('هذا الرقم خاص لعقارات بركاء'));
 });

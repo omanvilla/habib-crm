@@ -139,7 +139,8 @@ test('rental availability comes from the CRM, never from a fixed pinned reply',(
 
 test('visits are read from the conversation even when the agent stays quiet, and requests save with an allowed origin',()=>{
   const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8');
-  for(const why of ['agent_muted','human_handoff_open','client_paused','staff_replied','staff_active'])
+  // 'staff_replied' went with the 30-second rule (R1, 8 Nov); crm_chat_hold failures stay quiet too.
+  for(const why of ['agent_muted','human_handoff_open','client_paused','hold_check_failed','staff_active'])
     assert(agent.includes('{ await watch(); return fail("'+why+'"); }'),why);
   assert(agent.includes('if (review) return; try { const v = await watchVisit(msg)'),'trials never write visits');
   assert(agent.includes('any change the client makes is saved at once, whoever recorded the visit'),'a client change moves any visit');
