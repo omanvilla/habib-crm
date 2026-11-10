@@ -26,6 +26,7 @@ test('customer and property text is escaped in the card and the sheet',()=>{
   assert.match(js,/esc\(c\.name\)/);assert.match(js,/esc\(p\.title\)/);
 });
 
-test('visits table offers the quick result for today and overdue scheduled visits',()=>{
-  assert.match(simple,/v\.status==='scheduled'&&\(v\.viewing_date\|\|''\)<=today\?.*\(window\.crmQuickVisit\|\|editViewing\)/);
+test('visits table offers the quick result for today and overdue open visits (scheduled, confirmed, postponed)',()=>{
+  assert.match(simple,/const OPEN_VISIT=\['scheduled','confirmed','postponed'\]/);
+  assert.match(simple,/isOpenVisit\(v\)&&\(v\.viewing_date\|\|''\)<=today\?.*\(window\.crmQuickVisit\|\|editViewing\)/);
 });

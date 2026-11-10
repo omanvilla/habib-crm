@@ -376,8 +376,13 @@
   };
   const baseOpen=window.openWhatsAppConversation;
   if(typeof baseOpen==='function')window.openWhatsAppConversation=async function(id){
-    if(id!==waInboxActiveId){for(const item of media.values())URL.revokeObjectURL(item.url);media.clear();setReply(null);clearPending();}
-    return baseOpen.apply(this,arguments);
+    const fresh=id!==waInboxActiveId;
+    if(fresh){for(const item of media.values())URL.revokeObjectURL(item.url);media.clear();setReply(null);clearPending();}
+    const result=await baseOpen.apply(this,arguments);
+    // Phones (10 Nov 2026): the chat sits under the conversation list, so a chat just opened was below the screen.
+    // Only a newly chosen chat scrolls; a refresh after sending does not.
+    try{if(fresh&&window.matchMedia&&matchMedia('(max-width:900px)').matches){const p=document.querySelector('#page-whatsapp .wa-chat-panel');if(p&&p.getBoundingClientRect().top>innerHeight*0.4)p.scrollIntoView({block:'start',behavior:'smooth'});}}catch(_){}
+    return result;
   };
   document.addEventListener('click',e=>{
     const t=e.target;

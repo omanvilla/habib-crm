@@ -9,7 +9,7 @@
   const byId=id=>document.getElementById(id);
   const toast=(m,t)=>{if(typeof showToast==='function')showToast(m,t);};
   const isOwnerNow=()=>typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.role==='owner';
-  const KINDS={land:'أرض',villa:'فيلا / بيت',building:'مبنى',apartment:'شقة',farm:'مزرعة',shop:'محل',chalet:'شاليه',resthouse:'استراحة',other:'أخرى'};
+  const KINDS={land:'أرض',villa:'فيلا / بيت',house:'بيت',building:'مبنى',apartment:'شقة',farm:'مزرعة',shop:'محل',chalet:'شاليه',resthouse:'استراحة',other:'أخرى'};
   const STATUS={open:'جديد',studied:'انرسلت الدراسة',listed:'انعرض عندنا',closed:'مقفول'};
   const k=v=>v==null?'':(Number(v)>=1000?Math.round(Number(v)/1000).toLocaleString('en-US')+' الف':Number(v).toLocaleString('en-US'));
   let state={rows:[],loading:false,q:'',kind:'',onlyBuyers:true,status:'active',open:new Set()};
@@ -82,8 +82,9 @@
   function render(){
     const list=byId('olList');if(!list)return;
     const rows=filtered(),active=state.rows.filter(x=>['open','studied'].includes(x.status)),withB=active.filter(x=>x.buyers.length).length;
-    const sub=byId('olSub');if(sub)sub.textContent=active.length+' عرض مالك مو معروض · '+withB+' منها لها مشترين جاهزين';
-    const badge=byId('navOwnerLeadsCount');if(badge){badge.textContent=withB;badge.style.display=withB?'':'none';}
+    const waiting=state.loading&&!state.rows.length;
+    const sub=byId('olSub');if(sub)sub.textContent=waiting?'جاري التحميل…':active.length+' عرض مالك مو معروض · '+withB+' منها لها مشترين جاهزين';
+    const badge=byId('navOwnerLeadsCount');if(badge&&!waiting){badge.textContent=withB;badge.style.display=withB?'':'none';}
     list.innerHTML=state.loading&&!state.rows.length?'<p class="rp-muted">جاري التحميل…</p>':rows.length?rows.slice(0,200).map(card).join('')+(rows.length>200?'<p class="rp-muted">يظهر أول 200، استخدم البحث</p>':''):'<p class="rp-muted">ما في عروض بهالفلتر</p>';
   }
   document.addEventListener('input',e=>{if(e.target.id==='olQ'){state.q=e.target.value;render();}});

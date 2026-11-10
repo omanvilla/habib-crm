@@ -21,10 +21,12 @@
     const known=new Map(),chunks=[];
     for(let start=0;start<clients.length;start+=400)chunks.push(clients.slice(start,start+400).map(c=>c.id));
     if(!isCurrent())return [];
-    // Chunks are independent reads; run them together instead of one after another. A chunk that fails (the database
-    // cancels a statement after 8 s when many pages load at once, seen on the phone 10 Nov 2026) is read once more on its own.
+    // Two chunks at a time (10 Nov 2026): all five at once, next to the client and request pages, overloaded the
+    // database and it cancelled them after 8 s (seen on the phone). A chunk that still fails is read once more.
     const read=ids=>supa.rpc('crm_client_first_contacts',{p_client_ids:ids});
-    const results=await Promise.all(chunks.map(ids=>read(ids).then(r=>r&&r.error&&isCurrent()?read(ids):r)));
+    const results=new Array(chunks.length);let next=0;
+    const worker=async()=>{while(next<chunks.length&&isCurrent()){const i=next++;let r=await read(chunks[i]);if(r&&r.error&&isCurrent())r=await read(chunks[i]);results[i]=r;}};
+    await Promise.all([worker(),worker()]);
     if(!isCurrent())return [];
     for(let index=0;index<chunks.length;index++){
       const ids=chunks[index],allowed=new Set(ids),result=results[index];
