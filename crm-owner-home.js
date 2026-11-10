@@ -13,6 +13,30 @@
   const TITLES={followups:'متابعة اليوم',paused:'العقل موقوف عندهم',visits:'زيارات يتابعها الذكاء الاصطناعي',problems:'مشاكل تحتاج انتباه'};
   let sequence=0,sheetKind=null,pausedFilter='all',paused={items:[],total:0},last=null;
 
+  /* Boot gate (10 Nov 2026). The owner saw the old dashboard for several seconds before this page replaced it.
+   * As soon as the account is known to be the owner (applyRoleVisibility, before the app is shown), <html> gets
+   * .coh-boot, which hides the old dashboard and shows a light placeholder (crm-owner-home.css). The heavy old
+   * dashboard reads (crm-operations-v6.js) wait for window.crmHomeFirst, so this page's reads are not queued behind
+   * them. The gate opens after the first load, whatever its result, and never later than 8 seconds. */
+  let gate=null;
+  function armGate(){
+    if(gate)return;
+    let done;const p=new Promise(r=>{done=r;});
+    gate={done,timer:setTimeout(releaseGate,8000)};window.crmHomeFirst=p;
+    document.documentElement.classList.add('coh-boot');
+  }
+  function releaseGate(){
+    document.documentElement.classList.remove('coh-boot');
+    if(!gate)return;
+    clearTimeout(gate.timer);const g=gate;gate=null;window.crmHomeFirst=null;g.done();
+  }
+  const roleVisibility=window.applyRoleVisibility;
+  if(typeof roleVisibility==='function')window.applyRoleVisibility=function(){
+    const r=roleVisibility.apply(this,arguments);
+    if(isOwner()&&!last)armGate();else if(!isOwner())releaseGate();
+    return r;
+  };
+
   function mount(){
     const page=byId('page-dash');if(!page)return null;
     let box=byId('crmOwnerHome');
@@ -123,16 +147,20 @@
       +'<div class="coh-links2"><button type="button" class="coh-more" data-coh="nav" data-nav="properties">كل العقارات</button><button type="button" class="coh-more" data-coh="nav" data-nav="reports">التقارير الكاملة</button></div>';
   }
   async function load(){
-    const page=byId('page-dash'),box=mount();if(!page||!box)return;
-    if(!isOwner()||typeof supa==='undefined'){box.hidden=true;page.classList.remove('coh-on');return;}
+    const page=byId('page-dash'),box=mount();if(!page||!box){releaseGate();return;}
+    if(!isOwner()||typeof supa==='undefined'){box.hidden=true;page.classList.remove('coh-on');releaseGate();return;}
     const seq=++sequence;
-    const [home,pending,twinGroups,pz]=await Promise.all([supa.rpc('crm_owner_home'),typeof window.crmPendingReplies==='function'?window.crmPendingReplies().catch(()=>0):0,supa.rpc('crm_property_twins'),supa.rpc('crm_paused_chats')]);
-    if(seq!==sequence)return;
-    if(pz&&!pz.error&&pz.data)paused=pz.data;
-    if(home.error||!home.data){if(!last){box.hidden=true;page.classList.remove('coh-on');}return;}
-    last={data:home.data,pending:pending||0,twins:twinGroups&&!twinGroups.error?twinGroups.data:[]};
-    render();
-    box.hidden=false;page.classList.add('coh-on');
+    try{
+      // The follow-up count is read together with the rest (it is lighter), so its tile is there on the first draw.
+      const fu=typeof window.crmFollowupsRefresh==='function'?Promise.race([window.crmFollowupsRefresh(),new Promise(r=>setTimeout(r,1500))]):null;
+      const [home,pending,twinGroups,pz]=await Promise.all([supa.rpc('crm_owner_home'),typeof window.crmPendingReplies==='function'?window.crmPendingReplies().catch(()=>0):0,supa.rpc('crm_property_twins'),supa.rpc('crm_paused_chats'),fu]);
+      if(seq!==sequence)return;
+      if(pz&&!pz.error&&pz.data)paused=pz.data;
+      if(home.error||!home.data){if(!last){box.hidden=true;page.classList.remove('coh-on');}return;}
+      last={data:home.data,pending:pending||0,twins:twinGroups&&!twinGroups.error?twinGroups.data:[]};
+      render();
+      box.hidden=false;page.classList.add('coh-on');
+    }finally{if(seq===sequence)releaseGate();}
   }
   function render(){
     if(!last)return;

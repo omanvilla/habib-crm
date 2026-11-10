@@ -59,6 +59,8 @@
     const seq=++targetLoadSeq,user=currentUser.id,generation=crmSessionGeneration;
     targetPropertyScopes.clear();host.innerHTML='<p class="ops-state">جاري تحميل أهداف الفروع…</p>';
     try{
+      // Owner: the new home loads first (crm-owner-home.js boot gate); this section is behind «قائمة العمل الكاملة».
+      if(window.crmHomeFirst){await window.crmHomeFirst;if(seq!==targetLoadSeq||!crmSessionCurrent(generation,user))return;}
       const result=await bounded(supa.rpc('crm_branch_target_snapshot'));
       if(seq!==targetLoadSeq||!crmSessionCurrent(generation,user))return;
       if(result.error)throw result.error;
@@ -245,6 +247,8 @@
     const panel=$id('opsPerformanceDetails');if(panel){panel.hidden=!['owner','manager','agent'].includes(currentProfile.role);const heading=panel.querySelector('summary>span');if(heading)heading.textContent=owner||currentProfile.role==='manager'?'أداء الفريق خلال الفترة':'أدائي خلال الفترة';}
     if(typeof loadEmployeeTargetReminder==='function')loadEmployeeTargetReminder();
     const scopes=owner?['branches','investment']:['branches'];scopes.forEach(scope=>dashboardScopes.set(scope,{status:'loading'}));renderDashboard();
+    // Owner: wait for the new home's first load (boot gate, at most 8 s) so its reads are not queued behind these.
+    if(window.crmHomeFirst){await window.crmHomeFirst;if(session!==crmSessionGeneration+':'+(currentUser&&currentUser.id))return;}
     const reads=scopes.map(loadDashboardScope);
     // Successful mutations already refresh this workspace. Refresh a visible
     // performance panel with its selected period too; hidden reports reload on entry.

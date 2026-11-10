@@ -65,8 +65,10 @@
         +'<p class="cfu-text" dir="auto">'+esc(i.text)+'</p><small class="cfu-auto">'+esc(autoLine(i))+'</small>'
         +'<div class="cfu-actions">'+(url?'<a class="btn-primary cfu-open" href="'+esc(url)+'" rel="noopener noreferrer">فتح المحادثة</a><a class="cfu-other" href="'+esc(other)+'" target="_blank" rel="noopener noreferrer">رابط عادي</a>':'<span class="cfu-auto">ما له رقم</span>')+'<button type="button" class="btn-secondary" data-cfu="done" data-id="'+esc(i.client_id)+'">أرسلتها</button>'+(isOwner()?'<button type="button" class="btn-secondary" data-cfu="instr" data-k="'+esc(key(i))+'" aria-expanded="'+openInstr.has(key(i))+'">أمر للذكاء الاصطناعي</button>':'')+'</div>'+instrBox(i)+'</li>';}).join('')+'</ul>':'<p class="cfu-hint">ما في متابعات لهذا الفرع</p>');
   }
+  let startedAt=0;
   async function load(){
     if(typeof supa==='undefined'||typeof currentProfile==='undefined'||!currentProfile)return;
+    startedAt=Date.now();
     const n=++seq,r=await supa.rpc('crm_followups_today');
     if(n!==seq||r.error||!r.data)return;
     data=r.data;render();
@@ -101,5 +103,6 @@
   window.crmFollowupsCount=()=>(data.items||[]).length;
   window.crmFollowupsRefresh=()=>load().catch(()=>{});
   const loadDash=window.loadDashboard;
-  if(typeof loadDash==='function')window.loadDashboard=function(){const r=loadDash.apply(this,arguments);setTimeout(window.crmFollowupsRefresh,800);return r;};
+  // The owner home already starts this read with its own (10 Nov 2026); a second one within 3 s is skipped.
+  if(typeof loadDash==='function')window.loadDashboard=function(){const r=loadDash.apply(this,arguments);setTimeout(()=>{if(Date.now()-startedAt>3000)window.crmFollowupsRefresh();},800);return r;};
 })();
