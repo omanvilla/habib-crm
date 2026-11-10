@@ -11,7 +11,12 @@
   const plain=v=>String(v==null?'':v).replace(/<[^>]*>/g,'');
 
   // ---- Visits as rows -------------------------------------------------------
-  const statusLabels={scheduled:'مجدولة',done:'تمت',no_show:'لم يحضر',cancelled:'ألغيت',postponed:'تأجلت'};
+  const statusLabels={scheduled:'مجدولة',confirmed:'مؤكدة',done:'تمت',no_show:'لم يحضر',cancelled:'ألغيت',postponed:'تأجلت'};
+  // A visit is still open while scheduled, confirmed or postponed (10 Nov 2026). The home tile «زيارات يتابعها الذكاء
+  // الاصطناعي» (crm_owner_home) counts all three; this page counted «مجدولة» only, so a postponed visit whose new date
+  // had passed was on the home page but not under «متأخرة» here.
+  const OPEN_VISIT=['scheduled','confirmed','postponed'];
+  const isOpenVisit=v=>OPEN_VISIT.includes(v.status);
   const groupTitles=['متأخرة وتحتاج نتيجة','اليوم','قادمة','سجلات سابقة'];
   function visitDate(v){
     if(!v.viewing_date)return '—';
@@ -20,7 +25,7 @@
     return d.toLocaleDateString('ar-OM-u-nu-latn',{weekday:'short',day:'numeric',month:'short'});
   }
   function visitRow(v,today){
-    const overdue=v.status==='scheduled'&&(v.viewing_date||'')<today,id=esc(v.id);
+    const overdue=isOpenVisit(v)&&(v.viewing_date||'')<today,id=esc(v.id);
     const phone=v.client&&v.client.phone?String(v.client.phone).replace(/[^0-9+]/g,'').replace(/^\+/,''):'';
     const branch=typeof crmRecordBranchLabel==='function'?crmRecordBranchLabel(v):'';
     return '<tr'+(overdue?' class="crm-grid-late"':'')+'>'
@@ -30,7 +35,7 @@
       +'<td>'+esc(branch||'—')+'</td>'
       +'<td><span class="viewing-status '+esc(v.status)+'">'+esc(statusLabels[v.status]||v.status||'—')+'</span>'+(v.ahmed_present===true?' <span class="crm-grid-chip">أحمد حاضر</span>':v.ahmed_present===false?' <span class="crm-grid-chip">زار لحاله</span>':'')+(v.created_via==='whatsapp_ai'?' <span class="crm-grid-chip">من واتساب</span>':'')+'</td>'
       // Today's and overdue scheduled visits open the quick result sheet (crm-quick-visit.js).
-      +'<td class="crm-grid-actions">'+(v.status==='scheduled'&&(v.viewing_date||'')<=today?'<button type="button" class="ops-action" onclick="(window.crmQuickVisit||editViewing)(\''+id+'\')">تسجيل النتيجة</button>':'')
+      +'<td class="crm-grid-actions">'+(isOpenVisit(v)&&(v.viewing_date||'')<=today?'<button type="button" class="ops-action" onclick="(window.crmQuickVisit||editViewing)(\''+id+'\')">تسجيل النتيجة</button>':'')
       +'<button type="button" class="ops-action" onclick="editViewing(\''+id+'\')">تعديل</button>'
       +(phone?'<a class="ops-action" href="https://api.whatsapp.com/send?phone='+esc(phone)+'" target="_blank" rel="noopener">واتساب</a>':'')
       +'<button type="button" class="ops-action crm-grid-danger" onclick="deleteViewing(\''+id+'\')">حذف</button></td></tr>';
@@ -41,13 +46,13 @@
       const today=typeof toLocalDateStr==='function'?toLocalDateStr(new Date()):new Date().toISOString().slice(0,10);
       const tab=typeof viewingTab==='undefined'?'all':viewingTab,all=typeof allViewings==='undefined'?[]:allViewings;
       let rows=all;
-      if(tab==='upcoming')rows=all.filter(v=>v.status==='scheduled'&&(v.viewing_date||'')>=today);
-      else if(tab==='overdue')rows=all.filter(v=>v.status==='scheduled'&&(v.viewing_date||'')<today);
+      if(tab==='upcoming')rows=all.filter(v=>isOpenVisit(v)&&(v.viewing_date||'')>=today);
+      else if(tab==='overdue')rows=all.filter(v=>isOpenVisit(v)&&(v.viewing_date||'')<today);
       else if(tab==='today')rows=all.filter(v=>(v.viewing_date||'').substring(0,10)===today);
       else if(tab==='done')rows=all.filter(v=>v.status==='done');
       else if(tab==='no_show')rows=all.filter(v=>v.status==='no_show');
       if(!rows.length){list.innerHTML='<div class="empty"><div class="empty-ico">👁</div><div class="empty-title">لا توجد زيارات</div><div class="empty-desc">اضغط «زيارة جديدة» لجدولة زيارة لعميل.</div></div>';return;}
-      const group=v=>v.status==='scheduled'?(v.viewing_date<today?0:v.viewing_date===today?1:2):3;
+      const group=v=>isOpenVisit(v)?(v.viewing_date<today?0:v.viewing_date===today?1:2):3;
       rows=[...rows].sort((a,b)=>group(a)-group(b)||(group(a)===3?String(b.viewing_date||'').localeCompare(String(a.viewing_date||'')):String(a.viewing_date||'').localeCompare(String(b.viewing_date||'')))||String(a.viewing_time||'').localeCompare(String(b.viewing_time||'')));
       let body='',last=-1;
       for(const v of rows){
@@ -56,6 +61,17 @@
         body+=visitRow(v,today);
       }
       list.innerHTML='<div class="crm-grid-wrap"><table class="crm-grid" aria-label="قائمة الزيارات"><thead><tr><th>الموعد</th><th>العقار</th><th>العميل</th><th>الفرع</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>'+body+'</tbody></table></div>';
+    };
+  }
+  // Tab counts use the same open-visit rule as the rows above.
+  if(typeof window.updateViewingCounts==='function'){
+    const baseCounts=window.updateViewingCounts;
+    window.updateViewingCounts=function(){
+      baseCounts.apply(this,arguments);
+      const today=typeof toLocalDateStr==='function'?toLocalDateStr(new Date()):new Date().toISOString().slice(0,10);
+      const all=typeof allViewings==='undefined'?[]:allViewings,set=(id,n)=>{const el=byId(id);if(el)el.textContent=n;};
+      set('vCntUpcoming',all.filter(v=>isOpenVisit(v)&&(v.viewing_date||'')>=today).length);
+      set('vCntOverdue',all.filter(v=>isOpenVisit(v)&&(v.viewing_date||'')<today).length);
     };
   }
 

@@ -22,7 +22,7 @@
       +'<button type="button" class="btn-secondary" data-ol="match">طابق الحين</button></div>'
       +'<div class="ol-filters"><input id="olQ" type="search" placeholder="ابحث باسم المالك أو المنطقة" dir="auto">'
       +'<select id="olKind"><option value="">كل الأنواع</option>'+Object.keys(KINDS).map(x=>'<option value="'+x+'">'+KINDS[x]+'</option>').join('')+'</select>'
-      +'<select id="olStatus"><option value="active">الجديدة واللي انرسلت لها دراسة</option><option value="open">جديد</option><option value="studied">انرسلت الدراسة</option><option value="listed">انعرض عندنا</option><option value="closed">مقفول</option><option value="">الكل</option></select>'
+      +'<select id="olStatus"><option value="active">الجديدة واللي انرسلت لها دراسة</option><option value="week">جديد هذا الأسبوع (آخر 7 أيام)</option><option value="open">جديد</option><option value="studied">انرسلت الدراسة</option><option value="listed">انعرض عندنا</option><option value="closed">مقفول</option><option value="">الكل</option></select>'
       +'<label><input type="checkbox" id="olBuyers" checked> اللي لها مشترين بس</label></div><div id="olList"></div>';
     content.append(page);
     const nav=document.querySelector('#sidebar .nav-area');
@@ -42,12 +42,14 @@
       const l=await supa.from('owner_leads').select('id,client_id,conversation_id,kind,area,wilayat,price,land_size,built_size,plot_no,notes,status,created_at').order('created_at',{ascending:false}).limit(1000);
       if(l.error)throw l.error;
       const leads=l.data||[];
-      const ids=leads.map(x=>x.id),matches=[];
-      for(let i=0;i<ids.length;i+=150){const m=await supa.from('owner_lead_matches').select('lead_id,request_id').in('lead_id',ids.slice(i,i+150));if(m.data)matches.push(...m.data);}
-      const reqIds=[...new Set(matches.map(x=>x.request_id))],reqs=[];
-      for(let i=0;i<reqIds.length;i+=150){const q=await supa.from('client_requests').select('id,client_id,budget_max,preferred_area,property_type,updated_at').in('id',reqIds.slice(i,i+150));if(q.data)reqs.push(...q.data);}
-      const cids=[...new Set([...reqs.map(x=>x.client_id),...leads.map(x=>x.client_id)].filter(Boolean))],cls=[];
-      for(let i=0;i<cids.length;i+=150){const c=await supa.from('clients').select('id,name,phone').in('id',cids.slice(i,i+150));if(c.data)cls.push(...c.data);}
+      // Batches run side by side (10 Nov 2026): one after the other they took about 4 s and the page sat on «جاري التحميل».
+      const batches=async(list,read)=>{const parts=[];for(let i=0;i<list.length;i+=150)parts.push(list.slice(i,i+150));const res=await Promise.all(parts.map(read));const out=[];for(const r of res){if(r.error)throw r.error;out.push(...(r.data||[]));}return out;};
+      const ids=leads.map(x=>x.id);
+      const matches=await batches(ids,part=>supa.from('owner_lead_matches').select('lead_id,request_id').in('lead_id',part));
+      const reqIds=[...new Set(matches.map(x=>x.request_id))];
+      const reqs=await batches(reqIds,part=>supa.from('client_requests').select('id,client_id,budget_max,preferred_area,property_type,updated_at').in('id',part));
+      const cids=[...new Set([...reqs.map(x=>x.client_id),...leads.map(x=>x.client_id)].filter(Boolean))];
+      const cls=await batches(cids,part=>supa.from('clients').select('id,name,phone').in('id',part));
       const cm=new Map(cls.map(x=>[x.id,x])),qm=new Map(reqs.map(x=>[x.id,x]));
       const byLead=new Map();for(const m of matches){if(!byLead.has(m.lead_id))byLead.set(m.lead_id,[]);const r=qm.get(m.request_id);if(r)byLead.get(m.lead_id).push(Object.assign({},r,{client:cm.get(r.client_id)||{}}));}
       leads.forEach(x=>{x.owner=cm.get(x.client_id)||{};const p=Number(x.price||0);
@@ -59,7 +61,9 @@
   }
   function filtered(){
     const q=state.q.trim();
-    return state.rows.filter(x=>(state.status==='active'?['open','studied'].includes(x.status):!state.status||x.status===state.status)
+    // «week» is the home tile «عروض ملاك جديدة»: open and received in the last 7 days (same rule as crm_owner_home).
+    const weekAgo=Date.now()-7*86400000;
+    return state.rows.filter(x=>(state.status==='active'?['open','studied'].includes(x.status):state.status==='week'?x.status==='open'&&Date.parse(x.created_at)>weekAgo:!state.status||x.status===state.status)
       &&(!state.kind||x.kind===state.kind)&&(!state.onlyBuyers||x.buyers.length)
       &&(!q||[x.owner.name,x.owner.phone,x.area,x.wilayat,x.notes].some(v=>String(v||'').includes(q))));
   }
@@ -100,6 +104,11 @@
     else if(a==='match'){b.disabled=true;const r=await supa.rpc('crm_match_owner_leads_now');b.disabled=false;
       if(r.error)toast('تعذر: '+r.error.message,'error');else{toast('انضاف '+(r.data||0)+' مشتري مطابق','success');load();}}
   });
+  // The home tile opens the page on exactly what it counted (10 Nov 2026): new this week, with or without buyers.
+  window.crmOwnerLeadsShowWeek=function(){
+    state.status='week';state.onlyBuyers=false;
+    const s=byId('olStatus'),b=byId('olBuyers');if(s)s.value='week';if(b)b.checked=false;render();
+  };
   const nav=window.navigate;
   if(typeof nav==='function')window.navigate=function(id){
     if(id==='owner-leads'&&!isOwnerNow()){if(typeof showPermissionDenied==='function')showPermissionDenied();return;}

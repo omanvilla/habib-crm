@@ -187,7 +187,11 @@
       const call=act==='twin-yes'?supa.rpc('crm_link_twin_group',{p_properties:b.dataset.key.split(',')}):supa.rpc('crm_dismiss_twin_group',{p_key:b.dataset.key});
       call.then(r=>{if(r.error)throw r.error;toast(act==='twin-yes'?'انربطت الفيديوهات على الكل':'تمام ما راح أسأل عنهم مرة ثانية','success');return window.crmOwnerHomeRefresh();}).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});
     }
-    else if(act==='nav'&&typeof navigate==='function'){const nav=b.dataset.nav;closeSheet();navigate(nav,{replies:byId('navReplies'),'owner-leads':byId('navOwnerLeads')}[nav]||null);}
+    else if(act==='nav'&&typeof navigate==='function'){
+      const nav=b.dataset.nav;closeSheet();navigate(nav,{replies:byId('navReplies'),'owner-leads':byId('navOwnerLeads')}[nav]||null);
+      // The tile counts new offers of the last 7 days; the page opens on that same list (10 Nov 2026).
+      if(nav==='owner-leads'&&b.classList.contains('coh-tile')&&typeof window.crmOwnerLeadsShowWeek==='function')window.crmOwnerLeadsShowWeek();
+    }
   });
   window.crmOwnerHomeRefresh=()=>load().catch(()=>{});
   const loadDash=window.loadDashboard;
