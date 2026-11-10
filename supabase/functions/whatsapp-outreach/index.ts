@@ -95,7 +95,9 @@ async function queueRequests(limit = 25) {
     const ins = await db.from("whatsapp_messages").select("body").eq("conversation_id", conv.id).eq("direction", "inbound").order("message_timestamp", { ascending: false }).limit(5);
     const said = (ins.data || []).map((m: any) => String(m.body || "")).join(" ");
     if (STOP_RE.test(said)) { await db.from("clients").update({ followup_suppressed: true }).eq("id", r.client_id); await db.from("client_requests").update({ next_followup: null, status: "paused", next_action: "العميل طلب ما نتابع" }).eq("id", r.id); continue; }
-    if (FOUND_RE.test(said)) { await db.from("client_requests").update({ next_followup: null, status: "paused", search_status: "found", next_action: "العميل قال حصل" }).eq("id", r.id); continue; }
+    // "found" is not an allowed search_status (client_requests_search_status_check): the update failed every hour
+    // and the request came back each run (10 Nov 2026). "stopped" (توقف عن البحث) + the reason in next_action.
+    if (FOUND_RE.test(said)) { const up = await db.from("client_requests").update({ next_followup: null, status: "paused", search_status: "stopped", next_action: "العميل قال حصل" }).eq("id", r.id); if (up.error) out.push({ request: r.id, error: up.error.message }); continue; }
     // one office message a week at most, and two unanswered follow-ups pause the request
     const recent = await db.from("whatsapp_outreach_queue").select("id,status,sent_at,created_at").eq("client_id", r.client_id).in("status", ["pending", "approved", "sent"]).gte("created_at", new Date(now - 7 * DAY).toISOString()).limit(1);
     if ((recent.data || []).length) continue;
