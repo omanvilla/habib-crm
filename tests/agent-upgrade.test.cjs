@@ -356,3 +356,14 @@ test('a client who only answers «اسمك الكريم ؟» gets the next step,
  const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
  assert(brain.includes('إذا رده كان بس اسمه (جواب "اسمك الكريم ؟") وقبلها كان يسأل أو يبي تفاصيل: لا تسكت.'));
 });
+// R29 (Ahmed 11 Nov): «ايوه لقيناها الفيلا» after our after-visit question is not a purchase; no «مبروك» without one
+test('R29: a congratulation needs the customer to say they bought, reserved or paid',()=>{
+ const C=re('CONGRATS_RE'),B=re('BOUGHT_RE'),A=re('AFTER_VISIT_Q');
+ assert(C.test('مبروك الله يبارك لك 🌷'));
+ for(const s of ['ايوه لقيناها الفيلا','وعليكم السلام','شفناها','الله يرزقك'])assert(!B.test(s),s);
+ for(const s of ['حجزنا الفيلا الحمدلله','اشترينا بيت','دفعت العربون'])assert(B.test(s),s);
+ assert(A.test('السلام عليكم كيف شفتي فيلا الشخاخيط ؟ عجبتك ولا ما ناسبتك ؟')&&A.test('السلام عليكم كيف لقيتي فيلا الشخاخيط ؟'));
+ assert(agent.includes('texts = ["حياك الله، طيب عجبتك ولا ما ناسبتك ؟"]'));
+ const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
+ assert(brain.includes('قاعدة ثابتة (R29، أحمد 11 نوفمبر)')&&brain.includes('ممنوع "مبروك" أو "الله يبارك لك"'));
+});

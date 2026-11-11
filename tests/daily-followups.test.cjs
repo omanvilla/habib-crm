@@ -180,9 +180,11 @@ test('a visit follow-up asks the client about the property by name, never a gene
  const {propertyName,namedVisitQuestion}=new Function(src+';return {propertyName,namedVisitQuestion};')();
  const name=propertyName({type:'villa',area:'الرميس'});
  assert.equal(name,'فيلا الرميس');
- assert.equal(namedVisitQuestion('السلام عليكم بخصوص الزيارة قدرت تشوف العقار ؟',name),'السلام عليكم كيف لقيت فيلا الرميس ؟');
- assert.equal(namedVisitQuestion('السلام عليكم قدرتي تشوفين العقار ؟',propertyName({type:'house',area:'الحيل الجنوبية'})),'السلام عليكم كيف لقيتي بيت الحيل الجنوبية ؟');
- assert.equal(namedVisitQuestion('السلام عليكم كيف لقيت الفيلا في الهرم ؟','فيلا الهرم'),'السلام عليكم كيف لقيت الفيلا في الهرم ؟');
+ // R29 (Ahmed 11 Nov): the opinion in plain words, never «كيف لقيت» (read as «did you find the place ?»)
+ assert.equal(namedVisitQuestion('السلام عليكم بخصوص الزيارة قدرت تشوف العقار ؟',name),'السلام عليكم كيف شفت فيلا الرميس ؟ عجبتك ولا ما ناسبتك ؟');
+ assert.equal(namedVisitQuestion('السلام عليكم قدرتي تشوفين العقار ؟',propertyName({type:'house',area:'الحيل الجنوبية'})),'السلام عليكم كيف شفتي بيت الحيل الجنوبية ؟ عجبتك ولا ما ناسبتك ؟');
+ assert.equal(namedVisitQuestion('السلام عليكم كيف لقيتي فيلا الشخاخيط ؟','فيلا الشخاخيط'),'السلام عليكم كيف شفتي فيلا الشخاخيط ؟ عجبتك ولا ما ناسبتك ؟');
+ assert.equal(namedVisitQuestion('السلام عليكم كيف لقيت الفيلا ؟',''),'السلام عليكم كيف شفت الفيلا ؟ عجبتك ولا ما ناسبتك ؟');
  assert.equal(namedVisitQuestion('السلام عليكم قدرت تشوف العقار ؟',''),'السلام عليكم قدرت تشوف العقار ؟');
  assert(fn.includes('if (kind === "visit") out.text = namedVisitQuestion(out.text, name);'));
  assert(fn.includes('ممنوع سؤال عام مثل "قدرت تشوف العقار ؟"'));

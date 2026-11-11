@@ -39,7 +39,11 @@ const promisesResidency = (t: string) => RESIDENCY_WORD_RE.test(t) && RESIDENCY_
 const NEG_RESIDENCY_RE = /^\s*(ما\s*(في|فيه)\s*(عقار|قيمة|شي)[^\n]{0,30}(يضمن|تضمن|يعطي|تعطي)[^\n]{0,20}(إقامة|اقامة)|ما\s*(في|فيه)\s*(إقامة|اقامة)|(لا\s*يوجد|ما\s*عندنا)\s*(عقار)?[^\n]{0,20}(يضمن|تضمن)[^\n]{0,20}(إقامة|اقامة))/;
 const SAID_VISITED = /(زرت|زرنا|زرناه|زرناها|عاينت|عاينا|شفت البيت|شفت الفيلا|شفنا البيت|شفنا الفيلا|شفناه|شفناها|رحت شفت|رحنا شفنا|دخلت البيت|دخلنا)/;
 // R16 (9 Nov): our after-visit question («كيف لقيت…» / «قدرت تشوفه ؟» / «قدرتي تشوفينه ؟»), not a question about a video or photos
-const AFTER_VISIT_Q = /كيف\s*لقي|قدرت[يوا]*\s*تشوف/;
+const AFTER_VISIT_Q = /كيف\s*لقي|كيف\s*شفت|قدرت[يوا]*\s*تشوف/;
+// R29 (Ahmed 11 Nov): «مبروك» only when the customer says they bought, reserved or paid. «ايوه لقيناها الفيلا» after our
+// after-visit question means they found the place, not that they bought (Umm Mawadda got «مبروك الله يبارك لك 🌷»).
+const CONGRATS_RE = /مبروك|مبارك\s*عليك|يبارك\s*لك/;
+const BOUGHT_RE = /(اشتري|اشترينا|اشتريت|شرينا|شريت|حجزنا|حجزت|دفعنا|دفعت|عربون|تم\s*البيع|استلمنا|وقعنا|وقعت|سجلنا|تزوج|عرس|مولود|نجح|تخرج|توظف)/;
 const NOT_A_VISIT_Q = /فيديو|الصور|صور البيت|صور الفيلا|الرابط|الريل|الاعلان|الإعلان/;
 // R10 / R20 (8 and 10 Nov): an owner is declined politely (heirs, occupied, mortgaged); this reply always goes out.
 // A bare «نعتذر منك» (sorry for the delay) is not a decline.
@@ -1009,6 +1013,17 @@ Deno.serve(async (req) => {
       const kept = texts.filter((t) => !badResidency(t));
       const factsKept = kept.some((t) => RESIDENCY_WORD_RE.test(t) && /50|٥٠|خمسين/.test(t));
       texts = factsKept ? kept : texts.flatMap((t) => (badResidency(t) ? fixed : [t])).filter((t, i, a) => a.indexOf(t) === i);
+    }
+    // R29: a congratulation needs the customer's own words about buying, reserving or paying (or a happy occasion) since our
+    // last message. Otherwise it is dropped; after our after-visit question the customer is asked the opinion instead.
+    if (texts.some((t) => CONGRATS_RE.test(t))) {
+      let lastOutIdx = -1; history.forEach((h: any, i: number) => { if (h.direction === "outbound") lastOutIdx = i; });
+      const saidSince = history.slice(lastOutIdx + 1).filter((h: any) => h.direction === "inbound").map((h: any) => `${h.body || ""} ${h.transcript || ""}`).join(" ");
+      if (!BOUGHT_RE.test(saidSince)) {
+        texts = texts.filter((t) => !CONGRATS_RE.test(t));
+        const lastOutBody = lastOutIdx >= 0 ? String(history[lastOutIdx]?.body || "") : "";
+        if (!texts.length && AFTER_VISIT_Q.test(lastOutBody) && !NOT_A_VISIT_Q.test(lastOutBody)) texts = ["حياك الله، طيب عجبتك ولا ما ناسبتك ؟"];
+      }
     }
     // R14 (9 Nov): never send a line we already sent to this customer in the last 15 minutes (Amer Ali got "ارسل الكروكي" twice)
     if (!review && texts.length) {
