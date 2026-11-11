@@ -26,3 +26,10 @@ test('the home page draws for staff from crm_staff_home and keeps the owner-only
  assert(js.includes('if(!owner){paused={items:[],total:0};autoNotes=[];}'),'a staff session never shows the owner\'s lists left in the tab');
  assert(/crm-owner-home\.js\?v=20261111-staff1/.test(index));
 });
+test('a staff account is greeted by its own name; the branch stays under the name (Ahmed 11 Nov)',()=>{
+ const base=fs.readFileSync('app-base-v15.html','utf8');
+ assert(base.includes("const label=currentProfile.full_name||branchLabel||currentProfile.email;"));
+ assert(base.includes("$('userRole').textContent=roleAr(currentProfile.role)+(branchLabel?' · '+branchLabel:'');"));
+ assert(base.includes("$('welcomeName').textContent=(currentProfile.full_name||'').split(' ')[0]||branchLabel||'بك';"));
+ assert(/app-base-v15\.html\?v=20261111-name1/.test(index));
+});
