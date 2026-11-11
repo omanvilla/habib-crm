@@ -101,7 +101,7 @@ async function forwardMedia(tokens: string[], phoneId: string, to: string, m: an
   return await metaSend(tokens, phoneId, to, { type: kind, [kind]: body });
 }
 const OWNER_KINDS: Record<string, string> = { land: "أرض", villa: "فيلا", house: "بيت", building: "مبنى", apartment: "شقة", farm: "مزرعة", shop: "محل", chalet: "شاليه", rest_house: "استراحة" };
-async function priceStudy(convId: string, n: number, total: number, force: boolean) {
+async function priceStudy(convId: string, n: number, total: number, force: boolean, queuedId = "") {
   const c = await db.from("whatsapp_conversations").select("id,company_id,client_id,route_key,customer_name,customer_phone,customer_wa_id,human_handoff_required,handoff_reason,handoff_updated_at,meta_phone_number_id,ai_summary,agent_note").eq("id", convId).maybeSingle();
   const conv: any = c.data;
   if (!conv) return { conversation_id: convId, error: "conversation_not_found" };
@@ -153,27 +153,83 @@ async function priceStudy(convId: string, n: number, total: number, force: boole
     media.length ? `المستندات والصور: ${media.length} (تحت)` : "المستندات والصور: ما أرسل شي",
   ].filter(Boolean).join("\n");
   const results: any[] = [];
+  // Ahmed 11 Nov: the parts of one client arrived mixed with the next one. WhatsApp does not keep the order of messages
+  // sent back to back, so every part waits for the one before it (a pause after each, longer after a video or document).
   const first = await metaText(tokens, phoneId, to, short(head, 3900));
   results.push({ part: "details", ok: !!first.id, error: first.error });
   if (first.id) {
+    await pause(3000);
     let k = 0;
     for (const m of media) {
       k++;
       const cap = short(`${tag} · ${name} · ${k}/${media.length}${m.body ? ` · ${m.body}` : ""}`, 900);
       const r = await forwardMedia(tokens, phoneId, to, m, cap);
       results.push({ part: m.message_type, ok: !!r.id, error: r.error });
+      if (r.id) await pause(m.message_type === "image" ? 2500 : 6000);
     }
+    await pause(3000);
     const end = await metaText(tokens, phoneId, to, `✅ نهاية دراسة السعر ${tag} (${name})\n━━━━━━━━━━━━━━━━━━`);
     results.push({ part: "end", ok: !!end.id, error: end.error });
   }
   const okAll = results.every((r) => r.ok);
-  await db.from("whatsapp_automation_events").insert({
+  const ev = {
     company_id: conv.company_id, conversation_id: conv.id, client_id: conv.client_id, action_type: "owner_price_study",
     status: first.id ? "applied" : "failed", applied_at: first.id ? new Date().toISOString() : null,
     reason: first.error ? short(first.error, 400) : (okAll ? "sent" : "sent_with_missing_media"),
-    payload: { handoff_at: at, route_key: conv.route_key, to_owner: true, parts: results.length, media: media.length, failed: results.filter((r) => !r.ok) },
-  });
+    payload: { handoff_at: at, route_key: conv.route_key, to_owner: true, parts: results.length, media: media.length, failed: results.filter((r) => !r.ok), n, total },
+  };
+  if (queuedId) await db.from("whatsapp_automation_events").update(ev).eq("id", queuedId);
+  else await db.from("whatsapp_automation_events").insert(ev);
   return { conversation_id: convId, name, sent: !!first.id, media: media.length, failed: results.filter((r) => !r.ok) };
+}
+
+// Ahmed 11 Nov: price study reports go one client at a time, in order, with at least 2 minutes between two clients, so
+// each client's details and documents arrive complete before the next starts. Every report (live handoff or a resend of
+// all of them) is queued as an «owner_price_study» event (status detected, reason queued → sending → applied); the tick (cron every minute, and right
+// after a report is queued) sends the oldest one only when nothing is being sent and the last one finished 2+ minutes ago.
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const GAP_MS = 2 * 60 * 1000;
+async function enqueuePriceStudy(convId: string, n: number, total: number, force: boolean, seq: number) {
+  const c = await db.from("whatsapp_conversations").select("id,company_id,client_id,route_key,handoff_reason,handoff_updated_at").eq("id", convId).maybeSingle();
+  const conv: any = c.data;
+  if (!conv) return { conversation_id: convId, error: "conversation_not_found" };
+  if (!/^\s*دراسة\s*سعر/.test(String(conv.handoff_reason || ""))) return { conversation_id: convId, skipped: "not_price_study" };
+  const at = String(conv.handoff_updated_at || "");
+  const open = await db.from("whatsapp_automation_events").select("id,status").eq("conversation_id", conv.id).eq("action_type", "owner_price_study")
+    .in("status", force ? ["detected"] : ["detected", "applied"]).contains("payload", { handoff_at: at }).limit(1);
+  if ((open.data || []).length) return { conversation_id: convId, skipped: "already_queued_or_sent" };
+  const ins = await db.from("whatsapp_automation_events").insert({
+    company_id: conv.company_id, conversation_id: conv.id, client_id: conv.client_id, action_type: "owner_price_study", status: "detected",
+    reason: "queued", payload: { handoff_at: at, route_key: conv.route_key, to_owner: true, n, total, force, seq },
+  }).select("id").single();
+  return { conversation_id: convId, queued: !ins.error, error: ins.error?.message || null };
+}
+async function priceStudyTick() {
+  const now = Date.now();
+  const busy = await db.from("whatsapp_automation_events").select("id,created_at,payload").eq("action_type", "owner_price_study").eq("status", "detected").eq("reason", "sending").limit(5);
+  for (const b of busy.data || []) {
+    const since = Date.parse(String((b.payload as any)?.sending_at || b.created_at));
+    if (now - since < 10 * 60 * 1000) return { waiting: "sending" };
+    await db.from("whatsapp_automation_events").update({ status: "failed", reason: "stuck_sending" }).eq("id", b.id).eq("status", "detected").eq("reason", "sending");
+  }
+  const last = await db.from("whatsapp_automation_events").select("applied_at").eq("action_type", "owner_price_study").in("status", ["applied"])
+    .not("applied_at", "is", null).order("applied_at", { ascending: false }).limit(1).maybeSingle();
+  const lastAt = last.data?.applied_at ? Date.parse(last.data.applied_at) : 0;
+  if (now - lastAt < GAP_MS) return { waiting: "gap", next_at: new Date(lastAt + GAP_MS).toISOString() };
+  const q = await db.from("whatsapp_automation_events").select("id,conversation_id,payload,created_at").eq("action_type", "owner_price_study").eq("status", "detected").eq("reason", "queued")
+    .order("created_at", { ascending: true }).limit(50);
+  const rows = (q.data || []).sort((a: any, b: any) => (a.created_at === b.created_at ? Number(a.payload?.seq || 0) - Number(b.payload?.seq || 0) : 0));
+  const next: any = rows[0];
+  if (!next) return { idle: true };
+  const claim = await db.from("whatsapp_automation_events").update({ reason: "sending", payload: { ...next.payload, sending_at: new Date().toISOString() } })
+    .eq("id", next.id).eq("status", "detected").eq("reason", "queued").select("id");
+  if (!(claim.data || []).length) return { waiting: "claimed_elsewhere" };
+  const p = next.payload || {};
+  const r = await priceStudy(String(next.conversation_id), Math.max(1, Number(p.n) || 1), Math.max(1, Number(p.total) || 1), p.force === true, next.id);
+  if ((r as any).skipped || (r as any).error && !(r as any).name) {
+    await db.from("whatsapp_automation_events").update({ status: "skipped", reason: String((r as any).skipped || (r as any).error) }).eq("id", next.id);
+  }
+  return { sent: r, left: rows.length - 1 };
 }
 
 // Ahmed 8 Nov (R8): every day, an hour before the 24-hour window of each company number would close, that number writes
@@ -216,15 +272,19 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({}));
   if (body?.action === "keepalive") return json({ ok: true, routes: await keepAlive(body?.force === true) });
   // price study report: one chat (trigger) or every open «دراسة سعر» chat now (batch, numbered «n من N»)
-  // (n and total number the blocks when several are sent one after the other; one call per chat keeps them in order)
-  if (body?.action === "price_study") return json({ ok: true, result: await priceStudy(String(body?.conversation_id || ""), Math.max(1, Number(body?.n) || 1), Math.max(1, Number(body?.total) || 1), body?.force === true) });
+  // both only queue the reports; the tick sends them one client at a time with 2+ minutes between clients
+  if (body?.action === "price_study") {
+    const q1 = await enqueuePriceStudy(String(body?.conversation_id || ""), Math.max(1, Number(body?.n) || 1), Math.max(1, Number(body?.total) || 1), body?.force === true, 1);
+    return json({ ok: true, queued: q1, tick: await priceStudyTick() });
+  }
   if (body?.action === "price_study_batch") {
     const q = await db.from("whatsapp_conversations").select("id,handoff_updated_at").eq("human_handoff_required", true).in("route_key", ["barka", "muscat"])
       .ilike("handoff_reason", "دراسة%سعر%").order("handoff_updated_at", { ascending: true }).limit(40);
     const rows = q.data || [], out: any[] = [];
-    for (let i = 0; i < rows.length; i++) out.push(await priceStudy(rows[i].id, i + 1, rows.length, body?.force === true));
-    return json({ ok: true, total: rows.length, results: out });
+    for (let i = 0; i < rows.length; i++) out.push(await enqueuePriceStudy(rows[i].id, i + 1, rows.length, body?.force === true, i + 1));
+    return json({ ok: true, total: rows.length, queued: out, tick: await priceStudyTick() });
   }
+  if (body?.action === "price_study_tick") return json({ ok: true, tick: await priceStudyTick() });
   if (body?.action === "notify_owner") {
     // Ahmed 8 Nov: plain alert text to his private number from the given branch number (missing property details, new land study).
     const companyId = String(body?.company_id || ""), routeKey = body?.route_key === "barka" ? "barka" : "muscat", text = short(body?.text, 900);
