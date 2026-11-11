@@ -118,8 +118,9 @@
     const members=typeof allMembers!=='undefined'&&Array.isArray(allMembers)?allMembers:[];
     const m=members.find(x=>x&&x.id===id);return m&&m.full_name?String(m.full_name):'';
   }
-  // Setting a reason on an already archived row is not in contract A for the screen (SQL76 would log it as reason_set),
-  // so «سبب الأرشفة غير مسجل» stays read-only here until Ahmed decides; the archive dialog never opens on an archived row.
+  // 12 Nov: the owner sets the reason of an archive recorded as «سبب الأرشفة غير مسجل» with «حدد السبب» (SQL76 logs it as
+  // reason_set; only the owner may, the server checks). Any other archived row stays read-only; staff never see the button.
+  const needsReason=p=>p&&p.archived===true&&(!p.archive_reason||p.archive_reason==='unrecorded');
   function bannerHtml(p){
     if(p.archived===true){
       const r=reasonOf(p.archive_reason),by=archivedBy(p),since=dateAr(p.archived_at);
@@ -127,7 +128,7 @@
       if(by)line.push('بواسطة '+esc(by));
       if(p.archive_source==='backfill')line.push('السبب انسجل لاحقاً');
       return '<p>'+line.join(' · ')+'</p>'+(p.archive_note?'<p class="cpa-banner-note" dir="auto">'+esc(p.archive_note)+'</p>':'')
-        +(editor()?'<div class="cpa-banner-actions"><button type="button" class="btn-secondary" data-cpa-restore="'+esc(p.id)+'">استعادة كعقد جديد</button></div>':'');
+        +(editor()?'<div class="cpa-banner-actions">'+(owner()&&needsReason(p)?'<button type="button" class="btn-primary" data-cpa-reason="'+esc(p.id)+'">حدد السبب</button>':'')+'<button type="button" class="btn-secondary" data-cpa-restore="'+esc(p.id)+'">استعادة كعقد جديد</button></div>':'');
     }
     const relisted=dateAr(p.relisted_at);
     return relisted?'<p>♻️ رجع من الأرشيف كعقد جديد في '+esc(relisted)+'</p>':'';
@@ -277,7 +278,7 @@
       const deals=Array.isArray(pre.open_deals)?pre.open_deals:[];
       ctx.pre=pre;if(pre.status)ctx.status=pre.status;
       ctx.active=pre.active_deal===true||deals.some(x=>x&&ACTIVE_STAGES.includes(x.stage))||ACTIVE_STATUSES.includes(pre.status);
-      ctx.archivedAlready=pre.archived===true;
+      ctx.archivedAlready=!ctx.reasonOnly&&pre.archived===true;
       if(box)box.innerHTML=checksHtml(ctx);
     }catch(e){
       if(!live(ctx.s)||!d.isConnected)return;
@@ -320,21 +321,24 @@
     }catch(e){if(live(ctx.s))fail(ctx,'ما انحفظت الأرشفة: '+friendly(errText(e),'archive'));}
     finally{if(!done&&d.isConnected){busy(d,false);syncArchive(ctx);}}
   }
-  async function openArchive(id,title){
-    if(!editor()){toast('ليس لديك صلاحية الأرشفة','error');return;}
+  async function openArchive(id,title,mode){
+    const reasonOnly=mode==='reason';
+    if(!editor()||(reasonOnly&&!owner())){toast(reasonOnly?'تحديد سبب الأرشفة للمالك بس':'ليس لديك صلاحية الأرشفة','error');return;}
     const s=snapshot();let p=null;
     try{p=await findProperty(id);}catch(e){if(live(s))toast('تعذر فتح العقار: '+errText(e),'error');return;}
     if(!live(s))return;
     if(!p){toast('العقار غير موجود. حدّث القائمة ثم حاول مرة ثانية','error');return;}
-    if(p.archived===true){toast('العقار مؤرشف من قبل','info');return;}
-    const ctx={id,s,status:p.status||'',active:false,archivedAlready:false,pre:null};
-    const d=ctx.dialog=openDialog('أرشفة العقار — ليش؟',
+    if(reasonOnly&&!needsReason(p)){toast(p.archived===true?'سبب الأرشفة مسجل من قبل':'العقار مو في الأرشيف','info');return;}
+    if(!reasonOnly&&p.archived===true){toast('العقار مؤرشف من قبل','info');return;}
+    const ctx={id,s,status:p.status||'',active:false,archivedAlready:false,pre:null,reasonOnly};
+    const d=ctx.dialog=openDialog(reasonOnly?'حدد سبب الأرشفة':'أرشفة العقار — ليش؟',
       '<p class="cpa-prop"><bdi>'+esc(p.title||title||'عقار')+'</bdi>'+(p.area?' · '+esc(p.area):'')+'</p>'
+      +(reasonOnly?'<p class="cpa-note">العقار مؤرشف'+(dateAr(p.archived_at)?' من '+esc(dateAr(p.archived_at)):'')+' وسببه ما انسجل. اختر السبب، والحالة تتعدل حسبه (المباع يظل مباع)</p>':'')
       +'<div class="cpa-checks" data-cpa-checks aria-live="polite"><p class="cpa-note">جاري فحص الصفقات والزيارات…</p></div>'
       +'<fieldset class="cpa-reasons"><legend>السبب</legend><div class="cpa-list" data-cpa-reasons></div></fieldset>'
       +'<p class="cpa-hint" data-cpa-hint hidden></p>'+NOTE_FIELD
       +'<label class="cpa-check" data-cpa-force hidden><input type="checkbox" name="force"><span>أعرف إن على العقار صفقة شغالة</span></label>'
-      +ERROR_BOX+actions('أرشفة العقار'));
+      +ERROR_BOX+actions(reasonOnly?'حفظ السبب':'أرشفة العقار'));
     d.querySelector('form').addEventListener('submit',e=>{e.preventDefault();submitArchive(ctx);});
     d.addEventListener('change',e=>{if(e.target&&(e.target.name==='reason'||e.target.name==='force')){showError(d,'');syncArchive(ctx);}});
     d.addEventListener('input',e=>{if(e.target&&e.target.name==='note')showError(d,'');});
@@ -432,6 +436,7 @@
   // ---- Wiring --------------------------------------------------------------------------------------
   window.deleteProperty=function(id,title){openArchive(id,title).catch(e=>toast('تعذر فتح نافذة الأرشفة: '+errText(e),'error'));};
   window.restoreProperty=function(id,title){openRestore(id,title).catch(e=>toast('تعذر فتح نافذة الاستعادة: '+errText(e),'error'));};
+  window.setArchiveReason=function(id,title){openArchive(id,title,'reason').catch(e=>toast('تعذر فتح نافذة السبب: '+errText(e),'error'));};
   const baseStatusAr=window.propStatusAr;
   if(typeof baseStatusAr==='function')window.propStatusAr=function(s){return s==='withdrawn'?'⚪ مسحوب':baseStatusAr.apply(this,arguments);};
   const baseRender=window.renderPropertyDetail;
@@ -457,6 +462,8 @@
     return baseReset.apply(this,arguments);
   };
   document.addEventListener('click',e=>{
+    const rb=e.target&&e.target.closest?e.target.closest('[data-cpa-reason]'):null;
+    if(rb){e.preventDefault();const id=rb.getAttribute('data-cpa-reason'),p=window.viewingProperty;window.setArchiveReason(id,p&&p.id===id?p.title:'');return;}
     const b=e.target&&e.target.closest?e.target.closest('[data-cpa-restore]'):null;if(!b)return;
     e.preventDefault();const id=b.getAttribute('data-cpa-restore'),p=window.viewingProperty;
     window.restoreProperty(id,p&&p.id===id?p.title:'');

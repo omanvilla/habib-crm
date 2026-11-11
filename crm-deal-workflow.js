@@ -283,7 +283,7 @@
     try{const r=await supa.rpc('crm_save_deal_workflow',{p_payload:payload,p_idempotency_key:crmSaveKey('mDeal',payload)});if(!active(s))return;if(r.error)throw r.error;if(!r.data||!r.data.deal_id)throw new Error('لم يصل تأكيد حفظ الصفقة. حاول الحفظ مرة أخرى');
       crmFinishSave('mDeal');showToast(s.deal?'تم تحديث الصفقة':'تم تسجيل الصفقة وكل بياناتها','success');
       const refresh=[typeof loadDeals==='function'&&loadDeals(),typeof loadDashboard==='function'&&loadDashboard()];await Promise.allSettled(refresh.filter(Boolean));
-    }catch(e){if(active(s))error('لم تُحفظ الصفقة: '+e.message);}finally{if(active(s))crmEndSave('mDeal');}
+    }catch(e){if(active(s))error('لم تُحفظ الصفقة: '+(window.crmDealSaveError?window.crmDealSaveError(e):e.message));}finally{if(active(s))crmEndSave('mDeal');}
   };
   window.onDrop=async function(event){
     event.preventDefault();event.currentTarget.classList.remove('drag-over');

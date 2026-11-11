@@ -3699,7 +3699,7 @@ async function onDrop(e){
   const wasClosed=['closed','commission_collected'].includes(oldStage),nowClosed=['closed','commission_collected'].includes(newStage);
   if(nowClosed&&!wasClosed)patch.closed_at=new Date().toISOString();
   else if(wasClosed&&!nowClosed)patch.closed_at=null;
-  const r=await crmDataFrom('deals').update(patch).eq('id',dealId);if(r.error){showToast('خطأ: '+r.error.message,'error');loadDeals();return}
+  const r=await crmDataFrom('deals').update(patch).eq('id',dealId);if(r.error){showToast('خطأ: '+crmDealSaveError(r.error),'error');loadDeals();return}
   showToast('✅ '+dealStageAr(oldStage)+' → '+dealStageAr(newStage),'success');
   try{await logActivity('note','تم نقل رحلة العقار من "'+dealStageAr(oldStage)+'" إلى "'+dealStageAr(newStage)+'"',deal.client_id,dealId)}catch(_){ }
   await syncPropertyStatus(deal.property_id,newStage);loadDeals();loadDashboard();
@@ -3724,6 +3724,9 @@ function calcCompanyShare(){
   }
 }
 
+// 12 Nov: a second open card for the same client and property (SQL77c unique indexes) is refused in plain Arabic, not the raw 23505 text
+function crmDealSaveError(e){const raw=String(e&&(e.message||e.details)||e||'');if(/deals_one_open_card_per_viewing/.test(raw))return 'هذي الزيارة لها صفقة مفتوحة من قبل. افتح الصفقة الموجودة وكمّل عليها';if((e&&e.code==='23505')||/deals_one_open_card_per_client_property|duplicate key/.test(raw))return 'هذا العميل عنده صفقة مفتوحة على نفس العقار. افتح الصفقة الموجودة وكمّل عليها بدل صفقة جديدة';return raw;}
+window.crmDealSaveError=crmDealSaveError;
 async function saveDeal(){
   if(!canEdit())return;
   const cl=$('dClient').value;if(!cl){showToast('⚠️ اختر عميلاً','error');return}
@@ -3754,7 +3757,7 @@ async function saveDeal(){
     try{await logActivity('note',window.editingDealId?'تم تعديل رحلة العقار':'تم إنشاء رحلة عقارية جديدة',cl,r.data.id)}catch(_){ }
     if(propId)await syncPropertyStatus(propId,stage);
     closeModal('mDeal');showToast(window.editingDealId?'✅ تم تحديث الرحلة':'✅ تم حفظ الرحلة','success');window.editingDealId=null;loadDeals();loadDashboard();
-  }catch(err){showToast('خطأ: '+err.message,'error')}
+  }catch(err){showToast('خطأ: '+crmDealSaveError(err),'error')}
 }
 async function editDeal(dealId){
   if(!canEdit()){showToast('⚠️ ليس لديك صلاحية التعديل','error');return}
@@ -4661,7 +4664,7 @@ async function loadReports(){
  try{
  const [clients,deals,properties]=await Promise.all([
  crmReadAll(()=>supa.from('clients').select('*',{count:'exact'}).neq('archived',true).order('id')),
- crmReadAll(()=>(typeof crmDataFrom==='function'?crmDataFrom('deals'):crmDataFrom('deals')).select('*, agent:profiles!deals_agent_id_fkey(full_name), property:properties(title,type,area)',{count:'exact'}).order('id')),
+ crmReadAll(()=>(typeof crmDataFrom==='function'?crmDataFrom('deals'):crmDataFrom('deals')).select('*, agent:profiles!deals_agent_id_fkey(full_name), property:properties(title,type,area)',{count:'exact'}).is('merged_into_deal_id',null).order('id')),
  crmReadAll(()=>(typeof crmDataFrom==='function'?crmDataFrom('properties'):crmDataFrom('properties')).select('*',{count:'exact'}).neq('archived',true).order('id'))]);
  if(seq!==reportLoadSeq||!crmSessionCurrent(generation,user))return;
  const range=getPeriodRange({deals,clients,properties}),previous=getPreviousPeriodRange({deals,clients,properties});

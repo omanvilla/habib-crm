@@ -167,3 +167,12 @@ test('owner type agent, Ahmed presence on a visit and the safe add function',()=
   assert.match(s58,/REVOKE ALL ON FUNCTION public\.crm_add_property_with_owner\(jsonb, jsonb\) FROM PUBLIC, anon/);
   assert(s58.includes("right(v_phone, 8)"),'owner is reused by phone');
 });
+
+test('an approved draft books the meeting and fills the مستحقين list like the direct mode (12 Nov)', () => {
+  assert.match(fn,/const meetingBooked = analysis\.action === "book_meeting" && \/\^\s\*اجتماع\s\*:\/\.test/);
+  assert.match(fn,/if \(analysis\.action === "handoff" \|\| meetingBooked\) Object\.assign\(convPatch, \{ human_handoff_required: true/);
+  assert.match(fn,/if \(meetingBooked && !analysis\.meeting_already_booked\)/);
+  assert.match(fn,/أكد الموعد مع العميل أو اقترح وقت ثاني/);
+  assert.match(fn,/analysis\.mustahiq_waitlist === true && conv\.route_key !== "owner"/);
+  assert.match(fn,/onConflict: "company_id,client_id"/);
+});

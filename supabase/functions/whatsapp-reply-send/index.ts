@@ -214,8 +214,27 @@ Deno.serve(async (req) => {
 
   // keep the CRM up to date, like the agent's direct mode
   const convPatch: any = { ai_summary: short(analysis.crm_note, 1500), last_automation_action: { scenario: "reply_agent_v1", action: analysis.action, at: now, category: analysis.category, approved: true }, updated_at: now };
-  if (analysis.action === "handoff") Object.assign(convPatch, { human_handoff_required: true, handoff_reason: short(analysis.handoff_reason || analysis.intent, 500), handoff_updated_at: now });
+  // R19/R30 (12 Nov): an approved draft that books a meeting does what the agent's direct mode does: the soft handoff
+  // «اجتماع: …» (the conversation trigger alerts Ahmed's WhatsApp), a CRM notification and a task due today to confirm the slot
+  const meetingBooked = analysis.action === "book_meeting" && /^\s*اجتماع\s*:/.test(String(analysis.handoff_reason || "")) && !!analysis.meeting?.date;
+  if (analysis.action === "handoff" || meetingBooked) Object.assign(convPatch, { human_handoff_required: true, handoff_reason: short(analysis.handoff_reason || analysis.intent, 500), handoff_updated_at: now });
   await db.from("whatsapp_conversations").update(convPatch).eq("id", conv.id);
+  if (meetingBooked && !analysis.meeting_already_booked) {
+    try {
+      await db.from("notifications").insert({ user_id: owner.id, type: "whatsapp_handoff", is_read: false, client_id: client.id, link: "whatsapp",
+        title: `📅 اجتماع: ${client.name || conv.customer_name || client.phone || "عميل"}`, body: short(analysis.handoff_reason, 400) });
+      const open = await db.from("tasks").select("id").eq("client_id", client.id).ilike("title", "اجتماع%").eq("done", false).ilike("title", `%${analysis.meeting.date}%`).limit(1);
+      if (!(open.data || []).length) await db.from("tasks").insert({ company_id: owner.company_id, user_id: owner.id, client_id: client.id, title: short(analysis.handoff_reason, 200),
+        notes: short(`أكد الموعد مع العميل أو اقترح وقت ثاني. ${analysis.crm_note || ""}`, 1000), due_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date()), priority: "high", done: false });
+    } catch (e) { console.error("[reply-send] meeting", String((e as any)?.message || e)); }
+  }
+  // R31: an approved reply to a «المستحقين» asker puts him on the waiting list, like an auto-sent one (never the owner line)
+  if (analysis.mustahiq_waitlist === true && conv.route_key !== "owner") {
+    try {
+      await db.from("mustahiq_waitlist").upsert({ company_id: owner.company_id, client_id: client.id, conversation_id: conv.id, route_key: conv.route_key,
+        note: short(analysis.crm_note || analysis.intent || "", 500), last_asked_at: now }, { onConflict: "company_id,client_id" });
+    } catch (e) { console.error("[reply-send] mustahiq waitlist", String((e as any)?.message || e)); }
+  }
   try {
     const flags: any = {};
     if (analysis.category === "buyer" || analysis.category === "tenant") flags.is_buyer = true;

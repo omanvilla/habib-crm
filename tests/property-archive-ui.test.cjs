@@ -21,7 +21,7 @@ function load(extra){
 
 test('loader adds the archive module after the property grid and phone layout modules',()=>{
   assert(index.includes('<link rel="stylesheet" href="crm-property-archive.css?v=20261110-arch1">'));
-  const at=index.indexOf('<script src="crm-property-archive.js?v=20261110-arch1"><\\/script>');
+  const at=index.indexOf('<script src="crm-property-archive.js?v=20261112-fix1"><\\/script>');
   assert(at>0);
   assert(at>index.indexOf('crm-operations-v6.js?v='));
   assert(at>index.indexOf('crm-simple-ui.js?v='));
@@ -216,4 +216,28 @@ test('Claude and the agent archive through archive_property_internal with a reas
   // reason_set on an archived row that is reserved (or has an active-stage deal) is blocked: report it, never force.
   assert(doc.includes('وما يتسجل السبب (المصدر `agent` ما يفرض أبداً)'));
   assert(doc.includes('في 10 نوفمبر هذا حال `f99087b9`'));
+});
+
+test('«حدد السبب» lets the owner set the reason of an archive recorded as unrecorded (12 Nov)',()=>{
+  assert(js.includes("const needsReason=p=>p&&p.archived===true&&(!p.archive_reason||p.archive_reason==='unrecorded');"));
+  assert(js.includes("(owner()&&needsReason(p)?'<button type=\"button\" class=\"btn-primary\" data-cpa-reason=\"'"));
+  assert(js.includes("if(!editor()||(reasonOnly&&!owner()))"));
+  assert(js.includes("ctx.archivedAlready=!ctx.reasonOnly&&pre.archived===true;"));
+  assert(js.includes("window.setArchiveReason=function(id,title){openArchive(id,title,'reason')"));
+  const {ctx,toasts}=load({isOwner:()=>false,canEdit:()=>true});
+  assert.equal(typeof ctx.setArchiveReason,'function');
+});
+
+test('a second open deal card is refused in Arabic, not the raw 23505 text (12 Nov)',()=>{
+  const start=base.indexOf('function crmDealSaveError(e){'),end=base.indexOf('\n',start);
+  assert(start>0);
+  const c={};vm.createContext(c);vm.runInContext(base.slice(start,end),c);
+  const f=c.crmDealSaveError;
+  assert.match(f({code:'23505',message:'duplicate key value violates unique constraint "deals_one_open_card_per_client_property"'}),/عنده صفقة مفتوحة على نفس العقار/);
+  assert.match(f({code:'23505',message:'duplicate key value violates unique constraint "deals_one_open_card_per_viewing"'}),/هذي الزيارة لها صفقة مفتوحة/);
+  assert.equal(f({message:'other'}),'other');
+  assert(base.includes("showToast('خطأ: '+crmDealSaveError(err),'error')"));
+  assert(read('crm-deal-workflow.js').includes("window.crmDealSaveError?window.crmDealSaveError(e):e.message"));
+  assert(base.includes(".is('merged_into_deal_id',null).order('id')),"),'reports leave merged cards out');
+  assert(index.includes('crm-deal-workflow.js?v=20261112-fix1'));
 });
