@@ -169,7 +169,7 @@ test('owner type agent, Ahmed presence on a visit and the safe add function',()=
 });
 
 test('an approved draft books the meeting and fills the مستحقين list like the direct mode (12 Nov)', () => {
-  assert.match(fn,/const meetingBooked = analysis\.action === "book_meeting" && \/\^\s\*اجتماع\s\*:\/\.test/);
+  assert(fn.includes('const meetingBooked = analysis.action === "book_meeting" && /^\\s*اجتماع\\s*:/.test(String(analysis.handoff_reason || "")) && !!analysis.meeting?.date;'));
   assert.match(fn,/if \(analysis\.action === "handoff" \|\| meetingBooked\) Object\.assign\(convPatch, \{ human_handoff_required: true/);
   assert.match(fn,/if \(meetingBooked && !analysis\.meeting_already_booked\)/);
   assert.match(fn,/أكد الموعد مع العميل أو اقترح وقت ثاني/);
