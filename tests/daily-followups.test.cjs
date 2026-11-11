@@ -167,7 +167,8 @@ test('the hot client alert opens the chat in WhatsApp Business',()=>{
 test('«تم» on a handed-over chat is saved in the database for every device (SQL74)',()=>{
  const hot=fs.readFileSync('crm-hot-alerts.js','utf8');
  assert(hot.includes("supa.rpc('crm_hot_alert_done',{p_conversation_id:n.conversation_id})"));
- assert(hot.includes('if(w.owner_alert_done_at&&new Date(w.owner_alert_done_at)>=new Date(at))continue;'));
+ // 11 Nov 2026 (SQL88): also stays hidden when the same kind of handoff comes again
+ assert(hot.includes('if(w.owner_alert_done_at&&(new Date(w.owner_alert_done_at)>=new Date(at)||kindOf(w.owner_alert_done_reason)===kindOf(why)))continue;'));
  assert(!hot.includes('hidden[n.id]=Date.now()'));
  const sql=fs.readFileSync('db/changes/74-hot-alert-done.forward.sql','utf8');
  assert(sql.includes("public.my_role() IS DISTINCT FROM 'owner'")&&sql.includes('REVOKE ALL ON FUNCTION public.crm_hot_alert_done(uuid) FROM PUBLIC, anon;'));

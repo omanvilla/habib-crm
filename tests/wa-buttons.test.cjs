@@ -8,7 +8,7 @@ test('crmWaButtons gives «فتح في واتساب الجوال» and «فتح 
  const k=ctx.window.crmWaButtons({clientId:'x'});
  assert(k.includes('data-wa-phone="1"')&&k.includes('data-client="x"'),'no number at hand: looked up on tap');
  assert.equal(ctx.window.crmWaButtons({}),'');
- assert(/crm-wa-buttons\.js\?v=20261111-wa1"><\\/script>/.test(index),'loaded inside the boot script with an escaped closing tag');
+ assert(index.includes('crm-wa-buttons.js?v=20261111-wa1"><'+String.fromCharCode(92)+'/script>'),'loaded inside the boot script with an escaped closing tag');
 });
 test('the two buttons are used on every chat button',()=>{
  for(const f of ['crm-hot-alerts.js','crm-owner-home.js','crm-owner-leads.js','crm-reply-approvals.js','crm-investment-projects.js'])assert(fs.readFileSync(f,'utf8').includes('crmWaButtons'),f);
