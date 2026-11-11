@@ -13,13 +13,14 @@ test('the home sections are there and the full work list stays reachable',()=>{
  assert(js.includes('قائمة العمل الكاملة'));
  assert.match(css,/coh-on:not\(\.coh-full-open\)>#opsDailyWork/);
 });
-test('staff keep their page and a failed load keeps the old page',()=>{
- assert.match(js,/if\(!isOwner\(\)[^;]*;page\.classList\.remove\('coh-on'\);(releaseGate\(\);)?return;\}/);
+// 11 Nov 2026 (Ahmed): staff get this same home too (crm_staff_home, tests/staff-home.test.cjs); an account with no role keeps the old page
+test('an account without a home role and a failed load keep the old page',()=>{
+ assert.match(js,/if\(!hasHome\(\)[^;]*;page\.classList\.remove\('coh-on'\);(releaseGate\(\);)?return;\}/);
  assert.match(js,/if\(home\.error\|\|!home\.data\)\{if\(!last\)\{box\.hidden=true;page\.classList\.remove\('coh-on'\);\}return;\}/);
 });
 test('the old dashboard is never painted for the owner before the home (boot gate, 10 Nov 2026)',()=>{
  assert.match(css,/html\.coh-boot #page-dash:not\(\.coh-on\)>\*\{display:none!important\}/);
- assert.match(js,/if\(isOwner\(\)&&!last\)armGate\(\);else if\(!isOwner\(\)\)releaseGate\(\);/);
+ assert.match(js,/if\(hasHome\(\)&&!last\)armGate\(\);else if\(!hasHome\(\)\)releaseGate\(\);/);
  assert.match(js,/timer:setTimeout\(releaseGate,8000\)/,'the gate never holds the page longer than 8 s');
  assert.match(js,/\}finally\{if\(seq===sequence\)releaseGate\(\);\}/,'the gate opens after the first load whatever its result');
  const ops=fs.readFileSync('crm-operations-v6.js','utf8');
