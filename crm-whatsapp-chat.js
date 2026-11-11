@@ -10,7 +10,7 @@
   const esc=v=>escapeHtml(String(v==null?'':v));
   const TZ={timeZone:'Asia/Muscat'};
   const media=new Map();            // message id → {url,type,filename} (object URLs)
-  let stripOpen=false,reply=null,pending=null,recorder=null,recChunks=[],recStart=0,recTimer=null,pollTimer=null,polling=false,observer=null;
+  let stripOpen=false,reply=null,pending=null,recorder=null,recAfterStop=null,recChunks=[],recStart=0,recTimer=null,pollTimer=null,polling=false,observer=null;
   const EMOJI='😀 😁 😂 🤣 😊 😍 😘 😎 🤔 😅 😉 🙏 👍 👌 👏 🤝 💪 🙌 ❤️ 💚 🌹 🎉 ✅ ❌ ⭐ 🔥 💯 🏠 🏡 🏢 🏗️ 🔑 📍 📞 📅 ⏰ 💰 💵 📄 📷 🎥 🚗 ☀️ 🌙 👋 🤲 😢 😔 🙂 😃 🥰 😇 🤗 🤩 😴 🤷 👀 💡 📌 ✍️ 🕌 🎁'.split(' ');
 
   const dayKey=ts=>ts?new Intl.DateTimeFormat('en-CA',TZ).format(new Date(ts)):'';
@@ -201,7 +201,9 @@
     const attach=document.createElement('button');attach.type='button';attach.className='wa2-icon';attach.id='wa2AttachBtn';attach.title='إرفاق صورة أو فيديو أو ملف';attach.textContent='📎';
     const file=document.createElement('input');file.type='file';file.id='wa2File';file.hidden=true;file.accept='image/*,video/mp4,video/3gpp,audio/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt';
     const mic=document.createElement('button');mic.type='button';mic.className='wa2-send';mic.id='wa2MicBtn';mic.title='تسجيل رسالة صوتية';mic.textContent='🎤';
-    box.prepend(top);box.insertBefore(emoji,textarea);box.insertBefore(attach,textarea);box.append(mic,file);
+    // Discard a voice note while it is being recorded (WhatsApp's bin). Hidden otherwise.
+    const recCancel=document.createElement('button');recCancel.type='button';recCancel.className='wa2-icon wa2-rec-cancel';recCancel.id='wa2RecCancel';recCancel.title='إلغاء التسجيل بدون إرسال';recCancel.setAttribute('aria-label','إلغاء التسجيل');recCancel.textContent='🗑';recCancel.hidden=true;
+    box.prepend(top);box.insertBefore(emoji,textarea);box.insertBefore(attach,textarea);box.insertBefore(recCancel,textarea);box.append(mic,file);
     textarea.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();sendNow();}});
     textarea.addEventListener('input',()=>{autoGrow();syncButtons();});
     send.addEventListener('click',sendNow);
@@ -209,6 +211,7 @@
     attach.addEventListener('click',()=>file.click());
     file.addEventListener('change',()=>{if(file.files&&file.files[0])pick(file.files[0]);file.value='';});
     mic.addEventListener('click',toggleRecording);
+    recCancel.addEventListener('click',()=>stopRecording('discard'));
     textarea.addEventListener('paste',e=>{const f=[...(e.clipboardData?.files||[])][0];if(f){e.preventDefault();pick(f);}});
     const panel=document.querySelector('.wa-chat-panel');
     if(panel){panel.addEventListener('dragover',e=>{if(e.dataTransfer?.types?.includes('Files')){e.preventDefault();}});panel.addEventListener('drop',e=>{const f=e.dataTransfer?.files?.[0];if(f){e.preventDefault();pick(f);}});}
@@ -219,6 +222,7 @@
     const t=$('waInboxMessage'),send=$('waInboxSendBtn'),mic=$('wa2MicBtn');if(!t||!send||!mic)return;
     const hasContent=Boolean(t.value.trim()||pending);
     send.hidden=!hasContent&&!recorder;mic.hidden=hasContent&&!recorder;
+    const rc=$('wa2RecCancel');if(rc)rc.hidden=!recorder;
   }
   function setReply(m){
     reply=m?{id:m.id,wamid:m.whatsapp_message_id,text:snippet(m),out:m.direction==='outbound'}:null;
@@ -260,15 +264,21 @@
     if(!pending){box.hidden=true;box.innerHTML='';return;}
     const size=(pending.size/1024/1024).toFixed(pending.size>1048576?1:2)+' MB';
     const preview=pending.kind==='image'?'<img src="'+pending.preview+'" alt="">':pending.kind==='video'?'<video src="'+pending.preview+'" muted></video>':pending.kind==='audio'?'<audio controls src="'+pending.preview+'"></audio>':'<span class="wa2-doc-ico">📄</span>';
-    box.hidden=false;box.innerHTML=preview+'<div class="wa2-attach-info"><strong dir="auto">'+esc(pending.filename)+'</strong><small>'+esc(size)+(pending.kind!=='audio'?' · اكتب تعليقًا إن أردت ثم اضغط إرسال':' · اضغط إرسال')+'</small></div><button type="button" data-wa2-cancel-file aria-label="إلغاء المرفق">✕</button>';
+    box.hidden=false;box.innerHTML=preview+'<div class="wa2-attach-info"><strong dir="auto">'+esc(pending.filename)+'</strong><small>'+esc(size)+(pending.kind!=='audio'?' · اكتب تعليقًا إن أردت ثم اضغط إرسال':' · اسمعها ثم إرسال أو حذف')+'</small></div><button type="button" class="wa2-discard" data-wa2-cancel-file aria-label="'+(pending.kind==='audio'?'حذف الصوتية بدون إرسال':'إلغاء المرفق')+'">🗑 '+(pending.kind==='audio'?'حذف':'إلغاء')+'</button>';
   }
   // Voice notes: WhatsApp accepts OGG/Opus or MP4/AAC; Chrome and Safari record MP4.
   function recorderType(){
     if(typeof MediaRecorder!=='function')return '';
     return ['audio/ogg;codecs=opus','audio/mp4;codecs=mp4a.40.2','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t))||'';
   }
+  // mode: 'keep' = preview before sending (⏹), 'send' = send at once (➤), 'discard' = bin (🗑).
+  function stopRecording(mode){
+    if(!recorder)return;
+    recAfterStop=mode||'keep';
+    try{recorder.stop();}catch(_){recAfterStop=null;}
+  }
   async function toggleRecording(){
-    if(recorder){recorder.stop();return;}
+    if(recorder){stopRecording('keep');return;}
     const type=recorderType();
     if(!type){showToast('هذا المتصفح لا يسجّل بصيغة يقبلها واتساب. استخدم Chrome حديثًا أو أرسل ملفًا صوتيًا.','error');return;}
     let stream;
@@ -278,8 +288,11 @@
     recorder.ondataavailable=e=>{if(e.data&&e.data.size)recChunks.push(e.data);};
     recorder.onstop=()=>{stream.getTracks().forEach(t=>t.stop());clearInterval(recTimer);const mime=type.split(';')[0];const blob=new Blob(recChunks,{type:mime});recorder=null;
       const mic=$('wa2MicBtn');if(mic){mic.textContent='🎤';mic.classList.remove('rec');}
+      const mode=recAfterStop||'keep';recAfterStop=null;
+      if(mode==='discard'){recChunks=[];syncButtons();showToast('انحذفت الصوتية ولم تُرسل','success');return;}
       if(Date.now()-recStart<800||!blob.size){syncButtons();return;}
-      const f=new File([blob],'voice-'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+(mime==='audio/ogg'?'.ogg':'.m4a'),{type:mime});pick(f);};
+      const f=new File([blob],'voice-'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+(mime==='audio/ogg'?'.ogg':'.m4a'),{type:mime});
+      pick(f).then(()=>{if(mode==='send'&&pending&&pending.kind==='audio')sendMedia();});};
     recorder.start();
     const mic=$('wa2MicBtn');if(mic){mic.classList.add('rec');const tick=()=>{const s=Math.floor((Date.now()-recStart)/1000);mic.textContent='⏹ '+Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};tick();recTimer=setInterval(tick,500);}
     syncButtons();
@@ -322,6 +335,7 @@
     finally{send.disabled=false;send.innerHTML='➤';syncButtons();}
   }
   function sendNow(){
+    if(recorder)return stopRecording('send');
     if(pending)return sendMedia();
     if(reply&&$('waInboxMessage').value.trim())return sendReply();
     if($('waInboxMessage').value.trim())return sendWhatsAppInboxMessage().then(()=>{autoGrow();syncButtons();});
@@ -401,6 +415,6 @@
   document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelector('.wa2-lightbox')?.remove();}});
   pollTimer=setInterval(poll,12000);
   const reset=window.crmResetOperations;
-  if(typeof reset==='function')window.crmResetOperations=function(){for(const item of media.values())URL.revokeObjectURL(item.url);media.clear();reply=null;clearPending();if(recorder){try{recorder.stop();}catch(_){}}return reset.apply(this,arguments);};
+  if(typeof reset==='function')window.crmResetOperations=function(){for(const item of media.values())URL.revokeObjectURL(item.url);media.clear();reply=null;clearPending();if(recorder){recAfterStop='discard';try{recorder.stop();}catch(_){}}return reset.apply(this,arguments);};
   window.crmWhatsAppChat={renderBody,setReply,loadMedia};
 })();
