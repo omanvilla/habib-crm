@@ -64,5 +64,5 @@ test('each follow-up opens in the phone WhatsApp or inside the CRM',()=>{
  const f=fs.readFileSync('crm-followups-today.js','utf8');
  assert(f.includes('>فتح في واتساب الجوال</a>')&&f.includes('data-cfu="crm"')&&f.includes('>فتح في النظام</button>'));
  assert(f.includes("navigate('whatsapp',null);setTimeout(()=>openWhatsAppConversation(id),300)"));
- assert(!f.includes('\&'));
+ assert(!f.includes(String.fromCharCode(92)+'&'),'no escaped ampersand left in the code');
 });
