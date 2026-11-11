@@ -1002,7 +1002,7 @@ Deno.serve(async (req) => {
         else out.handoff_reason = short(`اجتماع: ${client.name || conv.customer_name || "عميل"} ${slot} ${short(topic, 120)} (ينتظر تأكيدك)`, 300);
         // R30: the agent never confirms the slot itself; Ahmed confirms it after checking his day
         const CONFIRMS = /نشوفك|نتشرف\s*فيك|تم\s*(الحجز|التأكيد|تأكيد)|موعدك\s*(تأكد|محجوز|ثابت)|أكدنا|اكدنا|حجزنا\s*لك|بانتظارك|ننتظرك/;
-        const kept = (out.reply_messages || []).filter((t: string) => !CONFIRMS.test(String(t)));
+        const kept = (out.reply_messages || []).map(String).filter((t) => !CONFIRMS.test(t));
         out.reply_messages = kept.length ? kept : ["تمام وصلت"];
       } else if (out.action === "book_meeting") { out.action = "none"; out.handoff_reason = null; out.meeting_waits = true; }
       else out.handoff_reason = openMeeting || short(`طلب اجتماع بدون موعد: ${topic}`, 300);
