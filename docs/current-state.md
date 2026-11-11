@@ -2,6 +2,10 @@
 
 Updated 2026-11-11. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 11 November 2026 — «أمر للذكاء الاصطناعي» on follow-ups for staff (R28, commit 3e4b270), live
+
+- Ahmed: the button was missing on the staff follow-up list. `whatsapp-visit-followup-auto` v23 → `3e4b270` (was `febde8b`) accepts manager and agent for the instruction; `crm-followups-today.js` `20261111-instr1` shows the button to them. Nothing is sent. A staff instruction is stored in `crm_owner_notes` with `apply_now=false` and `context.by_staff`, so it does not become an agent lesson; there is no screen yet for Ahmed to turn such a note into a lesson. Checked live as Barka: 23 buttons on the Barka tab, the box says the instruction waits for Ahmed, a call with a dummy id passes the role check (409 `followup_not_found`). Not run: a real rewrite from the Barka account. Rollback: pin back to `febde8b`, script `20261111-all1`.
+
 ## 11 November 2026 — staff resume paused chats (R27, SQL84) and follow everyone (SQL85), live
 
 - **Resume (R27).** Ahmed: «اريد الموظف ايضا يقدر يكمل موضوع العقل الموقوف». `crm_paused_chats` (SQL84) accepts manager and agent and never lists the owner's private line; the staff home shows «العقل موقوف عندهم» with «كمّل يا عقل». «دراسة سعر» rows stay Ahmed's: hidden on the staff page and `whatsapp-inbox` refuses `clear_handoff` from staff on them (`price_study_owner_only`). «ملاحظة لـ Claude» stays owner-only. `whatsapp-reply-agent` accepts a staff JWT for `resume` only (auth change, no wording change; owner line refused). Pins: `whatsapp-inbox` v25 and `whatsapp-reply-agent` v56 → `487329a` (were `3ff0641`). Rule in `docs/agent-rules.md` R27 (R1/R26 «أحمد يرجّعها» amended). Checked: as Barka 62 paused rows from SQL, 0 on the owner line, 8 price studies hidden → 54 on the page, each with «كمّل يا عقل» and no note button; the live agent answered an inline dry run after the deploy. Not pressed: a real resume from the Barka account (it would answer a real customer).
