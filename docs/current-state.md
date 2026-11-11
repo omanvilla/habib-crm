@@ -612,3 +612,14 @@ Recovery: restore prior frontend and both prior WhatsApp shared modules before S
 - تفريغ صوتيات أحمد (gpt-4o-transcribe + قاموس)، لوحة «العقل موقوف عندهم»، زر «وقّف العقل هنا»، إعادة تصميم الرئيسية (بلاطات + نوافذ)، إغلاق صفقات الزيارة الراكدة بعد 90 يوم، إصلاح cron سلوك العملاء.
 - R13: whatsapp-visit-followup-auto مثبت على 1627292، يقفل الزيارات الفائتة (عقار منتهي / 5 أيام بدون نتيجة) ويكتب ملاحظة للمحادثات الموقوفة. أول تشغيل: 14 زيارة انقفلت، 9 باقية حديثة (1–4 أيام).
 
+
+## Price study reports in order — 11 Nov 2026 (evening)
+
+Ahmed: the price-study reports reached him mixed (one client's parts interleaved, one arrived last). Now every report
+(live «دراسة سعر» handoff or `price_study_batch`) is only queued as an `owner_price_study` event (status `detected`,
+reason `queued` → `sending` → `applied`); `price_study_tick` (cron `owner_price_study_tick` every minute, SQL92, and
+right after queuing) sends the oldest one only when nothing is sending and the last one finished 2+ minutes ago. Inside
+one client every part waits (3 s after the details, 2.5 s after an image, 6 s after a video/document, 3 s before the end
+line). A stuck `sending` row fails after 10 minutes. Function v8 → `7f00022`. All 9 open price studies were resent in
+order at 17:19 Oman (#1 17:19, #2 17:22, then one every ~2–3 min). Media older than Meta keeps (chats d2bbc840 and
+df4af2b4, sent 25 Oct – 3 Nov) come back `media_expired`: we keep no copy, so those images/videos cannot be resent.
