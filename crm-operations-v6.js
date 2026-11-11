@@ -5,7 +5,8 @@
   const n=v=>Number(v||0).toLocaleString('en-US');
   const omanDate=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'});
   const dateText=d=>d?new Date(d).toLocaleDateString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat'}):'—';
-  const branchLabel=branch=>({muscat:'مسقط',barka:'بركاء'}[branch]||'الفرع');
+  // 11 Nov 2026 (SQL83): the person on the branch line («مرام») when known, else the branch
+  const branchLabel=branch=>(window.crmBranchPeople&&window.crmBranchPeople[branch])||({muscat:'مسقط',barka:'بركاء'}[branch]||'الفرع');
   function branchRows(data){
     const rows=data?.branches??data?.employees;
     if(!Array.isArray(rows))throw new Error('لم تصل بيانات الفروع. أعد المحاولة.');

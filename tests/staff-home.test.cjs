@@ -33,3 +33,13 @@ test('a staff account is greeted by its own name; the branch stays under the nam
  assert(base.includes("$('welcomeName').textContent=(currentProfile.full_name||'').split(' ')[0]||branchLabel||'بك';"));
  assert(/app-base-v15\.html\?v=20261111-name1/.test(index));
 });
+test('targets, performance, tasks and the responsible column name the person on the branch line (SQL83)',()=>{
+ const base=fs.readFileSync('app-base-v15.html','utf8'),ops=fs.readFileSync('crm-operations-v6.js','utf8'),tasks=fs.readFileSync('crm-v18-task-priority-patch.js','utf8');
+ const s83=fs.readFileSync('db/changes/83-branch-people.forward.sql','utf8');
+ assert(s83.includes("r.route_key IN ('muscat','barka') AND r.owner_only_inbox IS FALSE")&&!/phone|email/.test(s83.split('AS $function$')[1]),'branch lines only, no contact details');
+ assert(base.includes("supa.rpc('crm_branch_people')")&&base.includes('function updateUserUI(){if(!currentProfile)return;crmLoadBranchPeople();'));
+ assert.equal((base.match(/escapeHtml\(crmRecordPersonLabel\(c\)\)/g)||[]).length,2);
+ assert(ops.includes("const branchLabel=branch=>(window.crmBranchPeople&&window.crmBranchPeople[branch])||"));
+ assert(tasks.includes('crmRecordPersonLabel(task)')&&tasks.includes('return crmBranchPersonName(branch);'));
+ assert(/crm-v18-task-priority-patch\.js\?v=20261111-people1/.test(index)&&/crm-operations-v6\.js\?v=20261111-people1/.test(index));
+});
