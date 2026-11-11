@@ -2,6 +2,13 @@
 
 Updated 2026-11-11. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 11 November 2026 — price study report to Ahmed's WhatsApp (SQL89, commit ee92c2c), live
+
+- **What.** `whatsapp-owner-hot-alert` v7 → `ee92c2c` (was `210edc7`), action `price_study`: for a «دراسة سعر» chat it sends Ahmed's private number, from that chat's branch number (Barka → Barka, Muscat → Muscat), one block: «━━ 📋 دراسة سعر n من N · الفرع ━━», name, number, wa.me link, what was handed over, the owner offer on record (type, area, price in mind, land, built, plot, notes), the chat summary, the owner's own words (voice notes as transcripts, last 25 lines), then every image / document / video he sent in 45 days (downloaded from Meta and uploaded again from the branch number, captioned «n من N · الاسم · k/m»), and «✅ نهاية دراسة السعر n من N». Logged as `owner_price_study` (once per handoff). SQL89: the conversation trigger sends it automatically on each new «دراسة سعر» handoff (not on a rewording of an open one). Nothing goes to the customer.
+- **Sent now** (one call at a time so blocks never interleave): 8 open price studies, Barka 1–5 then Muscat 6–8, all details delivered; 23 of 27 documents. Zaid Al Shubaibi's 4 images (sent 3 Nov) could not be fetched from Meta (`media_expired`); they are in the chat.
+- **Not built:** sending Ahmed's priced reply on to the customer; he prices and answers from the branch number himself.
+- **Rollback.** `89-price-study-report.rollback.sql`; pin back to `210edc7`.
+
 ## 11 November 2026 — phone + CRM WhatsApp buttons everywhere, «تم» sticks (SQL88), price studies for staff, «وايش انطباعك عنها ؟» (commits b1b68dc–4d40947), live
 
 - **WhatsApp buttons.** `crm-wa-buttons.js` (new, `20261111-wa1`): `crmWaButtons({phone, conversationId, clientId})` gives «فتح في واتساب الجوال» (WhatsApp Business on the phone, wa.me on a computer) and «فتح في النظام» (the CRM chat; any home sheet closes first); a missing number or chat is looked up on tap. Used on «عملاء يحتاجونك الحين», the home's paused / price-study sheets, owner offers, all five approval cards, deal cards (app-base `20261111-wa1`), the مستحقين waiting list, and inside the CRM chat header (phone button). Follow-ups already had both.
