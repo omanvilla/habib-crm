@@ -156,3 +156,9 @@ test('R24: an archived or withdrawn property is "not available now", never "sold
  assert(agent.includes('عقارات ما عادت متوفرة (مو مباعة)'),'the context block the brain relies on');
  assert(rules.includes('| R24 |'));
 });
+
+test('R32: a villa «المعروضة» from an ad is a specific property, never «ما عندنا» (12 Nov)',()=>{
+ assert(brain.includes('كلام بصيغة عقار واحد معروض ("الفيلا المعروضة في..."، "البيت اللي في الاعلان"، "هذي الفيلا") = عقار معين من إعلان، مو بحث عام'));
+ assert(brain.includes('لا تقول "ما عندنا" ولا "اول ما يتوفر"، اسأل عن الرابط أو صورة من الاعلان، action=none.'));
+ assert(rules.includes('| R32 |'));
+});
