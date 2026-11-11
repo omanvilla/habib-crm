@@ -102,3 +102,7 @@ body.coh-lock{overflow:hidden}
 #cohSheetBody>#crmFollowups[hidden]{display:none!important}
 #cohSheetBody .cfu-title{display:none}
 #page-dash.coh-on>#crmFollowups{display:none!important}
+/* 12 Nov 2026: «ارسل السعر للمالك» on a price study row */
+.coh-price-form{display:grid;gap:8px;margin-top:10px;padding:10px;border:1px solid var(--border,#e5e7eb);border-radius:10px}
+.coh-price-form label{display:grid;gap:4px}
+.coh-price-form textarea{width:100%;min-height:84px;resize:vertical}

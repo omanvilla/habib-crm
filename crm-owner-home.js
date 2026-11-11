@@ -128,8 +128,28 @@
       // 11 Nov (Ahmed): a price study always stays with him, so no «كمّل يا عقل» there; every row can carry a note for Claude
       // notes for Claude are the owner's lessons (crm_owner_notes), so staff do not get that button
       +(isOwner()?'<button type="button" class="btn-secondary coh-go" data-coh="pnote" data-id="'+esc(i.conversation_id)+'" data-name="'+esc(i.name||'')+'">ملاحظة لـ Claude</button>':'')
-      +(pricing||!canResume()?'':'<button type="button" class="btn-primary coh-go" data-coh="presume" data-id="'+esc(i.conversation_id)+'">كمّل يا عقل</button>')+'</div></li>').join('');
+      +(pricing||!canResume()?'':'<button type="button" class="btn-primary coh-go" data-coh="presume" data-id="'+esc(i.conversation_id)+'">كمّل يا عقل</button>')
+      +(pricing&&isOwner()?'<button type="button" class="btn-primary coh-go" data-coh="pprice" data-id="'+esc(i.conversation_id)+'">ارسل السعر للمالك</button>':'')+'</div>'
+      +(pricing&&isOwner()?priceForm(i):'')+'</li>').join('');
   }
+  /* 12 Nov 2026 (Ahmed: «سوي زر يكون افضل»): the priced answer goes back to the owner from the chat's branch number, through
+   * the same CRM send as the chat (crmSendWhatsApp → whatsapp-send: 24 h window, one send per text, recorded in the chat).
+   * Ahmed types the price, a suggested message fills in and he can change it before sending. The chat stays his (R26). */
+  const PRICE_TEXT=p=>'السلام عليكم\nدرسنا العقار، والسعر المناسب له في السوق حالياً حوالي '+p+' ريال\nاذا يناسبك نبدأ نسوقه بهالسعر ؟';
+  function priceForm(i){
+    const id=esc(i.conversation_id);
+    return '<div class="coh-price-form" data-pf="'+id+'" hidden>'
+      +'<label class="coh-note">السعر (ريال)<input class="fi" type="text" inputmode="numeric" dir="ltr" data-pf-price="'+id+'" autocomplete="off"></label>'
+      +'<textarea class="fi" rows="4" dir="auto" data-pf-text="'+id+'" placeholder="اكتب السعر فوق والرسالة تنكتب هنا، وتقدر تعدلها"></textarea>'
+      +'<button type="button" class="btn-primary coh-go" data-coh="psend" data-id="'+id+'">ارسل للمالك من رقم الفرع</button></div>';
+  }
+  document.addEventListener('input',e=>{
+    const inp=e.target&&e.target.closest?e.target.closest('[data-pf-price]'):null;
+    if(inp){const id=inp.getAttribute('data-pf-price'),ta=document.querySelector('[data-pf-text="'+CSS.escape(id)+'"]');
+      const p=String(inp.value||'').replace(/[^\d.,]/g,'').trim();
+      if(ta&&ta.dataset.edited!=='1')ta.value=p?PRICE_TEXT(p):'';return;}
+    const ta=e.target&&e.target.closest?e.target.closest('[data-pf-text]'):null;if(ta)ta.dataset.edited='1';
+  });
   function pausedHtml(){
     const items=otherPaused();
     if(!items.length)return '<p class="coh-empty">ما في أحد موقوف عنده العقل</p>';
@@ -231,6 +251,19 @@
   document.addEventListener('click',e=>{
     const b=e.target.closest('[data-coh]');if(!b)return;
     const act=b.dataset.coh;
+    if(act==='pprice'){const f=document.querySelector('[data-pf="'+CSS.escape(b.dataset.id)+'"]');if(f){f.hidden=!f.hidden;if(!f.hidden){const p=f.querySelector('[data-pf-price]');if(p)p.focus();}}return;}
+    if(act==='psend'){
+      const id=b.dataset.id,it=paused.items.find(i=>i.conversation_id===id)||{},ta=document.querySelector('[data-pf-text="'+CSS.escape(id)+'"]');
+      const body=String(ta&&ta.value||'').trim();
+      if(!body){toast('اكتب السعر أو الرسالة أول','error');return;}
+      if(!it.client_id||typeof crmSendWhatsApp!=='function'){toast('ما قدرت أحدد المالك. افتح المحادثة وارسل منها','error');return;}
+      if(b.disabled)return;b.disabled=true;const old=b.textContent;b.textContent='جاري الإرسال…';
+      crmSendWhatsApp({client_id:it.client_id,conversation_id:id,body}).then(res=>{
+        b.textContent='انرسل ✓';if(ta)ta.disabled=true;
+        toast(res&&res.warning?res.warning:'انرسل السعر للمالك من رقم الفرع',res&&res.warning?'error':'success');
+      }).catch(err=>{b.disabled=false;b.textContent=old;toast(String(err&&err.message||err),'error');});
+      return;
+    }
     if(act==='sheet')openSheet(b.dataset.kind);
     else if(act==='sclose')closeSheet();
     else if(act==='pfilter'){pausedFilter=b.dataset.v||'all';drawSheet();}

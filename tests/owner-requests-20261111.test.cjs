@@ -56,3 +56,10 @@ test('resume: the agent reopens the same draft, never answers twice, and reads t
  assert.match(agent,/if \(!review && !resume\) await sleep\(DEBOUNCE_MS\)/);
  assert.match(agent,/body\?\.resume === true && body\?\.conversation_id && !dry/);
 });
+
+test('«ارسل السعر للمالك»: owner-only on price studies, sends through crmSendWhatsApp with the chat (12 Nov)',()=>{
+  assert(home.includes(`(pricing&&isOwner()?'<button type="button" class="btn-primary coh-go" data-coh="pprice"`));
+  assert(home.includes("crmSendWhatsApp({client_id:it.client_id,conversation_id:id,body})"));
+  assert(home.includes("درسنا العقار، والسعر المناسب له في السوق حالياً حوالي '+p+' ريال"));
+  assert(home.includes("if(ta&&ta.dataset.edited!=='1')ta.value=p?PRICE_TEXT(p):'';"),'a message Ahmed edited is not overwritten');
+});
