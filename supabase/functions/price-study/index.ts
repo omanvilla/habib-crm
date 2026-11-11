@@ -243,10 +243,13 @@ async function recordOut(s: any, conv: any, phoneId: string, to: string, wamid: 
   if (r.error && r.error.code !== "23505") console.error("[price-study] record", r.error.message);
 }
 async function templateApproved(companyId: string, routeKey: string) {
-  const r = await db.from("whatsapp_template_registry").select("status").eq("company_id", companyId).eq("route_key", routeKey).eq("template_name", TEMPLATE).eq("language", "ar").maybeSingle();
-  if (String(r.data?.status || "").toUpperCase() === "APPROVED") return true;
+  // Ahmed's standing rule (5 Nov 2026): only a UTILITY template goes out on its own. If Meta rates this one MARKETING the
+  // study stays held (it still goes as plain text the moment the owner writes) and Ahmed is told once (heldTick).
+  const usable = (status: unknown, category: unknown) => String(status || "").toUpperCase() === "APPROVED" && String(category || "").toUpperCase() === "UTILITY";
+  const r = await db.from("whatsapp_template_registry").select("status,category").eq("company_id", companyId).eq("route_key", routeKey).eq("template_name", TEMPLATE).eq("language", "ar").maybeSingle();
+  if (usable(r.data?.status, r.data?.category)) return true;
   const fresh = await templates("status", companyId); // Meta may have approved it since the last check
-  return fresh.some((x: any) => x.route === routeKey && x.status === "APPROVED");
+  return fresh.some((x: any) => x.route === routeKey && usable(x.status, x.category));
 }
 async function sendStudy(studyId: string, from: "approved" | "waiting_owner") {
   const claim = await db.from("owner_price_studies").update({ status: "sending", updated_at: new Date().toISOString() }).eq("id", studyId).eq("status", from).select("*");
@@ -398,10 +401,29 @@ async function ownerInbound(convId: string, messageId: string, secret: string) {
 
 // SQL95: approved studies that only wait for the template are tried again (cron, every 30 minutes while one waits); the
 // template check inside sendStudy asks Meta, so the first run after its approval sends them. Oldest approval first.
-async function heldTick() {
-  const q = await db.from("owner_price_studies").select("id").eq("status", "approved").eq("send_error", "template_not_approved").order("decided_at", { ascending: true }).limit(10);
+async function heldTick(secret: string) {
+  const q = await db.from("owner_price_studies").select("id,company_id").eq("status", "approved").eq("send_error", "template_not_approved").order("decided_at", { ascending: true }).limit(10);
   const out: any[] = [];
   for (const r of q.data || []) { out.push(await sendStudy(r.id, "approved")); await pause(1500); }
+  // Meta approved the template but not as UTILITY, or refused it: nothing goes out with it; Ahmed is told once per number
+  const companyId = (q.data || [])[0]?.company_id;
+  if (companyId) {
+    const reg = await db.from("whatsapp_template_registry").select("route_key,status,category").eq("company_id", companyId).eq("template_name", TEMPLATE).eq("language", "ar");
+    for (const t of reg.data || []) {
+      const status = String(t.status || "").toUpperCase(), category = String(t.category || "").toUpperCase();
+      const marketing = status === "APPROVED" && category !== "UTILITY", refused = status === "REJECTED";
+      if (!marketing && !refused) continue;
+      const key = `price_study_template_${marketing ? "marketing" : "rejected"}:${t.route_key}`;
+      const seen = await db.from("whatsapp_automation_events").select("id").eq("company_id", companyId).eq("action_type", "owner_notify").eq("status", "applied").eq("reason", key).limit(1);
+      if ((seen.data || []).length) continue;
+      const told = await tellAhmed(secret, companyId, t.route_key === "barka" ? "barka" : "muscat", [
+        `ℹ️ قالب «دراسة سعر عقارك جاهزة» على رقم ${branchAr(t.route_key)}: ${marketing ? "Meta اعتمدته كقالب تسويقي (MARKETING)" : "Meta رفضته"}`,
+        "ما ينرسل تلقائي. الدراسات اللي وافقت عليها تنرسل أول ما يكتب المالك",
+        "قل لـ Claude يعدل نص القالب ويرسله من جديد",
+      ].join("\n"), key);
+      out.push({ route: t.route_key, template: marketing ? "marketing" : "rejected", told_ahmed: told.sent });
+    }
+  }
   return out;
 }
 
@@ -458,7 +480,7 @@ Deno.serve(async (req) => {
     if (action === "pull_files") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await pullFiles(id, secret) }) : json({ ok: false, error: "study_id_required" }, 400); }
     if (action === "send") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await sendStudy(id, "approved") }) : json({ ok: false, error: "study_id_required" }, 400); }
     if (action === "owner_inbound") { const id = uuid(body?.conversation_id); return id ? json({ ok: true, result: await ownerInbound(id, uuid(body?.message_id), secret) }) : json({ ok: false, error: "conversation_id_required" }, 400); }
-    if (action === "held_tick") return json({ ok: true, results: await heldTick() });
+    if (action === "held_tick") return json({ ok: true, results: await heldTick(secret) });
     if (action === "template") {
       const c = await db.from("whatsapp_automation_runtime").select("company_id").limit(1).maybeSingle();
       if (!c.data?.company_id) return json({ ok: false, error: "company_missing" }, 500);

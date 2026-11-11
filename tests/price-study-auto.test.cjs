@@ -69,7 +69,12 @@ test('SQL95: an approved study held for the template goes by itself when the own
   assert(fn.includes('const held = rows.find((s: any) => s.status === "approved" && s.send_error === "template_not_approved");'));
   assert(fn.includes('if (held) return await sendStudy(held.id, "approved");'));
   assert(fn.includes('.eq("status", "approved").eq("send_error", "template_not_approved").order("decided_at", { ascending: true }).limit(10)'));
-  assert(fn.includes('if (action === "held_tick") return json({ ok: true, results: await heldTick() });'));
+  assert(fn.includes('if (action === "held_tick") return json({ ok: true, results: await heldTick(secret) });'));
+  // Ahmed's rule of 5 Nov: only a UTILITY template goes out on its own; a MARKETING or refused one holds and he is told once
+  assert(fn.includes('const usable = (status: unknown, category: unknown) => String(status || "").toUpperCase() === "APPROVED" && String(category || "").toUpperCase() === "UTILITY";'));
+  assert(fn.includes('return fresh.some((x: any) => x.route === routeKey && usable(x.status, x.category));'));
+  assert(fn.includes('const key = `price_study_template_${marketing ? "marketing" : "rejected"}:${t.route_key}`;'));
+  assert(fn.includes('.eq("action_type", "owner_notify").eq("status", "applied").eq("reason", key).limit(1)'),'told once per number');
   // test mode and «off» hold with another reason, so neither path ever sends those
   assert(!/test_mode_hold|sending_off/.test(f95));
   assert(ui.includes("if(now&&now.status==='approved'&&now.send_error)toast(HOLD[now.send_error]"),'the screen says why an approved study was not sent');
