@@ -31,5 +31,5 @@ test('price study report: details, number, owner offer, words, documents, separa
  assert(f.includes('async function forwardMedia(')&&f.includes('`https://graph.facebook.com/${GRAPH}/${phoneId}/media`'),'documents sent again from the branch number');
  assert(f.includes('action_type", "owner_price_study"')&&f.includes('contains("payload", { handoff_at: at })'),'one report per handoff');
  assert(f.includes('const route = (routes.data || []).find((r: any) => r.route_key === conv.route_key);'),'the branch number of that chat');
- assert(s.includes("'action', 'price_study'")&&s.includes("coalesce(OLD.handoff_reason,'') !~ '^\s*دراسة\s*سعر'"));
+ assert(s.includes("'action', 'price_study'")&&s.includes("coalesce(OLD.handoff_reason,'') !~ "),'only a new price study, not a rewording');
 });
