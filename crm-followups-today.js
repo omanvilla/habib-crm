@@ -13,17 +13,19 @@
   const LABEL={barka:'بركاء',muscat:'مسقط'};
   let data={items:[],auto_on:false},branch='all',seq=0,open=false;const openInstr=new Set(),drafts=new Map();
   const isOwner=()=>typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.role==='owner';
-  const ERR={followup_not_pending:'هذي المتابعة ما عادت في القائمة: انرسلت أو تغيرت',followup_not_found:'المتابعة ما عادت موجودة',owner_only:'الأوامر لصاحب الشركة بس',
+  const ERR={followup_not_pending:'هذي المتابعة ما عادت في القائمة: انرسلت أو تغيرت',followup_not_found:'المتابعة ما عادت موجودة',owner_only:'ما عندك صلاحية الأوامر',
     instruction_required:'اكتب الأمر أولاً',rewrite_failed:'ما قدرت أعيد الكتابة الحين. جرب مرة ثانية',route_blocked:'هذي المتابعة مو على رقم بركاء أو مسقط'};
   const errText=e=>{const raw=String(e&&(e.error||e.message)||e||'');for(const k of Object.keys(ERR))if(raw.includes(k))return ERR[k];return 'ما انحفظ: '+raw;};
   const key=i=>i.source+':'+i.id;
+  // 11 Nov 2026 (Ahmed, R28): staff (manager, agent) get «أمر للذكاء الاصطناعي» too; their instruction waits for Ahmed before it becomes a lesson
+  const canInstruct=()=>typeof currentProfile!=='undefined'&&currentProfile&&['owner','manager','agent'].includes(currentProfile.role);
   const instrBox=i=>{
-    if(!isOwner())return '';
+    if(!canInstruct())return '';
     const k=key(i),open=openInstr.has(k);
     return (i.owner_instruction?'<p class="cfu-instr-done">انكتبت حسب أمرك: <span dir="auto">'+esc(i.owner_instruction)+'</span></p>':'')
       +'<div class="cfu-instr"'+(open?'':' hidden')+' data-k="'+esc(k)+'"><label for="cfuI-'+esc(i.id)+'">أمر للذكاء الاصطناعي</label>'
       +'<textarea id="cfuI-'+esc(i.id)+'" class="fta cfu-instr-text" rows="2" dir="auto" placeholder="مثلاً: هذا زار وما عجبه الموقع اسأله عن المنطقة اللي يبغاها" data-k="'+esc(k)+'">'+esc(drafts.get(k)||'')+'</textarea>'
-      +'<small class="cfu-auto">يقرأ المحادثة كاملة ويكتب الرسالة من جديد، أو يشيل العميل إذا قلت ما لها داعي. الأمر ينحفظ درس للمراجعات الجاية. ما ينرسل شي.</small>'
+      +'<small class="cfu-auto">يقرأ المحادثة كاملة ويكتب الرسالة من جديد، أو يشيل العميل إذا قلت ما لها داعي. '+(isOwner()?'الأمر ينحفظ درس للمراجعات الجاية.':'الأمر يوصل أحمد يراجعه قبل ما يصير درس للعقل.')+' ما ينرسل شي.</small>'
       +'<div class="cfu-actions"><button type="button" class="btn-primary" data-cfu="instr-run" data-k="'+esc(k)+'">اكتبها من جديد</button><button type="button" class="btn-secondary" data-cfu="instr-close" data-k="'+esc(k)+'">إلغاء</button></div>'
       +'<div class="cfu-err" role="alert"></div></div>';
   };
@@ -63,7 +65,7 @@
     box.innerHTML='<h2 class="cfu-title"><button type="button" class="cfu-toggle" data-cfu="toggle" aria-expanded="true" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center">متابعات اليوم <b dir="ltr">'+all.length+'</b> <small>▴</small></button></h2><p class="cfu-hint">افتح الصفحة من جوال الفرع، واضغط «فتح المحادثة» وأرسل. العميل ينشال من القائمة لحاله.'+(isOwner()?'':' متابعة مسقط تنرسل من جوال مسقط، ومتابعة بركاء من جوال بركاء.')+(waiting?' باقي <b dir="ltr">'+waiting+'</b> قيد القراءة.':'')+'</p><div class="cfu-tabs">'+tabs+'</div>'
       +(items.length?'<ul class="cfu-list">'+items.map(i=>{const url=businessLink(i.phone,i.text),other=waLink(i.phone,i.text);return '<li class="cfu-row"><div class="cfu-head"><strong>'+esc(i.client||'عميل')+'</strong><small>'+esc(LABEL[i.route_key]||i.route_key)+' · '+esc(i.reason)+(i.property?' · '+esc(i.property):'')+'</small></div>'
         +'<p class="cfu-text" dir="auto">'+esc(i.text)+'</p><small class="cfu-auto">'+esc(autoLine(i))+'</small>'
-        +'<div class="cfu-actions">'+(url?'<a class="btn-primary cfu-open" href="'+esc(url)+'" rel="noopener noreferrer">فتح المحادثة</a><a class="cfu-other" href="'+esc(other)+'" target="_blank" rel="noopener noreferrer">رابط عادي</a>':'<span class="cfu-auto">ما له رقم</span>')+'<button type="button" class="btn-secondary" data-cfu="done" data-id="'+esc(i.client_id)+'">أرسلتها</button>'+(isOwner()?'<button type="button" class="btn-secondary" data-cfu="instr" data-k="'+esc(key(i))+'" aria-expanded="'+openInstr.has(key(i))+'">أمر للذكاء الاصطناعي</button>':'')+'</div>'+instrBox(i)+'</li>';}).join('')+'</ul>':'<p class="cfu-hint">ما في متابعات لهذا الفرع</p>');
+        +'<div class="cfu-actions">'+(url?'<a class="btn-primary cfu-open" href="'+esc(url)+'" rel="noopener noreferrer">فتح المحادثة</a><a class="cfu-other" href="'+esc(other)+'" target="_blank" rel="noopener noreferrer">رابط عادي</a>':'<span class="cfu-auto">ما له رقم</span>')+'<button type="button" class="btn-secondary" data-cfu="done" data-id="'+esc(i.client_id)+'">أرسلتها</button>'+(canInstruct()?'<button type="button" class="btn-secondary" data-cfu="instr" data-k="'+esc(key(i))+'" aria-expanded="'+openInstr.has(key(i))+'">أمر للذكاء الاصطناعي</button>':'')+'</div>'+instrBox(i)+'</li>';}).join('')+'</ul>':'<p class="cfu-hint">ما في متابعات لهذا الفرع</p>');
   }
   let startedAt=0;
   async function load(){

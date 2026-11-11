@@ -920,7 +920,9 @@ async function sendOne(f: any, numbers: string[], freeOnly = false) {
 }
 
 // «أمر للذكاء الاصطناعي» from the daily list. Owner only. Nothing is sent: a rewritten text waits on his list.
-async function instruct(companyId: string, ownerId: string, kind: "visit" | "request", id: string, instruction: string) {
+// 11 Nov 2026 (Ahmed): staff (manager, agent) get the button too. Their instruction rewrites the follow-up the same way, but it
+// is kept as a note with apply_now=false: it does not become a lesson for the agent until Ahmed applies it (R28).
+async function instruct(companyId: string, ownerId: string, kind: "visit" | "request", id: string, instruction: string, byOwner = true) {
   const table = kind === "visit" ? "whatsapp_visit_followups" : "whatsapp_outreach_queue";
   const openStatus = kind === "visit" ? "awaiting_approval" : "pending";
   const r = await db.from(table).select("*").eq("id", id).eq("company_id", companyId).maybeSingle();
@@ -935,8 +937,8 @@ async function instruct(companyId: string, ownerId: string, kind: "visit" | "req
   // the lesson: the next reviews (and the reply agent) read it from whatsapp_agent_prompts.lessons
   const note = await db.from("crm_owner_notes").insert({
     company_id: companyId, created_by: ownerId, conversation_id: x.conversation_id || null, outreach_id: kind === "request" ? x.id : null,
-    note: short(instruction, 1000), apply_now: true,
-    context: { source: "followup_instruction", kind, followup_id: x.id, client_id: x.client_id, route_key: x.route_key, decision: out.decision, result, reason: short(out.reason, 300), before: short(before, 500), after: out.decision === "followup" ? out.text : null },
+    note: short(instruction, 1000), apply_now: byOwner,
+    context: { source: "followup_instruction", by_staff: !byOwner, kind, followup_id: x.id, client_id: x.client_id, route_key: x.route_key, decision: out.decision, result, reason: short(out.reason, 300), before: short(before, 500), after: out.decision === "followup" ? out.text : null },
   });
   if (note.error) console.error("[followup-auto] lesson", note.error.message);
   return { ok: true, result, decision: out.decision, text: out.decision === "followup" ? out.text : null, reason: short(out.reason, 300), auto_ok: !!out.auto_ok, lesson_saved: !note.error };
@@ -963,12 +965,12 @@ Deno.serve(async (req) => {
     const jwt = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
     const u = jwt ? await db.auth.getUser(jwt) : null;
     const prof = u?.data?.user ? await db.from("profiles").select("id,company_id,role,is_active").eq("id", u.data.user.id).maybeSingle() : null;
-    if (!prof?.data || prof.data.role !== "owner" || prof.data.is_active === false) return reply({ ok: false, error: "owner_only" }, 403);
+    if (!prof?.data || !["owner", "manager", "agent"].includes(prof.data.role) || prof.data.is_active === false) return reply({ ok: false, error: "owner_only" }, 403);
     const body = await req.json().catch(() => ({}));
     const instruction = short(body?.instruction, 1000);
     const kind = body?.kind === "request" ? "request" : body?.kind === "visit" ? "visit" : null;
     if (!kind || !body?.id || instruction.length < 3) return reply({ ok: false, error: "instruction_required" }, 400);
-    try { const r = await instruct(prof.data.company_id, prof.data.id, kind, String(body.id), instruction); return reply(r, r.ok ? 200 : 409); }
+    try { const r = await instruct(prof.data.company_id, prof.data.id, kind, String(body.id), instruction, prof.data.role === "owner"); return reply(r, r.ok ? 200 : 409); }
     catch (e) { console.error("[followup-auto] instruct", String((e as any)?.message || e)); return reply({ ok: false, error: "rewrite_failed" }, 500); }
   }
   const input = await req.json().catch(() => ({}));

@@ -50,5 +50,5 @@ test('staff follow everyone like the owner, never the owner line (SQL85)',()=>{
  assert(s85.includes("WHERE v_owner OR (public.my_role() IN ('manager','agent','viewer') AND i.route_key IS DISTINCT FROM 'owner')"));
  assert(s85.includes('CASE WHEN v_owner THEN i.owner_instruction END'),'the owner instructions stay his');
  assert(!s85.includes('staff_is_branch_member'));
- assert(/crm-followups-today\.js\?v=20261111-all1/.test(index));
+ assert(/crm-followups-today\.js\?v=20261111-instr1/.test(index));
 });
