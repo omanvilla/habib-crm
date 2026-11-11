@@ -919,9 +919,9 @@ async function sendOne(f: any, numbers: string[], freeOnly = false) {
   }
 }
 
-// «أمر للذكاء الاصطناعي» from the daily list. Owner only. Nothing is sent: a rewritten text waits on his list.
-// 11 Nov 2026 (Ahmed): staff (manager, agent) get the button too. Their instruction rewrites the follow-up the same way, but it
-// is kept as a note with apply_now=false: it does not become a lesson for the agent until Ahmed applies it (R28).
+// «أمر للذكاء الاصطناعي» from the daily list. Nothing is sent: a rewritten text waits on the list.
+// 11 Nov 2026 (Ahmed, R28): staff (manager, agent) get the button too, and their instruction becomes a lesson like his
+// («نعم خلها دروس»); context.by_staff marks who gave it.
 async function instruct(companyId: string, ownerId: string, kind: "visit" | "request", id: string, instruction: string, byOwner = true) {
   const table = kind === "visit" ? "whatsapp_visit_followups" : "whatsapp_outreach_queue";
   const openStatus = kind === "visit" ? "awaiting_approval" : "pending";
@@ -937,7 +937,7 @@ async function instruct(companyId: string, ownerId: string, kind: "visit" | "req
   // the lesson: the next reviews (and the reply agent) read it from whatsapp_agent_prompts.lessons
   const note = await db.from("crm_owner_notes").insert({
     company_id: companyId, created_by: ownerId, conversation_id: x.conversation_id || null, outreach_id: kind === "request" ? x.id : null,
-    note: short(instruction, 1000), apply_now: byOwner,
+    note: short(instruction, 1000), apply_now: true,
     context: { source: "followup_instruction", by_staff: !byOwner, kind, followup_id: x.id, client_id: x.client_id, route_key: x.route_key, decision: out.decision, result, reason: short(out.reason, 300), before: short(before, 500), after: out.decision === "followup" ? out.text : null },
   });
   if (note.error) console.error("[followup-auto] lesson", note.error.message);

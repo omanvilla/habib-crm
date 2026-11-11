@@ -17,7 +17,7 @@
     instruction_required:'اكتب الأمر أولاً',rewrite_failed:'ما قدرت أعيد الكتابة الحين. جرب مرة ثانية',route_blocked:'هذي المتابعة مو على رقم بركاء أو مسقط'};
   const errText=e=>{const raw=String(e&&(e.error||e.message)||e||'');for(const k of Object.keys(ERR))if(raw.includes(k))return ERR[k];return 'ما انحفظ: '+raw;};
   const key=i=>i.source+':'+i.id;
-  // 11 Nov 2026 (Ahmed, R28): staff (manager, agent) get «أمر للذكاء الاصطناعي» too; their instruction waits for Ahmed before it becomes a lesson
+  // 11 Nov 2026 (Ahmed, R28): staff (manager, agent) get «أمر للذكاء الاصطناعي» too; their instruction becomes a lesson like his
   const canInstruct=()=>typeof currentProfile!=='undefined'&&currentProfile&&['owner','manager','agent'].includes(currentProfile.role);
   const instrBox=i=>{
     if(!canInstruct())return '';
@@ -25,7 +25,7 @@
     return (i.owner_instruction?'<p class="cfu-instr-done">انكتبت حسب أمرك: <span dir="auto">'+esc(i.owner_instruction)+'</span></p>':'')
       +'<div class="cfu-instr"'+(open?'':' hidden')+' data-k="'+esc(k)+'"><label for="cfuI-'+esc(i.id)+'">أمر للذكاء الاصطناعي</label>'
       +'<textarea id="cfuI-'+esc(i.id)+'" class="fta cfu-instr-text" rows="2" dir="auto" placeholder="مثلاً: هذا زار وما عجبه الموقع اسأله عن المنطقة اللي يبغاها" data-k="'+esc(k)+'">'+esc(drafts.get(k)||'')+'</textarea>'
-      +'<small class="cfu-auto">يقرأ المحادثة كاملة ويكتب الرسالة من جديد، أو يشيل العميل إذا قلت ما لها داعي. '+(isOwner()?'الأمر ينحفظ درس للمراجعات الجاية.':'الأمر يوصل أحمد يراجعه قبل ما يصير درس للعقل.')+' ما ينرسل شي.</small>'
+      +'<small class="cfu-auto">يقرأ المحادثة كاملة ويكتب الرسالة من جديد، أو يشيل العميل إذا قلت ما لها داعي. الأمر ينحفظ درس للمراجعات الجاية. ما ينرسل شي.</small>'
       +'<div class="cfu-actions"><button type="button" class="btn-primary" data-cfu="instr-run" data-k="'+esc(k)+'">اكتبها من جديد</button><button type="button" class="btn-secondary" data-cfu="instr-close" data-k="'+esc(k)+'">إلغاء</button></div>'
       +'<div class="cfu-err" role="alert"></div></div>';
   };

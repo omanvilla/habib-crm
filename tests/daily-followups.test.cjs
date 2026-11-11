@@ -116,7 +116,7 @@ test('AI instruction on a follow-up: owner and staff (R28), rewrites from the wh
  assert(rb72.includes('DROP COLUMN IF EXISTS owner_instruction')&&!rb72.split('ALTER TABLE')[0].includes('owner_instruction'));
  const part=fn.slice(fn.indexOf('async function instruct('),fn.indexOf('async function alertOwner('));
  assert(part.includes('await judge(kind, x, companyId, await availableText(companyId), instruction)'));
- assert(part.includes('source: "followup_instruction"')&&part.includes('apply_now: byOwner'),'a staff instruction waits for Ahmed before it is a lesson (R28)');
+ assert(part.includes('source: "followup_instruction"')&&part.includes('apply_now: true')&&part.includes('by_staff: !byOwner'),'every instruction is a lesson; staff ones are marked (R28)');
  assert(!part.includes('metaSend')&&!part.includes('sendOne'));
  assert(fn.includes('!["owner", "manager", "agent"].includes(prof.data.role)')&&fn.includes('instruction, prof.data.role === "owner")'));
  assert(fn.includes('if (x.conversation_id && !instruction)'));
