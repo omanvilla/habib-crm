@@ -45,3 +45,10 @@ test('targets, performance, tasks and the responsible column name the person on 
  assert(/crm-v18-task-priority-patch\.js\?v=20261111-people2/.test(index)&&/crm-operations-v6\.js\?v=20261111-people1/.test(index));
 });
 test('member labels name the person on the branch line',()=>{const base=fs.readFileSync('app-base-v15.html','utf8');assert(base.includes("return branch?crmBranchPersonName(branch):'حساب فريق';"));});
+test('staff follow everyone like the owner, never the owner line (SQL85)',()=>{
+ const s85=fs.readFileSync('db/changes/85-staff-followups-all.forward.sql','utf8');
+ assert(s85.includes("WHERE v_owner OR (public.my_role() IN ('manager','agent','viewer') AND i.route_key IS DISTINCT FROM 'owner')"));
+ assert(s85.includes('CASE WHEN v_owner THEN i.owner_instruction END'),'the owner instructions stay his');
+ assert(!s85.includes('staff_is_branch_member'));
+ assert(/crm-followups-today\.js\?v=20261111-all1/.test(index));
+});
