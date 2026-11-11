@@ -22,13 +22,14 @@ test('new owner Investor persists canonical route and owner despite default buye
 test('new Investor normalized phone reuses existing branch record without moving or mutating it',async()=>{
  const h=harness();h.el('cRoleInvestor').checked=true;h.c.respond=()=>({data:[{id:'EXISTING',name:'الاسم السابق',lead_route:'barka'}],error:null});await h.c.saveClient();assert.deepEqual(h.opened,['EXISTING']);assert.equal(h.calls.length,1);assert.equal(h.calls[0].operation,'select');assert(h.calls[0].filters.some(f=>f[0]==='eq'&&f[1]==='company_id'&&f[2]==='COMPANY'));assert.match(h.toasts[0].text,/دون تغيير مساره/);
 });
-test('staff investor classification and ordinary legacy investor edits keep existing branch behavior',async()=>{
- for(const role of ['agent','manager']){const h=harness(role);h.el('cRoleInvestor').checked=true;await h.c.saveClient();assert(!Object.hasOwn(h.calls.find(x=>x.operation==='insert').data,'lead_route'));}
+// SQL79 (11 Nov 2026): staff classify investors on the canonical investment route like the owner.
+test('staff investor classification uses the investment route; legacy investor edits keep their branch',async()=>{
+ for(const role of ['agent','manager']){const h=harness(role);h.el('cRoleInvestor').checked=true;await h.c.saveClient();const ins=h.calls.find(x=>x.operation==='insert');assert(!ins||ins.data.lead_route==='investment'||!Object.hasOwn(ins.data,'lead_route'));assert(!h.toasts.some(t=>/خاص بالمالك/.test(t.text)));}
  for(const route of ['muscat','barka']){const h=harness();h.c.editingClient='LEGACY';h.c.viewingClient={id:'LEGACY',client_type:'investor',is_investor:true,lead_route:route,assigned_to:'STAFF'};h.el('cRoleInvestor').checked=true;await h.c.saveClient();const row=h.calls.find(x=>x.operation==='update').data;assert(!Object.hasOwn(row,'lead_route'));assert.equal(row.assigned_to,'STAFF');}
 });
 test('privacy notice is based on canonical investment route, not a legacy investor flag',()=>{
- const h=harness();h.el('cRoleInvestor').checked=true;h.c.updateClientInvestmentForm();assert.equal(h.el('cInvestmentNotice').hidden,false);assert.match(h.el('cInvestmentNotice').textContent,/خاص بالمالك/);assert.equal(h.el('cAssignedTo').disabled,true);
- h.c.editingClient='LEGACY';h.c.viewingClient={id:'LEGACY',lead_route:'barka',client_type:'investor'};h.c.updateClientInvestmentForm();assert.doesNotMatch(h.el('cInvestmentNotice').textContent,/خاص بالمالك/);assert.equal(h.el('cAssignedTo').disabled,false);
+ const h=harness();h.el('cRoleInvestor').checked=true;h.c.updateClientInvestmentForm();assert.equal(h.el('cInvestmentNotice').hidden,false);assert.match(h.el('cInvestmentNotice').textContent,/المسار: المستثمرين/);assert.equal(h.el('cAssignedTo').disabled,true);
+ h.c.editingClient='LEGACY';h.c.viewingClient={id:'LEGACY',lead_route:'barka',client_type:'investor'};h.c.updateClientInvestmentForm();assert.doesNotMatch(h.el('cInvestmentNotice').textContent,/المسار: المستثمرين/);assert.equal(h.el('cAssignedTo').disabled,false);
 });
 test('investment request saves optional empty qualification and no-response without rejection or geographical reassignment',async()=>{
  const h=harness();h.c.clientRequestFormInvestment=true;h.el('nrType').value='investor';h.el('nrBranch').value='investment';h.el('nrStatus').value='active';h.el('nrSearchStatus').value='no_response';h.el('nrPipelineStage').value='new';h.el('nrPriority').value='2';h.el('nrManualAssignee').value='STAFF';
@@ -38,8 +39,8 @@ test('Oman milestone inputs save only explicit actual dates and preserve unedite
  const h=harness();h.el('nrMilestone_first_human_response_at').value='2026-10-15T12:30';h.el('nrMilestone_first_mutual_dialogue_at').value='2026-10-15T13:00';h.el('nrMilestone_qualified_at').value='2026-10-15T14:00';
  const row=h.c.crmReadInvestmentRequestFields({qualified_at:'2026-10-15T10:00:42.123Z'});assert.equal(row.first_human_response_at,'2026-10-15T08:30:00.000Z');assert.equal(row.first_mutual_dialogue_at,'2026-10-15T09:00:00.000Z');assert(!Object.hasOwn(row,'qualified_at'));assert(!Object.hasOwn(row,'created_at'));assert(!Object.hasOwn(row,'closed_won_at'));
 });
-test('nonowner private request and forged investment route on branch client fail before any database write',async()=>{
- const a=harness('agent');a.c.clientRequestFormInvestment=true;a.el('nrBranch').value='investment';await a.c.saveNewClientRequest();assert.equal(a.calls.length,0);assert(a.toasts.some(x=>x.kind==='error'));
+test('staff may save an investment request; a forged investment route on a branch client still fails before any write',async()=>{
+ const a=harness('agent');a.c.clientRequestFormInvestment=true;a.el('nrBranch').value='investment';await a.c.saveNewClientRequest();assert(!a.toasts.some(x=>/خاص بالمالك/.test(x.text)),'SQL79: no owner-only refusal for staff');
  const b=harness();b.el('nrBranch').value='investment';await b.c.saveNewClientRequest();assert.equal(b.calls.length,0);assert.match(b.toasts[0].text,/لن يتغير مسار/);
 });
 test('account switch while investor duplicate lookup is pending cannot insert or open previous identity',async()=>{

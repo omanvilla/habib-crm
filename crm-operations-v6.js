@@ -460,13 +460,14 @@
   if(typeof oldClients==='function')window.renderClients=function(){const list=$id('clientsList');if(!list)return oldClients.apply(this,arguments);
     captureListExport('clients',[]);
     let bar=$id('opsClientBranches');if(!bar){bar=document.createElement('div');bar.id='opsClientBranches';bar.className='ops-periods';list.parentNode.insertBefore(bar,list)}
-    if(isOwner())bar.innerHTML=['all','muscat','barka','investment','general'].map(k=>'<button class="btn-secondary '+(k===clientBranch?'active':'')+'" data-client-branch="'+k+'">'+({all:'الكل',muscat:'مسقط',barka:'بركاء',investment:'المستثمرين · خاص بالمالك',general:'غير محدد'}[k])+'</button>').join('');else bar.remove();
-    if(clientBranch==='all'||!isOwner())return oldClients.apply(this,arguments);
+    // 11 Nov 2026 (SQL79): staff see both branches and investors too, so everyone gets the branch filter.
+    if(true)bar.innerHTML=['all','muscat','barka','investment','general'].map(k=>'<button class="btn-secondary '+(k===clientBranch?'active':'')+'" data-client-branch="'+k+'">'+({all:'الكل',muscat:'مسقط',barka:'بركاء',investment:'المستثمرين',general:'غير محدد'}[k])+'</button>').join('');else bar.remove();
+    if(clientBranch==='all')return oldClients.apply(this,arguments);
     const original=allClients;try{allClients=original.filter(c=>c.lead_route===clientBranch);return oldClients.apply(this,arguments)}finally{allClients=original}
   };
   document.addEventListener('click',e=>{const b=e.target.closest('[data-client-branch]');if(b){clientBranch=b.dataset.clientBranch;renderClients()}});
   let clientWorkFilter='all';
-  window.crmClientFiltersActive=()=>clientWorkFilter!=='all'||isOwner()&&clientBranch!=='all';
+  window.crmClientFiltersActive=()=>clientWorkFilter!=='all'||clientBranch!=='all';
   window.crmRenderClientWorkList=function(clients){
     const list=$id('clientsList');if(!list)return;
     const today=omanDate(new Date()),byClient=new Map();

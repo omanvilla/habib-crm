@@ -14,9 +14,9 @@ test('media is read through the inbox function, never from Meta URLs in the brow
   assert.match(ui,/waInboxInvoke\(\{action:'media',conversation_id:conversationId,message_id:id\}\)/);
   assert(!ui.includes('lookaside.fbsbx.com'));
 });
-test('send-media keeps caller RLS, owner-only investment, 24h window and idempotency',()=>{
+test('send-media keeps caller RLS, owner-only private line, 24h window and idempotency',()=>{
   assert.match(send,/userClient\.from\("whatsapp_conversations"\)/);
-  assert.match(send,/conversation\.route_key === "investment" && profile\.role !== "owner"/);
+  assert.match(send,/r\.route_key !== "investment" && r\.owner_only_inbox === true/,'SQL79: investors open to staff, other owner-only routes not');
   assert.match(send,/outside_customer_service_window/);
   assert.match(send,/whatsapp_send_operations/);
   assert.match(send,/reply_target_not_in_conversation/);

@@ -60,7 +60,7 @@
     h+=row('طريقة الدفع / التمويل',payment(r.payment_method));
     h+=row('موعد الشراء',timing(r.purchase_timing));
     h+=row('الغرض',purpose(r.purpose));
-    h+=row('الفريق المسؤول',investment?'المالك — خاص بالمالك':teamText(teams,r));
+    h+=row('الفريق المسؤول',investment?'المالك':teamText(teams,r));
     if(investment){
       h+=row('جاهزية التمويل',({cash_confirmed:'السيولة مؤكدة',preapproved:'موافقة تمويل مسبقة',in_progress:'قيد التجهيز',not_started:'لم يبدأ',rejected:'رُفض التمويل',unknown:'غير معروف'}[r.financing_readiness]||r.financing_readiness||'غير محدد'));
       h+=row('صاحب القرار',({self:'العميل نفسه',joint_family:'قرار مشترك مع الأسرة',not_decision_maker:'ليس صاحب القرار',unknown:'غير معروف'}[r.decision_maker_status]||r.decision_maker_status||'غير محدد'));
@@ -102,7 +102,7 @@
     h+=row('البريد',c.email||'—',true);
     h+=row('المصدر',source);
     h+=row('تاريخ التسجيل',plainDate(c.created_at));
-    if(c.lead_route==='investment')h+=row('المسار والخصوصية','المستثمرين — المسؤول: المالك — خاص بالمالك');
+    if(c.lead_route==='investment')h+=row('المسار والخصوصية','المستثمرين — المسؤول: المالك');
     h+='<div id="crmCurrentRequests" style="margin-top:14px"><div style="font-size:12px;color:var(--umber)">جاري تحميل طلب العميل…</div></div>';
     root.innerHTML=h;repairVisibleFormattingArtifacts(root);
     try{

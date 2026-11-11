@@ -224,7 +224,7 @@ for (const userId of [MANAGER, AGENT]) {
     assert(!list.body.conversations.some(c => c.route_key === 'owner'));
     const listCall = f.calls.find(c => c.table === 'whatsapp_conversations' && c.range);
     const hidden = listCall.filters.find(x => x[0] === 'not' && x[1] === 'route_key');
-    assert(hidden && String(hidden[3]).includes('owner') && String(hidden[3]).includes('investment'));
+    assert(hidden && String(hidden[3]).includes('owner') && !String(hidden[3]).includes('investment'), 'SQL79: only the owner line is hidden from staff');
     for (const action of ['messages', 'media', 'media_stream']) {
       const r = await f.invoke({ action, conversation_id: 'TEST-conv-owner', message_id: 'TEST-msg-owner' });
       assert.equal(r.status, 404, action); assert.equal(r.body.error, 'conversation_not_found');
