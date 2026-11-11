@@ -12,7 +12,8 @@
 .cps-chip.hold{background:#e6ecf5;color:#33486b}
 .cps-facts{font-size:12px;color:#6f6552;overflow-wrap:anywhere}
 .cps-note{margin:0;padding:8px 10px;border-radius:10px;background:#fbf7ec;font-size:13px;overflow-wrap:anywhere}
-.cps-nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px}
+.cps-nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px}
+.cps-files a{display:inline-flex;align-items:center;justify-content:center;text-align:center;text-decoration:none}
 .cps-num{display:grid;gap:2px;padding:10px 12px;border:1px solid #efe7d6;border-radius:10px;min-width:0}
 .cps-num strong{font-size:20px;line-height:1.2;text-align:start}
 .cps-num small{font-size:12px;color:#6f6552}
