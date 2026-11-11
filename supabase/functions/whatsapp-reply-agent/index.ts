@@ -482,7 +482,15 @@ Deno.serve(async (req) => {
     const jwt = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
     const u = jwt ? await db.auth.getUser(jwt) : null;
     const prof = u?.data?.user ? await db.from("profiles").select("id,company_id,role,is_active").eq("id", u.data.user.id).maybeSingle() : null;
-    if (!prof?.data || prof.data.role !== "owner" || prof.data.is_active === false) return json({ ok: false, error: "owner_only" }, 403);
+    // 11 Nov (Ahmed): staff (manager, agent) may «كمّل يا عقل» too; every other caller action stays owner-only. Never on the
+    // owner's private line, and a «دراسة سعر» chat stays with Ahmed (R26; whatsapp-inbox clears the hold first and checks it).
+    const staffResume = !!prof?.data && ["manager", "agent"].includes(prof.data.role) && prof.data.is_active !== false
+      && body?.resume === true && !!body?.conversation_id && !dry;
+    if (staffResume) {
+      const c = await db.from("whatsapp_conversations").select("route_key").eq("id", String(body.conversation_id)).eq("company_id", prof!.data.company_id).maybeSingle();
+      if (!c.data || c.data.route_key === "owner") return json({ ok: false, error: "owner_only" }, 403);
+    }
+    if (!prof?.data || (prof.data.role !== "owner" && !staffResume) || prof.data.is_active === false) return json({ ok: false, error: "owner_only" }, 403);
     if (body?.resume === true && body?.conversation_id && !dry) {
       resume = true; message_id = await resumeTarget(prof.data.company_id, String(body.conversation_id));
       if (!message_id) return json({ ok: true, ignored: "nothing_to_answer" });

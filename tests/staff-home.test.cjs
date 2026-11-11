@@ -20,11 +20,11 @@ test('crm_staff_home runs with the caller\'s own row level security and never to
 test('the home page draws for staff from crm_staff_home and keeps the owner-only parts out',()=>{
  assert(js.includes("['manager','agent','viewer'].includes(currentProfile.role)"));
  assert(js.includes('if(hasHome()&&!last)armGate();'),'no old-dashboard flash for staff either');
- assert(js.includes(":[supa.rpc('crm_staff_home'),0,null,null,fu]"),'staff read no approvals, twins or paused chats');
+ assert(js.includes(":[supa.rpc('crm_staff_home'),0,null,canResume()?supa.rpc('crm_paused_chats'):null,fu]"),'staff read no approvals or twins; paused chats since R27');
  assert(js.includes("supa.rpc('crm_owner_home')"));
  assert(js.includes("(isOwner()?'<button type=\"button\" class=\"coh-more\" data-coh=\"nav\" data-nav=\"reports\">التقارير الكاملة</button>':'')"),'reports (money) stay owner-only');
  assert(js.includes('if(!owner){paused={items:[],total:0};autoNotes=[];}'),'a staff session never shows the owner\'s lists left in the tab');
- assert(/crm-owner-home\.js\?v=20261111-staff1/.test(index));
+ assert(/crm-owner-home\.js\?v=20261111-resume2/.test(index));
 });
 test('a staff account is greeted by its own name; the branch stays under the name (Ahmed 11 Nov)',()=>{
  const base=fs.readFileSync('app-base-v15.html','utf8');

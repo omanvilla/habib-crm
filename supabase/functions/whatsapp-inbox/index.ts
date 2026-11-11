@@ -419,12 +419,18 @@ Deno.serve(async (req) => {
     if (action === "clear_handoff") {
       const conversationId=String(payload?.conversation_id||"").trim();if(!conversationId)return json({ok:false,error:"conversation_id_required"},400);
       const conversation=await getConversation(conversationId);if(!conversation)return json({ok:false,error:"conversation_not_found"},404);
-      // R1/R3 (Ahmed 8 Nov): «تمت المعالجة» / «رجّعها للعقل» is Ahmed handing the chat back to the reply agent
+      // R1/R3 (Ahmed 8 Nov): «تمت المعالجة» / «رجّعها للعقل» is Ahmed handing the chat back to the reply agent.
+      // 11 Nov (Ahmed): staff may hand chats back too, except a «دراسة سعر» (R26: the price study stays with him).
+      const staffCaller=profile.role!=="owner";
+      if(staffCaller){
+        const h=await admin.from("whatsapp_conversations").select("handoff_reason,human_handoff_required").eq("id",conversationId).eq("company_id",companyId).maybeSingle();
+        if(h.data?.human_handoff_required&&/^\s*دراسة\s*سعر/.test(String(h.data.handoff_reason||"")))return json({ok:false,error:"price_study_owner_only"},403);
+      }
       const nowIso=new Date().toISOString();
       const ur=await admin.from("whatsapp_conversations").update({human_handoff_required:false,handoff_reason:null,handoff_updated_at:nowIso,agent_muted:false,agent_muted_reason:null,agent_returned_at:nowIso,updated_at:nowIso}).eq("id",conversationId).eq("company_id",companyId);if(ur.error)throw new Error(`clear_handoff_failed: ${ur.error.message}`);
       // 11 Nov (Ahmed): «كمّل يا عقل» — when the customer's last message is still unanswered, the agent reads the whole chat
-      // and carries on now (owner only; the agent checks the caller). Otherwise it answers the customer's next message as usual.
-      if(payload?.resume===true&&profile.role==="owner"){
+      // and carries on now (owner and staff since 11 Nov; the agent checks the caller). Otherwise it answers the customer's next message as usual.
+      if(payload?.resume===true&&["owner","manager","agent"].includes(profile.role)){
         const [li,lo]=await Promise.all([
           admin.from("whatsapp_messages").select("message_timestamp").eq("conversation_id",conversationId).eq("direction","inbound").order("message_timestamp",{ascending:false}).limit(1).maybeSingle(),
           admin.from("whatsapp_messages").select("message_timestamp").eq("conversation_id",conversationId).eq("direction","outbound").order("message_timestamp",{ascending:false}).limit(1).maybeSingle(),

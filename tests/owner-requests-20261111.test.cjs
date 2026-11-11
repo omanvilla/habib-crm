@@ -29,13 +29,20 @@ test('voice note: bin while recording, delete after, ➤ while recording sends',
 // Ahmed, 11 Nov 2026 (evening): «كمّل يا عقل» makes the agent read the chat and carry on now; price studies stay with him.
 test('resume: owner home asks the agent to carry on, pricing rows have no resume, every row has a Claude note',()=>{
  assert.match(home,/waInboxInvoke\(\{action:'clear_handoff',conversation_id:id,resume:true\}\)/);
- assert.match(home,/\(pricing\?'':'<button type="button" class="btn-primary coh-go" data-coh="presume"/);
+ // R27 (11 Nov): staff resume too; price studies are never theirs, notes for Claude stay the owner's
+ assert(home.includes(`(pricing||!canResume()?'':'<button type="button" class="btn-primary coh-go" data-coh="presume"`));
+ assert(home.includes("const pricingItems=()=>isOwner()?paused.items.filter(isPricing):[];"));
+ assert(home.includes(`(isOwner()?'<button type="button" class="btn-secondary coh-go" data-coh="pnote"`));
  assert.match(home,/data-coh="pnote"/);assert.match(home,/window\.crmClaudeNote\(\{conversation_id:b\.dataset\.id/);
  assert(home.includes('العقل ما قدر يكمل: '),'a failed resume tells Ahmed why and the chat stays in his list');
 });
-test('resume: inbox calls the agent only when the last customer message is unanswered, owner only',()=>{
+test('resume: inbox calls the agent only when the last customer message is unanswered, owner and staff (R27)',()=>{
  const inbox=fs.readFileSync('supabase/functions/whatsapp-inbox/index.ts','utf8');
- assert.match(inbox,/if\(payload\?\.resume===true&&profile\.role==="owner"\)/);
+ assert(inbox.includes('if(payload?.resume===true&&["owner","manager","agent"].includes(profile.role)){'));
+ const agentSrc=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8');
+ assert(agentSrc.includes('if (!c.data || c.data.route_key === "owner") return json({ ok: false, error: "owner_only" }, 403);'),'never on the owner line');
+ assert(agentSrc.includes('(prof.data.role !== "owner" && !staffResume)'),'staff get resume only');
+ assert(inbox.includes('return json({ok:false,error:"price_study_owner_only"},403)'),'staff never hand back a price study (R26, R27)');
  assert.match(inbox,/if\(!inAt\|\|outAt>=inAt\)return json\(\{ok:true,resume:"nothing_to_answer"\}\)/);
  assert.match(inbox,/functions\/v1\/whatsapp-reply-agent`,\{method:"POST",headers:\{"Content-Type":"application\/json",Authorization:authHeader\}/);
 });

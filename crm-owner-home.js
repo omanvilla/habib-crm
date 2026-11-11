@@ -15,14 +15,18 @@
   const isStaff=()=>typeof currentProfile!=='undefined'&&currentProfile&&['manager','agent','viewer'].includes(currentProfile.role);
   const hasHome=()=>isOwner()||isStaff();
   const toast=(m,t)=>{if(typeof showToast==='function')showToast(m,t);};
-  const KIND={negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرارك',muted:'مكتوم عنهم',manual_reply:'رديت بنفسك'};
+  const OWNER_KIND={negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرارك',muted:'مكتوم عنهم',manual_reply:'رديت بنفسك'};
+  const STAFF_KIND={negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرار',muted:'مكتوم عنهم',manual_reply:'انرد عليها من المكتب'};
+  const KIND=new Proxy({},{get:(_,k)=>(isOwner()?OWNER_KIND:STAFF_KIND)[k],ownKeys:()=>Object.keys(OWNER_KIND),getOwnPropertyDescriptor:()=>({enumerable:true,configurable:true})});
   const TITLES={followups:'متابعة اليوم',paused:'العقل موقوف عندهم',pricing:'دراسة سعر: ملاك ينتظرون تسعيرك',visits:'زيارات يتابعها الذكاء الاصطناعي',problems:'مشاكل تحتاج انتباه'};
   let sequence=0,sheetKind=null,pausedFilter='all',paused={items:[],total:0},last=null;
   /* «دراسة سعر:» handoffs (11 Nov 2026, Ahmed): owners waiting for a price have their own tile and list, so the
    * paused list keeps only chats that need another decision. Display only: the hold, the reason text and
    * «كمّل يا عقل» are unchanged (crm_paused_chats still returns them as kind=negotiation). */
   const isPricing=i=>/^\s*دراسة\s*سعر/.test(String(i&&i.reason||''));
-  const pricingItems=()=>paused.items.filter(isPricing);
+  // 11 Nov 2026 (Ahmed, SQL84): staff see and resume paused chats too; price studies stay with Ahmed (R26), so staff never get them
+  const canResume=()=>typeof currentProfile!=='undefined'&&currentProfile&&['owner','manager','agent'].includes(currentProfile.role);
+  const pricingItems=()=>isOwner()?paused.items.filter(isPricing):[];
   const otherPaused=()=>paused.items.filter(i=>!isPricing(i));
 
   /* Boot gate (10 Nov 2026). The owner saw the old dashboard for several seconds before this page replaced it.
@@ -119,8 +123,9 @@
       +(i.summary?'<small class="coh-note">'+esc(i.summary)+'</small>':'')+'</div>'
       +'<div class="coh-paused-actions"><button type="button" class="btn-secondary coh-go" data-coh="popen" data-id="'+esc(i.conversation_id)+'">افتح المحادثة</button>'
       // 11 Nov (Ahmed): a price study always stays with him, so no «كمّل يا عقل» there; every row can carry a note for Claude
-      +'<button type="button" class="btn-secondary coh-go" data-coh="pnote" data-id="'+esc(i.conversation_id)+'" data-name="'+esc(i.name||'')+'">ملاحظة لـ Claude</button>'
-      +(pricing?'':'<button type="button" class="btn-primary coh-go" data-coh="presume" data-id="'+esc(i.conversation_id)+'">كمّل يا عقل</button>')+'</div></li>').join('');
+      // notes for Claude are the owner's lessons (crm_owner_notes), so staff do not get that button
+      +(isOwner()?'<button type="button" class="btn-secondary coh-go" data-coh="pnote" data-id="'+esc(i.conversation_id)+'" data-name="'+esc(i.name||'')+'">ملاحظة لـ Claude</button>':'')
+      +(pricing||!canResume()?'':'<button type="button" class="btn-primary coh-go" data-coh="presume" data-id="'+esc(i.conversation_id)+'">كمّل يا عقل</button>')+'</div></li>').join('');
   }
   function pausedHtml(){
     const items=otherPaused();
@@ -200,7 +205,7 @@
       const fu=typeof window.crmFollowupsRefresh==='function'?Promise.race([window.crmFollowupsRefresh(),new Promise(r=>setTimeout(r,1500))]):null;
       const [home,pending,twinGroups,pz]=await Promise.all(owner
         ?[supa.rpc('crm_owner_home'),typeof window.crmPendingReplies==='function'?window.crmPendingReplies().catch(()=>0):0,supa.rpc('crm_property_twins'),supa.rpc('crm_paused_chats'),fu]
-        :[supa.rpc('crm_staff_home'),0,null,null,fu]);
+        :[supa.rpc('crm_staff_home'),0,null,canResume()?supa.rpc('crm_paused_chats'):null,fu]);
       if(seq!==sequence)return;
       // a staff session never keeps the owner's lists from an earlier session in the same tab
       if(!owner){paused={items:[],total:0};autoNotes=[];}
