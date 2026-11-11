@@ -9,7 +9,7 @@
   const button = (action, label, id='') => '<button type="button" class="ws-action" data-workspace-action="'+action+'" data-id="'+esc(id)+'">'+label+'</button>';
   const table = (heads, rows, name) => '<div class="ws-table-wrap"><table class="ws-table" aria-label="'+name+'"><thead><tr>'+heads.map(h=>'<th scope="col">'+h+'</th>').join('')+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
   const cell = (label, value, cls='') => '<td data-label="'+label+'" class="'+cls+'">'+value+'</td>';
-  const labels={instagram:'Instagram',youtube:'YouTube',oman_reel:'Oman Reel',signboard:'لوحة العقار',referral:'إحالات',other:'أخرى'};
+  const labels={instagram:'Instagram',facebook:'Facebook',youtube:'YouTube',oman_reel:'Oman Reel',signboard:'لوحة العقار',referral:'إحالات',other:'أخرى'};
   class InputError extends Error {}
   let marketingSeq=0, marketingContext=null;
 
@@ -168,8 +168,9 @@
       const channel=el('pmChannel').value,kind=el('pmEventType').value,raw=el('pmUrl').value.trim(),url=raw?canonicalLink(raw,channel):null,viewRaw=el('pmViews').value.trim(),rawDate=el('pmPublishedAt').value;
       if(!(channel in labels)||!['publish','update','install','remove','other'].includes(kind))throw new InputError('اختر قناة ونوع نشاط صحيحين');
       if(raw&&!url)throw new InputError('أدخل رابطًا صحيحًا يبدأ بـ https:// أو http://');
-      if(['instagram','youtube','oman_reel'].includes(channel)&&kind==='publish'&&!url)throw new InputError('أضف رابط الفيديو أو المنشور قبل الحفظ');
+      if(['instagram','facebook','youtube','oman_reel'].includes(channel)&&kind==='publish'&&!url)throw new InputError('أضف رابط الفيديو أو المنشور قبل الحفظ');
       if(url&&channel==='instagram'&&!window.CRMFunnel?.instagramUrl(url))throw new InputError('أدخل رابط منشور أو Reel من Instagram');
+      if(url&&channel==='facebook'&&!/^https?:\/\/(?:www\.|m\.|web\.)?(?:facebook\.com|fb\.com|fb\.watch)\//i.test(url))throw new InputError('أدخل رابط فيديو أو منشور من Facebook');
       if(url&&channel==='youtube'&&!/^(www\.|m\.)?youtube\.com$|^youtu\.be$/.test(new URL(url).hostname))throw new InputError('اختر رابطًا من YouTube لهذه القناة');
       const views=viewRaw===''?null:Number(viewRaw);if(views!==null&&(!Number.isSafeInteger(views)||views<0))throw new InputError('المشاهدات عدد صحيح غير سالب، أو اتركه فارغًا إن كان غير معروف');
       const published=rawDate?new Date(rawDate+':00+04:00'):null;
