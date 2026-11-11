@@ -464,13 +464,29 @@ Deno.serve(async (req) => {
   // redo: the owner, from the approval screen, asks for a waiting draft to be rewritten following
   // their instruction ("ارسل له تفاصيل العقار"). The new reply replaces the draft and still waits for approval.
   let redo: { draftId: string; instruction: string } | null = null;
+  // resume (11 Nov, Ahmed): «كمّل يا عقل» on a paused chat. The agent reads the whole chat again and answers the customer's
+  // last message now, if nobody answered it; when it still cannot, the chat comes back to Ahmed with the reason.
+  let resume = false;
+  const resumeTarget = async (companyId: string | null, conversationId: string) => {
+    let q = db.from("whatsapp_messages").select("id,company_id").eq("conversation_id", conversationId).eq("direction", "inbound")
+      .order("message_timestamp", { ascending: false }).order("created_at", { ascending: false }).limit(1);
+    if (companyId) q = q.eq("company_id", companyId);
+    const r = await q.maybeSingle();
+    return r.data?.id || null;
+  };
   const secret = req.headers.get("x-crm-agent") || "";
   const ok = secret ? await db.rpc("crm_reply_agent_secret_ok", { p_secret: secret }) : null;
-  if (!ok || ok.error || ok.data !== true) {
+  if (ok && !ok.error && ok.data === true && body?.resume === true && body?.conversation_id && !dry) {
+    resume = true; message_id = await resumeTarget(null, String(body.conversation_id));
+  } else if (!ok || ok.error || ok.data !== true) {
     const jwt = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
     const u = jwt ? await db.auth.getUser(jwt) : null;
     const prof = u?.data?.user ? await db.from("profiles").select("id,company_id,role,is_active").eq("id", u.data.user.id).maybeSingle() : null;
     if (!prof?.data || prof.data.role !== "owner" || prof.data.is_active === false) return json({ ok: false, error: "owner_only" }, 403);
+    if (body?.resume === true && body?.conversation_id && !dry) {
+      resume = true; message_id = await resumeTarget(prof.data.company_id, String(body.conversation_id));
+      if (!message_id) return json({ ok: true, ignored: "nothing_to_answer" });
+    } else {
     const instruction = short(body?.instruction, 1000);
     if (!body?.draft_id || !instruction) return json({ ok: false, error: "instruction_required" }, 400);
     const d = await db.from("whatsapp_reply_drafts").select("id,message_id,status,analysis").eq("id", String(body.draft_id)).eq("company_id", prof.data.company_id).maybeSingle();
@@ -479,6 +495,7 @@ Deno.serve(async (req) => {
     redo = { draftId: d.data.id, instruction };
     message_id = d.data.message_id;
     dry = forcedDry || d.data.analysis?.dry_run === true;
+    }
   }
   if (!message_id) return json({ ok: false, error: "message_id_required" }, 400);
   // inline dry run (10 Nov): {dry_run:true, inline:true, message_id, brain_sha?} claims no draft and writes nothing (reads only), so it
@@ -496,12 +513,12 @@ Deno.serve(async (req) => {
   const watch = async () => { if (review) return; try { const v = await watchVisit(msg); if (v?.applied) console.log("[reply-agent] visit", v.event); } catch (e) { console.error("[reply-agent] visit", String((e as any)?.message || e)); } };
 
   // let the customer finish typing; only the newest inbound message is answered
-  if (!review) await sleep(DEBOUNCE_MS);
+  if (!review && !resume) await sleep(DEBOUNCE_MS);
   const latest = await db.from("whatsapp_messages").select("id").eq("conversation_id", msg.conversation_id).eq("direction", "inbound")
     .order("message_timestamp", { ascending: false }).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (!review && latest.data?.id !== msg.id) return json({ ok: true, ignored: "superseded" });
   // a bare greeting is usually followed by the question: give the customer a little longer
-  if (!review) {
+  if (!review && !resume) {
     const lo = await db.from("whatsapp_messages").select("message_timestamp").eq("conversation_id", msg.conversation_id).eq("direction", "outbound")
       .order("message_timestamp", { ascending: false }).limit(1).maybeSingle();
     const burst = await db.from("whatsapp_messages").select("body,message_type").eq("conversation_id", msg.conversation_id).eq("direction", "inbound")
@@ -517,6 +534,20 @@ Deno.serve(async (req) => {
 
   let draftId = "";
   if (redo) draftId = redo.draftId;
+  else if (resume) {
+    // the message already had a run (it was handed to Ahmed): the same draft row is reopened, its earlier outcome kept
+    const prev = await db.from("whatsapp_reply_drafts").select("id,status,error,analysis").eq("message_id", msg.id).maybeSingle();
+    if (prev.data) {
+      if (prev.data.status === "sent") return json({ ok: true, ignored: "already_answered" });
+      const reopened = await db.from("whatsapp_reply_drafts").update({ status: "pending", error: null, analysis: { ...(prev.data.analysis || {}), resumed: { from: prev.data.status, error: prev.data.error, at: new Date().toISOString() } } }).eq("id", prev.data.id).eq("status", prev.data.status).select("id").maybeSingle();
+      if (!reopened.data) return json({ ok: true, ignored: "already_processed" });
+      draftId = reopened.data.id;
+    } else {
+      const claim = await db.from("whatsapp_reply_drafts").insert({ company_id: msg.company_id, conversation_id: msg.conversation_id, message_id: msg.id, client_id: msg.client_id, status: "pending", analysis: { resumed: { from: null, at: new Date().toISOString() } } }).select("id").single();
+      if (claim.error) return json({ ok: true, ignored: "already_processed" });
+      draftId = claim.data.id;
+    }
+  }
   else if (!inline) {
     const claim = await db.from("whatsapp_reply_drafts").insert({ company_id: msg.company_id, conversation_id: msg.conversation_id, message_id: msg.id, client_id: msg.client_id, status: "pending", analysis: dry ? { dry_run: true } : {} }).select("id").single();
     if (claim.error) return json({ ok: true, ignored: "already_processed" });
@@ -884,6 +915,7 @@ Deno.serve(async (req) => {
       ...(otherRoute ? [otherRoute, ""] : []),
       "المحادثة (الأقدم أولاً، وآخر سطر هو اللي ترد عليه):",
       transcript,
+      ...(resume || (inline && body?.resume_preview === true) ? ["", "أحمد رجّع لك هذي المحادثة («كمّل يا عقل»): اقرأ المحادثة كاملة من أولها وافهم وين وصلنا مع العميل وكمّل معه من هالنقطة، بنفس القواعد. إذا لسا ما تعرف كيف ترد، action=handoff وسبب يبدأ بـ«ما عرفنا» يوضح وش الناقص بالضبط."] : []),
       ...(redo ? ["", `أمر من المدير لهذا الرد (نفّذه، وهو أهم من أي قاعدة عن طريقة الرد، بس لا تخالف الممنوعات ولا تكتب معلومة مو مكتوبة قدامك): ${redo.instruction}`] : []),
     ].join("\n");
 
@@ -1376,7 +1408,7 @@ Deno.serve(async (req) => {
       company_id: msg.company_id, conversation_id: conv.id, message_id: msg.id, client_id: client.id, property_id: prop?.id || null,
       action_type: "reply_agent_v1", status: "applied", confidence: 1, reason: short(out.intent, 500), payload: analysis, applied_at: now,
     });
-    return json({ ok: true, sent: sentIds.length, action: out.action });
+    return json({ ok: true, sent: sentIds.length, action: out.action, ...(resume ? { resumed: true, reply_messages: out.reply_messages, handoff_reason: out.handoff_reason ?? null } : {}) });
   } catch (e) {
     const why = short((e as any)?.message || e, 800);
     if (!redo && !inline) await db.from("whatsapp_reply_drafts").update({ status: "failed", error: why }).eq("id", draftId);

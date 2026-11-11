@@ -422,6 +422,21 @@ Deno.serve(async (req) => {
       // R1/R3 (Ahmed 8 Nov): «تمت المعالجة» / «رجّعها للعقل» is Ahmed handing the chat back to the reply agent
       const nowIso=new Date().toISOString();
       const ur=await admin.from("whatsapp_conversations").update({human_handoff_required:false,handoff_reason:null,handoff_updated_at:nowIso,agent_muted:false,agent_muted_reason:null,agent_returned_at:nowIso,updated_at:nowIso}).eq("id",conversationId).eq("company_id",companyId);if(ur.error)throw new Error(`clear_handoff_failed: ${ur.error.message}`);
+      // 11 Nov (Ahmed): «كمّل يا عقل» — when the customer's last message is still unanswered, the agent reads the whole chat
+      // and carries on now (owner only; the agent checks the caller). Otherwise it answers the customer's next message as usual.
+      if(payload?.resume===true&&profile.role==="owner"){
+        const [li,lo]=await Promise.all([
+          admin.from("whatsapp_messages").select("message_timestamp").eq("conversation_id",conversationId).eq("direction","inbound").order("message_timestamp",{ascending:false}).limit(1).maybeSingle(),
+          admin.from("whatsapp_messages").select("message_timestamp").eq("conversation_id",conversationId).eq("direction","outbound").order("message_timestamp",{ascending:false}).limit(1).maybeSingle(),
+        ]);
+        const inAt=li.data?.message_timestamp?Date.parse(li.data.message_timestamp):0,outAt=lo.data?.message_timestamp?Date.parse(lo.data.message_timestamp):0;
+        if(!inAt||outAt>=inAt)return json({ok:true,resume:"nothing_to_answer"});
+        try{
+          const r=await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-reply-agent`,{method:"POST",headers:{"Content-Type":"application/json",Authorization:authHeader},body:JSON.stringify({resume:true,conversation_id:conversationId}),signal:AbortSignal.timeout(110000)});
+          const agent=await r.json().catch(()=>null);
+          return json({ok:true,resume:"agent_ran",agent});
+        }catch(_){return json({ok:true,resume:"agent_pending"});}
+      }
       return json({ok:true});
     }
 
