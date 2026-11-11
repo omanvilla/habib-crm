@@ -23,3 +23,13 @@ test('«تم» closes everything of the client and stays closed for the same kin
  assert(hot.includes("kindOf(w.owner_alert_done_reason)===kindOf(why)"),'a re-handoff of the same kind stays hidden');
  assert(hot.includes('kindOf(x.owner_alert_done_reason)===kindOf(n.title)'),'a new notification of the same kind stays hidden');
 });
+// 11 Nov 2026 (Ahmed): price study report to his WhatsApp from the branch number, one block per client with separators
+test('price study report: details, number, owner offer, words, documents, separators; once per handoff (SQL89)',()=>{
+ const f=fs.readFileSync('supabase/functions/whatsapp-owner-hot-alert/index.ts','utf8'),s=fs.readFileSync('db/changes/89-price-study-report.forward.sql','utf8');
+ assert(f.includes('`📋 دراسة سعر ${tag} · ${branch}`')&&f.includes('✅ نهاية دراسة السعر ${tag}'),'header and end separators');
+ assert(f.includes('`الرقم: ${phone}`')&&f.includes('`المحادثة: https://wa.me/${phone}`'));
+ assert(f.includes('async function forwardMedia(')&&f.includes('`https://graph.facebook.com/${GRAPH}/${phoneId}/media`'),'documents sent again from the branch number');
+ assert(f.includes('action_type", "owner_price_study"')&&f.includes('contains("payload", { handoff_at: at })'),'one report per handoff');
+ assert(f.includes('const route = (routes.data || []).find((r: any) => r.route_key === conv.route_key);'),'the branch number of that chat');
+ assert(s.includes("'action', 'price_study'")&&s.includes("coalesce(OLD.handoff_reason,'') !~ '^\s*دراسة\s*سعر'"));
+});
