@@ -1221,7 +1221,7 @@ window.fbAsyncInit = function(){
 <div class="fgrid">
 <div class="fg full"><label class="fl">العميل *</label><select class="fs" id="piClient"><option value="">اختر عميلاً</option></select></div>
 <div class="fg"><label class="fl">مصدر الاستفسار *</label><select class="fs" id="piSource">
-<option value="whatsapp">واتساب</option><option value="instagram">إنستغرام</option><option value="oman_reel">Oman Reel</option><option value="youtube">يوتيوب</option><option value="signboard">اللوحة</option><option value="referral">إحالة / شخص آخر</option><option value="website">الموقع</option><option value="other">أخرى</option>
+<option value="whatsapp">واتساب</option><option value="instagram">إنستغرام</option><option value="facebook">فيسبوك</option><option value="oman_reel">Oman Reel</option><option value="youtube">يوتيوب</option><option value="signboard">اللوحة</option><option value="referral">إحالة / شخص آخر</option><option value="website">الموقع</option><option value="other">أخرى</option>
 </select></div>
 <div class="fg"><label class="fl">الحالة</label><select class="fs" id="piStatus">
 <option value="inquiry">استفسار</option><option value="followup">تحت المتابعة</option><option value="viewing_scheduled">معاينة محددة</option><option value="viewed">تمت المعاينة</option><option value="negotiation">تفاوض</option><option value="reserved">حجز / عربون</option><option value="deal">صفقة</option><option value="not_suitable">لم يناسبه</option><option value="no_response">لا يرد</option><option value="closed">مغلق</option>
@@ -1261,7 +1261,7 @@ window.fbAsyncInit = function(){
 <div class="modal-ov" id="mPropertyMarketing"><div class="modal-box lg">
 <div class="modal-title">📣 تسجيل نشاط تسويقي للعقار</div>
 <div class="fgrid">
-<div class="fg"><label class="fl">القناة *</label><select class="fs" id="pmChannel" onchange="updatePropertyMarketingHint()"><option value="instagram">إنستغرام</option><option value="oman_reel">Oman Reel</option><option value="youtube">يوتيوب</option><option value="signboard">اللوحة</option><option value="referral">إحالات</option><option value="other">أخرى</option></select></div>
+<div class="fg"><label class="fl">القناة *</label><select class="fs" id="pmChannel" onchange="updatePropertyMarketingHint()"><option value="instagram">إنستغرام</option><option value="facebook">فيسبوك</option><option value="oman_reel">Oman Reel</option><option value="youtube">يوتيوب</option><option value="signboard">اللوحة</option><option value="referral">إحالات</option><option value="other">أخرى</option></select></div>
 <div class="fg"><label class="fl">نوع النشاط</label><select class="fs" id="pmEventType" onchange="updatePropertyMarketingHint()"><option value="publish">نشر إعلان</option><option value="update">تحديث مشاهدات / أداء</option><option value="install">تركيب لوحة</option><option value="remove">إزالة لوحة</option><option value="other">أخرى</option></select></div>
 <div class="fg"><label class="fl">تاريخ النشر / النشاط</label><input class="fi" type="datetime-local" id="pmPublishedAt"></div>
 <div class="fg"><label class="fl">المشاهدات (اختياري)</label><input class="fi" type="number" min="0" id="pmViews" placeholder="اتركها فارغة لإنستغرام بعد الربط"></div>
@@ -3208,9 +3208,9 @@ async function syncStructuredReasons(inquiryId,clientId,propertyId,requestId,pre
 function primaryStructuredReasonCode(prefix){var set=prefix==='pi'?piStructuredSelected:ifStructuredSelected,primary=prefix==='pi'?piStructuredPrimary:ifStructuredPrimary,id=primary||[...set][0];var x=structuredReasonCatalog.find(r=>r.id===id);return x?x.code:null}
 async function inferSingleActiveRequest(clientId){var r=await supa.from('client_requests').select('id').eq('client_id',clientId).eq('status','active').order('created_at',{ascending:false}).limit(3);if(r.error)throw r.error;return (r.data||[]).length===1?r.data[0].id:null}
 function propertyInquiryStatusAr(v){return ({inquiry:'💬 استفسار',followup:'☎️ متابعة',viewing_scheduled:'📅 معاينة محددة',viewed:'✅ تمت المعاينة',negotiation:'🤝 تفاوض',reserved:'💰 حجز / عربون',deal:'🏁 صفقة',not_suitable:'❌ لم يناسبه',no_response:'📵 لا يرد',closed:'⚪ مغلق'})[v]||v||'—'}
-function propertyInquirySourceAr(v){return ({whatsapp:'واتساب',instagram:'إنستغرام',oman_reel:'Oman Reel',youtube:'يوتيوب',signboard:'اللوحة',referral:'إحالة',website:'الموقع',other:'أخرى'})[v]||v||'—'}
+function propertyInquirySourceAr(v){return ({whatsapp:'واتساب',instagram:'إنستغرام',facebook:'فيسبوك',oman_reel:'Oman Reel',youtube:'يوتيوب',signboard:'اللوحة',referral:'إحالة',website:'الموقع',other:'أخرى'})[v]||v||'—'}
 function propertyRejectReasonAr(v){return ({price:'السعر',location:'الموقع',area:'المساحة',room_layout:'تقسيم الغرف',design:'التصميم',finishing:'التشطيب',parking:'المواقف / الحوش',financing:'التمويل',found_other:'وجد عقاراً آخر',not_interested:'لم يعجبه العقار',not_serious:'غير جاد',no_response:'لم يرد بعد المعاينة',other:'سبب آخر'})[v]||v||'—'}
-function marketingChannelAr(v){return ({instagram:'إنستغرام',oman_reel:'Oman Reel',youtube:'يوتيوب',signboard:'اللوحة',referral:'إحالات',other:'أخرى'})[v]||v||'—'}
+function marketingChannelAr(v){return ({instagram:'إنستغرام',facebook:'فيسبوك',oman_reel:'Oman Reel',youtube:'يوتيوب',signboard:'اللوحة',referral:'إحالات',other:'أخرى'})[v]||v||'—'}
 function localDateTimeValue(d){var x=d?new Date(d):new Date();if(isNaN(x))x=new Date();var z=n=>String(n).padStart(2,'0');return x.getFullYear()+'-'+z(x.getMonth()+1)+'-'+z(x.getDate())+'T'+z(x.getHours())+':'+z(x.getMinutes())}
 function daysSince(d){if(!d)return null;var x=new Date(d);if(isNaN(x))return null;return Math.floor((Date.now()-x.getTime())/86400000)}
 

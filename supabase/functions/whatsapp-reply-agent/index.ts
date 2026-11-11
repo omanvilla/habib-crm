@@ -162,6 +162,56 @@ async function reelCovers(companyId: string, propIds: string[]) {
 
 const IG_RE = /instagram\.com\/(?:reels?|p|tv)\/([A-Za-z0-9_-]+)/i;
 
+// Facebook (11 Nov 2026, Ahmed): properties are posted on the Facebook page and customers send its links, mostly
+// «facebook.com/share/r|v/...». Same keys as normalize_property_marketing_link (SQL80).
+const FB_URL_RE = /https?:\/\/(?:www\.|m\.|web\.|business\.)?(?:facebook\.com|fb\.com|fb\.watch)\/[^\s<>"']+/gi;
+const FB_HOSTS = new Set(["facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com", "business.facebook.com", "fb.com", "www.fb.com", "fb.watch", "www.fb.watch"]);
+export function facebookKeyOf(url: string): string {
+  const u = String(url || "").trim().replace(/&amp;/g, "&").replace(/[\])}>,.;!؟،]+$/, "");
+  const host = "^(?:https?:\\/\\/)?(?:www\\.|m\\.|web\\.|business\\.)?(?:facebook|fb)\\.com";
+  const tries: [RegExp, string][] = [
+    [new RegExp(host + "\\/reel\\/([0-9]+)(?:[\\/?#]|$)", "i"), "facebook:"],
+    [new RegExp(host + "\\/[^\\/?#]+\\/videos\\/(?:[^\\/?#]+\\/)?([0-9]+)(?:[\\/?#]|$)", "i"), "facebook:"],
+    [new RegExp(host + "\\/watch\\/?\\?[^#]*\\bv=([0-9]+)", "i"), "facebook:"],
+    [new RegExp(host + "\\/[^\\/?#]+\\/posts\\/([A-Za-z0-9]+)(?:[\\/?#]|$)", "i"), "facebook:"],
+    [new RegExp(host + "\\/(?:permalink|story)\\.php\\?[^#]*\\bstory_fbid=([A-Za-z0-9]+)", "i"), "facebook:"],
+    [new RegExp(host + "\\/share\\/(?:[a-z]\\/)?([A-Za-z0-9_-]+)(?:[\\/?#]|$)", "i"), "facebook-share:"],
+    [/^(?:https?:\/\/)?(?:www\.)?fb\.watch\/([A-Za-z0-9_-]+)(?:[\/?#]|$)/i, "facebook-share:"],
+  ];
+  for (const [re, prefix] of tries) { const m = u.match(re); if (m) return prefix + m[1]; }
+  return "";
+}
+const decodeHtml = (s: string) => s.replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+  .replace(/&#([0-9]+);/g, (_, d) => String.fromCodePoint(Number(d))).replace(/&quot;/g, '"').replace(/&#039;|&apos;/g, "'")
+  .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+// Opens a Facebook link (fixed Facebook hosts only, at most 4 redirects) and reads the real video/post id and the
+// public post text. Nothing is sent or posted. Returns null when the page cannot be read.
+export async function readFacebookLink(url: string, fetcher: typeof fetch = fetch) {
+  let current = url, key = facebookKeyOf(url), html = "";
+  for (let hop = 0; hop < 5; hop++) {
+    let host = "";
+    try { host = new URL(current).hostname.toLowerCase(); } catch { return null; }
+    if (!FB_HOSTS.has(host)) return null;
+    const r = await fetcher(current, { redirect: "manual", headers: { "User-Agent": "facebookexternalhit/1.1", "Accept-Language": "ar,en" }, signal: AbortSignal.timeout(7000) });
+    const loc = r.headers.get("location");
+    if (r.status >= 300 && r.status < 400 && loc) {
+      current = new URL(loc, current).toString();
+      const k = facebookKeyOf(current); if (k.startsWith("facebook:")) key = k;
+      continue;
+    }
+    if (!r.ok) return null;
+    html = (await r.text()).slice(0, 900000);
+    break;
+  }
+  const meta = (name: string) => decodeHtml((html.match(new RegExp(`<meta[^>]+property="${name}"[^>]+content="([^"]*)"`, "i")) || html.match(new RegExp(`<meta[^>]+content="([^"]*)"[^>]+property="${name}"`, "i")) || [])[1] || "");
+  const canonical = decodeHtml((html.match(/<link rel="canonical" href="([^"]+)"/i) || [])[1] || "") || meta("og:url");
+  const k2 = facebookKeyOf(canonical); if (k2.startsWith("facebook:")) key = k2;
+  const page = (canonical.match(/(?:facebook|fb)\.com\/([0-9]{6,})\//i) || [])[1] || null;
+  const caption = meta("og:description").slice(0, 2000);
+  if (!key.startsWith("facebook:") && !caption) return null;
+  return { resolved_key: key.startsWith("facebook:") ? key : null, page_id: page, caption: caption || null };
+}
+
 const NAME_NOT_GIVEN = "ما ذكر اسمه، الاسم المسجل من الواتساب مو اسمه الحقيقي";
 const schema = {
   type: "object", additionalProperties: false,
@@ -522,7 +572,7 @@ Deno.serve(async (req) => {
     }
 
     const [histR, propsR, rulesR, priorR] = await Promise.all([
-      db.from("whatsapp_messages").select("id,direction,message_type,body,transcript,media_id,actor_type,message_timestamp,matched_property_id,property_link_key,property_image_analysis")
+      db.from("whatsapp_messages").select("id,direction,message_type,body,transcript,media_id,actor_type,message_timestamp,matched_property_id,property_link_key,property_image_analysis,referral:raw_payload->referral")
         .eq("conversation_id", conv.id).lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(60),
       db.from("properties").select("id,title,internal_name,type,area,wilayat,price,bedrooms,bathrooms,land_size,built_size,listing_purpose,public_details,description,map_url,visit_method,visit_instructions,lockbox_image_url,owner_id,branch_key,rental_terms,rented_units")
         .eq("company_id", msg.company_id).eq("status", "available").eq("archived", false),
@@ -607,6 +657,38 @@ Deno.serve(async (req) => {
       const mm = String(h.body || "").match(IG_RE);
       if (mm) codes.add(`instagram:${mm[1]}`);
     }
+    // Facebook links: the key as sent (often a share code), then the real video/post id read from Facebook (cached).
+    const fbOf: Record<string, { sent: string; key: string; caption: string | null; page_id: string | null }> = {};
+    try {
+      const sent: { id: string; url: string; key: string }[] = [];
+      for (const h of history) {
+        const urls = String(h.body || "").match(FB_URL_RE) || [];
+        const ref = String(h.referral?.source_url || "");
+        if (ref) urls.push(ref);
+        for (const url of urls) { const key = facebookKeyOf(url); if (key) { sent.push({ id: h.id, url, key }); break; } }
+      }
+      if (sent.length) {
+        const keys = [...new Set(sent.map((x) => x.key))];
+        const cached = await db.from("facebook_link_cache").select("link_key,resolved_key,page_id,caption,status,fetched_at").in("link_key", keys);
+        const cache: Record<string, any> = {};
+        for (const c of cached.data || []) cache[c.link_key] = c;
+        let reads = 0;
+        for (const x of sent) {
+          let c = cache[x.key];
+          const stale = c && c.status === "unreadable" && Date.now() - Date.parse(c.fetched_at) > 6 * 3600000;
+          if ((!c || stale) && reads < 3) {
+            reads++;
+            const got = await readFacebookLink(x.url).catch(() => null);
+            c = got ? { link_key: x.key, ...got, status: "resolved" } : { link_key: x.key, resolved_key: x.key.startsWith("facebook:") ? x.key : null, page_id: null, caption: null, status: "unreadable" };
+            cache[x.key] = c;
+            if (!inline) await db.from("facebook_link_cache").upsert({ ...c, fetched_at: new Date().toISOString() }); // an inline dry run writes nothing
+          }
+          const key = c?.resolved_key || x.key;
+          fbOf[x.id] = { sent: x.key, key, caption: c?.caption || null, page_id: c?.page_id || null };
+          codes.add(key); codes.add(x.key);
+        }
+      }
+    } catch (e) { console.error("[reply-agent] facebook links", String((e as any)?.message || e)); }
     const reels: Record<string, any> = {};
     if (codes.size) {
       const r = await db.from("instagram_media_catalog").select("link_key,caption,property_id,state,project_id").eq("company_id", msg.company_id).in("link_key", [...codes]);
@@ -618,7 +700,12 @@ Deno.serve(async (req) => {
         for (const x of Object.values(reels) as any[]) x.project = (pr.data || []).find((y: any) => y.id === x.project_id) || null;
       }
       const ev = await db.from("property_marketing_events").select("link_key,property_id").eq("company_id", msg.company_id).in("link_key", [...codes]);
+      // Facebook: a video saved on a property (journal channel facebook) or read from the link
+      for (const f of Object.values(fbOf)) if (!reels[f.key]) reels[f.key] = { link_key: f.key, caption: f.caption, property_id: null, state: null, facebook: true };
       for (const e of ev.data || []) if (reels[e.link_key]) (reels[e.link_key].propertyIds ||= []).push(e.property_id);
+      // a share link saved on the property as it was copied (facebook-share:...) counts for the video it opens
+      for (const f of Object.values(fbOf)) if (f.sent !== f.key) for (const e of ev.data || []) if (e.link_key === f.sent && !(reels[f.key].propertyIds || []).includes(e.property_id)) (reels[f.key].propertyIds ||= []).push(e.property_id);
+      for (const f of Object.values(fbOf)) { const r = reels[f.key]; r.facebook = true; if (!r.caption && f.caption) r.caption = f.caption; if (!r.property_id && r.propertyIds?.length === 1) r.property_id = r.propertyIds[0]; }
     }
 
     // recently sold or booked: the agent must recognise them and answer with the sold rule, never offer them
@@ -671,10 +758,15 @@ Deno.serve(async (req) => {
     const transcript = history.map((h: any) => {
       const who = h.direction === "inbound" ? "العميل" : (h.actor_type === "human" ? "المكتب (شخص)" : "المكتب (رد سابق منك)");
       let text = h.transcript ? `[رسالة صوتية: ${h.transcript}]` : (h.body || (h.message_type === "audio" ? "[رسالة صوتية ما انفهمت]" : `[${h.message_type}]`));
-      const key = String(h.property_link_key || "") || ((String(h.body || "").match(IG_RE) || [])[1] ? `instagram:${String(h.body).match(IG_RE)![1]}` : "");
+      const key = fbOf[h.id]?.key || String(h.property_link_key || "") || ((String(h.body || "").match(IG_RE) || [])[1] ? `instagram:${String(h.body).match(IG_RE)![1]}` : "");
       const reel = key ? reels[key] : null;
       let extra = "";
-      if (reel) extra += ` {ريل من حسابنا. وصفه: ${short(reel.caption, 300).replace(/\n+/g, " / ")}${reel.property_id ? ` | عقار مرتبط: ${reel.property_id}` : ""}${reel.project ? ` | عن مشروع استثماري: ${reel.project.name}${reel.project.developer ? ` للمطور ${reel.project.developer}` : ""}` : ""}${(reel.propertyIds || []).length > 1 ? ` | نفس الفيديو لعقارات متطابقة: ${reel.propertyIds.join(" و ")}، إذا واحد راح اعرض الثاني المتوفر` : ""}}`;
+      if (reel?.facebook) extra += reel.property_id
+        ? ` {منشور فيسبوك من صفحتنا${reel.caption ? `. وصفه: ${short(reel.caption, 300).replace(/\n+/g, " / ")}` : ""} | عقار مرتبط: ${reel.property_id}}`
+        : reel.caption
+          ? ` {منشور فيسبوك (الوصف مقروء من الرابط، مو مربوط بعقار): ${short(reel.caption, 400).replace(/\n+/g, " / ")}. حدد العقار من القائمة بالمواصفات، وإذا ما تطابق شي اسأل مثل الريل المو مسجل}`
+          : " {منشور فيسبوك ما قدرنا نقرأ وصفه: عامله مثل الريل المو مسجل}";
+      else if (reel) extra += ` {ريل من حسابنا. وصفه: ${short(reel.caption, 300).replace(/\n+/g, " / ")}${reel.property_id ? ` | عقار مرتبط: ${reel.property_id}` : ""}${reel.project ? ` | عن مشروع استثماري: ${reel.project.name}${reel.project.developer ? ` للمطور ${reel.project.developer}` : ""}` : ""}${(reel.propertyIds || []).length > 1 ? ` | نفس الفيديو لعقارات متطابقة: ${reel.propertyIds.join(" و ")}، إذا واحد راح اعرض الثاني المتوفر` : ""}}`;
       else if (key) extra += " {ريل ما عرفنا وصفه}";
       // R6: say plainly when the property behind a reel or message was sold, so the sold rule applies (old reels of sold villas)
       const soldOf = (id: any) => soldRows.find((s: any) => s.id === id);
@@ -1115,7 +1207,7 @@ Deno.serve(async (req) => {
     // redirect is really sent (once per chat)
     let burstFrom = 0;
     history.forEach((h: any, i: number) => { if (h.direction === "outbound") burstFrom = i + 1; });
-    const reelKeyOf = (h: any) => String(h.property_link_key || "") || ((String(h.body || "").match(IG_RE) || [])[1] ? `instagram:${String(h.body).match(IG_RE)![1]}` : "");
+    const reelKeyOf = (h: any) => fbOf[h.id]?.key || String(h.property_link_key || "") || ((String(h.body || "").match(IG_RE) || [])[1] ? `instagram:${String(h.body).match(IG_RE)![1]}` : "");
     if (history.slice(burstFrom).some((h: any) => h.direction === "inbound" && reels[reelKeyOf(h)]?.project)) { out.category = "investor"; analysis.project_reel_investor = true; }
     // 8 Nov (Ahmed): investors and owners of Muscat-area properties who write to the Barka number are sent to the Muscat number (R9), nothing is held
     const MUSCAT_AREAS = /(الحيل|الخوض|السيب|بوشر|العامرات|مطرح|قريات|المعبيلة|الموالح|مسقط|الأنصب|الانصب|مدينة السلطان)/;
