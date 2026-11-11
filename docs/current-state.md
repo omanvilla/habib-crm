@@ -2,6 +2,13 @@
 
 Updated 2026-11-11. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 11 November 2026 — staff get the owner's home page (SQL81, commits 4f9eef1, a282f14), live
+
+- **Why.** Ahmed opened the Barka account and saw the old dashboard instead of his home: "the whole system the same for the employee, except what the rules keep from staff".
+- **What.** `crm-owner-home.js` (v `20261111-staff1`) now draws for manager, agent and viewer accounts too, with the same boot gate (no old-dashboard flash). Staff data comes from `crm_staff_home()` (SQL81), SECURITY INVOKER so every count goes through the account's own row level security (SQL79 shared branches) and deals through `crm_deals_access` (no money, no merged cards). Same tiles and sheets: follow-ups (per branch, as `crm_followups_today` gives), visits the AI follows, property and week summary. Kept owner-only: approvals, paused chats and price studies, owner offers, problems, twins, videos, agent reply counts, and the Reports link (money). Sidebar unchanged: staff still have no approvals, reports, expenses, activity log, owner offers, investment projects, branches (team) or backup.
+- **Checked.** As the Barka account in a transaction (14 overdue visits, both branches' properties, 0 money fields) and in Ahmed's Chrome as the Barka account: home shown at once, follow-ups 23 and visits 14 open their sheets. CI green.
+- **Rollback.** `db/changes/81-staff-home.rollback.sql`, and `crm-owner-home.js` back to `20261111-resume1`.
+
 ## 11 November 2026 — branches share data, Facebook links, voice note discard, «دراسة سعر» tile (PRs #74, #75, SQL79, SQL80)
 
 - **Voice note (PR #74, live).** In the CRM chat, 🗑 while recording discards it, ➤ while recording sends it, and the preview has a clear «🗑 حذف» (only a faint ✕ before). Synthetic Chromium with a fake mic at 375 px; not tried on a real phone.
