@@ -24,7 +24,7 @@ test('negotiation gets no reply and goes to Ahmed',()=>{
  assert(!brain.includes('"تمام بشوف مع المالك وارد عليك"، و action=handoff'));
 });
 test('interior photos of an occupied home get the fixed reply after checking the property',()=>{
- assert(brain.includes('البيت حالياً مسكون عشان كذا ما صورناه من الداخل'));
+ assert(brain.includes('بحكم إن المالك ساكن في البيت ما صورنا البيت من الداخل عشان الخصوصية'));assert(brain.includes('لا تعد بصور أبداً ولا تسأل "أرسل لك الصور ؟"'),'R34');
  assert(brain.includes('"الزيارة: المالك ساكن"'));
 });
 // Ahmed 10 Nov (point 1): every visit result is recorded by the AI, also for a visit already saved "done" with no opinion.

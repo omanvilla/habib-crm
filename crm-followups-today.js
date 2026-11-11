@@ -10,7 +10,7 @@
   const byId=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
   const toast=(m,t)=>{if(typeof showToast==='function')showToast(m,t);};
-  const LABEL={barka:'بركاء',muscat:'مسقط'};
+  const LABEL={barka:'بركاء',muscat:'مسقط',investor:'مستثمر · رقم مسقط'};
   let data={items:[],auto_on:false},branch='all',seq=0,open=false;const openInstr=new Set(),drafts=new Map();
   const isOwner=()=>typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.role==='owner';
   const ERR={followup_not_pending:'هذي المتابعة ما عادت في القائمة: انرسلت أو تغيرت',followup_not_found:'المتابعة ما عادت موجودة',owner_only:'ما عندك صلاحية الأوامر',
@@ -54,17 +54,25 @@
     else if(header&&box.previousElementSibling!==header)header.after(box);
     return box;
   }
+  // 12 Nov 2026: past the 24 hours the system can only send the Meta template, so show what really reaches the client
+  function sendsLine(i){
+    if(!('sends_text' in i))return '';
+    if(i.sends_text==null)return '<small class="cfu-auto">ما تنرسل من النظام بعد 24 ساعة: رد عليه من المحادثة بنفسك</small>';
+    const a=String(i.sends_text).replace(/\s+/g,' ').trim(),b=String(i.text||'').replace(/\s+/g,' ').trim();
+    return a===b?'':'<small class="cfu-auto">اللي بيوصل للعميل من النظام (قالب واتساب بعد 24 ساعة): <span dir="auto">'+esc(i.sends_text)+'</span></small>';
+  }
   function render(){
     const box=host();if(!box)return;
-    const all=data.items||[],items=branch==='all'?all:all.filter(i=>i.route_key===branch);
+    // 12 Nov 2026 (Ahmed, SQL91): investors and project askers are their own lane, apart from Muscat properties (both from the Muscat number)
+    const laneOf=i=>i.lane||i.route_key,all=data.items||[],items=branch==='all'?all:all.filter(i=>laneOf(i)===branch);
     const waiting=Number(data.waiting_review||0);
     box.hidden=!all.length&&!waiting;
     if(!all.length){box.innerHTML=waiting?'<h2 class="cfu-title">متابعات اليوم</h2><p class="cfu-hint">جاري قراءة المحادثات، باقي <b dir="ltr">'+waiting+'</b>. تطلع هنا بعد المراجعة.</p>':'';return;}
-    const tabs=[['all','الكل'],['barka','بركاء'],['muscat','مسقط']].map(([k,l])=>{const n=k==='all'?all.length:all.filter(i=>i.route_key===k).length;return '<button type="button" class="cfu-tab'+(branch===k?' on':'')+'" data-cfu="tab" data-v="'+k+'" aria-pressed="'+(branch===k)+'">'+l+' <b dir="ltr">'+n+'</b></button>';}).join('');
+    const tabs=[['all','الكل'],['barka','بركاء'],['muscat','مسقط'],['investor','المستثمرين']].map(([k,l])=>{const n=k==='all'?all.length:all.filter(i=>laneOf(i)===k).length;return '<button type="button" class="cfu-tab'+(branch===k?' on':'')+'" data-cfu="tab" data-v="'+k+'" aria-pressed="'+(branch===k)+'">'+l+' <b dir="ltr">'+n+'</b></button>';}).join('');
     if(!open){box.innerHTML='<h2 class="cfu-title"><button type="button" class="cfu-toggle" data-cfu="toggle" aria-expanded="false" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center">متابعات اليوم <b dir="ltr">'+all.length+'</b> <small>▾</small></button></h2>';return;}
     box.innerHTML='<h2 class="cfu-title"><button type="button" class="cfu-toggle" data-cfu="toggle" aria-expanded="true" style="all:unset;cursor:pointer;display:flex;gap:8px;align-items:center">متابعات اليوم <b dir="ltr">'+all.length+'</b> <small>▴</small></button></h2><p class="cfu-hint">افتح الصفحة من جوال الفرع، واضغط «فتح في واتساب الجوال» وأرسل، أو «فتح في النظام» تشوف المحادثة وترد من هنا. العميل ينشال من القائمة لحاله.'+(isOwner()?'':' متابعة مسقط تنرسل من جوال مسقط، ومتابعة بركاء من جوال بركاء.')+(waiting?' باقي <b dir="ltr">'+waiting+'</b> قيد القراءة.':'')+'</p><div class="cfu-tabs">'+tabs+'</div>'
-      +(items.length?'<ul class="cfu-list">'+items.map(i=>{const url=businessLink(i.phone,i.text),other=waLink(i.phone,i.text);return '<li class="cfu-row"><div class="cfu-head"><strong>'+esc(i.client||'عميل')+'</strong><small>'+esc(LABEL[i.route_key]||i.route_key)+' · '+esc(i.reason)+(i.property?' · '+esc(i.property):'')+'</small></div>'
-        +'<p class="cfu-text" dir="auto">'+esc(i.text)+'</p><small class="cfu-auto">'+esc(autoLine(i))+'</small>'
+      +(items.length?'<ul class="cfu-list">'+items.map(i=>{const url=businessLink(i.phone,i.text),other=waLink(i.phone,i.text);return '<li class="cfu-row"><div class="cfu-head"><strong>'+esc(i.client||'عميل')+'</strong><small>'+esc(LABEL[laneOf(i)]||LABEL[i.route_key]||i.route_key)+' · '+esc(i.reason)+(i.property?' · '+esc(i.property):'')+'</small></div>'
+        +'<p class="cfu-text" dir="auto">'+esc(i.text)+'</p>'+sendsLine(i)+'<small class="cfu-auto">'+esc(autoLine(i))+'</small>'
         +'<div class="cfu-actions">'+(url?'<a class="btn-primary cfu-open" href="'+esc(url)+'" rel="noopener noreferrer">فتح في واتساب الجوال</a><a class="cfu-other" href="'+esc(other)+'" target="_blank" rel="noopener noreferrer">رابط عادي</a>':'<span class="cfu-auto">ما له رقم</span>')+(i.conversation_id&&typeof openWhatsAppConversation==='function'?'<button type="button" class="btn-secondary cfu-crm" data-cfu="crm" data-id="'+esc(i.conversation_id)+'">فتح في النظام</button>':'')+'<button type="button" class="btn-secondary" data-cfu="done" data-id="'+esc(i.client_id)+'">أرسلتها</button>'+(canInstruct()?'<button type="button" class="btn-secondary" data-cfu="instr" data-k="'+esc(key(i))+'" aria-expanded="'+openInstr.has(key(i))+'">أمر للذكاء الاصطناعي</button>':'')+'</div>'+instrBox(i)+'</li>';}).join('')+'</ul>':'<p class="cfu-hint">ما في متابعات لهذا الفرع</p>');
   }
   let startedAt=0;
