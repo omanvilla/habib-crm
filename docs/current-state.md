@@ -2,6 +2,10 @@
 
 Updated 2026-11-11. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 11 November 2026 — the Barka account is greeted as «مرام» (commit c263ec1), live
+
+- Ahmed: «مسار بركاء خليه باسم مرام نفس صباح الخير وغيره». The Barka profile name changed from «Maram» to «مرام» (`profiles.full_name`, same account id, so authorship is unchanged). `updateUserUI` (app-base `20261111-name1`) shows a staff account's own name in the greeting and the sidebar, with «موظف مبيعات · بركاء» under it. Branch targets, filters, task assignee labels and record attribution still say «بركاء» (branch identity, AGENTS.md). Checked live as Barka: «صباح الخير مرام». Rollback: name back to «Maram», app-base `20261111-resume1`.
+
 ## 11 November 2026 — owner offers and investment projects open to staff (SQL82, commit 17453d3), live
 
 - **Why.** Ahmed, asked whether staff should see «عروض الملاك» and «المشاريع الاستثمارية»: «نعم افتحها لهم».
