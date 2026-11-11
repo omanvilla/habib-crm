@@ -2,6 +2,13 @@
 
 Updated 2026-11-11. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 11 November 2026 — R29: after-visit question in plain words, no «مبروك» without a purchase (commit 494f748), live
+
+- **Dry run before publishing** (`whatsapp-reply-agent-dryrun` v15 at 494f748, inline, nothing sent): Umm Mawadda's «ايوه لقيناها الفيلا» → «حياك الله طيب عجبتك ولا ما ناسبتك ؟» (twice; once with «اسمك الكريم ؟»), and the latest message of the last 20 chats: no congratulation anywhere, the Muscat redirect, owner decline, office meeting and alternatives as before. **Published:** `whatsapp-reply-agent` v57 and `whatsapp-visit-followup-auto` v25 → `494f748` (were `487329a` / `fff79d6`); prompts synced from main. Rollback: pin back to those commits and re-sync.
+
+- **Why.** Umm Mawadda got «السلام عليكم كيف لقيتي فيلا الشخاخيط ؟», answered «ايوه لقيناها الفيلا» (we found the place) and the agent replied «مبروك الله يبارك لك 🌷». Ahmed: make the question clear and a fixed rule.
+- **What.** Follow-ups ask «كيف شفت(ي) <العقار> ؟ عجبتك ولا ما ناسبتك ؟»: `namedVisitQuestion` turns any «كيف لقيت» into it, and the review prompt forbids «كيف لقيت». The 10 waiting visit follow-ups that said «كيف لقيت …» were rewritten in place. `brain.ts` (بعد الزيارة) has R29: «لقيناها / وصلنا / شفناها» without an opinion means they saw it, never «مبروك»; ask «حياك الله، طيب عجبتك ولا ما ناسبتك ؟». `index.ts` drops a congratulation unless the customer's messages since our last one say they bought, reserved or paid (or a happy occasion), and after our after-visit question replaces it with that opinion question; `AFTER_VISIT_Q` also matches «كيف شفت». The Meta template `visit_followup_1_ar_v1` («بخصوص الزيارة قدرت تشوف العقار ؟ كيف لقيته ؟») is unchanged (an approved template; changing it needs Meta review).
+
 ## 11 November 2026 — stale follow-up offers go back to review (SQL86, 86b); «فتح في النظام» (commits 0bf9cbe, 894ee10), live
 
 - **Why.** A waiting follow-up offered «فيلا في الصومحان الجنوبية ب٥٧ ألف», written 8 Nov; the four 57,000 Al Sawmhan villas were archived on 10 Nov (not available) and the text stayed.
