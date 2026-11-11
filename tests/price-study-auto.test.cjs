@@ -53,7 +53,12 @@ test('nothing reaches an owner before the approval, and test mode only reaches t
 test('outside the 24-hour window the approved template asks first; the study follows the owner\'s answer',()=>{
   assert(fn.includes('const TEMPLATE = "owner_price_study_ready_ar_v1";'));
   assert(fn.includes('const TEMPLATE_TEXT = "السلام عليكم دراسة سعر عقارك جاهزة نرسلها لك هنا ؟";'));
-  assert(fn.includes('if (!(await templateApproved(conv.company_id, conv.route_key))) return await set("approved", "template_not_approved");'));
+  assert(fn.includes('const tpl = await templateApproved(conv.company_id, conv.route_key);'));
+  assert(fn.includes('if (!tpl) return await set("approved", "template_not_approved");'));
+  // v2 (Ahmed 11 Nov, night): Meta rated v1 MARKETING on Muscat; the wording he approved for that number only
+  assert(fn.includes('{ name: "owner_price_study_ready_ar_v2", text: "السلام عليكم بخصوص طلبك دراسة سعر عقارك الدراسة جاهزة نرسلها لك هنا ؟", routes: ["muscat"] },'));
+  assert(fn.includes('{ name: TEMPLATE, text: TEMPLATE_TEXT, routes: ["barka", "muscat"] },'));
+  assert(fn.includes('template: { name: tpl.name, language: { code: "ar" } }'),'the template sent is the one usable on that number');
   assert(fn.includes('return await set("waiting_owner", null, { template_sent_at: new Date().toISOString() });'));
   assert(fwd.includes("s.status = 'waiting_owner'"));
 });
@@ -72,8 +77,9 @@ test('SQL95: an approved study held for the template goes by itself when the own
   assert(fn.includes('if (action === "held_tick") return json({ ok: true, results: await heldTick(secret) });'));
   // Ahmed's rule of 5 Nov: only a UTILITY template goes out on its own; a MARKETING or refused one holds and he is told once
   assert(fn.includes('const usable = (status: unknown, category: unknown) => String(status || "").toUpperCase() === "APPROVED" && String(category || "").toUpperCase() === "UTILITY";'));
-  assert(fn.includes('return fresh.some((x: any) => x.route === routeKey && usable(x.status, x.category));'));
-  assert(fn.includes('const key = `price_study_template_${marketing ? "marketing" : "rejected"}:${t.route_key}`;'));
+  assert(fn.includes('const pick = (rows: { name: string; status: unknown; category: unknown }[]) => mine.find((t) => rows.some((r) => r.name === t.name && usable(r.status, r.category))) || null;'));
+  assert(fn.includes('return pick(fresh.filter((x: any) => x.route === routeKey));'));
+  assert(fn.includes('const key = `price_study_template_${marketing ? "marketing" : "rejected"}:${t.route_key}:${t.template_name}`;'));
   assert(fn.includes('.eq("action_type", "owner_notify").eq("status", "applied").eq("reason", key).limit(1)'),'told once per number');
   // test mode and «off» hold with another reason, so neither path ever sends those
   assert(!/test_mode_hold|sending_off/.test(f95));

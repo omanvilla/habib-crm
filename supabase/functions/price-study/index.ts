@@ -29,6 +29,13 @@ const WINDOW_MS = 24 * 3600 * 1000 - 5 * 60 * 1000; // five minutes of margin be
 const TEMPLATE = "owner_price_study_ready_ar_v1";
 const TEMPLATE_TEXT = "السلام عليكم دراسة سعر عقارك جاهزة نرسلها لك هنا ؟";
 const TEMPLATE_BUTTON = "نعم ارسلها";
+// v2 (Ahmed 11 Nov 2026, night): Meta approved v1 as UTILITY on the Barka number and as MARKETING on the Muscat number, and
+// only a UTILITY template goes out on its own. He approved this wording for Muscat: it says the study answers the owner's
+// own request. Each number uses its first template that Meta approved as UTILITY.
+const TEMPLATES: { name: string; text: string; routes: string[] }[] = [
+  { name: TEMPLATE, text: TEMPLATE_TEXT, routes: ["barka", "muscat"] },
+  { name: "owner_price_study_ready_ar_v2", text: "السلام عليكم بخصوص طلبك دراسة سعر عقارك الدراسة جاهزة نرسلها لك هنا ؟", routes: ["muscat"] },
+];
 const REPORT_NAME = "دراسة سعر العقار.pdf";
 const PRICE_STUDY = /^\s*دراسة\s*سعر/;
 // the owner answered the template with a plain «لا»: nothing is sent, Ahmed is told
@@ -246,10 +253,13 @@ async function templateApproved(companyId: string, routeKey: string) {
   // Ahmed's standing rule (5 Nov 2026): only a UTILITY template goes out on its own. If Meta rates this one MARKETING the
   // study stays held (it still goes as plain text the moment the owner writes) and Ahmed is told once (heldTick).
   const usable = (status: unknown, category: unknown) => String(status || "").toUpperCase() === "APPROVED" && String(category || "").toUpperCase() === "UTILITY";
-  const r = await db.from("whatsapp_template_registry").select("status,category").eq("company_id", companyId).eq("route_key", routeKey).eq("template_name", TEMPLATE).eq("language", "ar").maybeSingle();
-  if (usable(r.data?.status, r.data?.category)) return true;
+  const mine = TEMPLATES.filter((t) => t.routes.includes(routeKey));
+  const pick = (rows: { name: string; status: unknown; category: unknown }[]) => mine.find((t) => rows.some((r) => r.name === t.name && usable(r.status, r.category))) || null;
+  const r = await db.from("whatsapp_template_registry").select("template_name,status,category").eq("company_id", companyId).eq("route_key", routeKey).in("template_name", mine.map((t) => t.name)).eq("language", "ar");
+  const known = pick((r.data || []).map((x: any) => ({ name: x.template_name, status: x.status, category: x.category })));
+  if (known) return known;
   const fresh = await templates("status", companyId); // Meta may have approved it since the last check
-  return fresh.some((x: any) => x.route === routeKey && usable(x.status, x.category));
+  return pick(fresh.filter((x: any) => x.route === routeKey));
 }
 async function sendStudy(studyId: string, from: "approved" | "waiting_owner") {
   const claim = await db.from("owner_price_studies").update({ status: "sending", updated_at: new Date().toISOString() }).eq("id", studyId).eq("status", from).select("*");
@@ -276,10 +286,11 @@ async function sendStudy(studyId: string, from: "approved" | "waiting_owner") {
     if (!inWindow) {
       // the owner's last message is older than 24 hours: the approved template asks, his answer brings the study (owner_inbound)
       if (s.template_sent_at && Date.now() - Date.parse(s.template_sent_at) < 24 * 3600 * 1000) return await set("waiting_owner", null);
-      if (!(await templateApproved(conv.company_id, conv.route_key))) return await set("approved", "template_not_approved");
-      const t = await metaSend(tokens, phoneId, to, { type: "template", template: { name: TEMPLATE, language: { code: "ar" } } });
+      const tpl = await templateApproved(conv.company_id, conv.route_key);
+      if (!tpl) return await set("approved", "template_not_approved");
+      const t = await metaSend(tokens, phoneId, to, { type: "template", template: { name: tpl.name, language: { code: "ar" } } });
       if (!t.id) return await set("send_failed", `template: ${t.error}`);
-      await recordOut(s, conv, phoneId, to, t.id, "template", TEMPLATE_TEXT, { template: TEMPLATE });
+      await recordOut(s, conv, phoneId, to, t.id, "template", tpl.text, { template: tpl.name });
       return await set("waiting_owner", null, { template_sent_at: new Date().toISOString() });
     }
     let textId = s.owner_message_wamid as string | null;
@@ -408,12 +419,16 @@ async function heldTick(secret: string) {
   // Meta approved the template but not as UTILITY, or refused it: nothing goes out with it; Ahmed is told once per number
   const companyId = (q.data || [])[0]?.company_id;
   if (companyId) {
-    const reg = await db.from("whatsapp_template_registry").select("route_key,status,category").eq("company_id", companyId).eq("template_name", TEMPLATE).eq("language", "ar");
-    for (const t of reg.data || []) {
+    const reg = await db.from("whatsapp_template_registry").select("route_key,template_name,status,category").eq("company_id", companyId).in("template_name", TEMPLATES.map((x) => x.name)).eq("language", "ar");
+    const rows = reg.data || [];
+    const good = (x: any) => String(x.status || "").toUpperCase() === "APPROVED" && String(x.category || "").toUpperCase() === "UTILITY";
+    for (const t of rows) {
       const status = String(t.status || "").toUpperCase(), category = String(t.category || "").toUpperCase();
       const marketing = status === "APPROVED" && category !== "UTILITY", refused = status === "REJECTED";
       if (!marketing && !refused) continue;
-      const key = `price_study_template_${marketing ? "marketing" : "rejected"}:${t.route_key}`;
+      // a number that has a usable template (v2 after v1 was rated MARKETING) needs no alert, nor one that still waits for Meta
+      if (rows.some((x: any) => x.route_key === t.route_key && (good(x) || String(x.status || "").toUpperCase() === "PENDING"))) continue;
+      const key = `price_study_template_${marketing ? "marketing" : "rejected"}:${t.route_key}:${t.template_name}`;
       const seen = await db.from("whatsapp_automation_events").select("id").eq("company_id", companyId).eq("action_type", "owner_notify").eq("status", "applied").eq("reason", key).limit(1);
       if ((seen.data || []).length) continue;
       const told = await tellAhmed(secret, companyId, t.route_key === "barka" ? "barka" : "muscat", [
@@ -436,31 +451,33 @@ async function templates(action: "create" | "status", companyId: string) {
       const waba = String(a.data?.meta_waba_id || "");
       const tokens = await routeTokens(companyId, rk);
       if (!waba || !tokens.length) { out.push({ route: rk, error: "route_not_ready" }); continue; }
-      let t: any = null, err: string | null = null, reached = false;
-      for (const token of tokens) {
-        const f = await fetch(`https://graph.facebook.com/${GRAPH}/${waba}/message_templates?name=${TEMPLATE}&fields=name,status,category,language,id`, { headers: { Authorization: `Bearer ${token}` } });
-        const p = await f.json().catch(() => ({}));
-        if (!f.ok) { err = short(p?.error?.message || `HTTP ${f.status}`, 300); continue; }
-        reached = true; err = null;
-        t = (p.data || []).find((x: any) => x.name === TEMPLATE && String(x.language).toLowerCase().startsWith("ar")) || null;
-        if (!t && action === "create") {
-          const c = await fetch(`https://graph.facebook.com/${GRAPH}/${waba}/message_templates`, {
-            method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ name: TEMPLATE, language: "ar", category: "UTILITY", components: [{ type: "BODY", text: TEMPLATE_TEXT }, { type: "BUTTONS", buttons: [{ type: "QUICK_REPLY", text: TEMPLATE_BUTTON }] }] }),
-          });
-          const cp = await c.json().catch(() => ({}));
-          if (c.ok) t = { id: cp.id, status: cp.status || "PENDING", category: cp.category || "UTILITY" };
-          else err = short(cp?.error?.error_user_msg || cp?.error?.message || `HTTP ${c.status}`, 300);
+      for (const tpl of TEMPLATES.filter((x) => x.routes.includes(rk))) {
+        let t: any = null, err: string | null = null, reached = false;
+        for (const token of tokens) {
+          const f = await fetch(`https://graph.facebook.com/${GRAPH}/${waba}/message_templates?name=${tpl.name}&fields=name,status,category,language,id`, { headers: { Authorization: `Bearer ${token}` } });
+          const p = await f.json().catch(() => ({}));
+          if (!f.ok) { err = short(p?.error?.message || `HTTP ${f.status}`, 300); continue; }
+          reached = true; err = null;
+          t = (p.data || []).find((x: any) => x.name === tpl.name && String(x.language).toLowerCase().startsWith("ar")) || null;
+          if (!t && action === "create") {
+            const c = await fetch(`https://graph.facebook.com/${GRAPH}/${waba}/message_templates`, {
+              method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ name: tpl.name, language: "ar", category: "UTILITY", components: [{ type: "BODY", text: tpl.text }, { type: "BUTTONS", buttons: [{ type: "QUICK_REPLY", text: TEMPLATE_BUTTON }] }] }),
+            });
+            const cp = await c.json().catch(() => ({}));
+            if (c.ok) t = { id: cp.id, status: cp.status || "PENDING", category: cp.category || "UTILITY" };
+            else err = short(cp?.error?.error_user_msg || cp?.error?.message || `HTTP ${c.status}`, 300);
+          }
+          break;
         }
-        break;
+        if (reached) {
+          const row = { company_id: companyId, route_key: rk, waba_id: waba, template_name: tpl.name, language: "ar", template_id: t?.id || null,
+            status: t ? String(t.status || "PENDING").toUpperCase() : (err ? "ERROR" : "MISSING"), category: t?.category || "UTILITY", last_error: err,
+            last_checked_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+          if (t || err) await db.from("whatsapp_template_registry").upsert(row, { onConflict: "company_id,route_key,template_name,language" });
+        }
+        out.push({ route: rk, name: tpl.name, status: t ? String(t.status).toUpperCase() : (err ? "ERROR" : "MISSING"), category: t?.category || null, error: err });
       }
-      if (reached) {
-        const row = { company_id: companyId, route_key: rk, waba_id: waba, template_name: TEMPLATE, language: "ar", template_id: t?.id || null,
-          status: t ? String(t.status || "PENDING").toUpperCase() : (err ? "ERROR" : "MISSING"), category: t?.category || "UTILITY", last_error: err,
-          last_checked_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-        if (t || err) await db.from("whatsapp_template_registry").upsert(row, { onConflict: "company_id,route_key,template_name,language" });
-      }
-      out.push({ route: rk, name: TEMPLATE, status: t ? String(t.status).toUpperCase() : (err ? "ERROR" : "MISSING"), category: t?.category || null, error: err });
     } catch (e) { out.push({ route: rk, error: short(String((e as any)?.message || e), 200) }); }
   }
   return out;
