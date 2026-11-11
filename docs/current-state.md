@@ -2,6 +2,13 @@
 
 Updated 2026-11-11. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 11 November 2026 — owner offers and investment projects open to staff (SQL82, commit 17453d3), live
+
+- **Why.** Ahmed, asked whether staff should see «عروض الملاك» and «المشاريع الاستثمارية»: «نعم افتحها لهم».
+- **What.** SQL82 adds staff policies (manager, agent, viewer read; manager and agent update offer status and add or edit projects) on `owner_leads`, `owner_lead_matches`, `investment_projects`; offers tied to the owner's private line stay hidden (`owner_line_is_private`, none today). `crm_match_owner_leads_now` («طابق الحين») accepts manager and agent; `crm_investment_projects` accepts staff and leaves out clients who wrote on the owner's line. `crm_staff_home` now counts new offers, so the staff home has the «عروض ملاك جديدة» tile. Kept owner-only: adding or removing a video on a project (`crm_project_add_video`, `crm_instagram_link_project`, Instagram manual review). Front end `crm-owner-leads.js` and `crm-investment-projects.js` v `20261111-staff1`.
+- **Checked.** As the Barka account in a transaction: 258/258 offers, 1,674/1,674 matches, 3/3 projects; in Ahmed's Chrome as Barka: both sidebar links shown, offers page «253 عرض مالك مو معروض · 94 منها لها مشترين جاهزين», projects page 3 projects and 12 videos with «تعديل» and no video buttons. A browser that cached the old `index.html` needs one reload. Not tried: saving a project or changing an offer status from the Barka account (real records).
+- **Rollback.** `db/changes/82-staff-owner-leads-projects.rollback.sql`, then re-run `81-staff-home.forward.sql`; the two scripts back to `20261110-week2` / `20261105-proj1`.
+
 ## 11 November 2026 — staff get the owner's home page (SQL81, commits 4f9eef1, a282f14), live
 
 - **Why.** Ahmed opened the Barka account and saw the old dashboard instead of his home: "the whole system the same for the employee, except what the rules keep from staff".
