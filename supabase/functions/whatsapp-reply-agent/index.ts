@@ -268,7 +268,7 @@ const schema = {
     meeting: { anyOf: [{ type: "null" }, {
       type: "object", additionalProperties: false,
       properties: {
-        place: { type: "string", enum: ["office", "online", "developer"] },
+        place: { type: "string", enum: ["office", "online", "developer", "dar_global", "project_tbd"] },
         date: { type: ["string", "null"] },
         time: { type: ["string", "null"] },
       },
@@ -979,7 +979,9 @@ Deno.serve(async (req) => {
     // A plain handoff the model labelled «اجتماع:» is read the same way, so Ahmed never gets a meeting alert without a day and an hour.
     // R30 (Ahmed 11 Nov): a project meeting (Al Ahli Sabour) is at the developer's office in Al Udhaybah, not ours in Mawaleh;
     // the time is only a request until Ahmed confirms it (it must not clash with his day), and never the same day.
-    const MEETING_PLACE: Record<string, string> = { office: "مكتب الموالح", online: "اونلاين", developer: "مكتب الأهلي صبور في العذيبة" };
+    // R33 (Ahmed 12 Nov): a project meeting is at that project's developer: Al Ahli Sabour in Al Udhaybah, Aida (Dar Global) at
+    // their office by the Opera House; a project whose office Ahmed has not named yet (Al Yazan) waits for him to set the place
+    const MEETING_PLACE: Record<string, string> = { office: "مكتب الموالح", online: "اونلاين", developer: "مكتب الأهلي صبور في العذيبة", dar_global: "مكتب دار جلوبال عند دار الأوبرا", project_tbd: "عند المطور (المكان يحدده أحمد)" };
     // the meeting this chat already booked (an open «اجتماع:» handoff): booking the same one again («تمام» after it) alerts nobody
     const openMeeting = !!conv.human_handoff_required && /^\s*اجتماع\s*:/.test(String(conv.handoff_reason || "")) ? String(conv.handoff_reason) : "";
     if (out.action === "book_meeting" || (out.action === "handoff" && /^\s*اجتماع\s*:/.test(String(out.handoff_reason || "")))) {

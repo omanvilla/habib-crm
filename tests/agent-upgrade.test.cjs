@@ -190,7 +190,7 @@ test('5: the schema adds seriousness, seriousness_reason, meeting and book_meeti
  assert.deepEqual(schema.properties.seriousness.enum,['strong','possible','weak','unknown']);
  assert.equal(schema.properties.seriousness_reason.type,'string');
  const meeting=schema.properties.meeting.anyOf.find((x)=>x.type==='object');
- assert.deepEqual(meeting.properties.place.enum,['office','online','developer']);
+ assert.deepEqual(meeting.properties.place.enum,['office','online','developer','dar_global','project_tbd']);
  assert.deepEqual(meeting.properties.date.type,['string','null']);
  assert.deepEqual(meeting.properties.time.type,['string','null']);
  assert(schema.properties.action.enum.includes('book_meeting'));
@@ -392,4 +392,16 @@ test('R31: المستحقين stopped, askers join the waiting list',()=>{
  assert(s.includes('UNIQUE (company_id, client_id)')&&s.includes("route_key IS DISTINCT FROM 'owner'"));
  const p=fs.readFileSync('crm-investment-projects.js','utf8');
  assert(p.includes('قائمة انتظار المستحقين')&&p.includes("data-ip=\"wdone\""));
+});
+
+test('R33: each project meeting is at its developer (Aida at Dar Global by the Opera House), never Mawaleh (12 Nov)',()=>{
+ const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
+ const block=agent.slice(at('const MEETING_PLACE'),at('    // the agent may only touch properties that are really available')).replace(': Record<string, string>','');
+ const run=(o,conv={})=>new Function('out','conv','client','dayM','short',block+'\nreturn out;')(o,conv,{name:'أبو سالم'},'2026-11-10',short);
+ let o=run({action:'book_meeting',meeting:{place:'dar_global',date:'2026-11-12',time:'10:00'},handoff_reason:'اجتماع: عايدة',intent:'x',reply_messages:['تمام وصلت']});
+ assert.equal(o.handoff_reason,'اجتماع: أبو سالم مكتب دار جلوبال عند دار الأوبرا 2026-11-12 10:00 عايدة (ينتظر تأكيدك)');
+ o=run({action:'book_meeting',meeting:{place:'project_tbd',date:'2026-11-12',time:'10:00'},handoff_reason:'اجتماع: اليزن',intent:'x',reply_messages:['تمام وصلت']});
+ assert(o.handoff_reason.includes('عند المطور (المكان يحدده أحمد)'));
+ assert(brain.includes('كل مشروع اجتماعه عند مطوره (R33، أحمد 12 نوفمبر)، أبداً في الموالح'));
+ assert(brain.includes('عايدة (دار جلوبال) في مكتبهم عند دار الأوبرا'));
 });
