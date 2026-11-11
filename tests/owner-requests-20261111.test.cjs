@@ -30,7 +30,8 @@ test('voice note: bin while recording, delete after, ➤ while recording sends',
 test('resume: owner home asks the agent to carry on, pricing rows have no resume, every row has a Claude note',()=>{
  assert.match(home,/waInboxInvoke\(\{action:'clear_handoff',conversation_id:id,resume:true\}\)/);
  // R27 (11 Nov): staff resume too; price studies are never theirs, notes for Claude stay the owner's
- assert(home.includes(`(pricing||!canResume()?'':'<button type="button" class="btn-primary coh-go" data-coh="presume"`));
+ // SQL94: a chat whose study already went to the owner sits with the other paused chats; staff still get no resume on it
+ assert(home.includes(`(pricing||!canResume()||(!isOwner()&&isStudyChat(i))?'':'<button type="button" class="btn-primary coh-go" data-coh="presume"`));
  // 11 Nov (later): staff see price studies too («حتى دراسة تسعير اريد تظهر للموظف»); still no resume on them
  assert(home.includes("const pricingItems=()=>canResume()?paused.items.filter(isPricing):[];"));
  assert(home.includes(`(isOwner()?'<button type="button" class="btn-secondary coh-go" data-coh="pnote"`));
