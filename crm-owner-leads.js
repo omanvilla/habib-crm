@@ -2,13 +2,14 @@
  * details (seller requests from WhatsApp and the old intake form, plus what the reply agent records)
  * with the active buyers looking for the same type in the same area and budget. The list is filled and
  * matched by crm_match_owner_leads() every morning; the button "طابق الحين" runs it on demand.
- * Owner only (RLS on owner_leads / owner_lead_matches). */
+ * Owner and staff (SQL82, RLS on owner_leads / owner_lead_matches). */
 (function(){
   'use strict';
   const esc=v=>typeof escapeHtml==='function'?escapeHtml(String(v==null?'':v)):String(v==null?'':v).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
   const byId=id=>document.getElementById(id);
   const toast=(m,t)=>{if(typeof showToast==='function')showToast(m,t);};
-  const isOwnerNow=()=>typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.role==='owner';
+  // 11 Nov 2026 (Ahmed, SQL82): staff see owner offers too; offers from the owner's private line stay hidden (RLS)
+  const isOwnerNow=()=>typeof currentProfile!=='undefined'&&currentProfile&&['owner','manager','agent','viewer'].includes(currentProfile.role);
   const KINDS={land:'أرض',villa:'فيلا / بيت',house:'بيت',building:'مبنى',apartment:'شقة',farm:'مزرعة',shop:'محل',chalet:'شاليه',resthouse:'استراحة',other:'أخرى'};
   const STATUS={open:'جديد',studied:'انرسلت الدراسة',listed:'انعرض عندنا',closed:'مقفول'};
   const k=v=>v==null?'':(Number(v)>=1000?Math.round(Number(v)/1000).toLocaleString('en-US')+' الف':Number(v).toLocaleString('en-US'));

@@ -1,13 +1,16 @@
 /* Investment projects (5 November 2026). Page "المشاريع الاستثمارية": each project with its developer,
  * its videos, and the clients who wrote to us from one of those videos. Videos link here from the
  * Instagram cards, from this page by link, or by the scan when the caption names one project.
- * Owner only (RLS on investment_projects, owner check in the functions). */
+ * Owner and staff (Ahmed 11 Nov 2026, SQL82): staff read, manager/agent edit projects; linking or removing a video
+ * stays owner-only (Instagram manual review). */
 (function(){
   'use strict';
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
   const byId=id=>document.getElementById(id);
   const toast=(m,t)=>{if(typeof showToast==='function')showToast(m,t);};
   const isOwnerNow=()=>typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.role==='owner';
+  const canSee=()=>typeof currentProfile!=='undefined'&&currentProfile&&['owner','manager','agent','viewer'].includes(currentProfile.role);
+  const canEdit=()=>typeof currentProfile!=='undefined'&&currentProfile&&['owner','manager','agent'].includes(currentProfile.role);
   const safeLink=v=>{try{const u=new URL(v);return u.protocol==='https:'&&/^(www\.)?instagram\.com$/.test(u.hostname)?u.href:'';}catch{return '';}};
   const safeThumb=v=>{try{const u=new URL(v);return u.protocol==='https:'&&/(\.cdninstagram\.com|\.fbcdn\.net)$/.test(u.hostname)?u.href:'';}catch{return '';}};
   const day=v=>String(v||'').slice(0,10);
@@ -30,9 +33,9 @@
     }
     syncVisibility();
   }
-  function syncVisibility(){const l=byId('navProjects');if(l)l.style.display=isOwnerNow()?'':'none';}
+  function syncVisibility(){const l=byId('navProjects');if(l)l.style.display=canSee()?'':'none';}
   async function load(){
-    if(loading||!isOwnerNow())return;loading=true;
+    if(loading||!canSee())return;loading=true;
     try{const r=await supa.rpc('crm_investment_projects');if(r.error)throw r.error;projects=r.data||[];render();}
     catch(e){const list=byId('ipList');if(list)list.innerHTML='<div class="ws-error" role="alert">تعذر تحميل المشاريع. حدّث الصفحة.</div>';}
     finally{loading=false;}
@@ -53,7 +56,7 @@
     const url=safeLink(v.permalink),thumb=safeThumb(v.thumbnail_url);
     return '<li class="ip-video">'+(thumb?'<img src="'+esc(thumb)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<div class="ip-thumb">فيديو</div>')
       +'<div class="ip-video-body"><small>'+esc(day(v.published_at))+(url?' · <a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">فتح الفيديو ↗</a>':'')+'</small><p>'+esc(v.caption||'بدون وصف')+'</p></div>'
-      +'<button type="button" class="btn-secondary ip-remove" data-ip="unlink" data-id="'+esc(v.id)+'" data-project="'+esc(p.id)+'">شيله</button></li>';
+      +(isOwnerNow()?'<button type="button" class="btn-secondary ip-remove" data-ip="unlink" data-id="'+esc(v.id)+'" data-project="'+esc(p.id)+'">شيله</button>':'')+'</li>';
   }
   function render(){
     const list=byId('ipList'),sub=byId('ipSub');if(!list)return;
@@ -61,9 +64,9 @@
     if(sub)sub.textContent=projects.length+' مشاريع · '+videos+' فيديو';
     drawForm();
     list.innerHTML=projects.length?projects.map(p=>'<section class="card ip-card">'
-      +'<div class="ip-head"><div><h2>'+esc(p.name)+'</h2><small>'+(p.developer?'المطور: '+esc(p.developer):'المطور غير محدد')+(p.area?' · '+esc(p.area):'')+'</small></div><button type="button" class="btn-secondary" data-ip="edit" data-id="'+esc(p.id)+'">تعديل</button></div>'
+      +'<div class="ip-head"><div><h2>'+esc(p.name)+'</h2><small>'+(p.developer?'المطور: '+esc(p.developer):'المطور غير محدد')+(p.area?' · '+esc(p.area):'')+'</small></div>'+(canEdit()?'<button type="button" class="btn-secondary" data-ip="edit" data-id="'+esc(p.id)+'">تعديل</button>':'')+'</div>'
       +(p.notes?'<p class="ip-notes">'+esc(p.notes)+'</p>':'')
-      +'<div class="ip-add"><input class="fi" data-ip-link="'+esc(p.id)+'" placeholder="الصق رابط فيديو إنستغرام" dir="ltr"><button type="button" class="btn-primary" data-ip="add" data-id="'+esc(p.id)+'">أضف الفيديو</button></div>'
+      +(isOwnerNow()?'<div class="ip-add"><input class="fi" data-ip-link="'+esc(p.id)+'" placeholder="الصق رابط فيديو إنستغرام" dir="ltr"><button type="button" class="btn-primary" data-ip="add" data-id="'+esc(p.id)+'">أضف الفيديو</button></div>':'')
       +'<h3>الفيديوهات <b dir="ltr">'+p.videos.length+'</b></h3>'
       +(p.videos.length?'<ul class="ip-videos">'+p.videos.map(v=>videoRow(p,v)).join('')+'</ul>':'<p class="ip-empty">ما في فيديو مربوط للحين</p>')
       +'<h3>عملاء تواصلوا من الفيديوهات <b dir="ltr">'+p.clients.length+'</b></h3>'
@@ -104,7 +107,7 @@
   });
   const nav=window.navigate;
   if(typeof nav==='function')window.navigate=function(id){
-    if(id==='projects'&&!isOwnerNow()){if(typeof showPermissionDenied==='function')showPermissionDenied();return;}
+    if(id==='projects'&&!canSee()){if(typeof showPermissionDenied==='function')showPermissionDenied();return;}
     ensurePage();
     const r=nav.apply(this,arguments);
     if(id==='projects'){const t=byId('tbTitle');if(t)t.innerHTML='<em>المشاريع الاستثمارية</em>';load();}

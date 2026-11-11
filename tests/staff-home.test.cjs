@@ -9,6 +9,8 @@ test('crm_staff_home runs with the caller\'s own row level security and never to
  assert(sql.includes('STABLE SECURITY INVOKER'));
  assert(!/SECURITY DEFINER/.test(sql));
  assert(sql.includes("'owner_leads_new', 0")&&sql.includes("'problems', '[]'::jsonb")&&sql.includes("'agent_replies', NULL"));
+ // SQL82 (Ahmed 11 Nov): owner offers open to staff, so their home counts new offers through the staff policy
+ assert(fs.readFileSync('db/changes/82-staff-owner-leads-projects.forward.sql','utf8').includes("'owner_leads_new', (SELECT count(*) FROM public.owner_leads l WHERE l.company_id = v_company AND l.status = 'open'"));
  assert(!/owner_leads l|cron\.job|instagram_|whatsapp_reply_drafts|crm_paused_chats\(\)/.test(sql.split('AS $function$')[1]),'no owner-only table inside the body');
  assert(!/FROM public\.deals /.test(sql),'deals only through crm_deals_access (no money, no merged cards)');
  assert(sql.includes('FROM public.crm_deals_access d'));
