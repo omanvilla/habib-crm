@@ -10,7 +10,7 @@ test('SQL91 is guarded, mirrored, and adds lane + sends_text',()=>{
   assert(fwd.includes('SQL91 ('));
   assert(fwd.includes("'d9f0f7ca93fa33025bbedfe3c0b5a8f7'"));
   assert(fwd.includes('AS lane,'));
-  assert(fwd.includes("'بخصوص طلبك ' || coalesce(q.template_params ->> 0, '') || E'\nلين الحين تبحث ؟'"));
+  assert(fwd.includes("'بخصوص طلبك ' || coalesce(q.template_params ->> 0, '') || E'\\nلين الحين تبحث ؟'"));
   assert(fwd.includes("THEN 'investor' ELSE 'muscat' END"));
 });
 test('the follow-ups screen has an investors tab and shows what reaches the client',()=>{
