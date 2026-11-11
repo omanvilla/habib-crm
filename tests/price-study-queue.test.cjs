@@ -8,7 +8,8 @@ test('reports are queued and sent by a tick with a 2-minute gap',()=>{
   assert(fn.includes('const GAP_MS = 2 * 60 * 1000;'));
   assert(fn.includes('async function priceStudyTick()'));
   assert(fn.includes('if (now - lastAt < GAP_MS) return { waiting: "gap"'));
-  assert(fn.includes('out.push(await enqueuePriceStudy(rows[i].id, i + 1, rows.length'));
+  assert(fn.includes('out.push(await enqueuePriceStudy(rows[i].id, counts[rk], totals[rk]'),'numbered per branch');
+  assert(fn.includes('const rows = ["barka", "muscat"].flatMap('),'Barka first, then Muscat');
   assert(fn.includes('if (body?.action === "price_study_tick")'));
   assert(!fn.includes('out.push(await priceStudy(rows[i].id'));
 });

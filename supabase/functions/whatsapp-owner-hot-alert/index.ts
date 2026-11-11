@@ -278,10 +278,17 @@ Deno.serve(async (req) => {
     return json({ ok: true, queued: q1, tick: await priceStudyTick() });
   }
   if (body?.action === "price_study_batch") {
-    const q = await db.from("whatsapp_conversations").select("id,handoff_updated_at").eq("human_handoff_required", true).in("route_key", ["barka", "muscat"])
+    const q = await db.from("whatsapp_conversations").select("id,route_key,handoff_updated_at").eq("human_handoff_required", true).in("route_key", ["barka", "muscat"])
       .ilike("handoff_reason", "دراسة%سعر%").order("handoff_updated_at", { ascending: true }).limit(40);
-    const rows = q.data || [], out: any[] = [];
-    for (let i = 0; i < rows.length; i++) out.push(await enqueuePriceStudy(rows[i].id, i + 1, rows.length, body?.force === true, i + 1));
+    // Ahmed 11 Nov: numbered per branch («1 من 6» Barka, «1 من 3» Muscat), Barka first then Muscat, each oldest first
+    const all = q.data || [], out: any[] = [];
+    const rows = ["barka", "muscat"].flatMap((rk) => all.filter((r: any) => r.route_key === rk));
+    const totals: Record<string, number> = {}, counts: Record<string, number> = {};
+    for (const r of rows) totals[r.route_key] = (totals[r.route_key] || 0) + 1;
+    for (let i = 0; i < rows.length; i++) {
+      const rk = rows[i].route_key; counts[rk] = (counts[rk] || 0) + 1;
+      out.push(await enqueuePriceStudy(rows[i].id, counts[rk], totals[rk], body?.force === true, i + 1));
+    }
     return json({ ok: true, total: rows.length, queued: out, tick: await priceStudyTick() });
   }
   if (body?.action === "price_study_tick") return json({ ok: true, tick: await priceStudyTick() });
