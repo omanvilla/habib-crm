@@ -2,6 +2,10 @@
 
 Updated 2026-11-11. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 11 November 2026 — targets, performance and tasks name «مرام» instead of «بركاء» (SQL83), live
+
+- Ahmed: «نعم غيّرها». `crm_branch_people()` (SQL83, security definer, names only) returns the active staff account on each branch line (`company_lead_routes.assigned_to`): Barka = «مرام»; Muscat has no staff account and stays «مسقط». `crmBranchPersonName` / `crmRecordPersonLabel` (app-base `20261111-people2`) use it in the targets and performance cards (`crm-operations-v6.js` `20261111-people1`), the task list and its «المسؤول» column, which was headed «الفرع» (`crm-v18-task-priority-patch.js` `20261111-people2`), member selectors and the clients' responsible column. Display only: targets, filters, data and attribution stay per branch; a new person on the line shows automatically. Checked live as Barka: target card «مرام», 8 of 8 tasks «مرام». Rollback: `83-branch-people.rollback.sql` (labels fall back to the branch).
+
 ## 11 November 2026 — the Barka account is greeted as «مرام» (commit c263ec1), live
 
 - Ahmed: «مسار بركاء خليه باسم مرام نفس صباح الخير وغيره». The Barka profile name changed from «Maram» to «مرام» (`profiles.full_name`, same account id, so authorship is unchanged). `updateUserUI` (app-base `20261111-name1`) shows a staff account's own name in the greeting and the sidebar, with «موظف مبيعات · بركاء» under it. Branch targets, filters, task assignee labels and record attribution still say «بركاء» (branch identity, AGENTS.md). Checked live as Barka: «صباح الخير مرام». Rollback: name back to «Maram», app-base `20261111-resume1`.

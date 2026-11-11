@@ -131,7 +131,7 @@
       +'<td class="crm-grid-actions"><button type="button" class="ops-action" onclick="openTaskDetails(\''+id+'\')">التفاصيل</button>'+(edit?'<button type="button" class="ops-action" onclick="editTask(\''+id+'\')">تعديل</button><button type="button" class="ops-action crm-grid-danger" onclick="deleteTask(\''+id+'\')">حذف</button>':'')+'</td></tr>'
   }
   function renderTable(rows){
-    return '<div class="crm-grid-wrap"><table class="crm-grid" aria-label="قائمة المهام"><thead><tr><th aria-label="تمت"></th><th>المهمة</th><th>العميل</th><th>الموعد</th><th>الأولوية</th><th>الفرع</th><th>إجراءات</th></tr></thead><tbody>'+rows.map(renderRow).join('')+'</tbody></table></div>'
+    return '<div class="crm-grid-wrap"><table class="crm-grid" aria-label="قائمة المهام"><thead><tr><th aria-label="تمت"></th><th>المهمة</th><th>العميل</th><th>الموعد</th><th>الأولوية</th><th>المسؤول</th><th>إجراءات</th></tr></thead><tbody>'+rows.map(renderRow).join('')+'</tbody></table></div>'
   }
 
   window.renderTasks=function(){

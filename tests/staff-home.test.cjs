@@ -41,6 +41,7 @@ test('targets, performance, tasks and the responsible column name the person on 
  assert.equal((base.match(/escapeHtml\(crmRecordPersonLabel\(c\)\)/g)||[]).length,2);
  assert(ops.includes("const branchLabel=branch=>(window.crmBranchPeople&&window.crmBranchPeople[branch])||"));
  assert(tasks.includes('crmRecordPersonLabel(task)')&&tasks.includes('return crmBranchPersonName(branch);'));
- assert(/crm-v18-task-priority-patch\.js\?v=20261111-people1/.test(index)&&/crm-operations-v6\.js\?v=20261111-people1/.test(index));
+ assert(tasks.includes('<th>المسؤول</th>'),'the task column says who is responsible');
+ assert(/crm-v18-task-priority-patch\.js\?v=20261111-people2/.test(index)&&/crm-operations-v6\.js\?v=20261111-people1/.test(index));
 });
 test('member labels name the person on the branch line',()=>{const base=fs.readFileSync('app-base-v15.html','utf8');assert(base.includes("return branch?crmBranchPersonName(branch):'حساب فريق';"));});
