@@ -14,14 +14,16 @@ test('loader includes the simplification module after the modules it builds on',
   assert(index.indexOf('crm-simple-ui.js?v=')>index.indexOf('crm-whatsapp-chat.js?v='));
 });
 
-test('staff selectors and task rows name the branch, never an e-mail address',()=>{
+// 11 Nov 2026 (Ahmed, SQL83): the person on the branch line («مرام») when known, else the branch; never an e-mail
+test('staff selectors and task rows name the person or the branch, never an e-mail address',()=>{
   const start=base.indexOf('function crmMemberChoiceLabel(');
   const body=base.slice(start,base.indexOf('\nfunction ',start+10));
-  const ctx={leadRouteData:{a:{route_key:'barka',assigned_to:'U1'}},currentUser:{id:'X'},window:{}};
-  vm.createContext(ctx);
-  vm.runInContext(base.slice(base.indexOf('function crmBranchName('),base.indexOf('\n',base.indexOf('function crmBranchName(')))+'\n'+body,ctx);
-  assert.equal(ctx.crmMemberChoiceLabel({id:'U1',role:'agent',email:'staff@example.invalid'}),'بركاء');
-  assert.equal(ctx.crmMemberChoiceLabel({id:'U2',role:'agent',email:'staff@example.invalid'}),'حساب فريق');
+  const line=name=>base.slice(base.indexOf('function '+name+'('),base.indexOf('\n',base.indexOf('function '+name+'(')));
+  const run=people=>{const ctx={leadRouteData:{a:{route_key:'barka',assigned_to:'U1'}},currentUser:{id:'X'},window:{crmBranchPeople:people}};
+    vm.createContext(ctx);vm.runInContext(line('crmBranchName')+'\n'+line('crmBranchPersonName')+'\n'+body,ctx);return ctx;};
+  assert.equal(run({barka:'مرام'}).crmMemberChoiceLabel({id:'U1',role:'agent',email:'staff@example.invalid'}),'مرام');
+  assert.equal(run({}).crmMemberChoiceLabel({id:'U1',role:'agent',email:'staff@example.invalid'}),'بركاء');
+  assert.equal(run({}).crmMemberChoiceLabel({id:'U2',role:'agent',email:'staff@example.invalid'}),'حساب فريق');
 });
 
 function runTasks(rows,edit){
