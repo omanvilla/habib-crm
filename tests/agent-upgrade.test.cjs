@@ -367,3 +367,25 @@ test('R29: a congratulation needs the customer to say they bought, reserved or p
  const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
  assert(brain.includes('قاعدة ثابتة (R29، أحمد 11 نوفمبر)')&&brain.includes('ممنوع "مبروك" أو "الله يبارك لك"'));
 });
+// R30 (Ahmed 11 Nov): project meetings at the developer's office in Al Udhaybah; the agent never confirms a slot; never today
+test('R30: meeting at Al Udhaybah, Ahmed confirms the time, never the same day',()=>{
+ assert(agent.includes('developer: "مكتب الأهلي صبور في العذيبة"'));
+ assert(agent.includes('String(mt.date) > dayM')&&agent.includes('out.reply_messages = ["اليوم صعب، بكره أو بعده يناسبك ؟"]'));
+ assert(agent.includes('(ينتظر تأكيدك)')&&agent.includes('out.reply_messages = kept.length ? kept : ["تمام وصلت"]'));
+ const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
+ assert(brain.includes('مع المطور الأهلي صبور في مكتبهم بالعذيبة')&&brain.includes('انت ما تأكد الموعد أبداً'));
+ assert(!brain.includes('تمام ان شاء الله نشوفك الاحد الساعة 5 في المكتب'));
+ const hot=fs.readFileSync('supabase/functions/whatsapp-owner-hot-alert/index.ts','utf8');
+ assert(hot.includes('📅 طلب اجتماع ينتظر تأكيدك'));
+});
+// R31 (Ahmed 11 Nov): «المستحقين» stopped; askers go on a waiting list
+test('R31: المستحقين stopped, askers join the waiting list',()=>{
+ const k=fs.readFileSync('supabase/functions/whatsapp-reply-agent/knowledge.ts','utf8');
+ assert(k.includes('طرح المستحقين في مدينة السلطان هيثم حالياً موقف')&&k.includes('mustahiq_waitlist=true'));
+ assert(agent.includes('mustahiq_waitlist: { type: "boolean" }')&&agent.includes('"name_declined", "mustahiq_waitlist"]'));
+ assert(agent.includes('await db.from("mustahiq_waitlist").upsert(')&&agent.includes('conv.route_key !== "owner"'));
+ const s=fs.readFileSync('db/changes/87-mustahiq-waitlist.forward.sql','utf8');
+ assert(s.includes('UNIQUE (company_id, client_id)')&&s.includes("route_key IS DISTINCT FROM 'owner'"));
+ const p=fs.readFileSync('crm-investment-projects.js','utf8');
+ assert(p.includes('قائمة انتظار المستحقين')&&p.includes("data-ip=\"wdone\""));
+});

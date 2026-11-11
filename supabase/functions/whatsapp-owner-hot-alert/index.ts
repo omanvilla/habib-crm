@@ -135,12 +135,13 @@ Deno.serve(async (req) => {
   const meeting = /^\s*اجتماع/.test(String(conv.handoff_reason || ""));
   const kind = meeting ? "اجتماع" : /^\s*تفاوض/.test(String(conv.handoff_reason || "")) ? "يبي يتفاوض" : "مشتري جاد";
   const text = [
-    `${test ? "🧪 تجربة تنبيه\n" : ""}${meeting ? "📅 اجتماع انحجز" : `🔥 عميل ساخن (${kind})`} · ${branch}`,
+    `${test ? "🧪 تجربة تنبيه\n" : ""}${meeting ? "📅 طلب اجتماع ينتظر تأكيدك" : `🔥 عميل ساخن (${kind})`} · ${branch}`,
     `الاسم: ${name}`,
     `الرقم: ${phone}`,
-    reason ? `${meeting ? "الموعد" : "الموضوع"}: ${short(reason, 300)}` : "",
+    reason ? `${meeting ? "الموعد اللي طلبه" : "الموضوع"}: ${short(reason, 300)}` : "",
     `افتح المحادثة: https://wa.me/${phone}`,
-    meeting ? "العقل يكمل يرد على أسئلته لين الموعد" : "العقل ساكن في محادثته لين ترد عليه",
+    // R30 (Ahmed 11 Nov): the agent only took the requested slot; Ahmed confirms it or offers another time
+    meeting ? "العقل قال له «تمام وصلت» بس. أكد له الموعد أو اقترح وقت ثاني" : "العقل ساكن في محادثته لين ترد عليه",
   ].filter(Boolean).join("\n");
 
   const r = await metaText(await routeTokens(conv.company_id, conv.route_key), phoneId, to, text);

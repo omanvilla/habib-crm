@@ -274,8 +274,10 @@ const schema = {
       },
       required: ["place", "date", "time"],
     }] },
+    // R31 (Ahmed 11 Nov): the client asked about «المستحقين» units (stopped for now) and goes on the waiting list
+    mustahiq_waitlist: { type: "boolean" },
   },
-  required: ["reply_messages", "category", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives", "close_other_branch", "owner_offer", "request", "seriousness", "seriousness_reason", "meeting", "client_name_stated", "name_declined"],
+  required: ["reply_messages", "category", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives", "close_other_branch", "owner_offer", "request", "seriousness", "seriousness_reason", "meeting", "client_name_stated", "name_declined", "mustahiq_waitlist"],
 };
 
 // The marketing text (property description, or the longest reel caption for it) is what the office
@@ -975,7 +977,9 @@ Deno.serve(async (req) => {
     // R19 (Ahmed 10 Nov): a meeting is booked only once the client fixed both the day and the hour (and not in the past); then the
     // agent answers and Ahmed gets a soft handoff «اجتماع: …» with a task for that day. Without both it keeps asking (action none).
     // A plain handoff the model labelled «اجتماع:» is read the same way, so Ahmed never gets a meeting alert without a day and an hour.
-    const MEETING_PLACE: Record<string, string> = { office: "مكتب الموالح", online: "اونلاين", developer: "مكتب المطور" };
+    // R30 (Ahmed 11 Nov): a project meeting (Al Ahli Sabour) is at the developer's office in Al Udhaybah, not ours in Mawaleh;
+    // the time is only a request until Ahmed confirms it (it must not clash with his day), and never the same day.
+    const MEETING_PLACE: Record<string, string> = { office: "مكتب الموالح", online: "اونلاين", developer: "مكتب الأهلي صبور في العذيبة" };
     // the meeting this chat already booked (an open «اجتماع:» handoff): booking the same one again («تمام» after it) alerts nobody
     const openMeeting = !!conv.human_handoff_required && /^\s*اجتماع\s*:/.test(String(conv.handoff_reason || "")) ? String(conv.handoff_reason) : "";
     if (out.action === "book_meeting" || (out.action === "handoff" && /^\s*اجتماع\s*:/.test(String(out.handoff_reason || "")))) {
@@ -983,14 +987,23 @@ Deno.serve(async (req) => {
       // "16:00", "9:30" and "16:00:00" are the same kind of hour; it is kept as HH:MM
       const hm = String(mt?.time || "").trim().match(/^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/);
       if (mt && hm) mt.time = `${hm[1].padStart(2, "0")}:${hm[2]}`;
-      const dated = !!mt && !!hm && /^\d{4}-\d{2}-\d{2}$/.test(String(mt.date || "")) && String(mt.date) >= dayM;
+      // R30: today is never offered (Ahmed needs time to fit it in); tomorrow or later only
+      const sameDay = !!mt && /^\d{4}-\d{2}-\d{2}$/.test(String(mt.date || "")) && String(mt.date) === dayM;
+      const dated = !!mt && !!hm && /^\d{4}-\d{2}-\d{2}$/.test(String(mt.date || "")) && String(mt.date) > dayM;
       // the topic is what the model wrote after «اجتماع:» (else its intent); the fixed part comes first for Ahmed
-      const topic = String(out.handoff_reason || "").replace(/^\s*اجتماع\s*:\s*/, "").trim() || String(out.intent || out.crm_note || "");
-      if (dated && MEETING_PLACE[mt.place]) {
+      const topic = String(out.handoff_reason || "").replace(/^\s*اجتماع\s*:\s*/, "").replace(/\s*\(ينتظر تأكيدك\)\s*$/, "").trim() || String(out.intent || out.crm_note || "");
+      if (sameDay) {
+        out.action = "none"; out.handoff_reason = null; out.meeting_waits = true;
+        out.reply_messages = ["اليوم صعب، بكره أو بعده يناسبك ؟"];
+      } else if (dated && MEETING_PLACE[mt.place]) {
         out.action = "book_meeting";
         const slot = `${MEETING_PLACE[mt.place]} ${mt.date} ${mt.time}`;
         if (openMeeting.includes(slot)) { out.handoff_reason = openMeeting; out.meeting_already_booked = true; }
-        else out.handoff_reason = short(`اجتماع: ${client.name || conv.customer_name || "عميل"} ${slot} ${short(topic, 120)}`, 300);
+        else out.handoff_reason = short(`اجتماع: ${client.name || conv.customer_name || "عميل"} ${slot} ${short(topic, 120)} (ينتظر تأكيدك)`, 300);
+        // R30: the agent never confirms the slot itself; Ahmed confirms it after checking his day
+        const CONFIRMS = /نشوفك|نتشرف\s*فيك|تم\s*(الحجز|التأكيد|تأكيد)|موعدك\s*(تأكد|محجوز|ثابت)|أكدنا|اكدنا|حجزنا\s*لك|بانتظارك|ننتظرك/;
+        const kept = (out.reply_messages || []).filter((t: string) => !CONFIRMS.test(String(t)));
+        out.reply_messages = kept.length ? kept : ["تمام وصلت"];
       } else if (out.action === "book_meeting") { out.action = "none"; out.handoff_reason = null; out.meeting_waits = true; }
       else out.handoff_reason = openMeeting || short(`طلب اجتماع بدون موعد: ${topic}`, 300);
     }
@@ -1326,7 +1339,7 @@ Deno.serve(async (req) => {
     if (inline) {
       const send_preview = outgoing.map((m: any) => m.type === "text" ? (/^\d{8,}$/.test(String(m.text.body)) ? "[رقم صاحب العقار]" : m.text.body) : "[صورة صندوق المفتاح]");
       return json({ ok: true, inline: true, forced_dry: forcedDry, reply_messages: out.reply_messages, action: out.action, handoff_reason: out.handoff_reason ?? null, category: out.category,
-        seriousness: out.seriousness ?? "unknown", seriousness_reason: out.seriousness_reason ?? "", meeting: out.meeting ?? null, crm_note: out.crm_note ?? "", send_preview, analysis });
+        seriousness: out.seriousness ?? "unknown", seriousness_reason: out.seriousness_reason ?? "", meeting: out.meeting ?? null, mustahiq_waitlist: out.mustahiq_waitlist === true, crm_note: out.crm_note ?? "", send_preview, analysis });
     }
     if (dry || holdForOwner || (rt.reply_agent_mode === "approval" && !autoSend)) {
       // nothing to say (closing words, the other branch handles it): no empty card in the approval screen
@@ -1394,9 +1407,18 @@ Deno.serve(async (req) => {
       await notifyHandoff(msg.company_id, conv, client, out.handoff_reason, true);
       try {
         const o = await db.from("profiles").select("id").eq("company_id", msg.company_id).eq("role", "owner").eq("is_active", true).limit(1).maybeSingle();
-        const open = await db.from("tasks").select("id").eq("client_id", client.id).ilike("title", "اجتماع%").eq("due_date", out.meeting.date).eq("done", false).limit(1);
-        if (!(open.data || []).length) await db.from("tasks").insert({ company_id: msg.company_id, user_id: o.data?.id || null, client_id: client.id, title: short(out.handoff_reason, 200), notes: short(out.crm_note, 1000), due_date: out.meeting.date, done: false });
+        // R30: the task is to confirm the slot, so it is due today (the meeting day is in its title)
+        const open = await db.from("tasks").select("id").eq("client_id", client.id).ilike("title", "اجتماع%").eq("done", false).ilike("title", `%${out.meeting.date}%`).limit(1);
+        if (!(open.data || []).length) await db.from("tasks").insert({ company_id: msg.company_id, user_id: o.data?.id || null, client_id: client.id, title: short(out.handoff_reason, 200), notes: short(`أكد الموعد مع العميل أو اقترح وقت ثاني. ${out.crm_note || ""}`, 1000), due_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date()), priority: "high", done: false });
       } catch (e) { console.error("[reply-agent] meeting task", String((e as any)?.message || e)); }
+    }
+    // R31 (Ahmed 11 Nov): a client asking about the «المستحقين» units goes on their waiting list (one row per client), so
+    // he can be messaged as soon as new units open. Never on the owner's private line.
+    if (out.mustahiq_waitlist === true && client?.id && conv.route_key !== "owner") {
+      try {
+        await db.from("mustahiq_waitlist").upsert({ company_id: msg.company_id, client_id: client.id, conversation_id: conv.id, route_key: conv.route_key,
+          note: short(out.crm_note || out.intent || "", 500), last_asked_at: now }, { onConflict: "company_id,client_id" });
+      } catch (e) { console.error("[reply-agent] mustahiq waitlist", String((e as any)?.message || e)); }
     }
     try {
       const flags: any = {};

@@ -5,7 +5,7 @@ const sql=fs.readFileSync('db/changes/61-investment-projects.forward.sql','utf8'
 
 // 11 Nov 2026 (Ahmed, SQL82): staff see the page and edit projects; linking a video stays owner-only
 test('the page loads for owner and staff; video linking stays owner-only',()=>{
- assert.match(index,/crm-investment-projects\.js\?v=20261111-staff1/);
+ assert.match(index,/crm-investment-projects\.js\?v=20261111-wait1/);
  assert(js.includes("if(id==='projects'&&!canSee())"));
  assert(js.includes("(isOwnerNow()?'<div class=\"ip-add\">"),'adding a video: owner only');
  assert(js.includes("(isOwnerNow()?'<button type=\"button\" class=\"btn-secondary ip-remove\""),'removing a video: owner only');

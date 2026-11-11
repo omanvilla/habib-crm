@@ -22,7 +22,7 @@
     if(byId('page-projects'))return;
     const content=document.querySelector('.content');if(!content)return;
     const page=document.createElement('div');page.className='page';page.id='page-projects';
-    page.innerHTML='<div class="page-header"><div><div class="page-title"><span>المشاريع الاستثمارية</span></div><div class="page-sub" id="ipSub">جاري التحميل…</div></div><button type="button" class="btn-primary" data-ip="new">مشروع جديد</button></div><div id="ipForm"></div><div id="ipList" class="ip-list"></div>';
+    page.innerHTML='<div class="page-header"><div><div class="page-title"><span>المشاريع الاستثمارية</span></div><div class="page-sub" id="ipSub">جاري التحميل…</div></div><button type="button" class="btn-primary" data-ip="new">مشروع جديد</button></div><div id="ipWait"></div><div id="ipForm"></div><div id="ipList" class="ip-list"></div>';
     content.append(page);
     const nav=document.querySelector('#sidebar .nav-area');
     if(nav&&!byId('navProjects')){
@@ -39,6 +39,26 @@
     try{const r=await supa.rpc('crm_investment_projects');if(r.error)throw r.error;projects=r.data||[];render();}
     catch(e){const list=byId('ipList');if(list)list.innerHTML='<div class="ws-error" role="alert">تعذر تحميل المشاريع. حدّث الصفحة.</div>';}
     finally{loading=false;}
+    loadWait();
+  }
+  /* «المستحقين» waiting list (11 Nov 2026, Ahmed, SQL87/R31): their sales are stopped; whoever asked waits here so they can be
+   * told as soon as new units open. «فتح في النظام» opens the chat, «تم التواصل» takes the client off the list. */
+  let waitRows=[];
+  async function loadWait(){
+    const box=byId('ipWait');if(!box)return;
+    const r=await supa.from('mustahiq_waitlist').select('id,client_id,conversation_id,route_key,note,last_asked_at,clients(name)').is('contacted_at',null).order('last_asked_at',{ascending:false}).limit(300);
+    if(r.error){box.innerHTML='';return;}
+    waitRows=r.data||[];drawWait();
+  }
+  function drawWait(){
+    const box=byId('ipWait');if(!box)return;
+    const label={muscat:'مسقط',barka:'بركاء'};
+    box.innerHTML='<section class="card ip-card"><div class="ip-head"><div><h2>قائمة انتظار المستحقين <b dir="ltr">'+waitRows.length+'</b></h2><small>طرح المستحقين موقف حالياً. أول ما يفتح تواصل معهم وحطهم «تم التواصل»</small></div></div>'
+      +(waitRows.length?'<ul class="ip-clients">'+waitRows.map(w=>'<li><button type="button" class="ip-client" data-ip="client" data-id="'+esc(w.client_id)+'">'+esc((w.clients&&w.clients.name)||'عميل')+'</button><small>'+esc(label[w.route_key]||'')+' · آخر سؤال '+esc(day(w.last_asked_at))+'</small>'
+        +(w.note?'<small dir="auto">'+esc(String(w.note).slice(0,140))+'</small>':'')
+        +(w.conversation_id&&typeof openWhatsAppConversation==='function'?'<button type="button" class="btn-secondary" data-ip="wchat" data-id="'+esc(w.conversation_id)+'">فتح في النظام</button>':'')
+        +(canEdit()?'<button type="button" class="btn-secondary" data-ip="wdone" data-id="'+esc(w.id)+'">تم التواصل</button>':'')+'</li>').join('')+'</ul>':'<p class="ip-empty">ما في أحد في قائمة الانتظار</p>')
+      +'</section>';
   }
   function drawForm(){
     const box=byId('ipForm');if(!box)return;
@@ -104,6 +124,8 @@
     else if(act==='add')addVideo(id);
     else if(act==='unlink')unlink(b.dataset.project,id);
     else if(act==='client'&&typeof viewClient==='function')viewClient(id);
+    else if(act==='wchat'&&typeof navigate==='function'&&typeof openWhatsAppConversation==='function'){navigate('whatsapp',null);setTimeout(()=>openWhatsAppConversation(id),300);}
+    else if(act==='wdone'){b.disabled=true;supa.from('mustahiq_waitlist').update({contacted_at:new Date().toISOString(),contacted_by:currentUser&&currentUser.id||null}).eq('id',id).then(r=>{if(r.error)throw r.error;waitRows=waitRows.filter(w=>w.id!==id);drawWait();toast('انشال من قائمة الانتظار','success');}).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});}
   });
   const nav=window.navigate;
   if(typeof nav==='function')window.navigate=function(id){
