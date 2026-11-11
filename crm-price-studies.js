@@ -18,7 +18,7 @@
   const waiting=()=>data.items.filter(i=>i.status==='awaiting_approval');
   const HOLD={test_mode_hold:'وافقت عليها. الإرسال للملاك في وضع التجربة، فما انرسلت. تنرسل لما يتفعّل الإرسال وتضغط «ارسل الحين»',
     sending_off:'وافقت عليها، والإرسال للملاك موقف',
-    template_not_approved:'وافقت عليها. آخر رسالة من المالك أقدم من 24 ساعة وقالب «دراسة سعر عقارك جاهزة» ما اعتمدته Meta للحين. اضغط «ارسل الحين» بعد ما يعتمد',
+    template_not_approved:'موافقتك انحفظت، بس ما انرسلت للحين: آخر رسالة من المالك أقدم من 24 ساعة، وقالب «دراسة سعر عقارك جاهزة» ما اعتمدته Meta. تنرسل لحالها أول ما يكتب المالك أو يعتمد القالب، وما تحتاج تضغط مرة ثانية',
     owner_said_no_to_the_template:'المالك رد «لا» على رسالة «دراسة سعر عقارك جاهزة»، فما انرسلت له'};
   const REACTION={accepted:'المالك وافق على السعر',price_rejected:'السعر ما ناسب المالك',counter_offer:'المالك طلب سعر ثاني'};
 
@@ -107,11 +107,19 @@
     b.disabled=true;const old=b.textContent;b.textContent='لحظة…';
     const r=await supa.rpc('crm_price_study_decide',args);
     if(r.error){b.disabled=false;b.textContent=old;toast('ما انحفظ: '+(r.error.message||''),'error');return;}
-    toast(approve?'تمام. الإرسال للمالك في الطريق':'رجعت لـ Claude مع ملاحظتك','success');
+    toast(approve?'موافقتك انحفظت. لحظة أتأكد من الإرسال…':'رجعت لـ Claude مع ملاحظتك','success');
     item.status=approve?'approved':'rejected';if(!approve)item.reject_note=args.p_note;if(approve)item.send_error=null;
     redraw();document.dispatchEvent(new CustomEvent('crm-price-studies-updated'));
     // the send runs in the background: read where it ended
-    if(approve){setTimeout(()=>refresh().then(redraw),5000);setTimeout(()=>refresh().then(redraw),15000);}
+    // SQL95 (Ahmed's test, 11 Nov): he pressed «موافق» three times because nothing said the send was held. Say why, once.
+    if(approve){
+      const tell=()=>{const now=data.items.find(i=>i.id===id);
+        if(now&&now.status==='approved'&&now.send_error)toast(HOLD[now.send_error]||('ما انرسلت: '+now.send_error),'error');
+        else if(now&&now.status==='send_failed')toast('ما انرسلت: '+(HOLD[now.send_error]||now.send_error||''),'error');
+        else if(now&&now.status==='sent')toast('انرسلت الدراسة للمالك ✓','success');
+        else if(now&&now.status==='waiting_owner')toast('انرسل له «دراسة سعر عقارك جاهزة»، والدراسة تنرسل أول ما يرد','success');};
+      setTimeout(()=>refresh().then(()=>{redraw();tell();}),6000);setTimeout(()=>refresh().then(redraw),20000);
+    }
   }
   document.addEventListener('click',e=>{
     const b=e.target.closest&&e.target.closest('[data-cps]');if(!b)return;

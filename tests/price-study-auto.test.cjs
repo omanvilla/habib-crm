@@ -41,7 +41,9 @@ test('nothing reaches an owner before the approval, and test mode only reaches t
   assert(fn.includes('if (action === "send") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await sendStudy(id, "approved") })'));
   assert(fn.includes('if (mode === "off") return await set("approved", "sending_off");'));
   assert(fn.includes('if (mode !== "live" && !isTest) return await set("approved", "test_mode_hold");'));
-  assert.equal((fn.match(/sendStudy\(/g)||[]).length,3,'only the approval and the answer to the template deliver a study');
+  // a study is delivered from four places, every one of them from a status only Ahmed's approval leads to
+  assert.equal((fn.match(/sendStudy\(/g)||[]).length,5);
+  assert.equal((fn.match(/sendStudy\([\w.]+, "approved"\)/g)||[]).length,3);
   assert(fn.includes('return await sendStudy(waiting.id, "waiting_owner");'));
   // only the decide RPC (owner) sets «approved»
   assert.equal((fwd.match(/set status = 'approved'/g)||[]).length,1);
@@ -54,6 +56,23 @@ test('outside the 24-hour window the approved template asks first; the study fol
   assert(fn.includes('if (!(await templateApproved(conv.company_id, conv.route_key))) return await set("approved", "template_not_approved");'));
   assert(fn.includes('return await set("waiting_owner", null, { template_sent_at: new Date().toISOString() });'));
   assert(fwd.includes("s.status = 'waiting_owner'"));
+});
+test('SQL95: an approved study held for the template goes by itself when the owner writes or Meta approves',()=>{
+  const f95=fs.readFileSync('db/changes/95-price-study-held.forward.sql','utf8'),b95=fs.readFileSync('db/changes/95-price-study-held.rollback.sql','utf8');
+  assert.equal(f95,fs.readFileSync('supabase/migrations/20261112140000_price_study_held_20261111.sql','utf8'));
+  assert(f95.startsWith('-- SQL95 ('));
+  assert(f95.includes("or (s.status = 'approved' and s.send_error = 'template_not_approved')"));
+  assert(f95.includes("cron.schedule('owner_price_study_held', '*/30 * * * *'"));
+  assert(f95.includes("where exists (select 1 from public.owner_price_studies s where s.status = 'approved' and s.send_error = 'template_not_approved');"),'the job is idle unless a study waits');
+  assert(f95.includes('return NEW; -- never block message saving'));
+  assert(b95.includes("cron.unschedule('owner_price_study_held')")&&!b95.includes('template_not_approved'));
+  assert(fn.includes('const held = rows.find((s: any) => s.status === "approved" && s.send_error === "template_not_approved");'));
+  assert(fn.includes('if (held) return await sendStudy(held.id, "approved");'));
+  assert(fn.includes('.eq("status", "approved").eq("send_error", "template_not_approved").order("decided_at", { ascending: true }).limit(10)'));
+  assert(fn.includes('if (action === "held_tick") return json({ ok: true, results: await heldTick() });'));
+  // test mode and «off» hold with another reason, so neither path ever sends those
+  assert(!/test_mode_hold|sending_off/.test(f95));
+  assert(ui.includes("if(now&&now.status==='approved'&&now.send_error)toast(HOLD[now.send_error]"),'the screen says why an approved study was not sent');
 });
 test('after the send: the task closes, the offer becomes studied, the chat stays with Ahmed',()=>{
   assert(fn.includes('db.from("tasks").update({ done: true, completed_at: now }).eq("id", s.task_id)'));

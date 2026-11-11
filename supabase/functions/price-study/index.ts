@@ -373,7 +373,7 @@ async function readReaction(s: any, secret: string) {
   return { study_id: s.id, reaction: out.reaction, noted, told_ahmed: told.sent };
 }
 async function ownerInbound(convId: string, messageId: string, secret: string) {
-  const q = await db.from("owner_price_studies").select("*").eq("conversation_id", convId).in("status", ["waiting_owner", "sent"]).order("updated_at", { ascending: false }).limit(5);
+  const q = await db.from("owner_price_studies").select("*").eq("conversation_id", convId).in("status", ["waiting_owner", "sent", "approved"]).order("updated_at", { ascending: false }).limit(5);
   const rows = q.data || [];
   const m = messageId ? await db.from("whatsapp_messages").select("id,message_type,body,media_id").eq("id", messageId).maybeSingle() : { data: null };
   const msg: any = m.data;
@@ -388,9 +388,21 @@ async function ownerInbound(convId: string, messageId: string, secret: string) {
     }
     return await sendStudy(waiting.id, "waiting_owner");
   }
+  // SQL95: Ahmed already approved it, it only waited for a way to reach the owner; his message opened the 24-hour window
+  const held = rows.find((s: any) => s.status === "approved" && s.send_error === "template_not_approved");
+  if (held) return await sendStudy(held.id, "approved");
   const sent = rows.find((s: any) => s.status === "sent" && !s.owner_reaction && s.sent_at && Date.now() - Date.parse(s.sent_at) < 14 * 86400000);
   if (sent) return await readReaction(sent, secret);
   return { conversation_id: convId, skipped: "no_study_waiting" };
+}
+
+// SQL95: approved studies that only wait for the template are tried again (cron, every 30 minutes while one waits); the
+// template check inside sendStudy asks Meta, so the first run after its approval sends them. Oldest approval first.
+async function heldTick() {
+  const q = await db.from("owner_price_studies").select("id").eq("status", "approved").eq("send_error", "template_not_approved").order("decided_at", { ascending: true }).limit(10);
+  const out: any[] = [];
+  for (const r of q.data || []) { out.push(await sendStudy(r.id, "approved")); await pause(1500); }
+  return out;
 }
 
 // ---------- the template at Meta ----------
@@ -446,6 +458,7 @@ Deno.serve(async (req) => {
     if (action === "pull_files") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await pullFiles(id, secret) }) : json({ ok: false, error: "study_id_required" }, 400); }
     if (action === "send") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await sendStudy(id, "approved") }) : json({ ok: false, error: "study_id_required" }, 400); }
     if (action === "owner_inbound") { const id = uuid(body?.conversation_id); return id ? json({ ok: true, result: await ownerInbound(id, uuid(body?.message_id), secret) }) : json({ ok: false, error: "conversation_id_required" }, 400); }
+    if (action === "held_tick") return json({ ok: true, results: await heldTick() });
     if (action === "template") {
       const c = await db.from("whatsapp_automation_runtime").select("company_id").limit(1).maybeSingle();
       if (!c.data?.company_id) return json({ ok: false, error: "company_missing" }, 500);
