@@ -10,8 +10,14 @@
   const isOwner=()=>typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.role==='owner';
   const toast=(m,t)=>{if(typeof showToast==='function')showToast(m,t);};
   const KIND={negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرارك',muted:'مكتوم عنهم',manual_reply:'رديت بنفسك'};
-  const TITLES={followups:'متابعة اليوم',paused:'العقل موقوف عندهم',visits:'زيارات يتابعها الذكاء الاصطناعي',problems:'مشاكل تحتاج انتباه'};
+  const TITLES={followups:'متابعة اليوم',paused:'العقل موقوف عندهم',pricing:'دراسة سعر: ملاك ينتظرون تسعيرك',visits:'زيارات يتابعها الذكاء الاصطناعي',problems:'مشاكل تحتاج انتباه'};
   let sequence=0,sheetKind=null,pausedFilter='all',paused={items:[],total:0},last=null;
+  /* «دراسة سعر:» handoffs (11 Nov 2026, Ahmed): owners waiting for a price have their own tile and list, so the
+   * paused list keeps only chats that need another decision. Display only: the hold, the reason text and
+   * «كمّل يا عقل» are unchanged (crm_paused_chats still returns them as kind=negotiation). */
+  const isPricing=i=>/^\s*دراسة\s*سعر/.test(String(i&&i.reason||''));
+  const pricingItems=()=>paused.items.filter(isPricing);
+  const otherPaused=()=>paused.items.filter(i=>!isPricing(i));
 
   /* Boot gate (10 Nov 2026). The owner saw the old dashboard for several seconds before this page replaced it.
    * As soon as the account is known to be the owner (applyRoleVisibility, before the app is shown), <html> gets
@@ -73,7 +79,9 @@
     if(pending){todo+=pending;t.push(tile('ردود تنتظر موافقتك',pending,'data-coh="nav" data-nav="replies"','افتح واعتمد الرد',true));}
     const fu=followupsCount();
     if(fu){todo+=fu;t.push(tile('متابعة اليوم',fu,'data-coh="sheet" data-kind="followups"','أرسلها من واتساب',true));}
-    if(paused.total){todo+=paused.total;t.push(tile('العقل موقوف عندهم',paused.total,'data-coh="sheet" data-kind="paused"','شوف السبب وكمّل',true));}
+    const pr0=pricingItems().length,pa0=otherPaused().length;
+    if(pa0){todo+=pa0;t.push(tile('العقل موقوف عندهم',pa0,'data-coh="sheet" data-kind="paused"','شوف السبب وكمّل',true));}
+    if(pr0){todo+=pr0;t.push(tile('دراسة سعر',pr0,'data-coh="sheet" data-kind="pricing"','ملاك ينتظرون تسعيرك',true));}
     if(d.owner_leads_new)t.push(tile('عروض ملاك جديدة',d.owner_leads_new,'data-coh="nav" data-nav="owner-leads"','يفتح صفحة العروض',false));
     if(Number(d.overdue_total))t.push(tile('زيارات يتابعها الذكاء الاصطناعي',d.overdue_total,'data-coh="sheet" data-kind="visits"','للاطلاع، العقل يسأل العميل',false));
     const pr=(d.problems||[]).length;
@@ -96,24 +104,34 @@
     return list.length?'<ul class="coh-list">'+list.map(p=>'<li class="coh-row coh-problem"><div class="coh-info"><strong>'+esc(p.title)+(p.count?' <b dir="ltr">'+num(p.count)+'</b>':'')+'</strong>'+(p.detail?'<small>'+esc(p.detail)+'</small>':'')+'</div>'
       +(p.nav?'<button type="button" class="btn-secondary coh-go" data-coh="nav" data-nav="'+esc(p.nav)+'">فتح</button>':'')+'</li>').join('')+'</ul>':'<p class="coh-empty">ما في مشاكل الحين</p>';
   }
-  function pausedHtml(){
-    if(!paused.items.length)return '<p class="coh-empty">ما في أحد موقوف عنده العقل</p>';
-    const counts={};paused.items.forEach(i=>{counts[i.kind]=(counts[i.kind]||0)+1;});
-    const tabs=[['all','الكل',paused.items.length]].concat(Object.keys(KIND).filter(k=>counts[k]).map(k=>[k,KIND[k],counts[k]]))
-      .map(([k,l,n])=>'<button type="button" class="cfu-tab'+(pausedFilter===k?' on':'')+'" data-coh="pfilter" data-v="'+k+'" aria-pressed="'+(pausedFilter===k)+'">'+esc(l)+' <b dir="ltr">'+n+'</b></button>').join('');
-    const rows=paused.items.filter(i=>pausedFilter==='all'||i.kind===pausedFilter).map(i=>
-      '<li class="coh-row coh-paused"><div class="coh-info"><strong>'+esc(i.name||'عميل')+' <small>'+esc(KIND[i.kind]||'')+'</small></strong>'
-      +'<small class="coh-note">السبب: '+esc(i.reason)+'</small>'
+  const ROUTE={barka:'بركاء',muscat:'مسقط'};
+  function pausedRows(list,pricing){
+    return list.map(i=>
+      '<li class="coh-row coh-paused"><div class="coh-info"><strong>'+esc(i.name||'عميل')+' <small>'+esc(pricing?(ROUTE[i.route_key]||''):(KIND[i.kind]||''))+'</small></strong>'
+      +'<small class="coh-note">'+(pricing?esc(String(i.reason||'').replace(/^\s*دراسة\s*سعر\s*:?\s*/,'')):'السبب: '+esc(i.reason))+'</small>'
       +(i.last_message?'<small class="coh-note">آخر رسالة منه: <span dir="auto">'+esc(i.last_message)+'</span></small>':'')
       +(i.summary?'<small class="coh-note">'+esc(i.summary)+'</small>':'')+'</div>'
       +'<div class="coh-paused-actions"><button type="button" class="btn-secondary coh-go" data-coh="popen" data-id="'+esc(i.conversation_id)+'">افتح المحادثة</button>'
       +'<button type="button" class="btn-primary coh-go" data-coh="presume" data-id="'+esc(i.conversation_id)+'">كمّل يا عقل</button></div></li>').join('');
-    return '<div class="cfu-tabs coh-ptabs">'+tabs+'</div><ul class="coh-list">'+rows+'</ul>';
+  }
+  function pausedHtml(){
+    const items=otherPaused();
+    if(!items.length)return '<p class="coh-empty">ما في أحد موقوف عنده العقل</p>';
+    const counts={};items.forEach(i=>{counts[i.kind]=(counts[i.kind]||0)+1;});
+    if(pausedFilter!=='all'&&!counts[pausedFilter])pausedFilter='all';
+    const tabs=[['all','الكل',items.length]].concat(Object.keys(KIND).filter(k=>counts[k]).map(k=>[k,KIND[k],counts[k]]))
+      .map(([k,l,n])=>'<button type="button" class="cfu-tab'+(pausedFilter===k?' on':'')+'" data-coh="pfilter" data-v="'+k+'" aria-pressed="'+(pausedFilter===k)+'">'+esc(l)+' <b dir="ltr">'+n+'</b></button>').join('');
+    return '<div class="cfu-tabs coh-ptabs">'+tabs+'</div><ul class="coh-list">'+pausedRows(items.filter(i=>pausedFilter==='all'||i.kind===pausedFilter),false)+'</ul>';
+  }
+  function pricingHtml(){
+    const items=pricingItems();
+    if(!items.length)return '<p class="coh-empty">ما في ملاك ينتظرون تسعير الحين</p>';
+    return '<p class="coh-since">ملاك أرسلوا عقاراتهم والعقل وقف لين تحدد السعر. افتح المحادثة وسعّر، وبعدها «كمّل يا عقل»</p><ul class="coh-list">'+pausedRows(items,true)+'</ul>';
   }
   function drawSheet(){
     if(!sheetKind||sheetKind==='followups')return;
     const body=byId('cohSheetBody');if(!body)return;
-    body.innerHTML=sheetKind==='paused'?pausedHtml():sheetKind==='visits'?visitsHtml():problemsHtml();
+    body.innerHTML=sheetKind==='paused'?pausedHtml():sheetKind==='pricing'?pricingHtml():sheetKind==='visits'?visitsHtml():problemsHtml();
   }
   function openSheet(kind){
     const s=sheetEl();sheetKind=kind;byId('cohSheetTitle').textContent=TITLES[kind]||'';

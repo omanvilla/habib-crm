@@ -75,7 +75,11 @@
 .wa2-reply-bar button,.wa2-attach-preview button{border:0;background:transparent;font-size:16px;cursor:pointer;color:#54656f}
 .wa2-attach-preview{display:flex;align-items:center;gap:10px;background:#fff;border-radius:8px;padding:8px 10px}
 .wa2-attach-preview img,.wa2-attach-preview video{width:64px;height:64px;object-fit:cover;border-radius:6px}
-.wa2-attach-preview audio{height:34px;max-width:240px}
+.wa2-attach-preview audio{height:34px;max-width:min(240px,46vw);min-width:0}
+.wa2-attach-preview .wa2-discard{flex:none;font-size:13.5px;font-weight:600;color:#ea0038;background:#fdecef;border-radius:18px;padding:7px 12px;white-space:nowrap}
+.wa2-rec-cancel{color:#ea0038}
+.wa2-attach-preview:has(audio) .wa2-attach-info strong{display:none}
+.wa2-rec-cancel[hidden]{display:none}
 .wa2-attach-info{flex:1;min-width:0;display:flex;flex-direction:column;font-size:12.5px}
 .wa2-attach-info strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wa2-attach-info small{color:#667781}
