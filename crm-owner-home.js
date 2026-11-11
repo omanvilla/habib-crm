@@ -18,12 +18,17 @@
   const OWNER_KIND={negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرارك',muted:'مكتوم عنهم',manual_reply:'رديت بنفسك'};
   const STAFF_KIND={negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرار',muted:'مكتوم عنهم',manual_reply:'انرد عليها من المكتب'};
   const KIND=new Proxy({},{get:(_,k)=>(isOwner()?OWNER_KIND:STAFF_KIND)[k],ownKeys:()=>Object.keys(OWNER_KIND),getOwnPropertyDescriptor:()=>({enumerable:true,configurable:true})});
-  const TITLES={followups:'متابعة اليوم',paused:'العقل موقوف عندهم',pricing:'دراسة سعر: ملاك ينتظرون تسعيرك',visits:'زيارات يتابعها الذكاء الاصطناعي',problems:'مشاكل تحتاج انتباه'};
+  const TITLES={followups:'متابعة اليوم',paused:'العقل موقوف عندهم',pricing:'دراسة سعر: ملاك ينتظرون تسعيرك',studies:'دراسات سعر تنتظر موافقتك',visits:'زيارات يتابعها الذكاء الاصطناعي',problems:'مشاكل تحتاج انتباه'};
   let sequence=0,sheetKind=null,pausedFilter='all',paused={items:[],total:0},last=null;
   /* «دراسة سعر:» handoffs (11 Nov 2026, Ahmed): owners waiting for a price have their own tile and list, so the
    * paused list keeps only chats that need another decision. Display only: the hold, the reason text and
    * «كمّل يا عقل» are unchanged (crm_paused_chats still returns them as kind=negotiation). */
-  const isPricing=i=>/^\s*دراسة\s*سعر/.test(String(i&&i.reason||''));
+  const isPricing=i=>/^\s*دراسة\s*سعر/.test(String(i&&i.reason||''))&&!/انرسلت الدراسة/.test(String(i&&i.reason||''));
+  /* SQL94 (11 Nov 2026, Ahmed): once he approves a study and it reaches the owner, the hold stays (the chat is his) and its
+   * reason says «دراسة سعر: انرسلت الدراسة للمالك …»; that chat leaves «ملاك ينتظرون تسعيرك» and shows with the other paused
+   * chats. Staff still never resume a price study chat (whatsapp-inbox refuses it), so they get no «كمّل يا عقل» on it. */
+  const isStudyChat=i=>/^\s*دراسة\s*سعر/.test(String(i&&i.reason||''));
+  const studiesCount=()=>typeof window.crmPriceStudiesCount==='function'?Number(window.crmPriceStudiesCount()||0):0;
   // 11 Nov 2026 (Ahmed, SQL84): staff see and resume paused chats too. Price studies: staff see them as well (Ahmed, later
   // the same day: «حتى دراسة تسعير اريد تظهر للموظف»); nobody resumes the agent on one (R26)
   const canResume=()=>typeof currentProfile!=='undefined'&&currentProfile&&['owner','manager','agent'].includes(currentProfile.role);
@@ -90,6 +95,8 @@
     if(pending){todo+=pending;t.push(tile('ردود تنتظر موافقتك',pending,'data-coh="nav" data-nav="replies"','افتح واعتمد الرد',true));}
     const fu=followupsCount();
     if(fu){todo+=fu;t.push(tile('متابعة اليوم',fu,'data-coh="sheet" data-kind="followups"','أرسلها من واتساب',true));}
+    const st0=studiesCount();
+    if(st0){todo+=st0;t.push(tile('دراسات سعر جاهزة',st0,'data-coh="sheet" data-kind="studies"','راجع الأرقام ووافق',true));}
     const pr0=pricingItems().length,pa0=otherPaused().length;
     if(pa0){todo+=pa0;t.push(tile('العقل موقوف عندهم',pa0,'data-coh="sheet" data-kind="paused"','شوف السبب وكمّل',true));}
     if(pr0){todo+=pr0;t.push(tile('دراسة سعر',pr0,'data-coh="sheet" data-kind="pricing"','ملاك ينتظرون تسعيرك',true));}
@@ -128,7 +135,7 @@
       // 11 Nov (Ahmed): a price study always stays with him, so no «كمّل يا عقل» there; every row can carry a note for Claude
       // notes for Claude are the owner's lessons (crm_owner_notes), so staff do not get that button
       +(isOwner()?'<button type="button" class="btn-secondary coh-go" data-coh="pnote" data-id="'+esc(i.conversation_id)+'" data-name="'+esc(i.name||'')+'">ملاحظة لـ Claude</button>':'')
-      +(pricing||!canResume()?'':'<button type="button" class="btn-primary coh-go" data-coh="presume" data-id="'+esc(i.conversation_id)+'">كمّل يا عقل</button>')
+      +(pricing||!canResume()||(!isOwner()&&isStudyChat(i))?'':'<button type="button" class="btn-primary coh-go" data-coh="presume" data-id="'+esc(i.conversation_id)+'">كمّل يا عقل</button>')
       +(pricing&&isOwner()?'<button type="button" class="btn-primary coh-go" data-coh="pprice" data-id="'+esc(i.conversation_id)+'">ارسل السعر للمالك</button>':'')+'</div>'
       +(pricing&&isOwner()?priceForm(i):'')+'</li>').join('');
   }
@@ -167,11 +174,13 @@
   function drawSheet(){
     if(!sheetKind||sheetKind==='followups')return;
     const body=byId('cohSheetBody');if(!body)return;
+    if(sheetKind==='studies'){body.innerHTML=typeof window.crmPriceStudiesHtml==='function'?window.crmPriceStudiesHtml():'';return;}
     body.innerHTML=sheetKind==='paused'?pausedHtml():sheetKind==='pricing'?pricingHtml():sheetKind==='visits'?visitsHtml():problemsHtml();
   }
   function openSheet(kind){
     const s=sheetEl();sheetKind=kind;byId('cohSheetTitle').textContent=TITLES[kind]||'';
     const body=byId('cohSheetBody');body.innerHTML='';
+    if(kind!=='studies'&&typeof window.crmPriceStudiesLeave==='function')window.crmPriceStudiesLeave();
     if(kind==='followups'){
       const fu=byId('crmFollowups');if(!fu)return;
       body.append(fu);fu.hidden=false;
@@ -184,6 +193,7 @@
     const fu=byId('crmFollowups'),home=byId('crmOwnerHome');
     if(fu&&fu.closest('#cohSheetBody')&&home)home.append(fu);
     s.hidden=true;sheetKind=null;document.body.classList.remove('coh-lock');
+    if(typeof window.crmPriceStudiesLeave==='function')window.crmPriceStudiesLeave();
   }
   /* System updates (10 Nov 2026): deals the system closed because a property was sold, withdrawn or archived
    * (SQL77, type deal_auto_closed) and listing contracts that ended (SQL76, type property_archive). Nothing else in
@@ -226,8 +236,10 @@
     try{
       // The follow-up count is read together with the rest (it is lighter), so its tile is there on the first draw.
       const fu=typeof window.crmFollowupsRefresh==='function'?Promise.race([window.crmFollowupsRefresh(),new Promise(r=>setTimeout(r,1500))]):null;
+      // SQL94: the price studies waiting for his approval are read with the rest (owner only), so their tile is there on the first draw
+      const ps=owner&&typeof window.crmPriceStudiesRefresh==='function'?Promise.race([window.crmPriceStudiesRefresh().catch(()=>0),new Promise(r=>setTimeout(r,2500))]):null;
       const [home,pending,twinGroups,pz]=await Promise.all(owner
-        ?[supa.rpc('crm_owner_home'),typeof window.crmPendingReplies==='function'?window.crmPendingReplies().catch(()=>0):0,supa.rpc('crm_property_twins'),supa.rpc('crm_paused_chats'),fu]
+        ?[supa.rpc('crm_owner_home'),typeof window.crmPendingReplies==='function'?window.crmPendingReplies().catch(()=>0):0,supa.rpc('crm_property_twins'),supa.rpc('crm_paused_chats'),fu,ps]
         :[supa.rpc('crm_staff_home'),0,null,canResume()?supa.rpc('crm_paused_chats'):null,fu]);
       if(seq!==sequence)return;
       // a staff session never keeps the owner's lists from an earlier session in the same tab
@@ -247,6 +259,8 @@
     drawTiles(d,last.pending);drawTwins(last.twins);drawSummary(d);drawSheet();
   }
   document.addEventListener('crm-followups-updated',()=>{if(last)drawTiles(last.data,last.pending);});
+  document.addEventListener('crm-price-studies-updated',()=>{if(last)drawTiles(last.data,last.pending);});
+  window.crmOwnerHomeOpenSheet=kind=>{if(hasHome())openSheet(kind);};
   document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();});
   document.addEventListener('click',e=>{
     const b=e.target.closest('[data-coh]');if(!b)return;

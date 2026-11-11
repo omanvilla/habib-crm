@@ -1230,7 +1230,7 @@ Deno.serve(async (req) => {
       } catch (e) { console.error("[reply-agent] owner lead", String((e as any)?.message || e)); }
     }
     // an owner sent everything (kroki or house details, and the price): a price study goes on Ahmed's task list
-    if (!review && out.action === "handoff" && /^دراسة سعر/.test(String(out.handoff_reason || ""))) {
+    if (!review && out.action === "handoff" && /^دراسة سعر/.test(String(out.handoff_reason || "")) && !out.reply_messages.some((t: string) => DECLINE_RE.test(t))) {
       try {
         const o = await db.from("profiles").select("id").eq("company_id", msg.company_id).eq("role", "owner").eq("is_active", true).limit(1).maybeSingle();
         const open = await db.from("tasks").select("id").eq("client_id", client.id).ilike("title", "دراسة سعر%").eq("done", false).limit(1);
@@ -1268,6 +1268,23 @@ Deno.serve(async (req) => {
     const declining = out.reply_messages.some((t: string) => DECLINE_RE.test(t));
     const ownerWithAhmed = out.category === "seller" && !declining && (ahmedTyped || priceStudyOpen);
     analysis.owner_with_ahmed = ownerWithAhmed;
+    // R37 (Ahmed 11 Nov 2026, SQL94): a property we do not take (heirs, mortgaged, occupied: the polite decline of R10 / R20)
+    // closes its owner offer with the reason, so it leaves the open offers; no price study task is opened for it (above).
+    // A property Ahmed brought himself is never declined by the brain, so it never comes here. The reply is not changed.
+    if (!review && out.category === "seller" && declining) {
+      try {
+        const reply = out.reply_messages.join(" ");
+        const ownerSaid = `${history.filter((h: any) => h.direction === "inbound").slice(-8).map((h: any) => String(h.transcript || h.body || "")).join(" ")} ${out.crm_note || ""}`;
+        const mortgaged = /مرهون|رهن/.test(ownerSaid), occupied = /مسكون|ساكن|مستأجر|مأجر|مؤجر/.test(ownerSaid);
+        const why = /ورث|ترك[ةه]/.test(reply) ? "ورثة" : mortgaged && occupied ? "مرهون ومسكون" : mortgaged ? "مرهون" : occupied ? "مسكون" : "مرهون أو مسكون";
+        analysis.owner_offer_closed = why;
+        const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
+        const openLeads = await db.from("owner_leads").select("id,notes").eq("conversation_id", conv.id).eq("status", "open");
+        for (const l of openLeads.data || []) {
+          await db.from("owner_leads").update({ status: "closed", notes: [l.notes, `ما نستلم: ${why} (${day})`].filter(Boolean).join("\n").slice(0, 2000), updated_at: new Date().toISOString() }).eq("id", l.id);
+        }
+      } catch (e) { console.error("[reply-agent] decline closes the offer", String((e as any)?.message || e)); }
+    }
     if (!review && ownerWithAhmed) {
       await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages, status: "skipped", error: "owner_with_ahmed" }).eq("id", draftId);
       return json({ ok: true, ignored: "owner_with_ahmed" });

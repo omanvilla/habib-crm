@@ -1,0 +1,27 @@
+/* Price studies waiting for Ahmed's approval (SQL94, 11 Nov 2026): cards inside the home sheet. */
+.cps-list{display:grid;gap:12px}
+.cps-card{display:grid;gap:8px;padding:14px;border:1px solid #e6e1d4;border-radius:16px;background:#fff;min-width:0}
+.cps-card.focus{border-color:#d9a441;box-shadow:0 0 0 3px rgba(217,164,65,.25)}
+.cps-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.cps-head strong{font-size:15px;overflow-wrap:anywhere}
+.cps-head small{font-size:12px;font-weight:600;color:#9a6b12}
+.cps-chip{padding:4px 10px;border-radius:999px;background:#f1ede2;font-size:12px;font-weight:600;color:#5f554b}
+.cps-chip.wait{background:#ffe7b0;color:#8a5a00}
+.cps-chip.ok{background:#dcefe6;color:#1f4d40}
+.cps-chip.bad{background:#f8dcd6;color:#b3321f}
+.cps-chip.hold{background:#e6ecf5;color:#33486b}
+.cps-facts{font-size:12px;color:#6f6552;overflow-wrap:anywhere}
+.cps-note{margin:0;padding:8px 10px;border-radius:10px;background:#fbf7ec;font-size:13px;overflow-wrap:anywhere}
+.cps-nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px}
+.cps-num{display:grid;gap:2px;padding:10px 12px;border:1px solid #efe7d6;border-radius:10px;min-width:0}
+.cps-num strong{font-size:20px;line-height:1.2;text-align:start}
+.cps-num small{font-size:12px;color:#6f6552}
+.cps-num.priv{background:#f4f6fa;border-color:#d8dfeb}
+.cps-private{margin:4px 0 -2px;font-size:12px;font-weight:700;color:#33486b}
+.cps-files,.cps-actions{display:flex;flex-wrap:wrap;gap:8px}
+.cps-files button,.cps-files a,.cps-actions button{width:auto!important;min-height:44px;flex:1 1 140px}
+.cps-label{display:grid;gap:4px;font-size:12px;color:#6f6552}
+.cps-label textarea,.cps-reject textarea{width:100%;resize:vertical;font-size:14px}
+.cps-reject{display:grid;gap:8px}
+.cps-reject[hidden]{display:none}
+.cps-mode{margin:0 0 10px;padding:10px 12px;border-radius:10px;background:#e6ecf5;color:#33486b;font-size:13px;font-weight:600}
