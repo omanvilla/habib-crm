@@ -71,19 +71,18 @@ Deno.serve(async (req) => {
     } else if (!caption) return json({ ok: false, error: "message_required" }, 400);
     if (!media && !replyTo) return json({ ok: false, error: "use_whatsapp_send_for_plain_text" }, 400);
 
-    // Caller RLS decides access to the conversation (branch separation); investment threads stay owner-only.
+    // Caller RLS decides access to the conversation. 11 Nov 2026 (Ahmed): staff may answer investors too;
+    // only the owner's private line stays owner-only.
     const visible = await userClient.from("whatsapp_conversations").select("id,client_id,route_key,meta_phone_number_id,last_inbound_at")
       .eq("company_id", companyId).eq("id", conversationId).maybeSingle();
     if (visible.error) return json({ ok: false, error: "conversation_access_unavailable" }, 503);
     const conversation = visible.data;
     if (!conversation) return json({ ok: false, error: "conversation_not_authorized" }, 403);
-    if (conversation.route_key === "investment" && profile.role !== "owner") return json({ ok: false, error: "conversation_not_authorized" }, 403);
     const { data: routes } = await admin.from("company_lead_routes").select("route_key,owner_only_inbox").eq("company_id", companyId);
-    if (profile.role !== "owner" && (routes || []).some((r: any) => r.route_key === conversation.route_key && r.owner_only_inbox === true)) return json({ ok: false, error: "conversation_not_authorized" }, 403);
+    if (profile.role !== "owner" && (routes || []).some((r: any) => r.route_key === conversation.route_key && r.route_key !== "investment" && r.owner_only_inbox === true)) return json({ ok: false, error: "conversation_not_authorized" }, 403);
     if (!conversation.client_id) return json({ ok: false, error: "conversation_has_no_client" }, 409);
     const { data: client } = await admin.from("clients").select("id,phone,lead_route").eq("company_id", companyId).eq("id", conversation.client_id).maybeSingle();
     if (!client) return json({ ok: false, error: "client_not_found" }, 404);
-    if (client.lead_route === "investment" && profile.role !== "owner") return json({ ok: false, error: "client_not_found" }, 404);
     const to = digits(client.phone);
     if (to.length < 7 || to.length > 15) return json({ ok: false, error: "invalid_client_phone" }, 400);
     const lastInbound = conversation.last_inbound_at ? Date.parse(conversation.last_inbound_at) : 0;

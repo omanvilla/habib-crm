@@ -112,46 +112,27 @@ function runtime(name, { role = 'agent', active = true, clientRoute = 'muscat', 
 }
 const sendBody = { client_id: 'TEST-client', body: 'TEST synthetic content', operation_id: '00000000-0000-4000-8000-000000000001' };
 
-for (const role of ['agent', 'manager', 'viewer']) {
-  test(`whatsapp-send denies ${role} investment client before request/routing/credentials`, async () => {
-    const f = runtime('whatsapp-send', { role, clientRoute: 'investment', conversationRoute: 'muscat' });
-    const r = await f.invoke(sendBody);
-    assert([403, 404].includes(r.status));
-    assert(f.calls.every(call => ['profiles', 'clients'].includes(call.table)));
-    assert.equal(f.writes.length, 0); assert.equal(f.fetches.length, 0);
-  });
-}
+// SQL79 (11 Nov 2026, Ahmed): staff see and answer investors. Agents and managers now pass the investment gate
+// and reach the same checks as the owner (here: the 24 hour window); viewers still cannot send.
+test('whatsapp-send still denies a viewer before request/routing/credentials', async () => {
+  const f = runtime('whatsapp-send', { role: 'viewer', clientRoute: 'investment', conversationRoute: 'muscat' });
+  const r = await f.invoke(sendBody);
+  assert([403, 404].includes(r.status));
+  assert.equal(f.writes.length, 0); assert.equal(f.fetches.length, 0);
+});
 for (const role of ['agent', 'manager']) {
-  test(`whatsapp-send hides private request under existing public contact from ${role}`, async () => {
-    const f = runtime('whatsapp-send', { role, requestRoute: 'investment', conversationRoute: 'muscat' });
+  test(`whatsapp-send lets ${role} reach an investment client like the owner (window still enforced)`, async () => {
+    const f = runtime('whatsapp-send', { role, clientRoute: 'investment', requestRoute: 'investment', conversationRoute: 'investment' });
     const r = await f.invoke({ ...sendBody, request_id: 'TEST-request' });
-    assert.equal(r.status, 404); assert.equal(r.body.error, 'request_not_found');
-    assert(!f.calls.some(call => call.table === 'whatsapp_conversations' || call.rpc));
-    assert.equal(f.writes.length, 0); assert.equal(f.fetches.length, 0);
+    assert.notEqual(r.body.error, 'client_not_found'); assert.notEqual(r.body.error, 'request_not_found'); assert.notEqual(r.body.error, 'conversation_not_authorized');
+    assert.equal(f.fetches.length, 0);
   });
-  test(`whatsapp-send denies ${role} direct investment conversation even with public parent`, async () => {
-    const f = runtime('whatsapp-send', { role, conversationRoute: 'investment' });
-    const r = await f.invoke({ ...sendBody, conversation_id: 'TEST-conversation' });
-    assert.equal(r.status, 403); assert.equal(r.body.error, 'conversation_not_authorized');
-    assert(!f.calls.some(call => call.rpc)); assert.equal(f.fetches.length, 0);
+  test(`whatsapp-send no longer filters investment requests or conversations out for ${role}`, async () => {
+    const f = runtime('whatsapp-send', { role, requestRoute: 'investment', conversationRoute: 'muscat' });
+    await f.invoke(sendBody);
+    assert(!f.calls.some(call => (call.filters || []).some(filter => filter[0] === 'or' && /neq\.investment/.test(String(filter[1])))));
   });
 }
-test('private requests do not enter staff auto-selection or ambiguity counts', async () => {
-  const f = runtime('whatsapp-send', { role: 'manager', requestRoute: 'investment', conversationRoute: 'muscat' });
-  const r = await f.invoke(sendBody);
-  assert.equal(r.status, 403); assert.equal(r.body.error, 'conversation_not_authorized');
-  const call = f.calls.find(call => call.table === 'client_requests');
-  assert.deepEqual(call.filters.filter(filter => filter[0] === 'or'), [['or', 'and(or(route_key.is.null,route_key.neq.investment),or(branch_key.is.null,branch_key.neq.investment))']]);
-  assert.equal(f.writes.length, 0); assert.equal(f.fetches.length, 0);
-});
-test('later private conversation cannot block staff fallback to an ordinary conversation', async () => {
-  const f = runtime('whatsapp-send', { role: 'manager', conversationRoute: 'muscat' });
-  f.rows.whatsapp_conversations.unshift({ ...f.rows.whatsapp_conversations[0], id: 'TEST-private', route_key: 'investment' });
-  const r = await f.invoke(sendBody);
-  assert.equal(r.status, 409); assert.equal(r.body.error, 'outside_customer_service_window');
-  assert(f.calls.find(call => call.table === 'whatsapp_conversations').filters.some(filter => filter[0] === 'or' && filter[1] === 'route_key.is.null,route_key.neq.investment'));
-  assert.equal(f.writes.length, 0); assert.equal(f.fetches.length, 0);
-});
 test('active owner passes investment permission gate; sending window remains enforced', async () => {
   const f = runtime('whatsapp-send', { role: 'owner', clientRoute: 'investment', requestRoute: 'investment', conversationRoute: 'investment' });
   const r = await f.invoke({ ...sendBody, request_id: 'TEST-request' });

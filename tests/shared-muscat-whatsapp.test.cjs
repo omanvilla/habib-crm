@@ -346,12 +346,12 @@ for (const branch of ['muscat', 'barka']) test(`ordinary ${branch} send retains 
   assert.equal(result.body.sender_phone_number_id, f.physicalId); assert.equal(f.fetches.length, 1);
 });
 
-for (const role of ['agent', 'manager']) test(`${role} cannot send into investment through the shared physical Muscat line`, async () => {
+// SQL79 (11 Nov 2026): staff answer investors on the shared Muscat line; the request is no longer hidden from them.
+for (const role of ['agent', 'manager']) test(`${role} is no longer refused an investment request on the shared physical Muscat line`, async () => {
   const f = fixture('whatsapp-send', { role, privateRequest: true });
   const result = await f.invoke(send);
-  assert.equal(result.status, 404); assert.equal(result.body.error, 'request_not_found');
-  assert.equal(f.fetches.length, 0); assert.equal(f.writes.length, 0);
-  assert(!f.calls.some(call => call.table === 'whatsapp_route_credentials'));
+  assert.notEqual(result.body.error, 'request_not_found');
+  assert.notEqual(result.body.error, 'conversation_not_authorized');
 });
 
 test('stale assignment cannot authorize a direct send denied by current conversation RLS', async () => {

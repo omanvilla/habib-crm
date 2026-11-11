@@ -37,9 +37,9 @@ Deno.serve(async(req)=>{
   if(!clientId)return json({ok:false,error:"client_id_required"},400);if(!messageBody)return json({ok:false,error:"message_required"},400);
   const {data:client,error:clientError}=await admin.from("clients").select("id,company_id,name,phone,assigned_to,lead_route").eq("id",clientId).eq("company_id",profile.company_id).single();
   if(clientError||!client)return json({ok:false,error:"client_not_found"},404);
-  // Service-role lookups need the investment boundary before any routing,
-  // diagnostic response, credential lookup or outbound-operation claim.
-  if(client.lead_route==="investment"&&(profile.role!=="owner"||profile.is_active!==true))return json({ok:false,error:"client_not_found"},404);
+  // 11 Nov 2026 (Ahmed): staff see and answer investors and both branches. The caller's RLS on the
+  // conversation (below) stays the authority; only the owner's private line is owner-only.
+  if(profile.is_active!==true)return json({ok:false,error:"client_not_found"},404);
   const to=cleanDigits(client.phone);if(!to||to.length<7||to.length>15)return json({ok:false,error:"invalid_client_phone"},400);
 
   async function requestTeamAllowed(requestId:string){
@@ -53,19 +53,17 @@ Deno.serve(async(req)=>{
   if(requestedRequestId){
     const rr=await admin.from("client_requests").select("id,assigned_to,route_key,branch_key,status,updated_at").eq("id",requestedRequestId).eq("company_id",profile.company_id).eq("client_id",clientId).maybeSingle();
     if(rr.error)return json({ok:false,error:`request_lookup_failed: ${rr.error.message}`},500);if(!rr.data)return json({ok:false,error:"request_not_found"},404);
-    if((profile.role!=="owner"||profile.is_active!==true)&&[rr.data.route_key,rr.data.branch_key].includes("investment"))return json({ok:false,error:"request_not_found"},404);
-    if(profile.role==="agent"&&rr.data.assigned_to!==user.id&&!(await requestTeamAllowed(rr.data.id)))return json({ok:false,error:"request_not_authorized"},403);
+    if(profile.role==="agent"&&rr.data.assigned_to!==user.id){
+      const seen=await userClient.from("client_requests").select("id").eq("id",rr.data.id).eq("company_id",profile.company_id).maybeSingle();
+      if(seen.error)return json({ok:false,error:"request_access_unavailable"},503);
+      if(!seen.data&&!(await requestTeamAllowed(rr.data.id)))return json({ok:false,error:"request_not_authorized"},403);
+    }
     resolvedRequest=rr.data;requestLinkState="explicit";
   } else {
     let q=admin.from("client_requests").select("id,route_key,branch_key,status,updated_at,assigned_to").eq("company_id",profile.company_id).eq("client_id",clientId).in("status",["active","paused"]);
-    if(profile.role!=="owner"||profile.is_active!==true)q=q.or("and(or(route_key.is.null,route_key.neq.investment),or(branch_key.is.null,branch_key.neq.investment))");
     const rq=await q.order("updated_at",{ascending:false}).limit(20);if(rq.error)return json({ok:false,error:`request_lookup_failed: ${rq.error.message}`},500);
     let rows=rq.data||[];
-    if(profile.role==="agent"){
-      const a=await admin.from("client_request_assignees").select("request_id").eq("company_id",profile.company_id).eq("user_id",user.id).in("request_id",rows.map((x:any)=>x.id));
-      if(a.error)throw new Error(`request_team_filter_failed: ${a.error.message}`);const allowed=new Set((a.data||[]).map((x:any)=>String(x.request_id)));
-      rows=rows.filter((x:any)=>x.assigned_to===user.id||allowed.has(String(x.id)));
-    }
+    // 11 Nov 2026: staff work every branch's requests, so the agent links the same unique request as the owner.
     if(rows.length===1){resolvedRequest=rows[0];requestLinkState="unique_active_request";}else if(rows.length>1)requestLinkState="ambiguous_multiple_requests";
   }
 
@@ -104,11 +102,9 @@ Deno.serve(async(req)=>{
     const r=await admin.from("whatsapp_conversations").select(convSelect).eq("id",requestedConversationId).eq("company_id",profile.company_id).eq("client_id",clientId).maybeSingle();if(r.error)return json({ok:false,error:`conversation_lookup_failed: ${r.error.message}`},500);conversation=r.data;
   } else {
     let fallback=admin.from("whatsapp_conversations").select(convSelect).eq("company_id",profile.company_id).eq("client_id",clientId).not("last_inbound_at","is",null);
-    if(profile.role!=="owner"||profile.is_active!==true)fallback=fallback.or("route_key.is.null,route_key.neq.investment");
     const r=await fallback.order("last_inbound_at",{ascending:false}).limit(1).maybeSingle();if(r.error)return json({ok:false,error:`conversation_lookup_failed: ${r.error.message}`},500);conversation=r.data;
   }
   if(!conversation)return json({ok:false,error:"no_whatsapp_conversation",message:"لا توجد محادثة واتساب واردة لهذا العميل حتى نحدد رقم الإرسال الصحيح."},409);
-  if(conversation.route_key==="investment"&&(profile.role!=="owner"||profile.is_active!==true))return json({ok:false,error:"conversation_not_authorized"},403);
   const visibleConversation=await userClient.from("whatsapp_conversations").select("id").eq("id",conversation.id).eq("company_id",profile.company_id).maybeSingle();
   if(visibleConversation.error)return json({ok:false,error:"conversation_access_unavailable"},503);
   if(!visibleConversation.data)return json({ok:false,error:"conversation_not_authorized"},403);
@@ -122,12 +118,11 @@ Deno.serve(async(req)=>{
   const businessRoute=Array.isArray(business.data)?business.data[0]:business.data;
   if(business.error||!businessRoute||![transportRouteKey,"investment"].includes(businessRoute.route_key)||businessRoute.transport_route_key!==transportRouteKey)return json({ok:false,error:"business_route_unavailable"},503);
   const routeKey=String(businessRoute.route_key);
-  if(routeKey==="investment"&&(profile.role!=="owner"||profile.is_active!==true))return json({ok:false,error:"conversation_not_authorized"},403);
   if(resolvedRequest&&[resolvedRequest.route_key,resolvedRequest.branch_key].includes("investment")!==(routeKey==="investment"))return json({ok:false,error:"request_conversation_scope_changed",message:"تغيّر تصنيف المحادثة ولا يطابق الطلب المحدد. حدّث المحادثة واختر طلباً من المسار نفسه قبل الإرسال."},409);
   if(desiredRouteKey==="investment"&&routeKey!=="investment")return json({ok:false,error:"investment_context_unavailable"},409);
   if(conversation.route_key==="investment"&&routeKey!=="investment")return json({ok:false,error:"conversation_route_changed"},409);
   const {data:routePolicy,error:routePolicyError}=await admin.from("company_lead_routes").select("route_key,owner_only_inbox,assigned_to,is_active").eq("company_id",profile.company_id).eq("route_key",transportRouteKey).maybeSingle();if(routePolicyError)return json({ok:false,error:`route_policy_lookup_failed: ${routePolicyError.message}`},500);
-  const ownerOnly=routePolicy?.owner_only_inbox===true||businessRoute.owner_only_inbox===true||routeKey==="investment";
+  const ownerOnly=(routePolicy?.owner_only_inbox===true&&transportRouteKey!=="investment")||(businessRoute.owner_only_inbox===true&&routeKey!=="investment");
   let allowed=profile.role==="owner" || (profile.role==="manager"&&!ownerOnly);
   if(profile.role==="agent"&&!ownerOnly)allowed=true; // Caller RLS above is authoritative, including branch membership.
   if(!allowed)return json({ok:false,error:"conversation_not_authorized"},403);

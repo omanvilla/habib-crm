@@ -42,7 +42,7 @@
     const records=new Map(allProperties.map(p=>[p.id,p]));
     const rows=cards.map(card=>{
       const title=card.querySelector('.ops-title'),id=title?.dataset.workId,p=records.get(id)||{};
-      const route=p.branch_key==='muscat'?'مسقط':p.branch_key==='barka'?'بركاء':p.branch_key==='investment'?'المستثمرون · خاص بالمالك':'غير محدد';
+      const route=p.branch_key==='muscat'?'مسقط':p.branch_key==='barka'?'بركاء':p.branch_key==='investment'?'المستثمرون':'غير محدد';
       const code=card.querySelector('.ops-code')?.outerHTML||'';
       const facts=[typeof propTypeAr==='function'?propTypeAr(p.type):p.type,p.bedrooms?num(p.bedrooms)+' غرف':null,p.land_size?num(p.land_size)+' م² أرض':null,p.built_size?num(p.built_size)+' م² بناء':null].filter(Boolean);
       const identity=(title?.outerHTML||esc(p.title))+'<small>'+code+' · أضيف '+esc(date(p.created_at))+'</small>';

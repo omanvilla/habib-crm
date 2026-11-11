@@ -165,7 +165,8 @@ Deno.serve(async (req) => {
       admin.from("profiles").select("phone").eq("company_id",companyId).eq("is_active",true),
     ]);
     if (routesR.error) throw new Error(`route_access_failed: ${routesR.error.message}`);
-    const ownerOnly = new Set((routesR.data || []).filter((r:any)=>r.owner_only_inbox===true).map((r:any)=>String(r.route_key)));
+    // 11 Nov 2026 (Ahmed): staff see both branches and investors; only the owner's private line stays owner-only.
+    const ownerOnly = new Set((routesR.data || []).filter((r:any)=>r.owner_only_inbox===true&&r.route_key!=="investment").map((r:any)=>String(r.route_key)));
     if(staffR.error)throw new Error("internal_contacts_unavailable");
     const internalWaIds=new Set((staffR.data||[]).map((p:any)=>{const digits=String(p.phone||"").replace(/\D/g,"");return digits.length===8?"968"+digits:digits.startsWith("00")?digits.slice(2):digits}).filter((phone:string)=>phone.length>=8));
 

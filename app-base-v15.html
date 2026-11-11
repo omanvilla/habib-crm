@@ -2248,7 +2248,7 @@ async function loadApp(){
  return appLoadPromise;
 }
 async function loadAppInternal(){$('loaderScreen').style.display='flex';$('authScreen').classList.add('hidden');try{const sid=(((await supa.auth.getSession()).data||{}).session||{}).user?.id;const [u,p0]=await Promise.all([supa.auth.getUser(),sid?supa.from('profiles').select('*').eq('id',sid).single():null]);if(u.error||!u.data.user)throw new Error('لم يتم العثور على المستخدم');currentUser=u.data.user;const p=p0&&!p0.error&&p0.data&&p0.data.id===currentUser.id?p0:await supa.from('profiles').select('*').eq('id',currentUser.id).single();if(p.error||!p.data)throw new Error('لم يكتمل ملف هذا الحساب. تواصل مع صاحب الشركة.');currentProfile=p.data;if(currentProfile.is_active===false){throw new Error('حسابك معطّل. تواصل مع صاحب الشركة.')}if(!currentProfile.company_id){throw new Error('هذا الحساب غير مربوط بالشركة. استخدم رابط الدعوة الخاص بالموظف أو تواصل مع صاحب الشركة.')}const c=await supa.from('companies').select('*').eq('id',currentProfile.company_id).single();if(c.error||!c.data)throw new Error('تعذر تحميل بيانات الشركة.');currentCompany=c.data;updateUserUI();applyRoleVisibility();$('loaderScreen').style.display='none';$('appScreen').classList.add('visible');await loadDashboard();loadNotifications();refreshWhatsAppBadge();if(canManage()){try{const mr=await supa.from('profiles').select('*').eq('company_id',currentProfile.company_id).order('created_at');allMembers=mr.data||[]}catch(e){console.warn('Members load:',e)}}try{const or_=await supa.from('owners').select('id,name,phone,owner_type,archived').eq('archived',false);allOwners=or_.data||[]}catch(e){}}catch(err){console.error(err);showToast('خطأ: '+err.message,'error');$('loaderScreen').style.display='none';$('authScreen').classList.remove('hidden');await supa.auth.signOut({scope:'local'})}}
-function crmBranchName(branch){return ({muscat:'مسقط',barka:'بركاء',investment:'المستثمرون · خاص بالمالك',owner:'واتساب المالك · خاص',general:'غير محدد'}[branch]||'حساب الفرع')}
+function crmBranchName(branch){return ({muscat:'مسقط',barka:'بركاء',investment:'المستثمرون',owner:'واتساب المالك · خاص',general:'غير محدد'}[branch]||'حساب الفرع')}
 function crmRecordBranchLabel(row){
  const request=row?.request||(typeof clientWorkRequests!=='undefined'?clientWorkRequests:[]).find(r=>r.id===row?.request_id),client=row?.client||(typeof allClients!=='undefined'?allClients:[]).find(c=>c.id===row?.client_id),property=row?.property||(typeof allProperties!=='undefined'?allProperties:[]).find(p=>p.id===row?.property_id);
  const branches=[row?.lead_route,row?.route_key,row?.branch_key,request?.route_key,request?.branch_key,property?.branch_key,client?.lead_route];
@@ -2362,7 +2362,7 @@ function updateClientInvestmentForm(){
   const privateClient=original?original.lead_route==='investment':(isOwner()&&$('cRoleInvestor').checked);
   notice.hidden=!privateClient;notice.style.display=privateClient?'':'none';
   if(privateClient){
-    notice.textContent='المسار: المستثمرين · المسؤول: المالك · الخصوصية: خاص بالمالك';
+    notice.textContent='المسار: المستثمرين · المسؤول: المالك';
     if(!select.disabled)select.dataset.beforeInvestment=select.value;
     const ownerId=original&&original.assigned_to||currentUser.id;
     if(!Array.from(select.options||[]).some(o=>o.value===ownerId)){const option=document.createElement('option');option.value=ownerId;option.textContent='المالك';select.appendChild(option);}
@@ -2521,7 +2521,7 @@ async function saveClient(){
     const roles=[['buyer','cRoleBuyer'],['seller','cRoleSeller'],['investor','cRoleInvestor'],['tenant','cRoleTenant'],['landlord','cRoleLandlord'],['consultation','cRoleConsultation']].filter(x=>$(x[1]).checked).map(x=>x[0]);
     if(!roles.length)throw new Error('اختر نوع العميل');
     const special=roles.filter(x=>['tenant','landlord','consultation'].includes(x));if(special.length>1)throw new Error('اختر نوعاً أساسياً واحداً من مستأجر أو مؤجر أو استشارة؛ أضف بقية الاحتياجات كطلبات مستقلة');
-    const cid=await ensureCompany(),editingId=editingClient,privateInvestor=!editingClient&&isOwner()&&roles.includes('investor');
+    const cid=await ensureCompany(),editingId=editingClient,privateInvestor=!editingClient&&roles.includes('investor');
     if(!crmSessionCurrent(session,actor))return;
     if(privateInvestor&&fullPhone){
       const existing=await supa.from('clients').select('id,name,lead_route,archived').eq('company_id',cid).eq('phone_normalized',fullPhone).limit(2);if(!crmSessionCurrent(session,actor))return;if(existing.error)throw existing.error;
@@ -2635,7 +2635,7 @@ function crmInvestmentDateInput(value){
 function crmInvestmentRequestFields(request){
   const r=request||{},esc=escapeHtml;
   const choices=(id,label,list,value)=>'<div class="fg"><label class="fl" for="'+id+'">'+label+'</label><select class="fs" id="'+id+'">'+list.map(x=>'<option value="'+esc(x[0])+'"'+(String(x[0])===String(value||'')?' selected':'')+'>'+esc(x[1])+'</option>').join('')+'</select></div>';
-  let html='<div class="fg full" style="padding:12px;border:1px solid var(--gold);border-radius:10px;line-height:1.8">المسار: المستثمرين · المسؤول: المالك · الخصوصية: خاص بالمالك<br><small>بيانات التأهيل اختيارية ويمكن استكمالها لاحقاً. عدم الرد يبقى حالة متابعة ولا يعني الرفض.</small></div>';
+  let html='<div class="fg full" style="padding:12px;border:1px solid var(--gold);border-radius:10px;line-height:1.8">المسار: المستثمرين · المسؤول: المالك<br><small>بيانات التأهيل اختيارية ويمكن استكمالها لاحقاً. عدم الرد يبقى حالة متابعة ولا يعني الرفض.</small></div>';
   html+=choices('nrFinanceReadiness','جاهزية التمويل',[['','غير محدد'],['cash_confirmed','السيولة مؤكدة'],['preapproved','موافقة تمويل مسبقة'],['in_progress','قيد التجهيز'],['not_started','لم يبدأ'],['rejected','رُفض التمويل'],['unknown','غير معروف']],r.financing_readiness);
   html+=choices('nrDecisionMaker','صاحب القرار',[['','غير محدد'],['self','العميل نفسه'],['joint_family','قرار مشترك مع الأسرة'],['not_decision_maker','ليس صاحب القرار'],['unknown','غير معروف']],r.decision_maker_status);
   html+=choices('nrPriority','الأولوية',[['1','عالية'],['2','متوسطة'],['3','منخفضة']],r.priority||2);
@@ -2664,7 +2664,7 @@ async function openClientRequestForm(requestId,clientId){
     let request=null;if(requestId){const r=await supa.from('client_requests').select('*').eq('id',requestId).eq('client_id',clientId).single();if(r.error)throw r.error;request=r.data;}
     if(generation!==clientRequestFormGeneration||!crmSessionCurrent(session,actor))return;
     const client=viewingClient&&viewingClient.id===clientId?viewingClient:allClients.find(c=>c.id===clientId);
-    const investment=!!(client&&client.lead_route==='investment');if(investment&&!isOwner())throw new Error('مسار المستثمرين خاص بالمالك');
+    const investment=!!(client&&client.lead_route==='investment');
     clientRequestFormInvestment=investment;
     let modal=$('mClientRequest');if(!modal){modal=document.createElement('div');modal.className='modal-ov';modal.id='mClientRequest';document.body.appendChild(modal);}
     const options=(items)=>items.map(x=>'<option value="'+x[0]+'">'+escapeHtml(x[1])+'</option>').join('');
@@ -2699,7 +2699,7 @@ async function saveNewClientRequest(){
     if(!crmSessionCurrent(session,actor))return;
     const areas=($('nrAreas').value||'').split(/[,،]/).map(x=>x.trim()).filter(Boolean),pt=$('nrPropType').value,next=$('nrNextAction').value.trim();
     const investment=typeof clientRequestFormInvestment!=='undefined'&&clientRequestFormInvestment;
-    if(investment&&!isOwner())throw new Error('مسار المستثمرين خاص بالمالك');
+    
     if(!investment&&$('nrBranch').value==='investment')throw new Error('مسار المستثمرين يتطلب ملف عميل في مسار المستثمرين؛ لن يتغير مسار هذا العميل تلقائياً');
     if(!$('nrBranch').value)throw new Error('حدد الفرع المسؤول عن الطلب');if(!investment&&!areas.length&&!next)throw new Error('أدخل المنطقة المطلوبة أو الإجراء التالي للطلب');
     const landMin=crmReadNumber('nrLandMin','أدنى مساحة الأرض'),landMax=crmReadNumber('nrLandMax','أقصى مساحة الأرض'),builtMin=crmReadNumber('nrBuiltMin','أدنى مساحة البناء'),builtMax=crmReadNumber('nrBuiltMax','أقصى مساحة البناء');
