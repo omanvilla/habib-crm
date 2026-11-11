@@ -56,7 +56,8 @@ test('brain and knowledge stay one template string the prompt sync can read',()=
   assert(!src.includes('${'),name+' has no interpolation');
   assert(body(src).length>1000,name+' body is long enough for agent-prompt-sync');
  }
- assert(body(brain).length<60000,'the brain stays compact (Ahmed\'s open notes are appended after it)');
+ // 11 Nov 2026: R25–R31 grew it past 60,000; no hard limit downstream (compose_agent_brain only appends the lessons)
+ assert(body(brain).length<66000,'the brain stays compact (Ahmed\'s open notes are appended after it)');
 });
 test('R18: only the figures Ahmed wrote; any other price gets the "it depends" line and a meeting',()=>{
  assert(knowledge.includes('57,000'),'Iconic Tower studio from 57,000');

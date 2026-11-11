@@ -194,7 +194,7 @@ test('5: the schema adds seriousness, seriousness_reason, meeting and book_meeti
  assert.deepEqual(meeting.properties.date.type,['string','null']);
  assert.deepEqual(meeting.properties.time.type,['string','null']);
  assert(schema.properties.action.enum.includes('book_meeting'));
- assert(agent.includes('"client_name_stated", "name_declined"]'),'the required list still ends the same way');
+ assert(agent.includes('"client_name_stated", "name_declined", "mustahiq_waitlist"]'),'the required list still ends the same way (R31 added the waiting list flag)');
 });
 
 test('5: memory and seriousness are saved on live runs only, and an empty note never wipes the memory',()=>{
@@ -212,7 +212,10 @@ test('5: book_meeting is booked only with a day and an hour, as a soft «اجت�
  let o=run({action:'book_meeting',meeting:{place:'office',date:'2026-11-12',time:'9:30'},handoff_reason:'اجتماع: يبي جدول الدفع في مدينة السلطان هيثم',intent:'x'});
  assert.equal(o.action,'book_meeting');
  assert.equal(o.meeting.time,'09:30');
- assert.equal(o.handoff_reason,'اجتماع: أبو سالم مكتب الموالح 2026-11-12 09:30 يبي جدول الدفع في مدينة السلطان هيثم');
+ assert.equal(o.handoff_reason,'اجتماع: أبو سالم مكتب الموالح 2026-11-12 09:30 يبي جدول الدفع في مدينة السلطان هيثم (ينتظر تأكيدك)');
+ assert.deepEqual(o.reply_messages,['تمام وصلت'],'R30: the agent never confirms the slot itself');
+ o=run({action:'book_meeting',meeting:{place:'developer',date:'2026-11-10',time:'17:00'},handoff_reason:'اجتماع: x',intent:'x',reply_messages:['تمام نشوفك اليوم']});
+ assert.equal(o.action,'none');assert.deepEqual(o.reply_messages,['اليوم صعب، بكره أو بعده يناسبك ؟'],'R30: never the same day');
  o=run({action:'book_meeting',meeting:{place:'online',date:'2026-11-12',time:null},handoff_reason:'اجتماع: x',intent:'x'});
  assert.equal(o.action,'none');assert.equal(o.handoff_reason,null);assert.equal(o.meeting_waits,true);
  o=run({action:'book_meeting',meeting:{place:'office',date:'2026-11-09',time:'10:00'},handoff_reason:null,intent:'x'});
@@ -225,13 +228,14 @@ test('5: book_meeting is booked only with a day and an hour, as a soft «اجت�
  o=run({action:'handoff',meeting:null,handoff_reason:'اجتماع: تمام',intent:'x'},{human_handoff_required:true,handoff_reason:booked});
  assert.equal(o.handoff_reason,booked,'the booked meeting stays as it is');
  o=run({action:'book_meeting',meeting:{place:'developer',date:'2026-11-13',time:'16:00'},handoff_reason:'اجتماع: موعد جديد',intent:'x'},{human_handoff_required:true,handoff_reason:booked});
- assert(o.handoff_reason.startsWith('اجتماع: أبو سالم مكتب المطور 2026-11-13 16:00')&&!o.meeting_already_booked,'a changed slot is a new booking');
+ assert(o.handoff_reason.startsWith('اجتماع: أبو سالم مكتب الأهلي صبور في العذيبة 2026-11-13 16:00')&&!o.meeting_already_booked,'a changed slot is a new booking (R30: the developer office is Al Udhaybah)');
  // after the send: soft handoff, Ahmed alerted once with a task on the meeting day
  assert(agent.includes('const meetingBooked = out.action === "book_meeting" && /^\\s*اجتماع\\s*:/.test(String(out.handoff_reason || ""));'));
  assert(agent.includes('if (out.action === "handoff" || meetingBooked) Object.assign(convPatch, { human_handoff_required: true'));
  const mt=agent.slice(at('if (meetingBooked && !out.meeting_already_booked) {'),at('const flags: any = {};'));
  assert(mt.includes('await notifyHandoff(msg.company_id, conv, client, out.handoff_reason, true);'),'the meeting alert goes to the owner himself');
- assert(mt.includes('due_date: out.meeting.date'));
+ // R30: the task is to confirm the slot, due today, with the meeting day in its title
+ assert(mt.includes('due_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date()), priority: "high"')&&mt.includes('أكد الموعد مع العميل أو اقترح وقت ثاني'));
  assert(at('if (meetingBooked && !out.meeting_already_booked) {')>at('const wamid = await metaSend'),'the meeting is handed over after the reply went out');
  assert(agent.includes('/^اجتماع/.test(reason) ? "📅 اجتماع"'));
  assert(!re('HARD_HANDOFF').test(booked),'a meeting is a soft handoff: the agent keeps answering');

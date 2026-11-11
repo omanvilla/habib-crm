@@ -100,7 +100,7 @@ test('the agent asks a name once, never guesses, and notes when it was not given
  assert(brain.includes('اسأله عن اسمه مرة وحدة بس'));
  assert(brain.includes('لا تناديه به ولا تخمن اسمه'));
  assert(agent.includes('ما ذكر اسمه، الاسم المسجل من الواتساب مو اسمه الحقيقي'));
- assert(agent.includes('"client_name_stated", "name_declined"]'));
+ assert(agent.includes('"client_name_stated", "name_declined", "mustahiq_waitlist"]'));
  assert(agent.includes('rental_terms,rented_units"'));
 });
 // R1 (8 Nov): the 30-second rule is gone; crm_chat_hold() decides, and a follow-up sent from the daily list does not count.
