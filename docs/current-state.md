@@ -2,6 +2,11 @@
 
 Updated 2026-11-11. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 12 November 2026 — Aida reply off, old archives get a reason, live
+
+- **Aida (R18).** Ahmed: «ما معي الأسعار، لازم أقابل الشخص». The pinned reply ceeb852e (Aida villas from 170k, Oceana from 520k) is `active = false`; an Aida price question now follows R18 (the «it depends» line and a meeting invitation). Inline check on the live agent (nothing sent): the Muscat Aida/investment question twice → the Iconic studio from 57,000 and a rented house of ours, no Aida figure; the Barka Aida question → the Muscat line (R9). Open: where an Aida meeting happens (our Muscat office like R19, or a set Aida day) — Ahmed's choice.
+- **Old archives.** Ahmed: old archives without a reason «نسجل شي ونخلص من الموضوع». 11 of the 12 «سبب الأرشفة غير مسجل» now have a reason through `archive_property_internal` (source `agent`, logged `reason_set`, evidence names this decision): the 2 withdrawn ones `owner_withdrew` (status stays withdrawn), the 9 others `other` with the note «أرشيف قديم قبل 10 نوفمبر، السبب ما انسجل وقتها…» (status stays not_available). No deal changed. Left: `f99087b9` (Rizwan Sawmhan 69, reserved with open card `d45e6b4e`; the function refuses it while a deal is active).
+
 ## 12 November 2026 — R32: a villa «المعروضة» from an ad is a specific property (commit 0aa58e9), live by prompt sync
 
 - **Why.** In the dry run below, a buyer on the Muscat line asking «اريد استفسر عن الڤيلا المعروضه للبيع في حي الكوثر» got «حالياً ما عندنا فيلا للبيع في حي الكوثر» + «اول ما يتوفر بتواصل معك». The brain already said a specific property in an area with nothing listed must not get «ما متوفر» (ask which one and for the ad link); the model read it as a general search. Ahmed: «نعم صلحه». («اول ما يتوفر بتواصل معك» itself is Ahmed's approved wording for general searches, not an R5 promise.)
