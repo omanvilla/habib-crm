@@ -12,7 +12,7 @@ test('crmWaButtons gives «فتح في واتساب الجوال» and «فتح 
 });
 test('the two buttons are used on every chat button',()=>{
  for(const f of ['crm-hot-alerts.js','crm-owner-home.js','crm-owner-leads.js','crm-reply-approvals.js','crm-investment-projects.js'])assert(fs.readFileSync(f,'utf8').includes('crmWaButtons'),f);
- assert.equal((fs.readFileSync('crm-reply-approvals.js','utf8').match(/waBtns\(/g)||[]).length,6,'5 approval cards + the helper');
+ assert.equal((fs.readFileSync('crm-reply-approvals.js','utf8').match(/waBtns\(/g)||[]).length,5,'the 5 approval cards');
  assert(fs.readFileSync('app-base-v15.html','utf8').includes("window.crmWaButtons({clientId:d.client_id,cls:'btn-secondary crm-wa-small'})"),'deal cards');
  assert(fs.readFileSync('crm-whatsapp-chat.js','utf8').includes('فتح في واتساب الجوال'),'inside the CRM chat');
 });
