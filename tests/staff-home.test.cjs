@@ -50,5 +50,19 @@ test('staff follow everyone like the owner, never the owner line (SQL85)',()=>{
  assert(s85.includes("WHERE v_owner OR (public.my_role() IN ('manager','agent','viewer') AND i.route_key IS DISTINCT FROM 'owner')"));
  assert(s85.includes('CASE WHEN v_owner THEN i.owner_instruction END'),'the owner instructions stay his');
  assert(!s85.includes('staff_is_branch_member'));
- assert(/crm-followups-today\.js\?v=20261111-instr2/.test(index));
+ assert(/crm-followups-today\.js\?v=20261111-crm1/.test(index));
+});
+test('a follow-up naming a property that left the market goes back to review (SQL86)',()=>{
+ const s=fs.readFileSync('db/changes/86-followups-reread-unavailable.forward.sql','utf8');
+ assert(s.includes('AFTER UPDATE OF status, archived ON public.properties'));
+ assert(s.includes("IF (old.status = 'available' AND coalesce(old.archived, false) = false)"));
+ assert(s.includes('SET reviewed_at = NULL, owner_text = NULL')&&s.includes('AND q.reason IS NULL'),'owner-decided rows are left alone');
+ assert(s.includes("RAISE WARNING 'SQL86 followups_reread"),'a failure never blocks the property save');
+ assert(s.includes('SELECT DISTINCT ON (i.client_id) i.source, i.id, i.client_id, i.conversation_id,'));
+});
+test('each follow-up opens in the phone WhatsApp or inside the CRM',()=>{
+ const f=fs.readFileSync('crm-followups-today.js','utf8');
+ assert(f.includes('>فتح في واتساب الجوال</a>')&&f.includes('data-cfu="crm"')&&f.includes('>فتح في النظام</button>'));
+ assert(f.includes("navigate('whatsapp',null);setTimeout(()=>openWhatsAppConversation(id),300)"));
+ assert(!f.includes('\&'));
 });
