@@ -8,6 +8,12 @@
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
   const num=v=>Number(v||0).toLocaleString('en-US');
   const isOwner=()=>typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.role==='owner';
+  /* Staff home (11 Nov 2026, Ahmed: "the whole system the same for the employee, except what the rules keep from
+   * staff"). Any active staff account gets this same page from crm_staff_home (SQL81, its own row level security).
+   * Owner-only parts stay out: approvals, paused chats and price studies, owner offers, problems, twins, videos,
+   * agent reply counts and the Reports link (reports hold money). */
+  const isStaff=()=>typeof currentProfile!=='undefined'&&currentProfile&&['manager','agent','viewer'].includes(currentProfile.role);
+  const hasHome=()=>isOwner()||isStaff();
   const toast=(m,t)=>{if(typeof showToast==='function')showToast(m,t);};
   const KIND={negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرارك',muted:'مكتوم عنهم',manual_reply:'رديت بنفسك'};
   const TITLES={followups:'متابعة اليوم',paused:'العقل موقوف عندهم',pricing:'دراسة سعر: ملاك ينتظرون تسعيرك',visits:'زيارات يتابعها الذكاء الاصطناعي',problems:'مشاكل تحتاج انتباه'};
@@ -39,7 +45,7 @@
   const roleVisibility=window.applyRoleVisibility;
   if(typeof roleVisibility==='function')window.applyRoleVisibility=function(){
     const r=roleVisibility.apply(this,arguments);
-    if(isOwner()&&!last)armGate();else if(!isOwner())releaseGate();
+    if(hasHome()&&!last)armGate();else if(!hasHome())releaseGate();
     return r;
   };
 
@@ -72,7 +78,7 @@
     const date=new Date().toLocaleDateString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat',weekday:'long',day:'numeric',month:'long'});
     const name=(byId('welcomeName')&&byId('welcomeName').textContent||'').trim();
     byId('cohHello').innerHTML='<strong>'+(h<12?'صباح الخير':'مساء الخير')+(name?' '+esc(name):'')+'</strong><span>'+esc(date)+'</span>'
-      +'<p>'+(total?'عندك <b dir="ltr">'+num(total)+'</b> أشياء تحتاج تتابعها. ابدأ من الأعلى':'ما في شي يحتاج قرارك الحين')+'</p>';
+      +'<p>'+(total?'عندك <b dir="ltr">'+num(total)+'</b> أشياء تحتاج تتابعها. ابدأ من الأعلى':isOwner()?'ما في شي يحتاج قرارك الحين':'ما في شي متأخر الحين')+'</p>';
   }
   function drawTiles(d,pending){
     const t=[];let todo=0;
@@ -86,7 +92,7 @@
     if(Number(d.overdue_total))t.push(tile('زيارات يتابعها الذكاء الاصطناعي',d.overdue_total,'data-coh="sheet" data-kind="visits"','للاطلاع، العقل يسأل العميل',false));
     const pr=(d.problems||[]).length;
     if(pr)t.push(tile('مشاكل',pr,'data-coh="sheet" data-kind="problems"','تحتاج انتباه',false));
-    byId('cohTiles').innerHTML=t.length?t.join(''):'<p class="coh-empty">ما في شي يحتاج قرارك الحين ✓</p>';
+    byId('cohTiles').innerHTML=t.length?t.join(''):'<p class="coh-empty">'+(isOwner()?'ما في شي يحتاج قرارك الحين ✓':'ما في شي متأخر الحين ✓')+'</p>';
     drawHello(todo);
     const ig=byId('igDiscoveryAlert'),slot=byId('cohIg');if(ig&&slot&&ig.parentNode!==slot)slot.append(ig);
   }
@@ -177,23 +183,27 @@
   function drawSummary(d){
     const p=d.properties||{},r=d.report||{},label={barka:'بركاء',muscat:'مسقط'};
     const props=(p.branches||[]).map(b=>[(label[b.branch]||b.branch)+' متاح من 10',b.available]).concat([['أضيفت هذا الأسبوع',p.added_week],['توفرها ما تأكد من شهر',p.unchecked]]);
-    const rep=[['عملاء جدد',r.new_clients],['ردود الوكيل',r.agent_replies],['زيارات تمت',r.visits_done],['حجوزات الشهر',r.bookings_month],['مبيعات الشهر',r.sales_month]];
+    const rep=[['عملاء جدد',r.new_clients],['ردود الوكيل',r.agent_replies],['زيارات تمت',r.visits_done],['حجوزات الشهر',r.bookings_month],['مبيعات الشهر',r.sales_month]].filter(([,v])=>v!=null);
     const cells=a=>a.map(([l,v])=>'<div class="coh-stat"><strong dir="ltr">'+num(v)+'</strong><small>'+esc(l)+'</small></div>').join('');
     const noVideo=p.no_video||[];
     byId('cohSummary').innerHTML='<h2 class="coh-h">ملخص</h2><h3 class="coh-h3">العقارات</h3><div class="coh-stats">'+cells(props)+'</div>'
       +'<h3 class="coh-h3">هذا الأسبوع <small>من '+esc(r.week_start||'')+'</small></h3><div class="coh-stats">'+cells(rep)+'</div>'
       +(noVideo.length?'<details class="coh-novideo"><summary>متاحة من أكثر من 7 أيام بدون فيديو <b dir="ltr">'+num(noVideo.length)+'</b></summary><p>'+noVideo.map(esc).join(' · ')+'</p></details>':'')
-      +'<div class="coh-links2"><button type="button" class="coh-more" data-coh="nav" data-nav="properties">كل العقارات</button><button type="button" class="coh-more" data-coh="nav" data-nav="reports">التقارير الكاملة</button></div>';
+      +'<div class="coh-links2"><button type="button" class="coh-more" data-coh="nav" data-nav="properties">كل العقارات</button>'+(isOwner()?'<button type="button" class="coh-more" data-coh="nav" data-nav="reports">التقارير الكاملة</button>':'')+'</div>';
   }
   async function load(){
     const page=byId('page-dash'),box=mount();if(!page||!box){releaseGate();return;}
-    if(!isOwner()||typeof supa==='undefined'){box.hidden=true;page.classList.remove('coh-on');releaseGate();return;}
-    const seq=++sequence;
+    if(!hasHome()||typeof supa==='undefined'){box.hidden=true;page.classList.remove('coh-on');releaseGate();return;}
+    const seq=++sequence,owner=isOwner();
     try{
       // The follow-up count is read together with the rest (it is lighter), so its tile is there on the first draw.
       const fu=typeof window.crmFollowupsRefresh==='function'?Promise.race([window.crmFollowupsRefresh(),new Promise(r=>setTimeout(r,1500))]):null;
-      const [home,pending,twinGroups,pz]=await Promise.all([supa.rpc('crm_owner_home'),typeof window.crmPendingReplies==='function'?window.crmPendingReplies().catch(()=>0):0,supa.rpc('crm_property_twins'),supa.rpc('crm_paused_chats'),fu]);
+      const [home,pending,twinGroups,pz]=await Promise.all(owner
+        ?[supa.rpc('crm_owner_home'),typeof window.crmPendingReplies==='function'?window.crmPendingReplies().catch(()=>0):0,supa.rpc('crm_property_twins'),supa.rpc('crm_paused_chats'),fu]
+        :[supa.rpc('crm_staff_home'),0,null,null,fu]);
       if(seq!==sequence)return;
+      // a staff session never keeps the owner's lists from an earlier session in the same tab
+      if(!owner){paused={items:[],total:0};autoNotes=[];}
       if(pz&&!pz.error&&pz.data)paused=pz.data;
       if(home.error||!home.data){if(!last){box.hidden=true;page.classList.remove('coh-on');}return;}
       last={data:home.data,pending:pending||0,twins:twinGroups&&!twinGroups.error?twinGroups.data:[]};
