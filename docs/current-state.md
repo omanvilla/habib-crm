@@ -623,3 +623,5 @@ one client every part waits (3 s after the details, 2.5 s after an image, 6 s af
 line). A stuck `sending` row fails after 10 minutes. Function v8 → `7f00022`. All 9 open price studies were resent in
 order at 17:19 Oman (#1 17:19, #2 17:22, then one every ~2–3 min). Media older than Meta keeps (chats d2bbc840 and
 df4af2b4, sent 25 Oct – 3 Nov) come back `media_expired`: we keep no copy, so those images/videos cannot be resent.
+
+Later the same evening (Ahmed): a resend batch is numbered per branch and grouped, Barka «1 من N» first, then Muscat «1 من N», each oldest first, so he sees how many each branch has. Function v9 → `fb4849c`. The 9 already sent keep their old 1–9 numbering.
