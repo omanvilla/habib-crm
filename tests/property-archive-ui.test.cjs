@@ -25,7 +25,7 @@ test('loader adds the archive module after the property grid and phone layout mo
   assert(at>0);
   assert(at>index.indexOf('crm-operations-v6.js?v='));
   assert(at>index.indexOf('crm-simple-ui.js?v='));
-  assert(index.includes('crm-hot-alerts.js?v=20261110-arch1'));
+  assert(index.includes('crm-hot-alerts.js?v=20261111-wa1'));
   assert(/fetch\('app-base-v15\.html\?v=\d{8}-[a-z0-9]+'\)/.test(index));
   new vm.Script(js,{filename:'crm-property-archive.js'});
 });

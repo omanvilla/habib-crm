@@ -218,7 +218,7 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
     const pr: any = (v.data as any)?.properties;
     name = propertyName(pr);
     about = `متابعة بعد زيارة ${name || "عقار"} يوم ${v.data?.viewing_date || "غير معروف"}. ${v.data?.status === "done" ? "الزيارة تمت" : "ما نعرف هل زار"}.`;
-    if (name) about += ` اسم العقار للعميل: ${name}. إذا سؤالك عن الزيارة اسأله عن رأيه في ${name} بالاسم، مثل "كيف شفت ${name} ؟ عجبتك ولا ما ناسبتك ؟". ممنوع سؤال عام مثل "قدرت تشوف العقار ؟" أو "شفت العقار ؟" أو "بخصوص الزيارة"، وممنوع "كيف لقيت" (تنفهم «لقيتوا مكانها ؟»، R29).`;
+    if (name) about += ` اسم العقار للعميل: ${name}. إذا سؤالك عن الزيارة اسأله عن رأيه في ${name} بالاسم، مثل "كيف شفت ${name} وايش انطباعك عنها ؟" ("عنه" للبيت والمبنى والمحل). ممنوع سؤال عام مثل "قدرت تشوف العقار ؟" أو "شفت العقار ؟" أو "بخصوص الزيارة"، وممنوع "كيف لقيت" (تنفهم «لقيتوا مكانها ؟»، R29).`;
     if (x.after_visit) about += " هذي متابعة بعد موعد الزيارة بساعة ونص، وهذا أهم وقت للبيع. قرارك followup واسأله عن رأيه في العقار بالاسم، إلا إذا المحادثة تقول إنه ما زار أو موضوعه انتهى أو قال رأيه.";
   }
   const fixed = kind === "visit" ? String(x.body || "") : (x.messages || []).join(" ");
@@ -235,14 +235,16 @@ function propertyName(pr: any) {
 // Owner's rule 6 Nov: after a recorded visit the client is asked his opinion of the property by name, never a generic
 // "قدرت تشوف العقار ؟" / "بخصوص الزيارة". If the review still wrote one, it becomes the opinion question below.
 // R29 (Ahmed 11 Nov): «كيف لقيتي فيلا الشخاخيط ؟» was read as «did you find the place ?» («ايوه لقيناها») and the agent said
-// «مبروك». The question asks the opinion in plain words: «كيف شفت(ي) <name> ؟ عجبتك ولا ما ناسبتك ؟»; any «كيف لقيت» becomes it.
-const GENERIC_VISIT_Q = /(تشوف|تشوفين|تشوفي|شفت|شفتي)\s+العقار|بخصوص\s+الزيارة|كيف\s+لقيت(ي|وا|و)?/;
+// «مبروك». The question asks the opinion in plain words; Ahmed's wording (11 Nov, later): «السلام عليكم كيف شفت(ي) <name>
+// وايش انطباعك عنها ؟» («عنه» for a house, building, shop...). Any «كيف لقيت» or the first wording («عجبتك ولا ما ناسبتك») becomes it.
+const GENERIC_VISIT_Q = /(تشوف|تشوفين|تشوفي|شفت|شفتي)\s+العقار|بخصوص\s+الزيارة|كيف\s+لقيت(ي|وا|و)?|عجبتك\s+ولا\s+ما\s+ناسبتك/;
 function namedVisitQuestion(text: string | null, name: string) {
   if (!text || !GENERIC_VISIT_Q.test(text)) return text;
   const she = /(قدرتي|شفتي|تشوفين|تشوفي|لقيتي)/.test(text);
-  // no property name: keep the text, only «كيف لقيت» becomes «كيف شفت» with the opinion question
-  if (!name) return /كيف\s+لقيت/.test(text) ? text.replace(/كيف\s+لقيت(ي|وا|و)?/, (_m, s) => "كيف شفت" + (s === "ي" ? "ي" : "")).replace(/\s*؟?\s*$/, " ؟ عجبتك ولا ما ناسبتك ؟") : text;
-  return `السلام عليكم كيف شفت${she ? "ي" : ""} ${name} ؟ عجبتك ولا ما ناسبتك ؟`;
+  // no property name: keep the text, only «كيف لقيت» becomes «كيف شفت» with the impression question
+  if (!name) return /كيف\s+لقيت/.test(text) ? text.replace(/كيف\s+لقيت(ي|وا|و)?/, (_m, s) => "كيف شفت" + (s === "ي" ? "ي" : "")).replace(/\s*؟?\s*$/, " وايش انطباعك عنه ؟") : text;
+  const him = /^(بيت|منزل|مبنى|محل|مكتب|مستودع|مخزن|معرض)(\s|$)/.test(name);
+  return `السلام عليكم كيف شفت${she ? "ي" : ""} ${name} وايش انطباعك ${him ? "عنه" : "عنها"} ؟`;
 }
 
 async function reviewOne(kind: "visit" | "request", x: any, companyId: string, available: string) {

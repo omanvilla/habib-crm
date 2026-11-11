@@ -162,7 +162,7 @@ test('a saved visit result sends the visit follow-up back to review; property ty
 test('the hot client alert opens the chat in WhatsApp Business',()=>{
  const hot=fs.readFileSync('crm-hot-alerts.js','utf8');
  assert(hot.includes('package=com.whatsapp.w4b')&&hot.includes("'whatsapp-smb://send?phone='"));
- assert(hot.includes('class="btn-primary cha-open" href="'));
+ assert(hot.includes("class=\"btn-primary cha-open\" href=\"")&&hot.includes("window.crmWaButtons({phone:n.phone,conversationId:n.conversation_id,clientId:n.client_id,cls:'btn-primary'})"));
 });
 test('«تم» on a handed-over chat is saved in the database for every device (SQL74)',()=>{
  const hot=fs.readFileSync('crm-hot-alerts.js','utf8');
@@ -181,10 +181,12 @@ test('a visit follow-up asks the client about the property by name, never a gene
  const name=propertyName({type:'villa',area:'الرميس'});
  assert.equal(name,'فيلا الرميس');
  // R29 (Ahmed 11 Nov): the opinion in plain words, never «كيف لقيت» (read as «did you find the place ?»)
- assert.equal(namedVisitQuestion('السلام عليكم بخصوص الزيارة قدرت تشوف العقار ؟',name),'السلام عليكم كيف شفت فيلا الرميس ؟ عجبتك ولا ما ناسبتك ؟');
- assert.equal(namedVisitQuestion('السلام عليكم قدرتي تشوفين العقار ؟',propertyName({type:'house',area:'الحيل الجنوبية'})),'السلام عليكم كيف شفتي بيت الحيل الجنوبية ؟ عجبتك ولا ما ناسبتك ؟');
- assert.equal(namedVisitQuestion('السلام عليكم كيف لقيتي فيلا الشخاخيط ؟','فيلا الشخاخيط'),'السلام عليكم كيف شفتي فيلا الشخاخيط ؟ عجبتك ولا ما ناسبتك ؟');
- assert.equal(namedVisitQuestion('السلام عليكم كيف لقيت الفيلا ؟',''),'السلام عليكم كيف شفت الفيلا ؟ عجبتك ولا ما ناسبتك ؟');
+ // Ahmed's wording (11 Nov, later): «كيف شفت(ي) <العقار> وايش انطباعك عنها ؟», «عنه» for a house
+ assert.equal(namedVisitQuestion('السلام عليكم بخصوص الزيارة قدرت تشوف العقار ؟',name),'السلام عليكم كيف شفت فيلا الرميس وايش انطباعك عنها ؟');
+ assert.equal(namedVisitQuestion('السلام عليكم قدرتي تشوفين العقار ؟',propertyName({type:'house',area:'الحيل الجنوبية'})),'السلام عليكم كيف شفتي بيت الحيل الجنوبية وايش انطباعك عنه ؟');
+ assert.equal(namedVisitQuestion('السلام عليكم كيف لقيتي فيلا الشخاخيط ؟','فيلا الشخاخيط'),'السلام عليكم كيف شفتي فيلا الشخاخيط وايش انطباعك عنها ؟');
+ assert.equal(namedVisitQuestion('السلام عليكم كيف شفت فيلا الشخاخيط ؟ عجبتك ولا ما ناسبتك ؟','فيلا الشخاخيط'),'السلام عليكم كيف شفت فيلا الشخاخيط وايش انطباعك عنها ؟');
+ assert.equal(namedVisitQuestion('السلام عليكم كيف لقيت الفيلا ؟',''),'السلام عليكم كيف شفت الفيلا وايش انطباعك عنه ؟');
  assert.equal(namedVisitQuestion('السلام عليكم قدرت تشوف العقار ؟',''),'السلام عليكم قدرت تشوف العقار ؟');
  assert(fn.includes('if (kind === "visit") out.text = namedVisitQuestion(out.text, name);'));
  assert(fn.includes('ممنوع سؤال عام مثل "قدرت تشوف العقار ؟"'));

@@ -1035,7 +1035,7 @@ Deno.serve(async (req) => {
       if (!BOUGHT_RE.test(saidSince)) {
         texts = texts.filter((t) => !CONGRATS_RE.test(t));
         const lastOutBody = lastOutIdx >= 0 ? String(history[lastOutIdx]?.body || "") : "";
-        if (!texts.length && AFTER_VISIT_Q.test(lastOutBody) && !NOT_A_VISIT_Q.test(lastOutBody)) texts = ["حياك الله، طيب عجبتك ولا ما ناسبتك ؟"];
+        if (!texts.length && AFTER_VISIT_Q.test(lastOutBody) && !NOT_A_VISIT_Q.test(lastOutBody)) texts = ["حياك الله، وايش انطباعك بعد الزيارة ؟"];
       }
     }
     // R14 (9 Nov): never send a line we already sent to this customer in the last 15 minutes (Amer Ali got "ارسل الكروكي" twice)

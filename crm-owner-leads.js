@@ -76,7 +76,9 @@
       +'<p class="rp-muted">'+esc((x.owner.name||'مالك')+(x.owner.phone?' · '+x.owner.phone:''))+'</p><p class="ol-facts">'+facts.map(f=>'<span>'+esc(f)+'</span>').join('')+'</p>'
       +(x.buyers.length?'<ul class="ol-buyers">'+shown.map(b=>'<li><button type="button" class="ol-link" data-ol="client" data-client="'+esc(b.client_id)+'">'+esc(b.client.name||'عميل')+'</button> · ميزانية '+esc(k(b.budget_max))+(b.preferred_area?' · '+esc(b.preferred_area):'')+'</li>').join('')+'</ul>'
         +(x.buyers.length>5?'<button type="button" class="ol-link" data-ol="more">'+(open?'أقل':'عرض كل المشترين ('+x.buyers.length+')')+'</button>':''):'<p class="rp-muted">ما في مشتري مطابق لين الحين</p>')
-      +'<div class="rp-actions">'+(x.conversation_id?'<button type="button" class="btn-secondary" data-ol="chat">محادثة المالك</button>':'')
+      // 11 Nov 2026 (Ahmed): the owner's chat opens in the phone's WhatsApp or in the CRM (crm-wa-buttons.js)
+      +'<div class="rp-actions">'+(typeof window.crmWaButtons==='function'?window.crmWaButtons({phone:x.owner&&x.owner.phone,conversationId:x.conversation_id,clientId:x.client_id})
+        :(x.conversation_id?'<button type="button" class="btn-secondary" data-ol="chat">محادثة المالك</button>':''))
       +(x.client_id?'<button type="button" class="btn-secondary" data-ol="client" data-client="'+esc(x.client_id)+'">ملف المالك</button>':'')
       +'<select data-ol="status">'+Object.keys(STATUS).map(s=>'<option value="'+s+'"'+(s===x.status?' selected':'')+'>'+STATUS[s]+'</option>').join('')+'</select></div></section>';
   }

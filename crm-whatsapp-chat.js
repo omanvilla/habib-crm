@@ -371,6 +371,10 @@
       const strip=$('waClientStrip');if(strip)strip.style.display='none';
       const head=$('waChatHeader'),c=waInboxActiveConversation;
       if(head&&c&&!head.querySelector('.wa2-avatar')){const name=(c.client&&c.client.name)||c.customer_name||c.customer_phone||'؟';head.insertAdjacentHTML('afterbegin','<span class="wa2-avatar" aria-hidden="true">'+esc(String(name).trim().charAt(0)||'؟')+'</span>');}
+      // 11 Nov 2026 (Ahmed): inside the CRM chat, one tap opens the same chat in the phone's WhatsApp (crm-wa-buttons.js)
+      if(head&&c&&typeof window.crmWaPhoneLink==='function'){const old=head.querySelector('.crm-wa-phone'),l=window.crmWaPhoneLink(c.customer_phone||c.customer_wa_id||(c.client&&(c.client.phone_normalized||c.client.phone)));
+        if(old&&old.dataset.for!==c.id)old.remove();
+        if(l&&!head.querySelector('.crm-wa-phone'))head.insertAdjacentHTML('beforeend','<a class="btn-secondary crm-wa-phone" data-for="'+esc(c.id)+'" style="padding:4px 8px;font-size:11px;white-space:nowrap" href="'+esc(l)+'"'+(/^https:/.test(l)?' target="_blank"':'')+' rel="noopener noreferrer">فتح في واتساب الجوال</a>');}
       // R1/R3 (Ahmed 8 Nov, docs/agent-rules.md): a handed-over chat, or one the agent stays out of because Ahmed typed in it,
       // shows under the header with the button that hands it back to the agent (the old strip with «تمت المعالجة» is hidden).
       let hold=$('wa2Hold');

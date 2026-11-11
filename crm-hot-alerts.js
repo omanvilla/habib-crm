@@ -26,6 +26,8 @@
     if(/iPhone|iPad|iPod/i.test(ua))return 'whatsapp-smb://send?phone='+d;
     return waLink(d);
   };
+  // 11 Nov 2026 (Ahmed): «تم» sticks. A chat comes back only for a different kind of handoff (SQL88 keeps the one closed).
+  const kindOf=t=>{t=String(t||'');return /^\s*(📞|طلب اتصال)/.test(t)?'call':/^\s*(📅|اجتماع|طلب اجتماع)/.test(t)?'meeting':/^\s*(🔥|مشتري جاد|تفاوض)/.test(t)?'hot':'other';};
   const ago=d=>typeof timeAgo==='function'?timeAgo(d):String(d||'').slice(0,16);
   function host(){
     const head=document.querySelector('#page-dash .page-header');if(!head)return null;
@@ -41,7 +43,9 @@
     if(!items.length){box.innerHTML='';return;}
     box.innerHTML='<p class="cha-title">🔥 عملاء يحتاجونك الحين <b dir="ltr">'+items.length+'</b></p><ul class="cha-list">'+items.map(n=>
       '<li class="cha-row"><div class="cha-info"><strong dir="auto">'+esc(n.title)+'</strong>'+(n.body?'<small dir="auto">'+esc(n.body)+'</small>':'')+'<small class="cha-time">'+esc(ago(n.created_at))+'</small></div>'
-      +'<div class="cha-actions">'+(n.phone?'<a class="btn-primary cha-open" href="'+esc(businessLink(n.phone))+'" rel="noopener noreferrer">فتح المحادثة</a>':'<button type="button" class="btn-primary" data-cha="open" data-id="'+esc(n.id)+'">فتح المحادثة</button>')+'<button type="button" class="btn-secondary" data-cha="done" data-id="'+esc(n.id)+'">تم</button></div></li>').join('')+'</ul>';
+      // 11 Nov 2026 (Ahmed): every chat opens two ways, the phone's WhatsApp and the CRM chat (crm-wa-buttons.js)
+      +'<div class="cha-actions">'+(typeof window.crmWaButtons==='function'?window.crmWaButtons({phone:n.phone,conversationId:n.conversation_id,clientId:n.client_id,cls:'btn-primary'})
+        :(n.phone?'<a class="btn-primary cha-open" href="'+esc(businessLink(n.phone))+'" rel="noopener noreferrer">فتح المحادثة</a>':'<button type="button" class="btn-primary" data-cha="open" data-id="'+esc(n.id)+'">فتح المحادثة</button>'))+'<button type="button" class="btn-secondary" data-cha="done" data-id="'+esc(n.id)+'">تم</button></div></li>').join('')+'</ul>';
   }
   function ping(fresh){
     if(!fresh.length||typeof Notification==='undefined')return;
@@ -57,13 +61,20 @@
       const r=await supa.from('notifications').select('id,title,body,client_id,created_at').eq('user_id',currentUser.id).eq('type','whatsapp_handoff')
         .eq('is_read',false).gte('created_at',since).order('created_at',{ascending:false}).limit(60);
       if(r.error)return;
-      const list=(r.data||[]).filter(n=>/^(🔥|📞|📅)/.test(String(n.title||''))).map(n=>({...n,kind:'n'}));
-      const c=await supa.from('whatsapp_conversations').select('id,client_id,customer_name,customer_wa_id,route_key,handoff_reason,handoff_updated_at,owner_alert_done_at,updated_at,clients(name,phone,phone_normalized)')
+      let list=(r.data||[]).filter(n=>/^(🔥|📞|📅)/.test(String(n.title||''))).map(n=>({...n,kind:'n'}));
+      // a new notification of the same kind for a client Ahmed already marked «تم» stays away (the agent re-notifies hard handoffs)
+      const nc=[...new Set(list.map(n=>n.client_id).filter(Boolean))];
+      if(nc.length){
+        const d=await supa.from('whatsapp_conversations').select('client_id,owner_alert_done_at,owner_alert_done_reason').in('client_id',nc).not('owner_alert_done_at','is',null);
+        const done=d.error?[]:(d.data||[]);
+        list=list.filter(n=>!done.some(x=>x.client_id===n.client_id&&(new Date(x.owner_alert_done_at)>=new Date(n.created_at)||kindOf(x.owner_alert_done_reason)===kindOf(n.title))));
+      }
+      const c=await supa.from('whatsapp_conversations').select('id,client_id,customer_name,customer_wa_id,route_key,handoff_reason,handoff_updated_at,owner_alert_done_at,owner_alert_done_reason,updated_at,clients(name,phone,phone_normalized)')
         .eq('human_handoff_required',true).in('route_key',['barka','muscat']).gte('updated_at',since).order('updated_at',{ascending:false}).limit(80);
       for(const w of (c.error?[]:c.data||[])){
         const why=String(w.handoff_reason||'');if(!/^(مشتري جاد|تفاوض|طلب اتصال)/.test(why)&&!/^\s*اجتماع/.test(why))continue;
         const at=w.handoff_updated_at||w.updated_at;
-        if(w.owner_alert_done_at&&new Date(w.owner_alert_done_at)>=new Date(at))continue;
+        if(w.owner_alert_done_at&&(new Date(w.owner_alert_done_at)>=new Date(at)||kindOf(w.owner_alert_done_reason)===kindOf(why)))continue;
         const old='c-'+w.id+'-'+w.updated_at;
         if(hidden[old]){supa.rpc('crm_hot_alert_done',{p_conversation_id:w.id}).then(r=>{if(!r.error){delete hidden[old];saveHidden();}});continue;}
         const id='c-'+w.id+'-'+at;
@@ -89,9 +100,22 @@
     const b=e.target.closest('[data-cha]');if(!b)return;
     const n=items.find(x=>x.id===b.dataset.id);if(!n)return;
     if(b.dataset.cha==='open')openChat(n).catch(()=>toast('ما قدرت أفتح المحادثة','error'));
-    if(b.dataset.cha==='done'&&n.kind==='c'){b.disabled=true;supa.rpc('crm_hot_alert_done',{p_conversation_id:n.conversation_id}).then(r=>{if(r.error)throw r.error;items=items.filter(x=>x.id!==n.id);render();}).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});return;}
-    if(b.dataset.cha==='done'){b.disabled=true;supa.from('notifications').update({is_read:true}).eq('id',n.id).then(r=>{if(r.error)throw r.error;items=items.filter(x=>x.id!==n.id);seen.delete(n.id);render();}).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});}
+    if(b.dataset.cha==='done'){b.disabled=true;markDone(n).then(()=>{items=items.filter(x=>x.id!==n.id&&!(n.client_id&&x.client_id===n.client_id));if(seen)seen.delete(n.id);render();}).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});}
   });
+  /* «تم» (11 Nov 2026): the alert came back because «تم» on a notification left the client's chat (and his other
+   * notifications) open. Now one «تم» closes everything of that client: all his unread handoff notifications and every chat
+   * of his still handed over (crm_hot_alert_done keeps the handoff it closed, SQL88). */
+  async function markDone(n){
+    const jobs=[];
+    if(n.kind==='n')jobs.push(supa.from('notifications').update({is_read:true}).eq('id',n.id));
+    if(n.client_id){
+      jobs.push(supa.from('notifications').update({is_read:true}).eq('user_id',currentUser.id).eq('type','whatsapp_handoff').eq('client_id',n.client_id).eq('is_read',false));
+      const cs=await supa.from('whatsapp_conversations').select('id').eq('client_id',n.client_id).eq('human_handoff_required',true);
+      (cs.data||[]).forEach(c=>jobs.push(supa.rpc('crm_hot_alert_done',{p_conversation_id:c.id})));
+    }
+    if(n.conversation_id)jobs.push(supa.rpc('crm_hot_alert_done',{p_conversation_id:n.conversation_id}));
+    const rs=await Promise.all(jobs);const bad=rs.find(r=>r&&r.error);if(bad)throw bad.error;
+  }
   window.crmHotAlertsRefresh=()=>load().catch(()=>{});
   setInterval(()=>{if(document.visibilityState==='visible')window.crmHotAlertsRefresh();},45000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)window.crmHotAlertsRefresh();});

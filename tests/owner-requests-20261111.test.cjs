@@ -31,7 +31,8 @@ test('resume: owner home asks the agent to carry on, pricing rows have no resume
  assert.match(home,/waInboxInvoke\(\{action:'clear_handoff',conversation_id:id,resume:true\}\)/);
  // R27 (11 Nov): staff resume too; price studies are never theirs, notes for Claude stay the owner's
  assert(home.includes(`(pricing||!canResume()?'':'<button type="button" class="btn-primary coh-go" data-coh="presume"`));
- assert(home.includes("const pricingItems=()=>isOwner()?paused.items.filter(isPricing):[];"));
+ // 11 Nov (later): staff see price studies too («حتى دراسة تسعير اريد تظهر للموظف»); still no resume on them
+ assert(home.includes("const pricingItems=()=>canResume()?paused.items.filter(isPricing):[];"));
  assert(home.includes(`(isOwner()?'<button type="button" class="btn-secondary coh-go" data-coh="pnote"`));
  assert.match(home,/data-coh="pnote"/);assert.match(home,/window\.crmClaudeNote\(\{conversation_id:b\.dataset\.id/);
  assert(home.includes('العقل ما قدر يكمل: '),'a failed resume tells Ahmed why and the chat stays in his list');

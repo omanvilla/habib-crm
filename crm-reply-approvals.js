@@ -14,6 +14,8 @@
  * A browser notification fires when new drafts arrive while the CRM is open. Owner only. */
 (function(){
   'use strict';
+  // 11 Nov 2026 (Ahmed): every «فتح المحادثة» becomes two buttons, the phone's WhatsApp and the CRM chat (crm-wa-buttons.js)
+  const waBtns=(phone,conv,client,old)=>typeof window.crmWaButtons==='function'&&(conv||client)?window.crmWaButtons({phone,conversationId:conv,clientId:client}):old;
   const esc=v=>typeof escapeHtml==='function'?escapeHtml(String(v==null?'':v)):String(v==null?'':v).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
   const byId=id=>document.getElementById(id);
   const toast=(m,t)=>{if(typeof showToast==='function')showToast(m,t);};
@@ -77,7 +79,7 @@
       +'<p class="rp-muted">'+esc((x.owner.name||'')+(x.land_size?' · أرض '+x.land_size+' م²':'')+(x.built_size?' · بناء '+x.built_size+' م²':'')+(x.status==='studied'?' · انرسلت الدراسة':''))+'</p>'
       +(x.notes?'<p>'+esc(x.notes)+'</p>':'')
       +(x.buyers.length?'<p><b>مشترين يدورون نفس الشي ('+x.buyers.length+'):</b> '+esc(x.buyers.map(b=>b.name+(b.budget?' ('+Math.round(b.budget/1000)+' الف)':'')).join('، '))+'</p>':'<p class="rp-muted">ما في مشتري مطابق لين الحين</p>')
-      +'<div class="rp-actions"><button type="button" class="btn-secondary" data-rp="lead-open">افتح المحادثة</button></div></section>').join('');
+      +'<div class="rp-actions">'+waBtns(x.owner&&x.owner.phone,x.conversation_id,x.client_id,'<button type="button" class="btn-secondary" data-rp="lead-open">افتح المحادثة</button>')+'</div></section>').join('');
   }
   async function loadDrafts(){
     const q=supa.from('whatsapp_reply_drafts').select('id,conversation_id,client_id,message_id,status,analysis,reply_messages,created_at').eq('status','pending');
@@ -219,7 +221,7 @@
       +(!ok24&&!trial?'<p class="rp-warn">مرّت 24 ساعة على آخر رسالة من العميل؛ الرد العادي ما يوصل.</p>':'')
       +'<div class="rp-actions"><button type="button" class="btn-primary" data-rp="send"'+(trial||!ok24?' disabled':'')+'>موافقة وإرسال</button>'
       +'<button type="button" class="btn-secondary" data-rp="reject">رفض</button>'
-      +'<button type="button" class="btn-secondary" data-rp="open">فتح المحادثة</button>'
+      +waBtns(phone,d.conversation_id,d.client_id,'<button type="button" class="btn-secondary" data-rp="open">فتح المحادثة</button>')
       +'<button type="button" class="btn-secondary" data-rp="instr">أمر للذكاء الاصطناعي</button></div>'
       +'<div class="rp-error" role="alert"></div></article>';
   }
@@ -235,7 +237,7 @@
       +(d.reply_messages||[]).map(t=>'<li class="out"><b>انرسل:</b> <span dir="auto">'+esc(t)+'</span></li>').join('')
       +d.after.map(m=>'<li class="in"><b>رد العميل بعدها:</b> <span dir="auto">'+esc(String(msgText(m)).slice(0,300))+'</span></li>').join('')+'</ul>'
       +(d.after.length?'':'<p class="rp-muted">العميل ما رد بعدها لين الحين.</p>')
-      +'<div class="rp-actions"><button type="button" class="btn-secondary" data-rp="auto-open">فتح المحادثة</button>'
+      +'<div class="rp-actions">'+waBtns(phone,d.conversation_id,d.client_id,'<button type="button" class="btn-secondary" data-rp="auto-open">فتح المحادثة</button>')
       +(r&&r.active?'<button type="button" class="btn-secondary" data-rp="auto-pause">إيقاف هذا الرد المثبت</button>':'')
       +(r?'<button type="button" class="btn-secondary" data-rp="auto-edit">تعديل الرد المثبت</button>':'')+'</div>'
       +'<div class="rp-error" role="alert"></div></article>';
@@ -263,7 +265,7 @@
       +(o.error==='template_pending'?'<p class="rp-muted">قالب واتساب لهذي الرسالة لين الحين تحت مراجعة ميتا.</p>':'')+'</div>'
       +'<div class="rp-actions"><button type="button" class="btn-primary" data-rp="out-send">موافقة وإرسال</button>'
       +'<button type="button" class="btn-secondary" data-rp="out-skip">تخطي</button>'
-      +'<button type="button" class="btn-secondary" data-rp="out-open">فتح المحادثة</button></div>'
+      +waBtns(phone,o.conversation_id,o.client_id,'<button type="button" class="btn-secondary" data-rp="out-open">فتح المحادثة</button>')+'</div>'
       +'<div class="rp-error" role="alert"></div></article>';
   }
   function followupCard(f){
@@ -276,7 +278,7 @@
       +'<p class="rp-muted">نص ثابت معتمد من واتساب، ما ينعدّل. إذا العميل كتب قبل ما توافق تنلغي تلقائياً.</p></div>'
       +'<div class="rp-actions"><button type="button" class="btn-primary" data-rp="fu-send">موافقة وإرسال</button>'
       +'<button type="button" class="btn-secondary" data-rp="fu-skip">تخطي</button>'
-      +'<button type="button" class="btn-secondary" data-rp="fu-open">فتح المحادثة</button></div>'
+      +waBtns(phone,f.conversation_id,f.client_id,'<button type="button" class="btn-secondary" data-rp="fu-open">فتح المحادثة</button>')+'</div>'
       +'<div class="rp-error" role="alert"></div></article>';
   }
   // investors get the proposed reply plus up to two other wordings to pick from

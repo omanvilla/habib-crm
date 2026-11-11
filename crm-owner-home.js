@@ -24,9 +24,10 @@
    * paused list keeps only chats that need another decision. Display only: the hold, the reason text and
    * «كمّل يا عقل» are unchanged (crm_paused_chats still returns them as kind=negotiation). */
   const isPricing=i=>/^\s*دراسة\s*سعر/.test(String(i&&i.reason||''));
-  // 11 Nov 2026 (Ahmed, SQL84): staff see and resume paused chats too; price studies stay with Ahmed (R26), so staff never get them
+  // 11 Nov 2026 (Ahmed, SQL84): staff see and resume paused chats too. Price studies: staff see them as well (Ahmed, later
+  // the same day: «حتى دراسة تسعير اريد تظهر للموظف»); nobody resumes the agent on one (R26)
   const canResume=()=>typeof currentProfile!=='undefined'&&currentProfile&&['owner','manager','agent'].includes(currentProfile.role);
-  const pricingItems=()=>isOwner()?paused.items.filter(isPricing):[];
+  const pricingItems=()=>canResume()?paused.items.filter(isPricing):[];
   const otherPaused=()=>paused.items.filter(i=>!isPricing(i));
 
   /* Boot gate (10 Nov 2026). The owner saw the old dashboard for several seconds before this page replaced it.
@@ -121,7 +122,9 @@
       +'<small class="coh-note">'+(pricing?esc(String(i.reason||'').replace(/^\s*دراسة\s*سعر\s*:?\s*/,'')):'السبب: '+esc(i.reason))+'</small>'
       +(i.last_message?'<small class="coh-note">آخر رسالة منه: <span dir="auto">'+esc(i.last_message)+'</span></small>':'')
       +(i.summary?'<small class="coh-note">'+esc(i.summary)+'</small>':'')+'</div>'
-      +'<div class="coh-paused-actions"><button type="button" class="btn-secondary coh-go" data-coh="popen" data-id="'+esc(i.conversation_id)+'">افتح المحادثة</button>'
+      // 11 Nov 2026 (Ahmed): the phone's WhatsApp and the CRM chat, side by side (crm-wa-buttons.js)
+      +'<div class="coh-paused-actions">'+(typeof window.crmWaButtons==='function'?window.crmWaButtons({phone:i.phone,conversationId:i.conversation_id,clientId:i.client_id,cls:'btn-secondary coh-go'})
+        :'<button type="button" class="btn-secondary coh-go" data-coh="popen" data-id="'+esc(i.conversation_id)+'">افتح المحادثة</button>')
       // 11 Nov (Ahmed): a price study always stays with him, so no «كمّل يا عقل» there; every row can carry a note for Claude
       // notes for Claude are the owner's lessons (crm_owner_notes), so staff do not get that button
       +(isOwner()?'<button type="button" class="btn-secondary coh-go" data-coh="pnote" data-id="'+esc(i.conversation_id)+'" data-name="'+esc(i.name||'')+'">ملاحظة لـ Claude</button>':'')
