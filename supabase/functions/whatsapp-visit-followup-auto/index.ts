@@ -227,7 +227,52 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
   const fixed = kind === "visit" ? String(x.body || "") : (x.messages || []).join(" ");
   const out = await review(x, companyId, available, fixed, about, instruction, x.owner_text || fixed);
   if (kind === "visit") out.text = namedVisitQuestion(out.text, name);
+  // R36: a step-1 follow-up on a test wording asks the same opinion question in that wording (his instruction still wins)
+  if (kind === "visit" && Number(x.step) === 1 && !instruction) out.text = variantVisitQuestion(out.text, name, await variantFor(companyId, "visit_step1", x.variant_label));
   return out;
+}
+
+// R36 (Ahmed 11 Nov 2026, SQL93): comparison of follow-up wordings. A row carries variant_label. «A» (or no label) is today's
+// wording and nothing here changes for it: no read, no rewrite. Another letter is a wording Ahmed wrote and approved on the
+// screen, whose template Meta approved as UTILITY on both numbers; it is read from whatsapp_followup_variants (one minute cache).
+const variantCache = new Map<string, { at: number; v: any }>();
+async function variantFor(companyId: string, kind: "visit_step1" | "request_followup", label: unknown) {
+  const l = String(label || "");
+  if (!l || l === "A") return null;
+  const k = `${companyId}|${kind}|${l}`, hit = variantCache.get(k);
+  if (hit && Date.now() - hit.at < 60000) return hit.v;
+  const r = await db.from("whatsapp_followup_variants").select("label,text,template_name").eq("company_id", companyId).eq("kind", kind).eq("label", l).in("status", ["testing", "winner"]).maybeSingle();
+  variantCache.set(k, { at: Date.now(), v: r.data || null });
+  return r.data || null;
+}
+const oneLine = (s: unknown) => String(s ?? "").replace(/\s+/g, " ").trim();
+// today's after-visit opinion question (R29), as namedVisitQuestion or the review writes it
+const OPINION_Q = /كيف\s+شفت(ي)?\s.*انطباعك/;
+function variantVisitQuestion(text: string | null, name: string, v: any) {
+  if (!v || !text || !(OPINION_Q.test(text) || GENERIC_VISIT_Q.test(text))) return text;
+  return oneLine(String(v.text).replace("{العقار}", name || "العقار"));
+}
+// Is this text the wording itself, with any property or subject in its place ? A text the review wrote for one client is not.
+function isVariantText(text: unknown, wording: unknown, word: string) {
+  const quote = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^${quote(oneLine(wording)).replace(quote(word), ".+")}$`).test(oneLine(text));
+}
+// Which wording really went, for the results. undefined = the row is not part of the comparison, leave its label alone.
+// A template is its row's wording. Free text counts only when it is that wording; otherwise the label is cleared.
+async function sentVisitLabel(f: any, service: boolean, body: string) {
+  if (Number(f.step) !== 1 || !f.variant_label) return undefined;
+  if (!service) return f.variant_label;
+  if (f.variant_label === "A") return OPINION_Q.test(body) || oneLine(body) === oneLine(f.body) ? "A" : null;
+  const v = await variantFor(f.company_id, "visit_step1", f.variant_label);
+  return v && isVariantText(body, v.text, "{العقار}") ? f.variant_label : null;
+}
+// The subject the review found goes into a request follow-up on a test wording: its own lines and template variable.
+async function variantSubject(id: string, subject: string) {
+  const r = await db.from("whatsapp_outreach_queue").select("company_id,variant_label,template_name").eq("id", id).maybeSingle();
+  const v = r.data ? await variantFor(r.data.company_id, "request_followup", r.data.variant_label) : null;
+  if (!v || v.template_name !== r.data?.template_name) return;
+  await db.from("whatsapp_outreach_queue").update({ template_params: [subject], messages: String(v.text).replace("{الموضوع}", subject).split("\n").map(oneLine).filter(Boolean) })
+    .eq("id", id).eq("status", "pending").eq("variant_label", v.label);
 }
 
 // The property as the client knows it: type and area ("فيلا الرميس"). The title is internal (owner names, numbers).
@@ -267,7 +312,9 @@ async function applyDecision(kind: "visit" | "request", x: any, companyId: strin
     // R35 (12 Nov): past 24 hours the template «بخصوص طلبك {1} لين الحين تبحث ؟» goes, so {1} is what the client really asked about
     const subject = String(out.subject || "").replace(/^\s*(بخصوص\s+)?طلبك\s+/, "").replace(/[؟?،,.!]/g, " ").replace(/\s+/g, " ").trim();
     if (kind === "request" && (w.data || []).length && subject && subject.length <= 60 && !/[A-Za-z]/.test(subject)) {
-      await db.from(table).update({ template_params: [subject], messages: [`بخصوص طلبك ${subject}`, "لين الحين تبحث ؟"] }).eq("id", x.id).eq("status", openStatus).eq("template_name", "request_followup_ar_v2");
+      const a = await db.from(table).update({ template_params: [subject], messages: [`بخصوص طلبك ${subject}`, "لين الحين تبحث ؟"] }).eq("id", x.id).eq("status", openStatus).eq("template_name", "request_followup_ar_v2").select("id");
+      // R36: not on today's template. If it is on a test wording, the subject goes into that wording instead.
+      if (!a.error && !(a.data || []).length) await variantSubject(x.id, subject);
     }
     return (w.data || []).length ? "kept" : "not_pending";
   }
@@ -289,7 +336,7 @@ async function availableText(companyId: string) {
 // Reads what is on the list again under the current rules and returns the decisions. Writes nothing.
 // Follow-ups the owner decided himself (they carry a reason) are left out.
 async function preview(companyId: string, offset: number) {
-  const f = await db.from("whatsapp_visit_followups").select("id,client_id,route_key,conversation_id,viewing_id,step,body").eq("company_id", companyId).eq("status", "awaiting_approval").not("reviewed_at", "is", null).order("id");
+  const f = await db.from("whatsapp_visit_followups").select("id,client_id,route_key,conversation_id,viewing_id,step,body,variant_label").eq("company_id", companyId).eq("status", "awaiting_approval").not("reviewed_at", "is", null).order("id");
   const q = await db.from("whatsapp_outreach_queue").select("id,client_id,route_key,conversation_id,request_id,messages").eq("company_id", companyId).eq("status", "pending").eq("kind", "request_followup").eq("dry_run", false).is("reason", null).not("reviewed_at", "is", null).order("id");
   const all: ["visit" | "request", any][] = [...(f.data || []).map((x: any) => ["visit", x] as ["visit", any]), ...(q.data || []).map((x: any) => ["request", x] as ["request", any])];
   const jobs = all.slice(offset, offset + REVIEWS_PER_RUN);
@@ -307,7 +354,7 @@ async function preview(companyId: string, offset: number) {
 }
 
 async function reviewAll(companyId: string, out: Record<string, number>) {
-  const f = await db.from("whatsapp_visit_followups").select("id,client_id,route_key,conversation_id,viewing_id,step,body").eq("company_id", companyId).eq("status", "awaiting_approval").is("reviewed_at", null).limit(REVIEWS_PER_RUN);
+  const f = await db.from("whatsapp_visit_followups").select("id,client_id,route_key,conversation_id,viewing_id,step,body,variant_label").eq("company_id", companyId).eq("status", "awaiting_approval").is("reviewed_at", null).limit(REVIEWS_PER_RUN);
   const left = REVIEWS_PER_RUN - (f.data || []).length;
   const q = left > 0 ? await db.from("whatsapp_outreach_queue").select("id,client_id,route_key,conversation_id,request_id,messages").eq("company_id", companyId).eq("status", "pending").eq("kind", "request_followup").eq("dry_run", false).is("reviewed_at", null).limit(left) : { data: [] as any[] };
   const jobs: ["visit" | "request", any][] = [...(f.data || []).map((x: any) => ["visit", x] as ["visit", any]), ...((q as any).data || []).map((x: any) => ["request", x] as ["request", any])];
@@ -413,7 +460,8 @@ async function sendQueueText(q: any, numbers: string[]) {
       body: q.owner_text, message_timestamp: now, delivery_status: "sent", actor_type: "automated", channel_source: "crm_followup",
       raw_payload: { source: thinking ? "thinking_followup" : "request_followup", outreach_id: q.id, auto: true, in_window: true },
     });
-    await db.from("whatsapp_outreach_queue").update({ send_mode: "service", sent_at: now, approved_at: now, meta_message_id: wamid, error: null }).eq("id", q.id);
+    // R36: this text was written by the review for this client, so it is no wording's result (label cleared, A and the others alike)
+    await db.from("whatsapp_outreach_queue").update({ send_mode: "service", sent_at: now, approved_at: now, meta_message_id: wamid, error: null, ...(q.variant_label ? { variant_label: null } : {}) }).eq("id", q.id);
     await db.from("whatsapp_conversations").update({ last_message_at: now, last_outbound_at: now, updated_at: now }).eq("id", conv.id);
     return "sent";
   } catch (e) {
@@ -921,7 +969,9 @@ async function sendOne(f: any, numbers: string[], freeOnly = false) {
       body, message_timestamp: now, delivery_status: "sent", actor_type: "automated", channel_source: "crm_followup",
       raw_payload: { source: "visit_followup", followup_id: f.id, step: f.step, viewing_id: f.viewing_id, template_name: service ? null : f.template_name, auto: true, after_visit: freeOnly },
     });
-    await db.from("whatsapp_visit_followups").update({ status: "sent", send_mode: service ? "service" : "template", sent_at: now, meta_message_id: wamid, decided_at: now, error: null, updated_at: now }).eq("id", f.id);
+    // R36: the results count this follow-up under the wording that really went
+    const went = await sentVisitLabel(f, service, body).catch(() => undefined);
+    await db.from("whatsapp_visit_followups").update({ status: "sent", send_mode: service ? "service" : "template", sent_at: now, meta_message_id: wamid, decided_at: now, error: null, updated_at: now, ...(went === undefined ? {} : { variant_label: went }) }).eq("id", f.id);
     await db.from("whatsapp_conversations").update({ last_message_at: now, last_outbound_at: now, updated_at: now }).eq("id", conv.id);
     return "sent";
   } catch (e) {
@@ -1026,6 +1076,9 @@ Deno.serve(async (req) => {
   const out: Record<string, number> = {};
   const routes = await db.from("company_lead_routes").select("whatsapp_number");
   const numbers = (routes.data || []).map((r: any) => digits(r.whatsapp_number)).filter(Boolean);
+  // R36: a waiting follow-up whose test wording was stopped, or whose template Meta no longer approves, goes back to A
+  // before anything is read or sent. With no test wording this changes nothing.
+  { const st = await db.rpc("crm_followup_variants_settle"); if (st.error) console.error("[followup-auto] variants", st.error.message); }
   for (const rt of rts.data || []) {
     if (rt.mode !== "live") continue;
     if (rt.visit_followups_auto) await confirmBeforeVisit(rt.company_id, numbers, out);

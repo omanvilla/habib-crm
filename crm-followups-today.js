@@ -61,7 +61,9 @@
     const a=String(i.sends_text).replace(/\s+/g,' ').trim(),b=String(i.text||'').replace(/\s+/g,' ').trim();
     return a===b?'':'<small class="cfu-auto">اللي بيوصل للعميل من النظام (قالب واتساب بعد 24 ساعة): <span dir="auto">'+esc(i.sends_text)+'</span></small>';
   }
-  function render(){
+  // R36 (SQL93): the owner's wording comparison (crm-followup-variants.js) is drawn again at the bottom after every draw of the list
+  function render(){draw();const box=byId('crmFollowups');if(box&&typeof window.crmFollowupVariantsMount==='function')window.crmFollowupVariantsMount(box);}
+  function draw(){
     const box=host();if(!box)return;
     // 12 Nov 2026 (Ahmed, SQL91): investors and project askers are their own lane, apart from Muscat properties (both from the Muscat number)
     const laneOf=i=>i.lane||i.route_key,all=data.items||[],items=branch==='all'?all:all.filter(i=>laneOf(i)===branch);

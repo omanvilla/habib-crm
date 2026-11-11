@@ -1,7 +1,7 @@
 // Submits the four visit follow-up templates (SQL54) to Meta for the Barka and Muscat numbers,
 // or refreshes their approval status, and keeps whatsapp_template_registry in step.
-// Only these fixed texts can be created here (approved by the owner on 2 Nov and 5 Nov 2026); nothing is
-// sent to customers. Called with the reply-agent secret (x-crm-agent), e.g. from SQL net.http_post.
+// Only these fixed texts can be created here (approved by the owner on 2 Nov and 5 Nov 2026), plus the follow-up
+// wordings he approved for a test on the screen (R36, SQL93); nothing is sent to customers. Called with the reply-agent secret (x-crm-agent), e.g. from SQL net.http_post.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -39,6 +39,16 @@ async function route(rk: string) {
   return { waba: String(a.data.meta_waba_id), token };
 }
 
+// R36 (Ahmed 11 Nov 2026, SQL93): a follow-up wording Ahmed wrote and approved on the screen («جرّبها») gets its own template
+// here, on both numbers, and its Meta status is tracked like the fixed ones. Only wordings in status testing / winner; the
+// name was fixed when he approved. {العقار} goes as the word itself (the template has no variable), {الموضوع} is variable 1.
+async function variantTemplates() {
+  const r = await db.from("whatsapp_followup_variants").select("kind,text,template_name").eq("company_id", CID).in("status", ["testing", "winner"]).neq("label", "A").not("template_name", "is", null);
+  return (r.data || []).map((v: any) => v.kind === "request_followup"
+    ? { name: String(v.template_name), text: String(v.text).replace("{الموضوع}", "{{1}}"), example: String(v.text).includes("{الموضوع}") ? ["فيلا في العامرات بحدود 66 الف"] : null }
+    : { name: String(v.template_name), text: String(v.text).replace("{العقار}", "العقار").replace(/\s+/g, " ").trim(), example: null });
+}
+
 async function find(r: any, name: string) {
   const q = await fetch(`https://graph.facebook.com/${GRAPH}/${r.waba}/message_templates?name=${encodeURIComponent(name)}&fields=name,status,category,language,id`, { headers: { Authorization: `Bearer ${r.token}` } });
   const p = await q.json().catch(() => ({}));
@@ -61,18 +71,19 @@ Deno.serve(async (req) => {
   const { action } = await req.json().catch(() => ({}));
   if (!["create", "status"].includes(action)) return json({ ok: false, error: "action_must_be_create_or_status" }, 400);
   const out: any[] = [];
+  const wanted: { name: string; text: string; example: string[] | null }[] = [...Object.entries(TEMPLATES).map(([name, text]) => ({ name, text, example: null })), ...(await variantTemplates())];
   for (const rk of ["barka", "muscat"]) {
     let r: any = null;
     try { r = await route(rk); } catch (e) { out.push({ route: rk, error: short((e as any)?.message || e) }); continue; }
     if (!r) { out.push({ route: rk, error: "route_not_ready" }); continue; }
-    for (const [name, text] of Object.entries(TEMPLATES)) {
+    for (const { name, text, example } of wanted) {
       try {
         let t = await find(r, name);
         let err: string | null = null;
         if (!t && action === "create") {
           const q = await fetch(`https://graph.facebook.com/${GRAPH}/${r.waba}/message_templates`, {
             method: "POST", headers: { Authorization: `Bearer ${r.token}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ name, language: "ar", category: "UTILITY", components: [{ type: "BODY", text }] }),
+            body: JSON.stringify({ name, language: "ar", category: "UTILITY", components: [{ type: "BODY", text, ...(example ? { example: { body_text: [example] } } : {}) }] }),
           });
           const p = await q.json().catch(() => ({}));
           if (q.ok) t = { id: p.id, status: p.status || "PENDING", category: p.category || "UTILITY" };

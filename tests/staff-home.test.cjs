@@ -50,7 +50,7 @@ test('staff follow everyone like the owner, never the owner line (SQL85)',()=>{
  assert(s85.includes("WHERE v_owner OR (public.my_role() IN ('manager','agent','viewer') AND i.route_key IS DISTINCT FROM 'owner')"));
  assert(s85.includes('CASE WHEN v_owner THEN i.owner_instruction END'),'the owner instructions stay his');
  assert(!s85.includes('staff_is_branch_member'));
- assert(/crm-followups-today\.js\?v=20261112-lane1/.test(index));
+ assert(/crm-followups-today\.js\?v=20261112-ab1/.test(index));
 });
 test('a follow-up naming a property that left the market goes back to review (SQL86)',()=>{
  const s=fs.readFileSync('db/changes/86-followups-reread-unavailable.forward.sql','utf8');
