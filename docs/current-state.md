@@ -2,6 +2,13 @@
 
 Updated 2026-11-11. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
+## 11 November 2026 — stale follow-up offers go back to review (SQL86, 86b); «فتح في النظام» (commits 0bf9cbe, 894ee10), live
+
+- **Why.** A waiting follow-up offered «فيلا في الصومحان الجنوبية ب٥٧ ألف», written 8 Nov; the four 57,000 Al Sawmhan villas were archived on 10 Nov (not available) and the text stayed.
+- **What.** Trigger `crm_followups_reread_on_property_change` (properties, status/archived): when a property leaves the market, waiting follow-ups of its branch that name the area's place word (86b: area without the wilayat, «ال» and direction words, e.g. «الرميس» → رميس, «الصومحان الجنوبية» → صومحان) lose `reviewed_at`/`owner_text`: they leave the list and the 10am auto-send and `whatsapp-visit-followup-auto` rewrites them from the current available list on its next run. Owner-decided queue rows (`reason` set) are left alone; a failure only warns. The Sawmhan follow-up (01a96eee) was sent back now. Checked in a rolled-back transaction: marking the Rumais 59 villa unavailable sent back the two Rumais follow-ups and left the Shakhakhit and Muscat ones.
+- **Button.** `crm_followups_today` returns each follow-up's `conversation_id`; each row has «فتح في واتساب الجوال» (was «فتح المحادثة») and «فتح في النظام», which closes the home sheet and opens that chat in the CRM WhatsApp page (`crm-followups-today.js` `20261111-crm1`). Checked live as Barka: 17 rows with both buttons, the first opened its own chat (Ahmed). The list no longer shows the Sawmhan offer.
+- **Rollback.** `86-followups-reread-unavailable.rollback.sql` (drops trigger and functions; re-create `crm_followups_today` from SQL85 for the old shape), script `20261111-instr2`.
+
 ## 11 November 2026 — «أمر للذكاء الاصطناعي» on follow-ups for staff (R28, commits 3e4b270, fff79d6), live
 
 - **Update (Ahmed: «نعم خلها دروس»).** Staff instructions now become agent lessons like the owner's (`apply_now: true`, marked `context.by_staff`). `whatsapp-visit-followup-auto` v24 → `fff79d6`, `crm-followups-today.js` `20261111-instr2` (the box says the instruction is saved as a lesson). No staff note existed before, so nothing older needed changing. The first paragraph below describes the earlier step.
