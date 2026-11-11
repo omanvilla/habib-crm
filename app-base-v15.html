@@ -4085,7 +4085,7 @@ async function previewWhatsAppImage(messageId,button){
 }
 async function clearWhatsAppHandoff(){
   if(!waInboxActiveConversation)return;
-  try{await waInboxInvoke({action:'clear_handoff',conversation_id:waInboxActiveConversation.id});waInboxActiveConversation.human_handoff_required=false;waInboxActiveConversation.handoff_reason=null;waInboxActiveConversation._hold=null;var row=waInboxConversations.find(x=>x.id===waInboxActiveConversation.id);if(row){row.human_handoff_required=false;row.handoff_reason=null}renderWhatsAppChat();renderWhatsAppConversations();showToast('✅ رجعت المحادثة للعقل','success')}catch(e){showToast('⚠️ '+e.message,'error')}
+  try{var convId=waInboxActiveConversation.id;var res=await waInboxInvoke({action:'clear_handoff',conversation_id:convId,resume:true});waInboxActiveConversation.human_handoff_required=false;waInboxActiveConversation.handoff_reason=null;waInboxActiveConversation._hold=null;var row=waInboxConversations.find(x=>x.id===waInboxActiveConversation.id);if(row){row.human_handoff_required=false;row.handoff_reason=null}renderWhatsAppChat();renderWhatsAppConversations();var ag=(res&&res.agent)||{};if(res&&res.resume==='agent_ran'&&ag.action==='handoff')showToast('⚠️ العقل ما قدر يكمل: '+(ag.handoff_reason||'يحتاجك'),'error');else if(res&&res.resume==='agent_ran'&&ag.sent>0)showToast('✅ العقل قرأ المحادثة ورد على العميل','success');else showToast('✅ رجعت المحادثة للعقل','success');if(res&&res.resume==='agent_ran'&&typeof openWhatsAppConversation==='function'&&waInboxActiveId===convId)openWhatsAppConversation(convId)}catch(e){showToast('⚠️ '+e.message,'error')}
 }
 async function muteWhatsAppAgent(){
   if(!waInboxActiveConversation)return;

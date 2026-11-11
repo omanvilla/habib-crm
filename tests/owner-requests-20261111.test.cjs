@@ -25,3 +25,26 @@ test('voice note: bin while recording, delete after, ➤ while recording sends',
  assert.match(chat,/class="wa2-discard" data-wa2-cancel-file/);
  assert.match(css,/\.wa2-rec-cancel\[hidden\]\{display:none\}/);
 });
+
+// Ahmed, 11 Nov 2026 (evening): «كمّل يا عقل» makes the agent read the chat and carry on now; price studies stay with him.
+test('resume: owner home asks the agent to carry on, pricing rows have no resume, every row has a Claude note',()=>{
+ assert.match(home,/waInboxInvoke\(\{action:'clear_handoff',conversation_id:id,resume:true\}\)/);
+ assert.match(home,/\(pricing\?'':'<button type="button" class="btn-primary coh-go" data-coh="presume"/);
+ assert.match(home,/data-coh="pnote"/);assert.match(home,/window\.crmClaudeNote\(\{conversation_id:b\.dataset\.id/);
+ assert(home.includes('العقل ما قدر يكمل: '),'a failed resume tells Ahmed why and the chat stays in his list');
+});
+test('resume: inbox calls the agent only when the last customer message is unanswered, owner only',()=>{
+ const inbox=fs.readFileSync('supabase/functions/whatsapp-inbox/index.ts','utf8');
+ assert.match(inbox,/if\(payload\?\.resume===true&&profile\.role==="owner"\)/);
+ assert.match(inbox,/if\(!inAt\|\|outAt>=inAt\)return json\(\{ok:true,resume:"nothing_to_answer"\}\)/);
+ assert.match(inbox,/functions\/v1\/whatsapp-reply-agent`,\{method:"POST",headers:\{"Content-Type":"application\/json",Authorization:authHeader\}/);
+});
+test('resume: the agent reopens the same draft, never answers twice, and reads the whole chat first',()=>{
+ const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8');
+ assert.match(agent,/if \(prev\.data\.status === "sent"\) return json\(\{ ok: true, ignored: "already_answered" \}\)/);
+ assert.match(agent,/\.eq\("id", prev\.data\.id\)\.eq\("status", prev\.data\.status\)/,'reopen is conditional on the status it read');
+ assert(agent.includes('اقرأ المحادثة كاملة من أولها وافهم وين وصلنا مع العميل'));
+ assert(agent.includes('وسبب يبدأ بـ«ما عرفنا»'));
+ assert.match(agent,/if \(!review && !resume\) await sleep\(DEBOUNCE_MS\)/);
+ assert.match(agent,/body\?\.resume === true && body\?\.conversation_id && !dry/);
+});

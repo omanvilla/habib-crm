@@ -112,7 +112,9 @@
       +(i.last_message?'<small class="coh-note">آخر رسالة منه: <span dir="auto">'+esc(i.last_message)+'</span></small>':'')
       +(i.summary?'<small class="coh-note">'+esc(i.summary)+'</small>':'')+'</div>'
       +'<div class="coh-paused-actions"><button type="button" class="btn-secondary coh-go" data-coh="popen" data-id="'+esc(i.conversation_id)+'">افتح المحادثة</button>'
-      +'<button type="button" class="btn-primary coh-go" data-coh="presume" data-id="'+esc(i.conversation_id)+'">كمّل يا عقل</button></div></li>').join('');
+      // 11 Nov (Ahmed): a price study always stays with him, so no «كمّل يا عقل» there; every row can carry a note for Claude
+      +'<button type="button" class="btn-secondary coh-go" data-coh="pnote" data-id="'+esc(i.conversation_id)+'" data-name="'+esc(i.name||'')+'">ملاحظة لـ Claude</button>'
+      +(pricing?'':'<button type="button" class="btn-primary coh-go" data-coh="presume" data-id="'+esc(i.conversation_id)+'">كمّل يا عقل</button>')+'</div></li>').join('');
   }
   function pausedHtml(){
     const items=otherPaused();
@@ -216,10 +218,29 @@
     else if(act==='pfilter'){pausedFilter=b.dataset.v||'all';drawSheet();}
     else if(act==='full'){const page=byId('page-dash'),open=page.classList.toggle('coh-full-open');b.setAttribute('aria-expanded',String(open));b.textContent=open?'إخفاء قائمة العمل الكاملة':'قائمة العمل الكاملة';}
     else if(act==='popen'&&typeof navigate==='function'&&typeof openWhatsAppConversation==='function'){const id=b.dataset.id;closeSheet();navigate('whatsapp',null);setTimeout(()=>openWhatsAppConversation(id),300);}
+    else if(act==='pnote'&&typeof window.crmClaudeNote==='function'){
+      const it=paused.items.find(i=>i.conversation_id===b.dataset.id)||{};
+      window.crmClaudeNote({conversation_id:b.dataset.id,label:'على محادثة '+(b.dataset.name||'العميل'),context:{source:'paused_chat',reason:it.reason||null,last_message:it.last_message||null,summary:it.summary||null}});
+    }
     else if(act==='presume'&&typeof waInboxInvoke==='function'){
-      b.disabled=true;const id=b.dataset.id;
-      waInboxInvoke({action:'clear_handoff',conversation_id:id}).then(()=>{paused.items=paused.items.filter(i=>i.conversation_id!==id);paused.total=paused.items.length;if(last)drawTiles(last.data,last.pending);drawSheet();toast('رجّعتها للعقل','success');})
-        .catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});
+      // 11 Nov (Ahmed): the agent reads the whole chat and carries on now when the customer's last message is unanswered;
+      // if it still cannot, the chat comes back here with its reason.
+      b.disabled=true;const id=b.dataset.id;b.textContent='العقل يقرأ المحادثة…';
+      waInboxInvoke({action:'clear_handoff',conversation_id:id,resume:true}).then(res=>{
+        const a=(res&&res.agent)||{},reason=String(a.handoff_reason||'');
+        paused.items=paused.items.filter(i=>i.conversation_id!==id);
+        let msg='رجّعتها للعقل، ويرد أول ما يكتب العميل',kind='success';
+        if(res&&res.resume==='agent_ran'){
+          if(a.action==='handoff'){msg='العقل ما قدر يكمل: '+(reason||'يحتاجك');kind='error';
+            paused.items.unshift({conversation_id:id,name:b.closest('.coh-row')?.querySelector('strong')?.childNodes[0]?.textContent?.trim()||'عميل',kind:'handoff',reason:reason||'العقل ما عرف يكمل',last_message:null,summary:null});}
+          else if(a.sent>0)msg='العقل قرأ المحادثة ورد على العميل';
+          else if(a.status==='awaiting_approval')msg='العقل كتب رد ينتظر موافقتك في «ردود تنتظر موافقتك»';
+          else if(a.ignored==='outside_24h_to_followups')msg='آخر رسالة من العميل أقدم من 24 ساعة، فالرد راح لـ«متابعة اليوم»';
+          else if(a.ignored)msg='رجعت للعقل ('+a.ignored+')';
+        }else if(res&&res.resume==='agent_pending')msg='رجعت للعقل، والرد في الطريق';
+        paused.total=paused.items.length;if(last)drawTiles(last.data,last.pending);drawSheet();toast(msg,kind);
+        if(kind==='error'&&typeof window.crmOwnerHomeRefresh==='function')setTimeout(window.crmOwnerHomeRefresh,1500);
+      }).catch(()=>{b.disabled=false;b.textContent='كمّل يا عقل';toast('ما انحفظ. جرب مرة ثانية','error');});
     }
     else if(act==='auto-done'){
       b.disabled=true;const id=b.dataset.id;
