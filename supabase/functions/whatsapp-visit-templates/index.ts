@@ -19,6 +19,8 @@ const TEMPLATES: Record<string, string> = {
   visit_followup_2_ar_v2: "بخصوص زيارتك الاخيرة للعقار هل عندك ملاحظة عليه ؟",
   visit_followup_3_ar_v2: "بخصوص زيارتك الاخيرة للعقار هل وصلت لقرار ؟",
   visit_followup_4_ar_v2: "نراجع طلبك المسجل عندنا هل طلبك لين الحين قائم ؟",
+  // 12 Nov (Ahmed, R29): «كيف لقيته» was read as «did you find the place»; step 1 asks the opinion in plain words (SQL90)
+  visit_followup_1_ar_v2: "السلام عليكم كيف شفت العقار وايش انطباعك عنه ؟",
 };
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
