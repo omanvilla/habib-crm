@@ -66,3 +66,9 @@ test('each follow-up opens in the phone WhatsApp or inside the CRM',()=>{
  assert(f.includes("navigate('whatsapp',null);setTimeout(()=>openWhatsAppConversation(id),300)"));
  assert(!f.includes(String.fromCharCode(92)+'&'),'no escaped ampersand left in the code');
 });
+test('SQL86b matches the place word of the area, not the whole area text',()=>{
+ const s=fs.readFileSync('db/changes/86b-followups-reread-area-words.sql','utf8');
+ assert(s.includes("regexp_replace(regexp_replace(t, '^(و|ب)?ال', ''), '[ةه]$', '')"));
+ assert(s.includes("'بركاء','مسقط'")&&s.includes("'جنوبي','شمالي'"));
+ assert(s.includes('AND q.reason IS NULL'));
+});
