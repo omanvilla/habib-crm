@@ -3,6 +3,7 @@
 //   save_docs      copy every image / document / video the owner sent in a «دراسة سعر» chat into the private bucket
 //                  (Meta drops media after about two weeks), newest first
 //   sign           6-hour links to those copies, for Claude (crm_price_study_documents)
+//   sign_inspection 6-hour links to the photos of the office inspection of a task, for Claude (crm_price_study_inspection)
 //   pull_files     copy the two PDF reports of a study Claude handed in from Google Drive into the bucket, then tell Ahmed
 //   send           after Ahmed's approval: the message and the owner report go to the owner from the chat's branch number;
 //                  outside the 24-hour window an approved template asks first and the study follows the owner's answer
@@ -183,6 +184,17 @@ async function signDocs(convId: string) {
   for (const x of missing) docs.push({ sent_at: x.message_timestamp, kind: x.message_type, filename: null, mime: null, size: null, caption: x.body ? short(x.body, 500) : null, status: "not_saved_yet", url: null });
   if (missing.length || rows.some((r: any) => r.status === "failed")) background(saveDocs(convId));
   return docs;
+}
+// SQL96 (Ahmed 12 Nov 2026): the photos of the office inspection of a task, as 6-hour links for Claude
+// (crm_price_study_inspection). Only paths saved on the task's inspection, under its own folder, are signed.
+async function signInspection(taskId: string) {
+  const q = await db.from("owner_price_study_inspections").select("photos").eq("task_id", taskId).maybeSingle();
+  const paths = (((q.data as any)?.photos || []) as unknown[]).filter((p) => typeof p === "string" && p.startsWith(`inspections/${taskId}/`)) as string[];
+  if (!paths.length) return [];
+  const s = await db.storage.from(BUCKET).createSignedUrls(paths, 6 * 3600);
+  const urls: Record<string, string> = {};
+  for (const x of s.data || []) if (x?.path && x.signedUrl) urls[x.path] = x.signedUrl;
+  return paths.map((p) => urls[p]).filter(Boolean);
 }
 
 // ---------- the two reports ----------
@@ -494,6 +506,7 @@ Deno.serve(async (req) => {
   try {
     if (action === "save_docs") { const id = uuid(body?.conversation_id); return id ? json({ ok: true, result: await saveDocs(id) }) : json({ ok: false, error: "conversation_id_required" }, 400); }
     if (action === "sign") { const id = uuid(body?.conversation_id); return id ? json({ ok: true, documents: await signDocs(id) }) : json({ ok: false, error: "conversation_id_required" }, 400); }
+    if (action === "sign_inspection") { const id = uuid(body?.task_id); return id ? json({ ok: true, photos: await signInspection(id) }) : json({ ok: false, error: "task_id_required" }, 400); }
     if (action === "pull_files") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await pullFiles(id, secret) }) : json({ ok: false, error: "study_id_required" }, 400); }
     if (action === "send") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await sendStudy(id, "approved") }) : json({ ok: false, error: "study_id_required" }, 400); }
     if (action === "owner_inbound") { const id = uuid(body?.conversation_id); return id ? json({ ok: true, result: await ownerInbound(id, uuid(body?.message_id), secret) }) : json({ ok: false, error: "conversation_id_required" }, 400); }

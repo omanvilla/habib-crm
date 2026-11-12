@@ -174,7 +174,8 @@
   function drawSheet(){
     if(!sheetKind||sheetKind==='followups')return;
     const body=byId('cohSheetBody');if(!body)return;
-    if(sheetKind==='studies'){body.innerHTML=typeof window.crmPriceStudiesHtml==='function'?window.crmPriceStudiesHtml():'';return;}
+    // SQL96: the studies sheet draws itself, so a refresh of the home never wipes an inspection note being written or recorded
+    if(sheetKind==='studies'){if(typeof window.crmPriceStudiesDraw==='function')window.crmPriceStudiesDraw(body);else body.innerHTML=typeof window.crmPriceStudiesHtml==='function'?window.crmPriceStudiesHtml():'';return;}
     body.innerHTML=sheetKind==='paused'?pausedHtml():sheetKind==='pricing'?pricingHtml():sheetKind==='visits'?visitsHtml():problemsHtml();
   }
   function openSheet(kind){

@@ -24,7 +24,7 @@ test('the home page draws for staff from crm_staff_home and keeps the owner-only
  assert(js.includes("supa.rpc('crm_owner_home')"));
  assert(js.includes("(isOwner()?'<button type=\"button\" class=\"coh-more\" data-coh=\"nav\" data-nav=\"reports\">التقارير الكاملة</button>':'')"),'reports (money) stay owner-only');
  assert(js.includes('if(!owner){paused={items:[],total:0};autoNotes=[];}'),'a staff session never shows the owner\'s lists left in the tab');
- assert(/crm-owner-home\.js\?v=20261112-study1/.test(index));
+ assert(/crm-owner-home\.js\?v=20261112-insp1/.test(index));
 });
 test('a staff account is greeted by its own name; the branch stays under the name (Ahmed 11 Nov)',()=>{
  const base=fs.readFileSync('app-base-v15.html','utf8');

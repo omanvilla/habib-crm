@@ -76,3 +76,7 @@
 .cn-actions{display:flex;gap:8px;margin-top:10px}.cn-chat-btn{font-size:.8rem;padding:4px 10px;margin-inline-start:auto}
 .voice-btn{margin-top:6px;min-width:44px}.voice-btn.on{background:#fde8e8;color:#9f1239;border-color:#fecdd3}
 .cn-apply,.rp-keep{display:flex;gap:6px;align-items:center;font-size:.9rem;margin:8px 0}
+/* 12 Nov 2026: a recording whose transcription failed stays under its box (crm-voice-input.js) */
+.voice-keep{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px;min-width:0}
+.voice-keep audio{flex:1 1 180px;min-width:0;max-width:100%;height:40px}
+.voice-keep button{width:auto!important;min-height:40px;padding:6px 12px!important}
