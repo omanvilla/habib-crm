@@ -23,7 +23,7 @@ test('the two buttons carry their own look, not the page button classes',()=>{
  assert(s.includes('title="فتح في النظام"')&&s.includes('>النظام</button>'));
  assert(css.includes('.crm-wa-btn{')&&css.includes('white-space:nowrap')&&css.includes('.crm-wa-phone{')&&css.includes('.crm-wa-crm{')&&css.includes('.crm-wa-sm{'));
  assert(css.includes('.crm-wa-deal{flex-wrap:wrap}'),'on a narrow deal card the second button goes under the first, never cut');
- assert(index.includes('<link rel="stylesheet" href="crm-wa-buttons.css?v=20261112-wa4">'));
+ assert(index.includes('<link rel="stylesheet" href="crm-wa-buttons.css?v=20261112-wa5">'));
 });
 // 12 Nov 2026 (Ahmed: «نعم حوّلها»): the old single «واتساب» link in the visits and owners tables is the same pair
 test('visits and owners tables: the two buttons; an owner chat is found by the number',()=>{
@@ -39,7 +39,9 @@ test('visits and owners tables: the two buttons; an owner chat is found by the n
  // Ahmed, same day: «خلّ النص يظهر في جدول الزيارات بدل الأيقونات». The words always show; on a medium screen the icons go
  // and a very long client name is cut, so the fixed actions column does not cover the status column.
  assert(!css.includes('font-size:0'),'the words are never hidden');
- assert(css.includes('#page-viewings .crm-grid .crm-grid-actions .crm-wa-btn::before{display:none}')&&css.includes('#page-viewings .crm-grid td.crm-grid-client{max-width:124px;overflow:hidden;text-overflow:ellipsis}'));
+ // then: «سوّ نفس الشي لجدول الملاك، نص بدون أيقونات»: no icons in any table row
+ assert(css.includes('.crm-grid .crm-grid-actions .crm-wa-btn::before{display:none}')&&!css.includes('#page-viewings .crm-grid .crm-grid-actions'),'not the visits table only');
+ assert(css.includes('#page-viewings .crm-grid td.crm-grid-client{max-width:124px;overflow:hidden;text-overflow:ellipsis}'));
  assert(ui.includes('<td class="crm-grid-client" title="'),'the full client name stays as the tooltip');
  assert(/crm-simple-ui\.js\?v=20261112-wa4/.test(index));
 });
