@@ -1,5 +1,6 @@
-// The owner records a voice note in the CRM (a note for Claude, or an instruction to the reply agent)
-// and gets it back as text. Owner only; the audio is not stored.
+// A signed-in CRM account records a voice note next to a free-text box and gets it back as text, to read and change
+// before saving. The audio is not stored. 12 Nov 2026 (Ahmed): every active account of the company, staff included
+// (it was owner only); the text goes back to the caller's own screen, nothing is read or written here.
 import { createClient } from "npm:@supabase/supabase-js@2";
 const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false, autoRefreshToken: false } });
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
@@ -21,7 +22,7 @@ Deno.serve(async (req) => {
   const jwt = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   const u = jwt ? await db.auth.getUser(jwt) : null;
   const prof = u?.data?.user ? await db.from("profiles").select("role,is_active").eq("id", u.data.user.id).maybeSingle() : null;
-  if (!prof?.data || prof.data.role !== "owner" || prof.data.is_active === false) return json({ ok: false, error: "owner_only" }, 403);
+  if (!prof?.data || !["owner", "manager", "agent"].includes(prof.data.role) || prof.data.is_active === false) return json({ ok: false, error: "account_not_allowed" }, 403);
   const body = await req.json().catch(() => ({}));
   const b64 = String(body?.audio || "");
   const mime = String(body?.mime || "audio/webm").split(";")[0];

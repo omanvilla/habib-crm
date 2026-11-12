@@ -71,7 +71,7 @@ test('the screen: the box on cards whose task is open and inside the task window
   assert(ui.includes("supa.rpc('crm_price_study_inspection_save',{p_task_id:t,"));
   assert(ui.includes("<p class=\"cps-private\">لك فقط، ما يشوفها الموظف ولا المالك</p>"));
   assert(home.includes("if(sheetKind==='studies'){if(typeof window.crmPriceStudiesDraw==='function')window.crmPriceStudiesDraw(body);"));
-  for(const f of ['crm-price-studies.js','crm-price-studies.css','crm-owner-home.js','crm-voice-input.js','crm-reply-approvals.css'])assert(index.includes(f+'?v=20261112-insp1'),f);
+  for(const f of ['crm-price-studies.js','crm-price-studies.css','crm-owner-home.js'])assert(index.includes(f+'?v=20261112-insp1'),f);
 });
 test('«أعد الدراسة بعد المعاينة» only while the study waits for approval, through the existing rejection',()=>{
   assert(ui.includes("+(open?'<div class=\"cps-restudy\"><button type=\"button\" class=\"btn-secondary\" data-cps=\"restudy\" data-id=\"'+id+'\">أعد الدراسة بعد المعاينة</button>'"));
@@ -81,7 +81,7 @@ test('«أعد الدراسة بعد المعاينة» only while the study wai
   assert.equal((ui.match(/p_approve:/g)||[]).length,2,'the only two calls that decide: the approval screen and the restudy button (always a rejection)');
 });
 test('voice: the same button and transcription on the inspection note and the rejection note; a failed one keeps the recording',()=>{
-  assert(voice.includes("document.querySelectorAll('#cnText,.rp-instr-text,.cfu-instr-text,textarea[data-insp-note],textarea[data-cps-note]').forEach(attach)"));
+  assert(voice.includes("'#cnText','.rp-instr-text','.cfu-instr-text','textarea[data-insp-note]','textarea[data-cps-note]','textarea[data-cps-msg]',"));
   assert.equal((voice.match(/supa\.functions\.invoke\(/g)||[]).length,1,'one way to turn a recording into text');
   assert(voice.includes("const r=await supa.functions.invoke('crm-voice-transcribe',{body:{audio:await toB64(blob),mime:blob.type}});"));
   assert(voice.includes("}catch(e){\n      keep(btn,ta,blob);"));

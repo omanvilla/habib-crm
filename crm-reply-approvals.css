@@ -80,3 +80,9 @@
 .voice-keep{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px;min-width:0}
 .voice-keep audio{flex:1 1 180px;min-width:0;max-width:100%;height:40px}
 .voice-keep button{width:auto!important;min-height:40px;padding:6px 12px!important}
+/* 12 Nov 2026, part two: the 🎤 sits under every free-text box of the CRM, small and at the start of the line, whatever
+   the form around it (a column of fields, a grid, a label, a row of reply lines) */
+.voice-btn{width:auto!important;min-height:40px;padding:6px 14px!important;align-self:flex-start;justify-self:start;flex:0 0 auto}
+.rp-line .voice-btn{margin-top:0}
+label>.voice-btn{display:inline-flex}
+#crmAskText{z-index:3000}
