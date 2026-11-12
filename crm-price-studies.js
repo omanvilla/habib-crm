@@ -209,9 +209,12 @@
     ['edit','details'].forEach(kind=>{
       const modal=document.getElementById(kind==='edit'?'mTask':'mTaskDetails');if(!modal||modal.dataset.cpsWatch)return;
       modal.dataset.cpsWatch='1';new MutationObserver(()=>syncTask(kind)).observe(modal,{attributes:true,attributeFilter:['class']});
+      syncTask(kind);
     });
   }
-  watchTasks();document.addEventListener('DOMContentLoaded',watchTasks);
+  // the details window is created the first time a task is opened (crm-v18-task-priority-patch.js), so the body is watched too
+  function watchBody(){if(!document.body||document.body.dataset.cpsWatch)return;document.body.dataset.cpsWatch='1';new MutationObserver(watchTasks).observe(document.body,{childList:true});watchTasks();}
+  watchBody();document.addEventListener('DOMContentLoaded',watchBody);
   function statusLine(i){
     if(i.status==='awaiting_approval')return '<span class="cps-chip wait">تنتظر موافقتك</span>';
     if(i.status==='approved')return '<span class="cps-chip hold">موافق عليها، ما انرسلت</span>';
