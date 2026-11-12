@@ -763,6 +763,9 @@ Deno.serve(async (req) => {
     try { const ug = await db.rpc("crm_unit_groups", { p_company: msg.company_id }); if (!ug.error && Array.isArray(ug.data)) unitGroups = ug.data; } catch (_) { /* optional */ }
     const groupOf = (id: any) => unitGroups.find((g: any) => g.property_id === id);
     const remainingIds = new Set<string>(unitGroups.flatMap((g: any) => (g.remaining_ids || []) as string[]));
+    // the reel of a group is often saved on the units still available, so a customer who sends it is linked to an available
+    // unit: that unit carries the same sentence in the available list («من مجموعة انحجزت منها وحدة»)
+    const groupOfRemaining = (id: any) => unitGroups.find((g: any) => ((g.remaining_ids || []) as string[]).includes(id));
     try {
       // newest first (8 Nov: with 55 sold rows and no order, a property sold today could miss the 40), archived ones included
       // (a property sold elsewhere is often archived, and its old reels still bring questions)
@@ -922,7 +925,7 @@ Deno.serve(async (req) => {
       ...(conv.human_handoff_required && !hardHandoff ? [`موضوع محول لأحمد ولسا ما خلص (من ${String(conv.handoff_updated_at || "").slice(0, 16)}): ${conv.handoff_reason || ""}. أحمد بيكمل هذا الموضوع بنفسه وهو عنده في القائمة، وهذا التحويل ما يسكّتك (R23): رد على رسالة العميل عادي. إذا سأل عن نفس الموضوع اعطه اللي تقدر عليه بدون وعد (رد قصير، معلومة مكتوبة قدامك، أو سؤال يكمل مثل "متى يناسبك ؟"). إذا الموضوع "اجتماع:" فالموعد محجوز: أكد له اليوم والساعة إذا سأل وجاوب أسئلته البسيطة و action=none، وإذا غيّر الموعد book_meeting بالموعد الجديد. action=handoff بس إذا طلب شي جديد لازم أحمد يسويه. تسكت (reply_messages=[] و action=none) بس في حالات R23، أو إذا يستعجل أو يعيد طلب ما يقدر عليه غير أحمد (موعد ينتظر تأكيده، اتصال، معلومة مو مكتوبة قدامك) وانت رديت عليه فيه قبل`] : []),
       "",
       "العقارات المتاحة الآن (لا تعرض غيرها، ولا تذكر id للعميل):",
-      props.map(propLine).join("\n") || "لا يوجد",
+      props.map((p: any) => propLine(p) + (groupOfRemaining(p.id) ? ` | من مجموعة انحجزت منها وحدة: ${groupOfRemaining(p.id).line} (R38)` : "")).join("\n") || "لا يوجد",
       "",
       "عقارات انباعت او انحجزت مؤخراً (لا تعرضها، واذا العميل سأل عنها طبق قاعدة المباع. اللي جنبه \"وحدة من مجموعة\" له وحدة متاحة من نفس المجموعة: طبق R38):",
       soldList || "لا يوجد",
