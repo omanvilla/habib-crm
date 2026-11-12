@@ -2,13 +2,26 @@
 // "بخصوص الفيلا اللي سألت عنها في الهرم انحجزت" + "تحب تشوف خيارات ثانية ؟".
 // The reply agent takes the conversation from there (asks specs/budget or proposes an alternative).
 // Nothing is sent unless the owner approved the row; sending only 9am–9pm Oman time.
+// R38 (Ahmed 12 Nov 2026): the same wording as whatsapp-outreach queue_sold. When a unit of the same group is still available
+// (SQL97, crm_unit_group_notice): "… انحجزت وحدة منها والمتبقي الثانية والثالثة" + "تحب تشوفها ؟" (template
+// property_unit_booked_ar_v1 outside the 24 hours). R1/R3: nothing is sent to a chat Ahmed took or negotiates in, and nothing
+// is prepared for a negotiation (crm_chat_hold). The database trigger calls whatsapp-outreach; this older entry point is kept
+// in step with it.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false, autoRefreshToken: false } });
 const META_APP_SECRET = Deno.env.get("META_APP_SECRET") ?? "";
 const GRAPH = Deno.env.get("META_GRAPH_VERSION") || "v25.0";
 const TEMPLATE = "property_booked_options_ar_v1"; // body: بخصوص {{1}} اللي سألت عنها {{2}}\nتحب تشوف خيارات ثانية ؟
+const UNIT_TEMPLATE = "property_unit_booked_ar_v1"; // body: بخصوص {{1}} اللي سألت عنها في {{2}}\nانحجزت وحدة منها والمتبقي {{3}}\nتحب تشوفها ؟
 const LOOKBACK_DAYS = 90;
+// R1/R3 (crm_chat_hold; an error counts as held). Sending: any hold (someone typed in the chat by hand, a negotiation, muted).
+// Preparing: only a negotiation with Ahmed or a muted chat, as in whatsapp-outreach.
+async function held(conversationId: string, hardOnly = false) {
+  const h = await db.rpc("crm_chat_hold", { p_conversation: conversationId });
+  if (h.error) return true;
+  return hardOnly ? ["negotiation", "muted"].includes(String(h.data || "")) : !!h.data;
+}
 const enc = new TextEncoder();
 const digits = (v: unknown) => String(v ?? "").replace(/\D/g, "");
 const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { "content-type": "application/json; charset=utf-8" } });
@@ -60,6 +73,10 @@ async function collect(propertyId: string, dry: boolean) {
   ]);
   const [noun, verb] = NOUN[prop.type] || ["العقار", "انحجز"];
   const where = prop.area || prop.wilayat || "";
+  // R38: is a unit of the same group still available ?
+  const grp = await db.rpc("crm_unit_group_notice", { p_property: prop.id });
+  if (grp.error) console.error("[sold-notify] unit group", grp.error.message);
+  const unit: any = !grp.error && grp.data?.line && grp.data?.remaining_text ? grp.data : null;
   const rows: any[] = [];
   for (const c of cl.data || []) {
     const conv = (cv.data || []).find((x: any) => x.client_id === c.id);
@@ -68,11 +85,16 @@ async function collect(propertyId: string, dry: boolean) {
     else if (c.followup_suppressed) reason = "client_paused";
     else if (!conv) reason = "no_conversation";
     else if (company.includes(digits(c.phone_normalized || c.phone))) reason = "company_number";
+    else if (await held(conv.id, true)) reason = "owner_chat";
     const service = !!conv?.last_inbound_at && Date.now() - new Date(conv.last_inbound_at).getTime() < 23 * 3600000;
     rows.push({
       company_id: prop.company_id, kind: "property_sold", property_id: prop.id, client_id: c.id, conversation_id: conv?.id || null,
       route_key: conv?.route_key || null, send_mode: service ? "service" : "template", dry_run: dry,
-      messages: [`بخصوص ${noun} اللي سألت عنها${where ? ` في ${where}` : ""} ${verb}`, "تحب تشوف خيارات ثانية ؟"],
+      ...(unit
+        ? { step: "unit_booked", template_name: UNIT_TEMPLATE, template_params: [noun, where || "نفس المنطقة", String(unit.remaining_text)],
+            messages: [`بخصوص ${noun} اللي سألت عنها${where ? ` في ${where}` : ""} ${unit.line}`, "تحب تشوفها ؟"] }
+        : { step: "booked", template_name: TEMPLATE, template_params: [noun, `${where ? `في ${where} ` : ""}${verb}`],
+            messages: [`بخصوص ${noun} اللي سألت عنها${where ? ` في ${where}` : ""} ${verb}`, "تحب تشوف خيارات ثانية ؟"] }),
       status: reason ? "skipped" : "pending", reason,
     });
   }
@@ -91,7 +113,10 @@ async function collect(propertyId: string, dry: boolean) {
 async function sendApproved() {
   const h = omanHour();
   if (h < 9 || h >= 21) return { sent: 0, reason: "outside_sending_hours" };
-  const q = await db.from("whatsapp_outreach_queue").select("*").eq("status", "approved").eq("dry_run", false).limit(20);
+  // only the sold notices: every other approved row belongs to whatsapp-outreach
+  const q = await db.from("whatsapp_outreach_queue").select("*").eq("status", "approved").eq("dry_run", false).eq("kind", "property_sold").limit(20);
+  const reg = await db.from("whatsapp_template_registry").select("route_key,template_name,status");
+  const approvedTpl = new Set((reg.data || []).filter((x: any) => String(x.status).toUpperCase() === "APPROVED").map((x: any) => `${x.route_key}|${x.template_name}`));
   let sent = 0;
   for (const r of q.data || []) {
     try {
@@ -100,6 +125,8 @@ async function sendApproved() {
         db.from("whatsapp_conversations").select("id,meta_phone_number_id,last_inbound_at").eq("id", r.conversation_id).single(),
       ]);
       if (cl.data?.followup_suppressed) { await db.from("whatsapp_outreach_queue").update({ status: "skipped", reason: "client_paused" }).eq("id", r.id); continue; }
+      // R1/R3: the row waits while Ahmed holds the chat
+      if (await held(r.conversation_id)) continue;
       const t = await token(r.company_id, r.route_key);
       if (!t || !cv.data) throw new Error("route_not_ready");
       const to = digits(cl.data?.phone_normalized || cl.data?.phone), phoneId = digits(cv.data.meta_phone_number_id);
@@ -108,10 +135,16 @@ async function sendApproved() {
       const out: string[] = [];
       if (service) { for (const m of r.messages) out.push(await meta(t, phoneId, to, { type: "text", text: { preview_url: false, body: m } })); }
       else {
-        const [first] = r.messages as string[];
-        const mm = first.match(/^بخصوص (\S+) اللي سألت عنها (.+)$/);
-        if (!mm) throw new Error("template_params");
-        out.push(await meta(t, phoneId, to, { type: "template", template: { name: TEMPLATE, language: { code: "ar" }, components: [{ type: "body", parameters: [{ type: "text", text: mm[1] }, { type: "text", text: mm[2] }] }] } }));
+        // the row's own template and parameters (R38); rows queued before them carry only the text
+        let name = String(r.template_name || TEMPLATE);
+        let params: string[] = Array.isArray(r.template_params) ? r.template_params.map(String) : [];
+        if (!params.length) {
+          const mm = String((r.messages as string[])[0] || "").match(/^بخصوص (\S+) اللي سألت عنها (.+)$/);
+          if (!mm) throw new Error("template_params");
+          name = TEMPLATE; params = [mm[1], mm[2]];
+        }
+        if (!approvedTpl.has(`${r.route_key}|${name}`)) { await db.from("whatsapp_outreach_queue").update({ error: "template_pending" }).eq("id", r.id); continue; }
+        out.push(await meta(t, phoneId, to, { type: "template", template: { name, language: { code: "ar" }, components: [{ type: "body", parameters: params.map((x) => ({ type: "text", text: x })) }] } }));
       }
       for (let i = 0; i < out.length; i++) if (out[i]) await db.from("whatsapp_messages").insert({
         company_id: r.company_id, conversation_id: r.conversation_id, client_id: r.client_id, whatsapp_message_id: out[i], direction: "outbound",

@@ -3,7 +3,10 @@
 // as plain text inside the 24-hour window or as an approved template outside it.
 //   queue_requests  (hourly cron)  weekly follow-up of open requests: still searching ? / financing approved ?
 //                                   never when the client wrote in the last 7 days, max 2 unanswered, stop on "ما ابي"
-//   queue_sold      {property_id}   "بخصوص الفيلا اللي سألت عنها في … انحجزت" to everyone who asked, except the buyer
+//   queue_sold      {property_id}   "بخصوص الفيلا اللي سألت عنها في … انحجزت" to everyone who asked, except the buyer.
+//                                   R38 (Ahmed 12 Nov): when a unit of the same group is still available (SQL97,
+//                                   crm_unit_group_notice) the message is "… انحجزت وحدة منها والمتبقي الثانية والثالثة" +
+//                                   "تحب تشوفها ؟" instead (template property_unit_booked_ar_v1 outside the 24 hours)
 //   queue_listing   {property_id}   a new listing to open requests that match it, asking first if they still search
 //   send_approved   (cron)          sends approved rows
 //   templates       {submit}        submits / refreshes the four templates on both numbers
@@ -28,6 +31,11 @@ const TEMPLATES: Record<string, { category: string; body: string; example: strin
   financing_followup_ar_v1: { category: "UTILITY", body: "بخصوص التمويل {{1}}\nطلعت الموافقة ؟", example: ["من بنك الاسكان"] },
   property_booked_options_ar_v1: { category: "MARKETING", body: "بخصوص {{1}} اللي سألت عنها {{2}}\nتحب تشوف خيارات ثانية ؟", example: ["الفيلا", "في الهرم انحجزت"] },
   new_listing_match_ar_v1: { category: "MARKETING", body: "نزل عندنا {{1}} ممكن يناسب طلبك\nلين الحين تبحث ؟", example: ["فيلا في الصومحان بـ 57 الف"] },
+  // Ahmed 12 Nov (R38, R39): a unit of a group went and another is left; a booked visit the client did not come to; an
+  // available property for a client whose request it fits. He approved the three wordings before they went to Meta.
+  property_unit_booked_ar_v1: { category: "MARKETING", body: "بخصوص {{1}} اللي سألت عنها في {{2}}\nانحجزت وحدة منها والمتبقي {{3}}\nتحب تشوفها ؟", example: ["الفيلا", "الصومحان الجنوبية", "الثانية والثالثة"] },
+  visit_missed_rebook_ar_v1: { category: "UTILITY", body: "بخصوص موعد زيارتك {{1}}\nتحب نحدد لك موعد ثاني ؟", example: ["فيلا الشخاخيط"] },
+  request_offer_match_ar_v1: { category: "MARKETING", body: "بخصوص طلبك {{1}}\nعندنا {{2}} تحب ارسلك تفاصيله ؟", example: ["فيلا في الرميس بحدود 60 الف", "فيلا في الرميس بـ 59 الف"] },
 };
 const NOUN: Record<string, [string, string, string]> = { // label, "booked" verb, indefinite
   villa: ["الفيلا", "انحجزت", "فيلا"], twin_villa: ["الفيلا", "انحجزت", "توين فيلا"], townhouse: ["الفيلا", "انحجزت", "تاون هاوس"], house: ["البيت", "انحجز", "بيت"],
@@ -62,6 +70,13 @@ async function meta(t: string, phoneId: string, to: string, payload: any) {
 async function latestConv(clientId: string) {
   const c = await db.from("whatsapp_conversations").select("id,route_key,last_inbound_at,meta_phone_number_id").eq("client_id", clientId).order("last_inbound_at", { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
   return c.data || null;
+}
+// R1/R3 at preparation too (Ahmed 12 Nov): nothing is even prepared for a chat in a negotiation with Ahmed (تفاوض / مشتري جاد /
+// دراسة سعر) or a muted one. A chat someone typed in by hand (manual_reply) is prepared as before, so the office still sees
+// it on its lists, and the send refuses it until the chat is handed back (sendRows). An error counts as held.
+async function held(conversationId: string) {
+  const h = await db.rpc("crm_chat_hold", { p_conversation: conversationId });
+  return h.error ? true : ["negotiation", "muted"].includes(String(h.data || ""));
 }
 async function upsertRows(rows: any[]) {
   if (!rows.length) return 0;
@@ -98,6 +113,8 @@ async function queueRequests(limit = 25) {
     // "found" is not an allowed search_status (client_requests_search_status_check): the update failed every hour
     // and the request came back each run (10 Nov 2026). "stopped" (توقف عن البحث) + the reason in next_action.
     if (FOUND_RE.test(said)) { const up = await db.from("client_requests").update({ next_followup: null, status: "paused", search_status: "stopped", next_action: "العميل قال حصل" }).eq("id", r.id); if (up.error) out.push({ request: r.id, error: up.error.message }); continue; }
+    // a chat in a negotiation with Ahmed gets no follow-up prepared; looked at again tomorrow
+    if (await held(conv.id)) { await db.from("client_requests").update({ next_followup: new Date(now + DAY).toISOString() }).eq("id", r.id); out.push({ request: r.id, skip: "chat_held" }); continue; }
     // one office message a week at most, and two unanswered follow-ups pause the request
     const recent = await db.from("whatsapp_outreach_queue").select("id,status,sent_at,created_at").eq("client_id", r.client_id).in("status", ["pending", "approved", "sent"]).gte("created_at", new Date(now - 7 * DAY).toISOString()).limit(1);
     if ((recent.data || []).length) continue;
@@ -138,20 +155,28 @@ async function queueSold(propertyId: string, dry: boolean) {
   const where = prop.area || prop.wilayat || "";
   const done = await db.from("whatsapp_outreach_queue").select("client_id").eq("kind", "property_sold").eq("property_id", prop.id);
   const already = new Set((done.data || []).map((d: any) => d.client_id));
+  // R38: is a unit of the same group still available ? (same owner, area and kind, near specifications: SQL97)
+  const grp = await db.rpc("crm_unit_group_notice", { p_property: prop.id });
+  if (grp.error) console.error("[outreach] unit group", grp.error.message);
+  const unit: any = !grp.error && grp.data?.line && grp.data?.remaining_text ? grp.data : null;
   const rows: any[] = [];
   if (ids.size) {
     const cl = await db.from("clients").select("id,phone,phone_normalized,archived,followup_suppressed").in("id", [...ids]);
     for (const c of cl.data || []) {
       if (already.has(c.id) || c.archived || c.followup_suppressed || company.includes(digits(c.phone_normalized || c.phone))) continue;
       const conv = await latestConv(c.id);
-      if (!conv) continue;
+      if (!conv || await held(conv.id)) continue;
       const second = `${where ? "في " + where + " " : ""}${verb}`;
-      rows.push({ company_id: prop.company_id, kind: "property_sold", property_id: prop.id, client_id: c.id, conversation_id: conv.id, route_key: conv.route_key,
-        step: "booked", template_name: "property_booked_options_ar_v1", template_params: [noun, second], messages: [`بخصوص ${noun} اللي سألت عنها ${second}`, "تحب تشوف خيارات ثانية ؟"],
-        summary: prop.title, dry_run: dry, status: "pending" });
+      const base = { company_id: prop.company_id, kind: "property_sold", property_id: prop.id, client_id: c.id, conversation_id: conv.id, route_key: conv.route_key, dry_run: dry, status: "pending" };
+      rows.push(unit
+        ? { ...base, step: "unit_booked", template_name: "property_unit_booked_ar_v1", template_params: [noun, where || "نفس المنطقة", String(unit.remaining_text)],
+            messages: [`بخصوص ${noun} اللي سألت عنها${where ? " في " + where : ""} ${unit.line}`, "تحب تشوفها ؟"],
+            summary: short(`${prop.title} (المتبقي: ${(unit.remaining_titles || []).join(" و ")})`, 200) }
+        : { ...base, step: "booked", template_name: "property_booked_options_ar_v1", template_params: [noun, second], messages: [`بخصوص ${noun} اللي سألت عنها ${second}`, "تحب تشوف خيارات ثانية ؟"],
+            summary: prop.title });
     }
   }
-  return { property: prop.title, queued: await upsertRows(rows) };
+  return { property: prop.title, unit_group: unit ? unit.line : null, queued: await upsertRows(rows) };
 }
 
 // ---- new listing: open requests that match it ---------------------------------------------------
@@ -199,7 +224,7 @@ async function queueListing(propertyId: string, dry: boolean) {
     const cl = await db.from("clients").select("archived,followup_suppressed").eq("id", r.client_id).maybeSingle();
     if (!cl.data || cl.data.archived || cl.data.followup_suppressed) continue;
     const conv = await latestConv(r.client_id);
-    if (!conv) continue;
+    if (!conv || await held(conv.id)) continue;
     seen.add(r.client_id);
     rows.push({ company_id: prop.company_id, kind: "new_listing", property_id: prop.id, request_id: r.id, client_id: r.client_id, conversation_id: conv.id, route_key: conv.route_key,
       step: "ask_still_searching", template_name: "new_listing_match_ar_v1", template_params: [label], messages: [`نزل عندنا ${label} ممكن يناسب طلبك`, "لين الحين تبحث ؟"],
@@ -240,7 +265,11 @@ async function sendRows(ids?: string[]) {
       const now = new Date().toISOString();
       const outs: { id: string | null; body: string; type: string }[] = [];
       if (service) for (const m of r.messages as string[]) outs.push({ id: await meta(t, phoneId, to, { type: "text", text: { preview_url: false, body: m } }), body: m, type: "text" });
-      else outs.push({ id: await meta(t, phoneId, to, { type: "template", template: { name: r.template_name, language: { code: "ar" }, components: [{ type: "body", parameters: (r.template_params || []).map((x: string) => ({ type: "text", text: String(x) })) }] } }), body: (r.messages as string[]).join("\n"), type: "template" });
+      else {
+        // a template without variables (the visit follow-ups chosen by the client's stage, R39) takes no body component
+        const params = (r.template_params || []).map((x: string) => ({ type: "text", text: String(x) }));
+        outs.push({ id: await meta(t, phoneId, to, { type: "template", template: { name: r.template_name, language: { code: "ar" }, ...(params.length ? { components: [{ type: "body", parameters: params }] } : {}) } }), body: (r.messages as string[]).join("\n"), type: "template" });
+      }
       for (const o of outs) if (o.id) await db.from("whatsapp_messages").insert({
         company_id: r.company_id, conversation_id: r.conversation_id, client_id: r.client_id, request_id: r.request_id || null, whatsapp_message_id: o.id, direction: "outbound",
         message_type: o.type, sender_wa_id: phoneId, recipient_wa_id: to, body: o.body, message_timestamp: now, delivery_status: "sent", actor_type: "automated", channel_source: "crm_outreach",

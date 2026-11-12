@@ -22,7 +22,7 @@ test('R35: investors are followed up, not skipped; subject fills the template; R
   assert(!fn.includes('skip (تنتقل لمتابعة المستثمرين'));
   assert(fn.includes('R35، أحمد 12 نوفمبر'));
   assert(fn.includes('subject: { type: ["string", "null"] }'));
-  assert(fn.includes('required: ["decision", "reason", "text", "auto_ok", "request", "subject"]'));
+  assert(fn.includes('required: ["decision", "reason", "text", "auto_ok", "request", "subject", "stage", "offer_no"]'));
   assert(fn.includes('.eq("template_name", "request_followup_ar_v2")'));
   assert(fn.includes('لا تعد بصور أبداً ولا تسأل "أرسل لك الصور ؟"'));
 });

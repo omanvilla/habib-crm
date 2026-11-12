@@ -756,13 +756,20 @@ Deno.serve(async (req) => {
     // recently sold or booked: the agent must recognise them and answer with the sold rule, never offer them
     let soldList = "";
     let soldRows: any[] = [];
+    // R38 (Ahmed 12 Nov 2026, SQL97): a unit that was sold or booked while a unit of its group (same owner, area and kind, near
+    // specifications) is still available. The customer hears «انحجزت وحدة منها والمتبقي …» and is shown the remaining unit,
+    // never a bare «انباع» and never another alternative. The sentence comes from crm_unit_groups, the same one the notices use.
+    let unitGroups: any[] = [];
+    try { const ug = await db.rpc("crm_unit_groups", { p_company: msg.company_id }); if (!ug.error && Array.isArray(ug.data)) unitGroups = ug.data; } catch (_) { /* optional */ }
+    const groupOf = (id: any) => unitGroups.find((g: any) => g.property_id === id);
+    const remainingIds = new Set<string>(unitGroups.flatMap((g: any) => (g.remaining_ids || []) as string[]));
     try {
       // newest first (8 Nov: with 55 sold rows and no order, a property sold today could miss the 40), archived ones included
       // (a property sold elsewhere is often archived, and its old reels still bring questions)
       const sr = await db.from("properties").select("id,type,area,wilayat,price,status,title,map_url").eq("company_id", msg.company_id).in("status", ["sold", "reserved"])
         .gte("updated_at", new Date(Date.now() - 150 * 86400000).toISOString()).order("updated_at", { ascending: false }).limit(40);
       soldRows = sr.data || [];
-      soldList = (sr.data || []).map((p: any) => `- ${typeAr(p.type)} | ${[p.area, p.wilayat].filter(Boolean).join("، ")} | ${p.price ? Number(p.price).toLocaleString("en-US") + " ريال" : ""} | ${p.status === "sold" ? "انباع" : "انحجز"}`).join("\n");
+      soldList = (sr.data || []).map((p: any) => `- ${typeAr(p.type)} | ${[p.area, p.wilayat].filter(Boolean).join("، ")} | ${p.price ? Number(p.price).toLocaleString("en-US") + " ريال" : ""} | ${p.status === "sold" ? "انباع" : "انحجز"}${groupOf(p.id) ? ` | وحدة من مجموعة: ${groupOf(p.id).line} | المتبقي متاح: ${(groupOf(p.id).remaining_ids || []).join(" و ")}` : ""}`).join("\n");
     } catch (_) { /* optional */ }
     // R24 (Ahmed 10 Nov): archived but not sold (withdrawn, contract ended, rented...) in the last 150 days: "ما متوفر حالياً", never "انباع".
     // Duplicate and test records are left out. Before the archive reasons exist (contract A) the same rows are read without them.
@@ -816,7 +823,10 @@ Deno.serve(async (req) => {
       // R6: say plainly when the property behind a reel or message was sold, so the sold rule applies (old reels of sold villas)
       const soldOf = (id: any) => soldRows.find((s: any) => s.id === id);
       const sold = soldOf(reel?.property_id) || soldOf(h.matched_property_id) || (reel?.propertyIds || []).map(soldOf).find(Boolean);
-      if (sold && !props.some((p: any) => p.id === reel?.property_id || p.id === h.matched_property_id)) extra += ` {هذا العقار ${sold.status === "reserved" ? "انحجز" : "انباع"}: ${typeAr(sold.type)} ${sold.area || ""} ${sold.price ? Math.round(Number(sold.price) / 1000) + " الف" : ""}. طبق قاعدة المباع واعرض أقرب متاح}`;
+      const soldGroup = sold ? groupOf(sold.id) : null;
+      if (sold && !props.some((p: any) => p.id === reel?.property_id || p.id === h.matched_property_id)) extra += soldGroup
+        ? ` {هذا العقار وحدة من مجموعة وحدات متشابهة: ${typeAr(sold.type)} ${sold.area || ""} ${sold.price ? Math.round(Number(sold.price) / 1000) + " الف" : ""}. ${soldGroup.line}. المتبقي متاح: ${(soldGroup.remaining_ids || []).join(" و ")}. قل له هذا السطر واعرض الوحدة المتبقية، لا تقول انباع وخلاص ولا تعرض بديل ثاني (R38)}`
+        : ` {هذا العقار ${sold.status === "reserved" ? "انحجز" : "انباع"}: ${typeAr(sold.type)} ${sold.area || ""} ${sold.price ? Math.round(Number(sold.price) / 1000) + " الف" : ""}. طبق قاعدة المباع واعرض أقرب متاح}`;
       // R24: archived without being sold (withdrawn, contract ended): no longer available, and never called sold
       const goneOf = (id: any) => goneRows.find((s: any) => s.id === id);
       const gone = sold ? null : (goneOf(reel?.property_id) || goneOf(h.matched_property_id) || (reel?.propertyIds || []).map(goneOf).find(Boolean));
@@ -914,7 +924,7 @@ Deno.serve(async (req) => {
       "العقارات المتاحة الآن (لا تعرض غيرها، ولا تذكر id للعميل):",
       props.map(propLine).join("\n") || "لا يوجد",
       "",
-      "عقارات انباعت او انحجزت مؤخراً (لا تعرضها، واذا العميل سأل عنها طبق قاعدة المباع):",
+      "عقارات انباعت او انحجزت مؤخراً (لا تعرضها، واذا العميل سأل عنها طبق قاعدة المباع. اللي جنبه \"وحدة من مجموعة\" له وحدة متاحة من نفس المجموعة: طبق R38):",
       soldList || "لا يوجد",
       "",
       "عقارات ما عادت متوفرة (مو مباعة):",
@@ -1058,7 +1068,10 @@ Deno.serve(async (req) => {
       || Object.values(reels).some((r: any) => soldIds.has(r.property_id) || (r.propertyIds || []).some((id: string) => soldIds.has(id)))
       || (!!prop && texts.some((t) => /بس عندنا/.test(t)) && soldRows.some((s: any) => s.type === prop.type
         && String(s.area || "").replace(/^بركاء\s+/, "") === String(prop.area || "").replace(/^بركاء\s+/, "")));
-    if (linkedAvailable && !linkedSold && texts.some((t) => SOLD_RE.test(t))) {
+    // R38: «انحجزت وحدة منها والمتبقي …» about a group whose remaining unit is the one in hand is true, not a wrong «انباع»
+    const groupTalk = [out.property_id, prop?.id, ...history.map((h: any) => h.matched_property_id)].some((id: any) => !!id && remainingIds.has(id))
+      && texts.filter((t) => SOLD_RE.test(t)).every((t) => /المتبقي|متاح|باقي/.test(t));
+    if (linkedAvailable && !linkedSold && !groupTalk && texts.some((t) => SOLD_RE.test(t))) {
       texts = texts.filter((t) => !SOLD_RE.test(t));
       out.action = "handoff"; out.handoff_reason = "العقل كان بيقول العقار انباع وهو متوفر في الـ CRM، راجع المحادثة";
     }
