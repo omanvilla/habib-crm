@@ -5,6 +5,14 @@ Updated 2026-11-12. Read AGENTS.md. Latest owner instructions govern. Previous I
 > **Date note.** The sections headed «12 November 2026» below (and «12 Nov» / «12 نوفمبر» in R32–R35, SQL90/91 comments, file
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
+
+## 12 Nov 2026 night — R43, R44, failed templates (session 014CVqTs)
+- **Meta rejects every template since 8 Nov** on both WABAs: error 131042 «Business eligibility payment issue / currency not configured» (85 failures). Free text inside 24 h works. Ahmed will send the missed ones from his phone; billing in Meta Billing Hub still to fix.
+- **Resend list:** 57 pending `request_followup` rows with `template_name='manual_phone'`, `step='resend_phone'`, `auto_ok=false`, corrected `owner_text` (shown in «متابعة اليوم» with the phone button): 47 failed mass notices rewritten (Shakhakhit withdrawn → R24 + Somahan 69; Rumais sold → R6 + Rumais 59; Somahan unit → R38 line), 5 vague/promise follow-ups rewritten after `preview_stage`, 5 more corrected by hand (Fahad, Mazen, NB, Dawood, K). Not resent: Yousef, Abdullah Al-Harthi, Amir Al-Rahbi (Ahmed), the Hail 130 group (Ahmed: leave them), chats the review skipped.
+- **R43** (linked-later ads) and **R44** (Hay Asim wording, general search, «عارض بيت» = buyer, «مشيت شفته» = visited, no visit follow-up on a sold/withdrawn property, fixed-price line not volunteered) in `docs/agent-rules.md`. Prompts synced at `8cfe964` after a dry run (`brain_sha`, last 20 chats + Fahad, 🤍, Mazen: no naming explanation, no owner question, no «ثابت» unasked).
+- **Not deployed yet:** `whatsapp-visit-followup-auto` REVIEW_RULES lines for R44 (in `52ebaa7`), waiting for Ahmed at the computer. Follow-up rows fixed by hand meanwhile (Mazen, Abdullah, Amir rejected; Yousef skipped).
+- 55 ad messages linked (`resolved_manual`): 37 Hail 130 images, 18 reel links.
+
 ## 12 November 2026 (night) — R40 ignored chats, R41 a question the agent cannot answer, R42 a fixed price (SQL98, commit 04fff84)
 
 - **What Ahmed asked.** Job seekers, people who want to sign up as a broker under the office, brokers from outside Oman, bank staff and service offers must get nothing ever, must not reach him as a handoff and must not sit in «العقل موقوف عندهم» waiting for «كمّل يا عقل» (pressing it made the agent talk to them again); keep them in a separate place. Open notes of 12 Nov: HUDA (the agent answered «ما عندي معلومة مؤكدة» about the main road; he wants silence and the chat back to him), Munther (the Rumais 59 villa price is fixed; the agent must know per property), Mohammed (a broker sign-up should never have reached him). He approved the three rules (R40, R41, R42) with the plan.
