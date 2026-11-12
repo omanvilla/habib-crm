@@ -61,7 +61,7 @@ test('the CRM reads and saves the unit name; the rollback keeps names that were 
   assert(base.includes('id="pUnitLabel" maxlength="60"'));
   assert(base.includes("unit_label:$('pUnitLabel')?$('pUnitLabel').value.trim()||null:null,"));
   assert(base.includes("if($('pUnitLabel'))$('pUnitLabel').value=p.unit_label||'';"));
-  assert(index.includes('app-base-v15.html?v=20261112-unit1'));
+  assert(index.includes('app-base-v15.html?v=20261112-ign1'));
   assert(rb.indexOf('DROP VIEW IF EXISTS public.crm_properties_access;')<rb.indexOf('DROP COLUMN IF EXISTS unit_label'));
   assert(rb.includes("IF NOT EXISTS (SELECT 1 FROM public.properties WHERE nullif(btrim(coalesce(unit_label, '')), '') IS NOT NULL) THEN"));
   assert(rb.includes('DROP TRIGGER IF EXISTS crm_a_move_to_remaining_unit ON public.properties;'));

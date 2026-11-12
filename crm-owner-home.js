@@ -15,11 +15,13 @@
   const isStaff=()=>typeof currentProfile!=='undefined'&&currentProfile&&['manager','agent','viewer'].includes(currentProfile.role);
   const hasHome=()=>isOwner()||isStaff();
   const toast=(m,t)=>{if(typeof showToast==='function')showToast(m,t);};
-  const OWNER_KIND={negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرارك',muted:'مكتوم عنهم',manual_reply:'رديت بنفسك'};
-  const STAFF_KIND={negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرار',muted:'مكتوم عنهم',manual_reply:'انرد عليها من المكتب'};
+  /* 12 Nov 2026 (Ahmed, R40 / R41, SQL98): «سؤال ما عندي جوابه» has its own tab; the ignored chats (jobs, broker sign-ups,
+   * foreign brokers, banks, service offers) are not in this list at all: a small link at its end opens them. */
+  const OWNER_KIND={unknown_q:'سؤال ما يعرف جوابه',negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرارك',muted:'مكتوم عنهم',manual_reply:'رديت بنفسك'};
+  const STAFF_KIND={unknown_q:'سؤال ما يعرف جوابه',negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرار',muted:'مكتوم عنهم',manual_reply:'انرد عليها من المكتب'};
   const KIND=new Proxy({},{get:(_,k)=>(isOwner()?OWNER_KIND:STAFF_KIND)[k],ownKeys:()=>Object.keys(OWNER_KIND),getOwnPropertyDescriptor:()=>({enumerable:true,configurable:true})});
   const TITLES={followups:'متابعة اليوم',paused:'العقل موقوف عندهم',pricing:'دراسة سعر: ملاك ينتظرون تسعيرك',studies:'دراسات سعر تنتظر موافقتك',visits:'زيارات يتابعها الذكاء الاصطناعي',problems:'مشاكل تحتاج انتباه'};
-  let sequence=0,sheetKind=null,pausedFilter='all',paused={items:[],total:0},last=null;
+  let sequence=0,sheetKind=null,pausedFilter='all',paused={items:[],total:0},last=null,ignoredOpen=false,ignoredList=null;
   /* «دراسة سعر:» handoffs (11 Nov 2026, Ahmed): owners waiting for a price have their own tile and list, so the
    * paused list keeps only chats that need another decision. Display only: the hold, the reason text and
    * «كمّل يا عقل» are unchanged (crm_paused_chats still returns them as kind=negotiation). */
@@ -136,6 +138,8 @@
       // notes for Claude are the owner's lessons (crm_owner_notes), so staff do not get that button
       +(isOwner()?'<button type="button" class="btn-secondary coh-go" data-coh="pnote" data-id="'+esc(i.conversation_id)+'" data-name="'+esc(i.name||'')+'">ملاحظة لـ Claude</button>':'')
       +(pricing||!canResume()||(!isOwner()&&isStudyChat(i))?'':'<button type="button" class="btn-primary coh-go" data-coh="presume" data-id="'+esc(i.conversation_id)+'">كمّل يا عقل</button>')
+      // R40: «تجاهل نهائي» = no reply and no follow-up ever, and the chat leaves this list
+      +(pricing||!canResume()||isStudyChat(i)?'':'<button type="button" class="btn-secondary coh-go coh-ignore" data-coh="pignore" data-id="'+esc(i.conversation_id)+'">تجاهل نهائي</button>')
       +(pricing&&isOwner()?'<button type="button" class="btn-primary coh-go" data-coh="pprice" data-id="'+esc(i.conversation_id)+'">ارسل السعر للمالك</button>':'')+'</div>'
       +(pricing&&isOwner()?priceForm(i):'')+'</li>').join('');
   }
@@ -157,14 +161,34 @@
       if(ta&&ta.dataset.edited!=='1')ta.value=p?PRICE_TEXT(p):'';return;}
     const ta=e.target&&e.target.closest?e.target.closest('[data-pf-text]'):null;if(ta)ta.dataset.edited='1';
   });
+  function ignoredHtml(){
+    const n=Number(paused.ignored||0);
+    if(!n&&!(ignoredList&&ignoredList.length))return '';
+    let h='<div class="coh-ignored"><button type="button" class="coh-ignored-link" data-coh="ptoggle-ignored" aria-expanded="'+ignoredOpen+'">'+(ignoredOpen?'إخفاء ':'')+'المتجاهلين <b dir="ltr">'+num(n)+'</b></button>';
+    if(ignoredOpen){
+      if(ignoredList==null)h+='<p class="coh-empty">جاري التحميل…</p>';
+      else if(!ignoredList.length)h+='<p class="coh-empty">ما في أحد</p>';
+      else h+='<p class="coh-since">ما ينرد عليهم ولا توصلهم متابعة. «رجّعه» يخلي العقل يرد عليه مرة ثانية</p><ul class="coh-list">'+ignoredList.map(i=>
+        '<li class="coh-row coh-paused"><div class="coh-info"><strong>'+esc(i.name||'عميل')+' <small>'+esc(i.reason||'')+'</small></strong>'
+        +(i.last_message?'<small class="coh-note">آخر رسالة منه: <span dir="auto">'+esc(i.last_message)+'</span></small>':'')+'</div>'
+        +'<div class="coh-paused-actions">'+(typeof window.crmWaButtons==='function'?window.crmWaButtons({phone:i.phone,conversationId:i.conversation_id,clientId:i.client_id,cls:'btn-secondary coh-go'}):'')
+        +'<button type="button" class="btn-secondary coh-go" data-coh="punignore" data-id="'+esc(i.conversation_id)+'">رجّعه</button></div></li>').join('')+'</ul>';
+    }
+    return h+'</div>';
+  }
+  function loadIgnored(){
+    ignoredList=null;drawSheet();
+    supa.rpc('crm_ignored_chats').then(r=>{if(r.error)throw r.error;ignoredList=(r.data&&r.data.items)||[];paused.ignored=ignoredList.length;drawSheet();})
+      .catch(()=>{ignoredList=[];ignoredOpen=false;drawSheet();toast('ما قدرت أفتح المتجاهلين. جرب مرة ثانية','error');});
+  }
   function pausedHtml(){
     const items=otherPaused();
-    if(!items.length)return '<p class="coh-empty">ما في أحد موقوف عنده العقل</p>';
+    if(!items.length)return '<p class="coh-empty">ما في أحد موقوف عنده العقل</p>'+ignoredHtml();
     const counts={};items.forEach(i=>{counts[i.kind]=(counts[i.kind]||0)+1;});
     if(pausedFilter!=='all'&&!counts[pausedFilter])pausedFilter='all';
     const tabs=[['all','الكل',items.length]].concat(Object.keys(KIND).filter(k=>counts[k]).map(k=>[k,KIND[k],counts[k]]))
       .map(([k,l,n])=>'<button type="button" class="cfu-tab'+(pausedFilter===k?' on':'')+'" data-coh="pfilter" data-v="'+k+'" aria-pressed="'+(pausedFilter===k)+'">'+esc(l)+' <b dir="ltr">'+n+'</b></button>').join('');
-    return '<div class="cfu-tabs coh-ptabs">'+tabs+'</div><ul class="coh-list">'+pausedRows(items.filter(i=>pausedFilter==='all'||i.kind===pausedFilter),false)+'</ul>';
+    return '<div class="cfu-tabs coh-ptabs">'+tabs+'</div><ul class="coh-list">'+pausedRows(items.filter(i=>pausedFilter==='all'||i.kind===pausedFilter),false)+'</ul>'+ignoredHtml();
   }
   function pricingHtml(){
     const items=pricingItems();
@@ -282,6 +306,17 @@
     if(act==='sheet')openSheet(b.dataset.kind);
     else if(act==='sclose')closeSheet();
     else if(act==='pfilter'){pausedFilter=b.dataset.v||'all';drawSheet();}
+    else if(act==='ptoggle-ignored'){ignoredOpen=!ignoredOpen;if(ignoredOpen)loadIgnored();else drawSheet();}
+    else if(act==='pignore'||act==='punignore'){
+      const id=b.dataset.id,on=act==='pignore';if(b.disabled)return;b.disabled=true;
+      supa.rpc('crm_set_chat_ignored',{p_conversation:id,p_ignored:on}).then(r=>{
+        if(r.error)throw r.error;
+        if(on){paused.items=paused.items.filter(i=>i.conversation_id!==id);paused.total=paused.items.length;paused.ignored=Number(paused.ignored||0)+1;if(ignoredOpen)ignoredList=null;}
+        else{ignoredList=(ignoredList||[]).filter(i=>i.conversation_id!==id);paused.ignored=Math.max(0,Number(paused.ignored||0)-1);}
+        if(last)drawTiles(last.data,last.pending);drawSheet();if(on&&ignoredOpen)loadIgnored();
+        toast(on?'انتقل للمتجاهلين، وما بيوصله رد ولا متابعة':'رجع للعقل، ويرد عليه أول ما يكتب','success');
+      }).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});
+    }
     else if(act==='full'){const page=byId('page-dash'),open=page.classList.toggle('coh-full-open');b.setAttribute('aria-expanded',String(open));b.textContent=open?'إخفاء قائمة العمل الكاملة':'قائمة العمل الكاملة';}
     else if(act==='popen'&&typeof navigate==='function'&&typeof openWhatsAppConversation==='function'){const id=b.dataset.id;closeSheet();navigate('whatsapp',null);setTimeout(()=>openWhatsAppConversation(id),300);}
     else if(act==='pnote'&&typeof window.crmClaudeNote==='function'){
