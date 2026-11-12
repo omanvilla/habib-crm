@@ -81,6 +81,11 @@ test('R38: the sold notice says a unit is left when one is, in both senders; the
   // the house style of the templates: no comma, no full stop, a space before the question mark
   for(const m of out.matchAll(/body: "([^"]+)"/g)){assert(!/[،,.!]/.test(m[1]),m[1]);assert(!/[^ ]؟/.test(m[1]),m[1]);}
 });
+test('the template registry keeps the category Meta gave, so only a real UTILITY template goes out by itself',()=>{
+  assert(out.includes('fields=name,status,language,category'));
+  assert(out.includes('let category = String(found?.category || tp.category).toUpperCase();'));
+  assert(out.includes('template_name: name, language: "ar", category, status: String(status).toUpperCase(),'));
+});
 test('R1/R3: nothing is prepared for a negotiation chat, nothing is sent to a held chat',()=>{
   assert(out.includes('return h.error ? true : ["negotiation", "muted"].includes(String(h.data || ""));'));
   assert(out.includes('if (!conv || await held(conv.id)) continue;'));

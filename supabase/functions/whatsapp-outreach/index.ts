@@ -292,18 +292,22 @@ async function templates(submit: boolean) {
     const t = await token(rt.company_id, rt.route_key);
     if (!t || !rt.meta_waba_id) { out.push({ route: rt.route_key, error: "route_not_ready" }); continue; }
     for (const [name, tp] of Object.entries(TEMPLATES)) {
-      const g = await fetch(`https://graph.facebook.com/${GRAPH}/${rt.meta_waba_id}/message_templates?name=${name}&fields=name,status,language`, { headers: { Authorization: `Bearer ${t}` } });
+      const g = await fetch(`https://graph.facebook.com/${GRAPH}/${rt.meta_waba_id}/message_templates?name=${name}&fields=name,status,language,category`, { headers: { Authorization: `Bearer ${t}` } });
       const gd = await g.json().catch(() => ({}));
-      let status = (gd?.data || []).find((x: any) => x.name === name)?.status || "MISSING";
+      const found = (gd?.data || []).find((x: any) => x.name === name);
+      let status = found?.status || "MISSING";
+      // the category Meta gave it, not the one we asked for (12 Nov): only a template Meta rates UTILITY goes out by itself
+      let category = String(found?.category || tp.category).toUpperCase();
       if (status === "MISSING" && submit) {
         const c = await fetch(`https://graph.facebook.com/${GRAPH}/${rt.meta_waba_id}/message_templates`, { method: "POST", headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
           body: JSON.stringify({ name, language: "ar", category: tp.category, components: [{ type: "BODY", text: tp.body, example: { body_text: [tp.example] } }] }) });
         const cd = await c.json().catch(() => ({}));
         status = c.ok ? (cd.status || "PENDING") : `ERROR: ${short(cd?.error?.error_user_msg || cd?.error?.message, 200)}`;
+        if (c.ok && cd.category) category = String(cd.category).toUpperCase();
       }
-      out.push({ route: rt.route_key, name, status });
+      out.push({ route: rt.route_key, name, status, category });
       if (!status.startsWith("ERROR") && status !== "MISSING") {
-        await db.from("whatsapp_template_registry").upsert({ company_id: rt.company_id, route_key: rt.route_key, waba_id: String(rt.meta_waba_id), template_name: name, language: "ar", category: tp.category, status: String(status).toUpperCase(), last_checked_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "company_id,route_key,template_name,language" });
+        await db.from("whatsapp_template_registry").upsert({ company_id: rt.company_id, route_key: rt.route_key, waba_id: String(rt.meta_waba_id), template_name: name, language: "ar", category, status: String(status).toUpperCase(), last_checked_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "company_id,route_key,template_name,language" });
       }
     }
   }
