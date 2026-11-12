@@ -26,10 +26,13 @@
     const small=o.size==='sm'||extra.indexOf('crm-wa-small')>=0;
     const cls='crm-wa-btn'+(small?' crm-wa-sm':'')+extra.filter(c=>c!=='crm-wa-small').map(c=>' '+esc(c)).join('');
     const tip=k=>small?' title="'+FULL[k]+'" aria-label="'+FULL[k]+'"':'',text=k=>small?SHORT[k]:FULL[k];
-    const data=' data-conv="'+esc(conv)+'" data-client="'+esc(client)+'"';
+    // 12 Nov 2026 (Ahmed: the visits and owners tables too): with a number only (an owner has no client file) the CRM button
+    // looks the chat up by that number when pressed.
+    const byPhone=!conv&&!client?digits(o.phone):'';
+    const data=' data-conv="'+esc(conv)+'" data-client="'+esc(client)+'"'+(byPhone?' data-phone="'+byPhone+'"':'');
     const phoneBtn=link?'<a class="'+cls+' crm-wa-phone" href="'+esc(link)+'"'+(/^https:/.test(link)?' target="_blank"':'')+' rel="noopener noreferrer"'+tip('phone')+'>'+text('phone')+'</a>'
       :(conv||client)?'<button type="button" class="'+cls+' crm-wa-phone" data-wa-phone="1"'+data+tip('phone')+'>'+text('phone')+'</button>':'';
-    const crmBtn=(conv||client)?'<button type="button" class="'+cls+' crm-wa-crm" data-wa-crm="1"'+data+tip('crm')+'>'+text('crm')+'</button>':'';
+    const crmBtn=(conv||client||byPhone)?'<button type="button" class="'+cls+' crm-wa-crm" data-wa-crm="1"'+data+tip('crm')+'>'+text('crm')+'</button>':'';
     return phoneBtn+crmBtn;
   };
   function closeSheets(){const x=document.querySelector('#cohSheet:not([hidden]) .coh-sheet-x');if(x)x.click();}
@@ -37,8 +40,15 @@
     const r=await supa.from('whatsapp_conversations').select('id,customer_phone,customer_wa_id').eq('client_id',clientId).order('last_message_at',{ascending:false}).limit(1).maybeSingle();
     return r.data||null;
   }
-  window.crmOpenCrmChat=async function(conv,client){
+  // the latest chat of a number, among the chats this account may see (customer_wa_id is the number in digits)
+  async function chatOfPhone(phone){
+    const d=digits(phone);if(!d)return null;
+    const r=await supa.from('whatsapp_conversations').select('id').eq('customer_wa_id',d).order('last_message_at',{ascending:false,nullsFirst:false}).limit(1).maybeSingle();
+    return r.data||null;
+  }
+  window.crmOpenCrmChat=async function(conv,client,phone){
     if(!conv&&client){const c=await latestChat(client);conv=c&&c.id;}
+    if(!conv&&!client&&phone){const c=await chatOfPhone(phone);conv=c&&c.id;if(!conv){if(typeof showToast==='function')showToast('ما في محادثة واتساب لهذا الرقم داخل النظام','error');return;}}
     if(!conv){if(client&&typeof viewClient==='function')viewClient(client);else if(typeof showToast==='function')showToast('ما في محادثة واتساب لهذا العميل','error');return;}
     closeSheets();
     if(typeof openDashboardWhatsAppConversation==='function')openDashboardWhatsAppConversation(conv);
@@ -51,7 +61,7 @@
   }
   document.addEventListener('click',e=>{
     const crm=e.target.closest('[data-wa-crm]');
-    if(crm){e.preventDefault();window.crmOpenCrmChat(crm.dataset.conv||'',crm.dataset.client||'').catch(()=>{if(typeof showToast==='function')showToast('ما قدرت أفتح المحادثة','error');});return;}
+    if(crm){e.preventDefault();window.crmOpenCrmChat(crm.dataset.conv||'',crm.dataset.client||'',crm.dataset.phone||'').catch(()=>{if(typeof showToast==='function')showToast('ما قدرت أفتح المحادثة','error');});return;}
     const ph=e.target.closest('[data-wa-phone]');
     if(ph){e.preventDefault();ph.disabled=true;phoneOf(ph.dataset.conv||'',ph.dataset.client||'').then(p=>{ph.disabled=false;const l=phoneLink(p);if(!l){if(typeof showToast==='function')showToast('ما في رقم لهذا العميل','error');return;}if(/^https:/.test(l))window.open(l,'_blank','noopener');else window.location.href=l;}).catch(()=>{ph.disabled=false;});}
   });

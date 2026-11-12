@@ -37,7 +37,9 @@
       // Today's and overdue scheduled visits open the quick result sheet (crm-quick-visit.js).
       +'<td class="crm-grid-actions">'+(isOpenVisit(v)&&(v.viewing_date||'')<=today?'<button type="button" class="ops-action" onclick="(window.crmQuickVisit||editViewing)(\''+id+'\')">تسجيل النتيجة</button>':'')
       +'<button type="button" class="ops-action" onclick="editViewing(\''+id+'\')">تعديل</button>'
-      +(phone?'<a class="ops-action" href="https://api.whatsapp.com/send?phone='+esc(phone)+'" target="_blank" rel="noopener">واتساب</a>':'')
+      // 12 Nov 2026 (Ahmed): the same two WhatsApp buttons as everywhere, the phone and the chat inside the CRM (crm-wa-buttons.js)
+      +(typeof window.crmWaButtons==='function'&&(phone||v.client_id)?window.crmWaButtons({phone:phone,clientId:v.client_id,size:'sm'})
+        :(phone?'<a class="ops-action" href="https://api.whatsapp.com/send?phone='+esc(phone)+'" target="_blank" rel="noopener">واتساب</a>':''))
       +'<button type="button" class="ops-action crm-grid-danger" onclick="deleteViewing(\''+id+'\')">حذف</button></td></tr>';
   }
   if(typeof window.renderViewings==='function'){
@@ -218,7 +220,8 @@
             +'<td>'+esc(ownerTypes[o.owner_type||'owner']||o.owner_type)+'</td><td><bdi dir="ltr">'+esc(o.phone?phoneText(o.phone):'—')+'</bdi></td>'
             +'<td class="crm-grid-num">'+s.total+'</td><td class="crm-grid-num">'+s.available+'</td><td class="crm-grid-num">'+s.sold+'</td>'
             +'<td class="crm-grid-actions">'+(canEditNow()?'<button type="button" class="ops-action" onclick="editOwner(\''+id+'\')">تعديل</button>':'')
-            +(wa?'<a class="ops-action" href="https://api.whatsapp.com/send?phone='+esc(wa)+'" target="_blank" rel="noopener">واتساب</a>':'')
+            // 12 Nov 2026 (Ahmed): the same two WhatsApp buttons; an owner has no client file, so the chat is found by the number
+            +(wa?(typeof window.crmWaButtons==='function'?window.crmWaButtons({phone:wa,size:'sm'}):'<a class="ops-action" href="https://api.whatsapp.com/send?phone='+esc(wa)+'" target="_blank" rel="noopener">واتساب</a>'):'')
             +(typeof canDelete==='function'&&canDelete()?'<button type="button" class="ops-action crm-grid-danger" data-crm-action="archive-owner" data-record-id="'+id+'">أرشفة</button>':'')+'</td></tr>';}).join('')
         +'</tbody></table></div>';
     };
