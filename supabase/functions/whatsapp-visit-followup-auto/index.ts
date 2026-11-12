@@ -92,7 +92,7 @@ const REVIEW_RULES = `أنت تراجع متابعة عميل لمكتب عقا�
 - ما تقول "عزيزتي" أبداً لأنثى، خاطبها بالمؤنث بدون "عزيزتي".
 - متابعة بعد زيارة: سمّ العقار بالضبط واسأل هل شافه وهل ناسبه. لو الكلام عن عقار أرسلنا فيه رقم صاحب العقار للزيارة، اسأل هل شاف البيت وهل ناسبه.
 - العميل اللي أرسلنا له التفاصيل بس وما سألناه متى يزور، أو ما أرسلنا له رقم صاحب العقار: لا تسأله "كيف لقيت"، اسأله "متى يناسبك تزور ؟".
-- العقار اللي سأل عنه العميل وانباع أو انحجز: المتابعة تقول إنه انباع (أو انحجز) وتعرض الخيارات المتاحة في نفس المنطقة، وإذا ما في خيارات skip.
+- العقار اللي سأل عنه العميل وانباع أو انحجز: إذا مكتوب تحت في "وحدات انحجزت ولها وحدة متاحة من نفس المجموعة" (R38، أحمد 12 نوفمبر): لا تقول انباع وخلاص ولا تعرض بديل ثاني. المتابعة تقول السطر المكتوب له بالحرف (مثل "انحجزت وحدة منها والمتبقي الثانية والثالثة") وتسأله "تحب تشوفها ؟". إذا مو مكتوب هناك: المتابعة تقول إنه انباع (أو انحجز) وتعرض الخيارات المتاحة في نفس المنطقة، وإذا ما في خيارات skip.
 - إذا تواصلنا معه أكثر من مرة في نفس الموضوع وما رد (حتى لو من أشهر): skip، ولا تكتب له مرة ثانية. نفس الحال في أي متابعة ثانية بنفس الوضع، بدون ما ينتظر أحمد.
 - مواضيع الاستثمار والمشاريع (مدينة السلطان هيثم، وادي زها، الآيكونيك، عايدة، اليزن، المستحقين، التملك الحر، الإقامة) (R35، أحمد 12 نوفمبر): ما تنترك، لها قائمة المستثمرين على رقم مسقط. المتابعة تكمل موضوعه: الأرقام المكتوبة في المعرفة بس (R18)، والعزيمة لاجتماع مع المطور في مكتبه (الأهلي صبور في العذيبة، دار جلوبال عند دار الأوبرا لعايدة) (R33). ممنوع أسئلة الاستبيان مثل "الشراء عندك للسكن ولا للاستثمار ؟" و"تفضل تبحث عن فيلا مستقلة ولا نوع ثاني". العمل بعد الشراء: skip.
 - التبادل (عقار بعقار): skip، الموضوع غير مناسب.
@@ -104,6 +104,19 @@ const REVIEW_RULES = `أنت تراجع متابعة عميل لمكتب عقا�
 - عميل رد خلال أقل من 24 ساعة: القرار followup والنص جاهز يرسل مباشرة، مو للانتظار.
 - طلب غرفة وصالة أو شقة وما رجع: اسأل بس "لين الحين تبحث عن غرفة وصالة ؟" بدون كلمة "جديدة". أي رسالة "نزل عندنا" لمن سأل عن نفس الشقة قبل: اسأل بس "لين الحين تبحث عن شقق للإيجار ؟".
 
+وضع العميل (R39، أحمد 12 نوفمبر): قبل القرار اقرأ "ملف العميل من النظام" (زياراته وصفقاته وطلباته) مع المحادثة كاملة، وحدد في stage وين وصل. كل عميل ياخذ رسالة على حسب وضعه، مو نفس الرسالة للكل، واللي جاوب على سؤال ما ينعاد عليه:
+- asked_no_visit: سأل وما زار. (القواعد فوق: "متى يناسبك تزور ؟" إذا ما سألناه، وسكوته بعد التفاصيل جواب.)
+- booked_no_show: تحدد له موعد زيارة وما جاء، أو انلغى الموعد وما تحدد غيره. اسأله إذا يحب نحدد له موعد ثاني، مو "كيف شفت". واكتب في subject اسم العقار اللي كان موعده عليه.
+- visited_not_asked: زار (مسجل إن الزيارة تمت، أو قال إنه زار) وما سألناه عن رأيه. اسأله عن انطباعه وهل ناسبه، بالاسم.
+- visited_no_answer: زار وسألناه عن رأيه وما أعطى جواب واضح. skip (القاعدة فوق).
+- visited_liked: زار وقال رأي إيجابي أو قال بيفكر أو بيشاور. لا تعيد عليه سؤال "كيف شفت" ولا "هل ناسبك". سؤال واحد يكمل (مثل هل وصل لقرار).
+- visited_no_fit: زار وقال ما ناسبه. اكتب السبب في reason (الموقع، المساحة، السعر، التشطيب...). لا تعيد عليه سؤال الرأي. إذا في القائمة عقار متاح يقارب طلبه ويحل السبب اللي قاله: اعرضه في text وحط رقمه في offer_no. إذا ما في: wait_for_match.
+- budget_lower: ميزانيته أقل من اللي سأل عنه. اعرض بس اللي في حدود ميزانيته من القائمة (offer_no). إذا ما في: wait_for_match واحفظ ميزانيته في request.
+- other_area: يبي منطقة ثانية. اعرض المتاح في المنطقة اللي قالها (offer_no). إذا ما في: wait_for_match.
+- negotiating: في تفاوض على السعر، أو عنده صفقة شغالة (تفاوض، عربون، تمويل). skip، هذا لأحمد.
+- not_buyer: مالك أو وسيط أو مو عميل يبحث، أو موضوعه انتهى (اشترى، حصل، قال ما يبغى). skip.
+- unclear: ما يتضح من المحادثة والملف.
+
 التفاوض لصاحب المكتب بس: لا تفتح موضوع السعر ولا تخفيض في text.
 إذا فيه "[رسالة صوتية قديمة ما انقرت]" قريب من آخر المحادثة، ما تعرف اللي انقال فيها: لا تخمن، قل هذا في reason، وخل auto_ok=false.
 
@@ -111,7 +124,10 @@ text (لـ followup بس): رسالة واحدة يرسلها صاحب المك�
 reason: سطر قصير لصاحب المكتب يوضح وضع العميل، مثل "شاف فيلا الرميس وما عجبه الموقع".
 auto_ok: true بس إذا النص الثابت "${"{fixed}"}" مناسب لهذا العميل لو انرسل بدل text. إذا العميل سأل سؤال وما جاه رد، auto_ok=false.
 request: اللي يبغاه العميل إذا واضح من كلامه، وإلا null. لا تكتب شي ما قاله.
-subject (R35): بعد 24 ساعة من آخر رسالة للعميل ما ينرسل text، ينرسل قالب واتساب ثابت "بخصوص طلبك {subject} لين الحين تبحث ؟". اكتب في subject العقار أو الموضوع اللي سأل عنه العميل بالضبط بكلمتين لخمس، بالعربي وبدون "طلبك" وبدون سؤال، مثل "بيت الحيل الجنوبية" أو "توين فيلا الرميس" أو "عقار في مدينة السلطان هيثم" أو "شقة في المعبيلة". إذا ما في موضوع واضح: null.`;
+subject (R35): بعد 24 ساعة من آخر رسالة للعميل ما ينرسل text، ينرسل قالب واتساب ثابت "بخصوص طلبك {subject} لين الحين تبحث ؟". اكتب في subject العقار أو الموضوع اللي سأل عنه العميل بالضبط بكلمتين لخمس، بالعربي وبدون "طلبك" وبدون سؤال، مثل "بيت الحيل الجنوبية" أو "توين فيلا الرميس" أو "عقار في مدينة السلطان هيثم" أو "شقة في المعبيلة". إذا ما في موضوع واضح: null.
+stage (R39): وحدة من القيم المكتوبة فوق في "وضع العميل".
+offer_no (R39): رقم العقار من "العقارات المتاحة الآن" (الرقم اللي بين القوسين في أول سطره) إذا text يعرض عليه عقار منها، وإلا null. لا تعرض عقار مو في القائمة.
+قالب متابعة الطلب بعد 24 ساعة على حسب stage (R39): visited_not_asked ينرسل له "السلام عليكم كيف شفت العقار وايش انطباعك عنه ؟"، و booked_no_show ينرسل له "بخصوص موعد زيارتك {subject} تحب نحدد لك موعد ثاني ؟"، واللي له offer_no ينرسل له "بخصوص طلبك {subject} عندنا {العقار} تحب ارسلك تفاصيله ؟"، والباقي "بخصوص طلبك {subject} لين الحين تبحث ؟". في متابعة الطلب auto_ok=true بس إذا قالب وضعه هذا يناسبه لو انرسل بدل text.`;
 const reviewSchema = {
   type: "object", additionalProperties: false,
   properties: {
@@ -120,6 +136,8 @@ const reviewSchema = {
     text: { type: ["string", "null"] },
     auto_ok: { type: "boolean" },
     subject: { type: ["string", "null"] },
+    stage: { type: "string", enum: ["asked_no_visit", "booked_no_show", "visited_not_asked", "visited_no_answer", "visited_liked", "visited_no_fit", "budget_lower", "other_area", "negotiating", "not_buyer", "unclear"] },
+    offer_no: { type: ["number", "null"] },
     request: { anyOf: [{ type: "null" }, {
       type: "object", additionalProperties: false,
       properties: {
@@ -131,7 +149,13 @@ const reviewSchema = {
       required: ["areas", "property_types", "budget_max", "must_haves"],
     }] },
   },
-  required: ["decision", "reason", "text", "auto_ok", "request", "subject"],
+  required: ["decision", "reason", "text", "auto_ok", "request", "subject", "stage", "offer_no"],
+};
+// R39: where the client stands, as Ahmed reads it on his list (in front of the review's reason)
+const STAGE_AR: Record<string, string> = {
+  asked_no_visit: "سأل وما زار", booked_no_show: "حدد زيارة وما جاء", visited_not_asked: "زار وما انسأل عن رأيه", visited_no_answer: "زار وما جاوب",
+  visited_liked: "زار وعجبه أو يفكر", visited_no_fit: "زار وما ناسبه", budget_lower: "ميزانيته أقل", other_area: "يبي منطقة ثانية",
+  negotiating: "في تفاوض", not_buyer: "مو عميل يبحث أو موضوعه انتهى", unclear: "وضعه مو واضح",
 };
 const lineOf = (m: any) => {
   const who = m.direction === "inbound" ? "العميل" : "المكتب";
@@ -163,9 +187,55 @@ function newestPart(text: unknown, n = 6000) {
   return "…" + tail.slice(cut);
 }
 
+// R39 (Ahmed 12 Nov): the client's file as the CRM has it, so the review knows where he stands: his visits (result, opinion,
+// why it did not suit), his cards (stage, why one closed) and his open requests. No money figure but the listing price.
+const VISIT_AR: Record<string, string> = { scheduled: "موعد محدد", confirmed: "موعد مؤكد", postponed: "تأجلت", done: "تمت", cancelled: "انلغت", no_show: "ما جاء" };
+const DEAL_AR: Record<string, string> = {
+  new: "جديدة", viewing_scheduled: "موعد زيارة", viewing_no_show: "ما جاء للزيارة", viewing_cancelled: "الزيارة انلغت", viewing_postponed: "الزيارة تأجلت", visit: "زار",
+  negotiation: "تفاوض", deposit: "عربون", awaiting_finance: "ينتظر التمويل", finance_approved: "التمويل موافق عليه", awaiting_clearance: "ينتظر براءة الذمة",
+  ownership_transfer: "نقل الملكية", closed: "تم البيع له", commission_collected: "تم البيع له", lost: "انقفلت",
+};
+const propLine = (pr: any) => pr ? `${propertyName(pr) || typeAr(pr.type)}${pr.price ? ` بـ ${Number(pr.price).toLocaleString("en-US")}` : ""}${pr.status === "sold" ? " (انباع)" : pr.status === "reserved" ? " (انحجز)" : pr.status && pr.status !== "available" || pr.archived ? " (ما عاد متوفر)" : ""}` : "عقار";
+async function clientFile(companyId: string, clientId: string) {
+  try {
+    const [vs, ds, rs] = await Promise.all([
+      db.from("viewings").select("viewing_date,status,liked,client_feedback,rejection_reason,pipeline_outcome,outcome_note,properties(type,area,price,status,archived)").eq("company_id", companyId).eq("client_id", clientId).eq("archived", false).order("viewing_date", { ascending: false }).limit(8),
+      db.from("deals").select("stage,lost_from_stage,lost_reason_note,updated_at,properties(type,area,price,status,archived)").eq("company_id", companyId).eq("client_id", clientId).is("merged_into_deal_id", null).order("updated_at", { ascending: false }).limit(6),
+      db.from("client_requests").select("property_type,property_types,preferred_area,preferred_areas,budget_max,search_status,next_action").eq("company_id", companyId).eq("client_id", clientId).eq("status", "active").order("updated_at", { ascending: false }).limit(3),
+    ]);
+    const lines: string[] = [];
+    for (const v of vs.data || []) {
+      const said = [v.liked === true ? "عجبه" : v.liked === false ? "ما عجبه" : "", v.client_feedback ? `رأيه: ${short(v.client_feedback, 200)}` : "", v.rejection_reason ? `سبب الرفض: ${short(v.rejection_reason, 150)}` : "", v.outcome_note ? `ملاحظة: ${short(v.outcome_note, 150)}` : ""].filter(Boolean).join(" | ");
+      lines.push(`- زيارة ${v.viewing_date || ""}: ${propLine((v as any).properties)} | ${VISIT_AR[String(v.status)] || v.status}${said ? ` | ${said}` : v.status === "done" ? " | رأيه ما انسجل" : ""}`);
+    }
+    for (const d of ds.data || []) lines.push(`- صفقة على ${propLine((d as any).properties)}: ${DEAL_AR[String(d.stage)] || d.stage}${d.stage === "lost" ? `${d.lost_from_stage ? ` من مرحلة ${DEAL_AR[String(d.lost_from_stage)] || d.lost_from_stage}` : ""}${d.lost_reason_note ? ` (${short(d.lost_reason_note, 150)})` : ""}` : ""}`);
+    for (const r of rs.data || []) {
+      const types = [...(Array.isArray(r.property_types) ? r.property_types : []), r.property_type].filter(Boolean).map(typeAr);
+      const areas = [...(Array.isArray(r.preferred_areas) ? r.preferred_areas : []), r.preferred_area].filter(Boolean);
+      lines.push(`- طلب مفتوح: ${[...new Set(types)].join(" أو ") || "عقار"}${areas.length ? ` في ${[...new Set(areas)].join(" أو ")}` : ""}${r.budget_max ? ` بحدود ${Number(r.budget_max).toLocaleString("en-US")}` : ""}${r.next_action ? ` | ${short(r.next_action, 120)}` : ""}`);
+    }
+    return lines.length ? `ملف العميل من النظام (زياراته وصفقاته وطلباته المسجلة، الأحدث أول):\n${lines.join("\n")}` : "ملف العميل من النظام: ما في زيارة ولا صفقة ولا طلب مسجل";
+  } catch (e) { console.error("[followup-auto] client file", String((e as any)?.message || e)); return ""; }
+}
+// R38: units sold or booked in the last 150 days that still have an available unit of their group (SQL97), one minute cache
+let unitGroupsCache = { at: 0, company: "", text: "" };
+async function unitGroupsText(companyId: string) {
+  if (unitGroupsCache.company === companyId && Date.now() - unitGroupsCache.at < 60000) return unitGroupsCache.text;
+  let text = "";
+  try {
+    const g = await db.rpc("crm_unit_groups", { p_company: companyId });
+    if (g.error) console.error("[followup-auto] unit groups", g.error.message);
+    else text = ((g.data as any[]) || []).map((u: any) => `- ${typeAr(u.type)} ${u.area || ""} بـ ${Number(u.price || 0).toLocaleString("en-US")}: ${u.line}`).join("\n");
+  } catch (e) { console.error("[followup-auto] unit groups", String((e as any)?.message || e)); }
+  unitGroupsCache = { at: Date.now(), company: companyId, text };
+  return text;
+}
+
 async function review(item: any, companyId: string, available: string, fixed: string, about: string, instruction = "", current = "") {
   const learnt = await lessons();
-  const chat = item.conversation_id ? await chatOf(item.conversation_id, 40) : "";
+  // R39: the whole chat (the last 120 messages; a very long one keeps its newest 30,000 characters), not the last 40
+  const chat = item.conversation_id ? newestPart(await chatOf(item.conversation_id, 120), 30000) : "";
+  const [file, groups] = await Promise.all([clientFile(companyId, item.client_id), unitGroupsText(companyId)]);
   const others = await db.from("whatsapp_conversations").select("id,route_key").eq("company_id", companyId).eq("client_id", item.client_id).neq("id", item.conversation_id || "00000000-0000-0000-0000-000000000000").limit(2);
   const person = await db.from("clients").select("name").eq("id", item.client_id).maybeSingle();
   let behavior = "";
@@ -175,7 +245,7 @@ async function review(item: any, companyId: string, available: string, fixed: st
   const ai = await fetch("https://api.openai.com/v1/responses", {
     method: "POST", headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: OPENAI_MODEL, store: false, reasoning: { effort: "low" }, instructions: REVIEW_RULES.replace("{fixed}", fixed),
-      input: `تاريخ اليوم: ${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date())}\nسبب وجوده في القائمة: ${about}\nالاسم المسجل من الواتساب، يفيد بس لمعرفة إذا امرأة: ${person.data?.name || "غير معروف"}\nرقمنا اللي نتابع منه: ${item.route_key === "barka" ? "بركاء" : "مسقط"}${behavior ? `\n\n${behavior}\n(المتجوّل ما نتابعه بنفس الأسلوب: اسأله وش يبحث بالضبط. الساخن أولوية. البارد متابعة متباعدة. غير المعقول طلبه: لا تتابع.)` : ""}${learnt ? `\n\nدروس من صاحب المكتب من أوامر سابقة (طبقها إذا الموقف مشابه):\n${learnt}` : ""}${instruction ? `\n\nالنص الحالي للمتابعة (اللي يشوفه أحمد الحين): ${current || "لا يوجد"}\n\nأمر صاحب المكتب على هذي المتابعة (أهم من أي قاعدة فوق): ${instruction}\nكيف تفهم الأمر: أحمد يتكلم بلهجته وأحياناً بالصوت، فالأمر ممكن يجي غير مرتب. افهم قصده الحقيقي، ولا تنقل كلامه حرفياً ولا تلصقه في الرسالة. غالباً هو تصحيح للنص الحالي: (1) "بدل X اكتب Y" أو "لا تكتب X" يعني غيّر هذا الجزء بس وخل باقي النص مثل ما هو. (2) "لا تقول كذا قل كذا" يعني استبدل المعنى. (3) قاعدة عامة (مثل: لا تكتب كلمات إنجليزية لعميل عربي) طبقها على هذي الرسالة وعلى أي كلمة إنجليزية فيها. (4) تغيير الهدف (مثل: اسأله متى يناسبه يزور) اكتب النص من جديد. الناتج رسالة مرتبة بلهجة المكتب وبنفس القواعد الثابتة، مو نسخة من كلام أحمد. إذا يقول إن المتابعة ما لها داعي قرارك skip. لا تخالف الممنوعات ولا تكتب معلومة مو مكتوبة قدامك، وإذا يقول وش انقال في رسالة صوتية صدقه. في reason اكتب بسطر وش فهمت منه وش غيرت.` : ""}\n\nالعقارات المتاحة الآن:\n${available || "لا يوجد"}\n\nالمحادثة:\n${chat || "ما في محادثة مسجلة"}\n${other}`,
+      input: `تاريخ اليوم: ${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date())}\nسبب وجوده في القائمة: ${about}\nالاسم المسجل من الواتساب، يفيد بس لمعرفة إذا امرأة: ${person.data?.name || "غير معروف"}\nرقمنا اللي نتابع منه: ${item.route_key === "barka" ? "بركاء" : "مسقط"}${behavior ? `\n\n${behavior}\n(المتجوّل ما نتابعه بنفس الأسلوب: اسأله وش يبحث بالضبط. الساخن أولوية. البارد متابعة متباعدة. غير المعقول طلبه: لا تتابع.)` : ""}${file ? `\n\n${file}` : ""}${learnt ? `\n\nدروس من صاحب المكتب من أوامر سابقة (طبقها إذا الموقف مشابه):\n${learnt}` : ""}${instruction ? `\n\nالنص الحالي للمتابعة (اللي يشوفه أحمد الحين): ${current || "لا يوجد"}\n\nأمر صاحب المكتب على هذي المتابعة (أهم من أي قاعدة فوق): ${instruction}\nكيف تفهم الأمر: أحمد يتكلم بلهجته وأحياناً بالصوت، فالأمر ممكن يجي غير مرتب. افهم قصده الحقيقي، ولا تنقل كلامه حرفياً ولا تلصقه في الرسالة. غالباً هو تصحيح للنص الحالي: (1) "بدل X اكتب Y" أو "لا تكتب X" يعني غيّر هذا الجزء بس وخل باقي النص مثل ما هو. (2) "لا تقول كذا قل كذا" يعني استبدل المعنى. (3) قاعدة عامة (مثل: لا تكتب كلمات إنجليزية لعميل عربي) طبقها على هذي الرسالة وعلى أي كلمة إنجليزية فيها. (4) تغيير الهدف (مثل: اسأله متى يناسبه يزور) اكتب النص من جديد. الناتج رسالة مرتبة بلهجة المكتب وبنفس القواعد الثابتة، مو نسخة من كلام أحمد. إذا يقول إن المتابعة ما لها داعي قرارك skip. لا تخالف الممنوعات ولا تكتب معلومة مو مكتوبة قدامك، وإذا يقول وش انقال في رسالة صوتية صدقه. في reason اكتب بسطر وش فهمت منه وش غيرت.` : ""}\n\nالعقارات المتاحة الآن:\n${available || "لا يوجد"}${groups ? `\n\nوحدات انحجزت ولها وحدة متاحة من نفس المجموعة (R38):\n${groups}` : ""}\n\nالمحادثة:\n${chat || "ما في محادثة مسجلة"}\n${other}`,
       text: { format: { type: "json_schema", name: "followup_review", strict: true, schema: reviewSchema } } }),
   });
   const p = await ai.json().catch(() => ({}));
@@ -225,8 +295,17 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
     if (x.after_visit) about += " هذي متابعة بعد موعد الزيارة بساعة ونص، وهذا أهم وقت للبيع. قرارك followup واسأله عن رأيه في العقار بالاسم، إلا إذا المحادثة تقول إنه ما زار أو موضوعه انتهى أو قال رأيه.";
   }
   const fixed = kind === "visit" ? String(x.body || "") : (x.messages || []).join(" ");
+  // R39: a message prepared for everyone who asked about one property is read against each client's chat and file too.
+  // Its wording is Ahmed's and stays; the review only says whether it fits this client.
+  if (kind === "request" && x.kind === "property_sold") about = `رسالة جماعية لكل من سأل عن عقار انحجز أو انباع (${short(x.summary, 150) || "عقار"}). النص اللي ينتظر موافقة أحمد وما يتغير: "${fixed}". قرارك followup إذا الرسالة تناسب وضع هذا العميل (واكتب text نفس النص)، و skip إذا ما تناسبه: اشترى أو حصل، قال ما يبغى، زار وقال ما ناسبه، موضوعه انتهى، مو عميل يبحث، أو في تفاوض. auto_ok=false.`;
+  if (kind === "request" && x.kind === "new_listing") about = `رسالة جماعية عن عقار جديد نزل ممكن يناسب طلبه (${short(x.summary, 150) || "طلبه"}). النص اللي ينتظر موافقة أحمد وما يتغير: "${fixed}". قرارك followup إذا لين الحين يبحث والعقار يناسب اللي قاله (واكتب text نفس النص)، و skip إذا ما يناسبه أو موضوعه انتهى أو في تفاوض. auto_ok=false.`;
   const out = await review(x, companyId, available, fixed, about, instruction, x.owner_text || fixed);
   if (kind === "visit") out.text = namedVisitQuestion(out.text, name);
+  // R39: a client who already gave his opinion is never asked the step-1 opinion question again by the fixed template
+  if (kind === "visit" && Number(x.step) === 1 && ["visited_liked", "visited_no_fit"].includes(String(out.stage))) out.auto_ok = false;
+  // R39: the offered property is taken from the very list the review read (same snapshot), by its number
+  out.offer_label = "";
+  if (Number.isInteger(out.offer_no) && out.offer_no > 0) { const l = await availableList(companyId); if (l.text === available) out.offer_label = l.labels[out.offer_no - 1] || ""; }
   // R36: a step-1 follow-up on a test wording asks the same opinion question in that wording (his instruction still wins)
   if (kind === "visit" && Number(x.step) === 1 && !instruction) out.text = variantVisitQuestion(out.text, name, await variantFor(companyId, "visit_step1", x.variant_label));
   return out;
@@ -299,19 +378,63 @@ async function reviewOne(kind: "visit" | "request", x: any, companyId: string, a
   return applyDecision(kind, x, companyId, await judge(kind, x, companyId, available));
 }
 
+// R39 (Ahmed 12 Nov 2026): outside the 24 hours a request follow-up goes as the template that fits where the client stands,
+// as Ahmed chose by hand for the 35 Rizwan clients on 12 Nov. Only rows on today's template or on one of these (never the
+// financing follow-up, never a test wording of R36), and only when the template is approved on the client's number; whether
+// it may go by itself is still the UTILITY rule of the sender. null = today's template «بخصوص طلبك … لين الحين تبحث ؟».
+const STAGE_TEMPLATES = ["request_followup_ar_v2", "visit_followup_1_ar_v1", "visit_followup_1_ar_v2", "visit_missed_rebook_ar_v1", "request_offer_match_ar_v1"];
+async function stageTemplate(x: any, companyId: string, out: any, subject: string) {
+  if (x.kind && x.kind !== "request_followup") return null;
+  if (x.template_name && !STAGE_TEMPLATES.includes(String(x.template_name))) return null;
+  const approved = async (name: string) => {
+    const r = await db.from("whatsapp_template_registry").select("status").eq("company_id", companyId).eq("route_key", x.route_key).eq("template_name", name).maybeSingle();
+    return String(r.data?.status || "").toUpperCase() === "APPROVED";
+  };
+  const stage = String(out.stage || "");
+  if (stage === "visited_not_asked") {
+    const [t, tx] = await Promise.all([db.rpc("crm_visit_followup_template", { p_step: 1, p_route: x.route_key }), db.rpc("crm_visit_followup_text", { p_step: 1, p_route: x.route_key })]);
+    const name = String(t.data || ""), text = String(tx.data || "");
+    if (!t.error && !tx.error && name && text && await approved(name)) return { step: "visit_impression", template_name: name, template_params: [], messages: [text] };
+    return null;
+  }
+  if (stage === "booked_no_show" && subject && await approved("visit_missed_rebook_ar_v1"))
+    return { step: "missed_visit", template_name: "visit_missed_rebook_ar_v1", template_params: [subject], messages: [`بخصوص موعد زيارتك ${subject}`, "تحب نحدد لك موعد ثاني ؟"] };
+  const offer = String(out.offer_label || "");
+  if (offer && subject && ["visited_no_fit", "budget_lower", "other_area"].includes(stage) && await approved("request_offer_match_ar_v1"))
+    return { step: "offer_available", template_name: "request_offer_match_ar_v1", template_params: [subject, offer], messages: [`بخصوص طلبك ${subject}`, `عندنا ${offer} تحب ارسلك تفاصيله ؟`] };
+  return null;
+}
+
 // Writes the review's decision. With the owner's instruction the instruction is kept on the row and the day's wait
 // (reviewed_at) does not move. Returns "kept", "waiting_match", "removed", or "not_pending" when it was sent or changed meanwhile.
 async function applyDecision(kind: "visit" | "request", x: any, companyId: string, out: any, instruction = "") {
   const now = new Date().toISOString();
   const table = kind === "visit" ? "whatsapp_visit_followups" : "whatsapp_outreach_queue";
   const openStatus = kind === "visit" ? "awaiting_approval" : "pending";
-  const reason = short(out.reason, 300);
-  const extra: any = instruction ? { owner_instruction: short(instruction, 1000), instructed_at: now } : { reviewed_at: now };
+  // R39: where the client stands goes in front of the reason Ahmed reads on his list, and on the row (client_stage)
+  const stage = STAGE_AR[String(out.stage)] ? String(out.stage) : null;
+  const reason = short(`${stage && stage !== "unclear" ? `[${STAGE_AR[stage]}] ` : ""}${out.reason}`, 300);
+  const extra: any = instruction ? { owner_instruction: short(instruction, 1000), instructed_at: now, client_stage: stage } : { reviewed_at: now, client_stage: stage };
+  // a message prepared for everyone (sold notice, new listing): its wording is Ahmed's, so a kept row only gets the reason
+  const mass = kind === "request" && ["property_sold", "new_listing"].includes(String(x.kind));
+  if (mass && out.decision === "followup") {
+    const w = await db.from(table).update({ review_reason: reason, auto_ok: false, ...extra }).eq("id", x.id).eq("status", openStatus).select("id");
+    return (w.data || []).length ? "kept" : "not_pending";
+  }
   if (out.decision === "followup" && out.text) {
     const w = await db.from(table).update({ owner_text: short(out.text, 500), review_reason: reason, auto_ok: !!out.auto_ok, ...extra }).eq("id", x.id).eq("status", openStatus).select("id");
     // R35 (12 Nov): past 24 hours the template «بخصوص طلبك {1} لين الحين تبحث ؟» goes, so {1} is what the client really asked about
     const subject = String(out.subject || "").replace(/^\s*(بخصوص\s+)?طلبك\s+/, "").replace(/[؟?،,.!]/g, " ").replace(/\s+/g, " ").trim();
-    if (kind === "request" && (w.data || []).length && subject && subject.length <= 60 && !/[A-Za-z]/.test(subject)) {
+    const subjectOk = !!subject && subject.length <= 60 && !/[A-Za-z]/.test(subject);
+    // R39 (12 Nov): past 24 hours the template follows where the client stands (asked his opinion after a visit, offered a new
+    // time for a missed visit, offered the available property that fits), when that template is approved on his number
+    const staged = kind === "request" && (w.data || []).length ? await stageTemplate(x, companyId, out, subjectOk ? subject : "") : null;
+    if (staged) {
+      const s = await db.from(table).update({ ...staged, variant_label: null }).eq("id", x.id).eq("status", openStatus).in("template_name", STAGE_TEMPLATES).select("id");
+      if (s.error) console.error("[followup-auto] stage template", s.error.message);
+    } else if (kind === "request" && (w.data || []).length && subjectOk) {
+      // a row that was on a stage template and no longer is goes back to today's template first
+      if (x.template_name && x.template_name !== "request_followup_ar_v2" && STAGE_TEMPLATES.includes(String(x.template_name))) await db.from(table).update({ template_name: "request_followup_ar_v2", step: "still_searching" }).eq("id", x.id).eq("status", openStatus).eq("template_name", x.template_name);
       const a = await db.from(table).update({ template_params: [subject], messages: [`بخصوص طلبك ${subject}`, "لين الحين تبحث ؟"] }).eq("id", x.id).eq("status", openStatus).eq("template_name", "request_followup_ar_v2").select("id");
       // R36: not on today's template. If it is on a test wording, the subject goes into that wording instead.
       if (!a.error && !(a.data || []).length) await variantSubject(x.id, subject);
@@ -324,13 +447,26 @@ async function applyDecision(kind: "visit" | "request", x: any, companyId: strin
     : await db.from(table).update({ status: "skipped", reason: `review_${out.decision}`, review_reason: reason, ...extra, reviewed_at: instruction ? (x.reviewed_at || now) : now }).eq("id", x.id).eq("status", openStatus).select("id");
   if (!(w.data || []).length) return "not_pending";
   if (out.decision === "wait_for_match") { await saveRequest(companyId, x, out.request, reason); return "waiting_match"; }
-  if (kind === "request" && x.request_id) await db.from("client_requests").update({ next_followup: null, next_action: short(`ما يحتاج متابعة: ${reason}`, 300) }).eq("id", x.request_id);
+  // (a sold notice or a new listing that does not fit this client says nothing about his request's own follow-up)
+  if (kind === "request" && x.request_id && !mass) await db.from("client_requests").update({ next_followup: null, next_action: short(`ما يحتاج متابعة: ${reason}`, 300) }).eq("id", x.request_id);
   return "removed";
 }
 
+// The available list the review reads. R39: every line carries a number («[3]») the review returns in offer_no, so an offer
+// outside the 24 hours names a property that really is on the list (labels[n - 1]), never one the model made up.
+let availableCache = { at: 0, company: "", text: "", labels: [] as string[] };
+const priceShort = (p: unknown) => { const n = Number(p || 0); return n >= 1000 ? `${String(Math.round(n / 100) / 10)} الف` : `${n} ريال`; };
+async function availableList(companyId: string) {
+  if (availableCache.company === companyId && Date.now() - availableCache.at < 60000) return availableCache;
+  const props = await db.from("properties").select("type,area,price,bedrooms,listing_purpose,public_details,rented_units").eq("company_id", companyId).eq("status", "available").eq("archived", false).order("area").order("price").order("id");
+  const rows = props.data || [];
+  const text = rows.map((p: any, i: number) => `- [${i + 1}] ${typeAr(p.type)} ${p.listing_purpose === "rent" ? "للإيجار" : "للبيع"} في ${p.area} بـ ${Number(p.price || 0).toLocaleString("en-US")} ${p.bedrooms ? `${p.bedrooms} غرف` : ""}${p.rented_units ? ` | المؤجر حالياً: ${short(p.rented_units, 200)}` : ""}${p.public_details ? ` | التفاصيل: ${short(p.public_details, 700).replace(/\n+/g, " / ")}` : ""}`).join("\n");
+  const labels = rows.map((p: any) => `${typeAr(p.type)}${p.listing_purpose === "rent" ? " للإيجار" : ""} في ${p.area} بـ ${priceShort(p.price)}`.replace(/\s+/g, " ").trim());
+  availableCache = { at: Date.now(), company: companyId, text, labels };
+  return availableCache;
+}
 async function availableText(companyId: string) {
-  const props = await db.from("properties").select("type,area,price,bedrooms,listing_purpose,public_details,rented_units").eq("company_id", companyId).eq("status", "available").eq("archived", false);
-  return (props.data || []).map((p: any) => `- ${typeAr(p.type)} ${p.listing_purpose === "rent" ? "للإيجار" : "للبيع"} في ${p.area} بـ ${Number(p.price || 0).toLocaleString("en-US")} ${p.bedrooms ? `${p.bedrooms} غرف` : ""}${p.rented_units ? ` | المؤجر حالياً: ${short(p.rented_units, 200)}` : ""}${p.public_details ? ` | التفاصيل: ${short(p.public_details, 700).replace(/\n+/g, " / ")}` : ""}`).join("\n");
+  return (await availableList(companyId)).text;
 }
 
 // Reads what is on the list again under the current rules and returns the decisions. Writes nothing.
@@ -353,10 +489,29 @@ async function preview(companyId: string, offset: number) {
   return { total: all.length, offset, items };
 }
 
+// R1/R3 at preparation too (Ahmed 12 Nov): a follow-up of a chat that is in a negotiation with Ahmed (تفاوض / مشتري جاد /
+// دراسة سعر) or muted is not read, so it is not on any list until the chat is handed back. A chat someone typed in by hand
+// is read as before (the office sees it on the list) and every send still refuses it (chatHeld). An error counts as held.
+async function negotiationHold(conversationId: string) {
+  const r = await db.rpc("crm_chat_hold", { p_conversation: conversationId });
+  return r.error ? true : ["negotiation", "muted"].includes(String(r.data || ""));
+}
+async function notInNegotiation(rows: any[], max: number, out: Record<string, number>) {
+  const keep: any[] = [];
+  for (const r of rows) {
+    if (keep.length >= max) break;
+    if (r.conversation_id && await negotiationHold(r.conversation_id)) { out.review_held = (out.review_held || 0) + 1; continue; }
+    keep.push(r);
+  }
+  return keep;
+}
 async function reviewAll(companyId: string, out: Record<string, number>) {
-  const f = await db.from("whatsapp_visit_followups").select("id,client_id,route_key,conversation_id,viewing_id,step,body,variant_label").eq("company_id", companyId).eq("status", "awaiting_approval").is("reviewed_at", null).limit(REVIEWS_PER_RUN);
+  const fAll = await db.from("whatsapp_visit_followups").select("id,client_id,route_key,conversation_id,viewing_id,step,body,variant_label").eq("company_id", companyId).eq("status", "awaiting_approval").is("reviewed_at", null).order("created_at").limit(REVIEWS_PER_RUN * 4);
+  const f = { data: await notInNegotiation(fAll.data || [], REVIEWS_PER_RUN, out) };
   const left = REVIEWS_PER_RUN - (f.data || []).length;
-  const q = left > 0 ? await db.from("whatsapp_outreach_queue").select("id,client_id,route_key,conversation_id,request_id,messages").eq("company_id", companyId).eq("status", "pending").eq("kind", "request_followup").eq("dry_run", false).is("reviewed_at", null).limit(left) : { data: [] as any[] };
+  // R39: the messages prepared for everyone (sold notice, new listing) are read against each client's chat and file as well
+  const qAll = left > 0 ? await db.from("whatsapp_outreach_queue").select("id,client_id,route_key,conversation_id,request_id,messages,kind,summary,template_name,step").eq("company_id", companyId).eq("status", "pending").in("kind", ["request_followup", "property_sold", "new_listing"]).eq("dry_run", false).is("reviewed_at", null).order("created_at").limit(left * 4) : { data: [] as any[] };
+  const q = { data: left > 0 ? await notInNegotiation((qAll as any).data || [], left, out) : [] as any[] };
   const jobs: ["visit" | "request", any][] = [...(f.data || []).map((x: any) => ["visit", x] as ["visit", any]), ...((q as any).data || []).map((x: any) => ["request", x] as ["request", any])];
   if (!jobs.length) return;
   const available = await availableText(companyId);

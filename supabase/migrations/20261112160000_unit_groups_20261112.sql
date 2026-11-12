@@ -14,7 +14,8 @@
 --      a card at negotiation or later, a card with a booking or a deposit, a historical or merged card, anything of a client
 --      who holds such a card on the unit (the buyer), and a card of a client who already has one on the remaining unit.
 --   5. client_stage on the two follow-up tables: where the client stands, written by the follow-up review (R39).
--- Nothing existing is replaced. Rollback: 97-unit-groups.rollback.sql
+--   6. The view crm_properties_access (what the CRM screens read) carries unit_label at its end.
+-- Nothing existing is replaced but that view (one column appended). Rollback: 97-unit-groups.rollback.sql
 SET LOCAL lock_timeout = '10s';
 
 ALTER TABLE public.properties ADD COLUMN IF NOT EXISTS unit_label text;
@@ -339,3 +340,83 @@ DROP TRIGGER IF EXISTS crm_a_move_to_remaining_unit ON public.properties;
 CREATE TRIGGER crm_a_move_to_remaining_unit AFTER UPDATE OF status, archived ON public.properties
   FOR EACH ROW WHEN (new.status IN ('sold', 'reserved') AND old.status IS DISTINCT FROM new.status)
   EXECUTE FUNCTION crm_repair_private.move_to_remaining_unit_on_change();
+
+-- 6. The CRM reads properties through this view (crm-data adapter): unit_label is appended at the end, nothing else changes.
+--    Refused when the live view is not the SQL76 body (a second apply, already carrying unit_label, passes).
+DO $guard$
+DECLARE v_def text; v_path text := current_setting('search_path');
+BEGIN
+  PERFORM set_config('search_path', 'public', true);
+  v_def := pg_get_viewdef('public.crm_properties_access'::regclass, true);
+  PERFORM set_config('search_path', v_path, true);
+  IF md5(v_def) <> 'e7530d4663dcda5d66d5b18a71c526da' AND position('unit_label' IN v_def) = 0 THEN
+    RAISE EXCEPTION 'SQL97 refused: public.crm_properties_access changed since 12 Nov 2026 (md5 %)', md5(v_def);
+  END IF;
+END
+$guard$;
+CREATE OR REPLACE VIEW public.crm_properties_access AS
+ SELECT t.id,
+    t.company_id,
+    t.added_by,
+    t.title,
+    t.type,
+    t.area,
+    t.price,
+    t.bedrooms,
+    t.bathrooms,
+    t.land_size,
+    t.built_size,
+    t.status,
+    t.description,
+    t.images,
+    t.views_count,
+    t.inquiries_count,
+    t.created_at,
+    t.updated_at,
+    t.owner_client_id,
+    t.archived,
+    t.archived_at,
+    t.archived_by,
+    t.owner_id,
+        CASE
+            WHEN public.my_role() = 'owner'::text THEN t.owner_net
+            ELSE NULL::numeric
+        END AS owner_net,
+    t.wilayat,
+    t.source_type,
+    t.marketing_status,
+        CASE
+            WHEN public.my_role() = 'owner'::text THEN t.expected_commission
+            ELSE NULL::numeric
+        END AS expected_commission,
+    t.property_code,
+    t.internal_name,
+    t.branch_key,
+    t.availability_checked_at,
+    t.performance_tracking_started_at,
+    t.photography_status,
+    t.photography_reason,
+    t.photography_required_at,
+    t.photography_completed_at,
+    t.marketing_review_status,
+    t.marketing_reviewed_at,
+    t.marketing_review_note,
+    t.last_ai_recommendation,
+    t.last_ai_recommendation_at,
+    t.public_details,
+    t.map_url,
+    t.has_listing_agreement,
+    t.agreement_start_date,
+    t.agreement_duration_months,
+    t.agreement_end_date,
+    t.agreement_reminder_days,
+    t.sourced_by,
+    t.listing_purpose,
+    t.archive_reason,
+    t.archive_note,
+    t.archive_source,
+    t.archive_evidence,
+    t.relisted_at,
+    t.unit_label
+   FROM public.properties t
+  WHERE t.company_id = public.my_company() AND crm_repair_private.investment_row_allowed(t.company_id, to_jsonb(t.*)) AND crm_repair_private.staff_can_access_branch(t.company_id, t.branch_key);

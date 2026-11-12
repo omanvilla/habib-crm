@@ -33,6 +33,19 @@ test('R6: a sold property gets "sold" plus the nearest available one; twins only
  assert(brain.includes('توين حقيقي'));
  assert(agent.includes('linkedSold'));
 });
+test('R38: a unit sold out of a group of similar units: "one went, these are left", never a bare "sold"',()=>{
+ // the brain no longer treats the twin as simply available, and no longer offers another alternative first
+ assert(!brain.includes('العميل يقصد المتاح، اعتبره متوفر ولا تقول انباع'));
+ assert(brain.includes('مجموعة وحدات متشابهة (R38، أحمد 12 نوفمبر)'));
+ assert(brain.includes('انحجزت وحدة منها والمتبقي الثانية والثالثة'));
+ assert(brain.includes('انحجزت الكورنر والوسطية لين الحين متاحة'));
+ assert(brain.includes('property_id هو الوحدة المتبقية'));
+ // the agent reads the same sentence the notices use, and its "not sold" guard lets that sentence through
+ assert(agent.includes('db.rpc("crm_unit_groups", { p_company: msg.company_id })'));
+ assert(agent.includes('وحدة من مجموعة: ${groupOf(p.id).line}'));
+ assert(agent.includes('if (linkedAvailable && !linkedSold && !groupTalk && texts.some((t) => SOLD_RE.test(t)))'));
+ assert(rules.includes('| R38 |')&&rules.includes('| R39 |'));
+});
 test('R9: investors and Muscat-area owners on the Barka number go to the Muscat number, nothing held',()=>{
  assert(agent.includes('redirectToMuscat'));
  // R9 as amended by Ahmed on 10 Nov: investors on the Muscat number are answered directly; only running deals wait for him.
