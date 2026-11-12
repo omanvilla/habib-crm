@@ -1,0 +1,53 @@
+/* WhatsApp buttons: one look everywhere (12 Nov 2026, Ahmed: «ما جاي مرتب»).
+ * .crm-wa-btn is the button, .crm-wa-phone the phone's WhatsApp, .crm-wa-crm the same chat inside the CRM,
+ * .crm-wa-sm the small pair for narrow cards (deal cards), .crm-wa-main the filled phone button where sending from the
+ * phone is the main step (daily follow-ups). The buttons do not take the page's .btn-primary / .btn-secondary look, so
+ * they are the same size and colour on the home page, in the sheets, in approvals, on deal cards and in the chat. */
+.crm-wa-btn{--crm-wa-ic:#164e3f;display:inline-flex!important;align-items:center;justify-content:center;gap:6px;box-sizing:border-box;flex:0 0 auto;width:auto!important;min-width:0;min-height:38px;margin:0;padding:0 12px!important;border:1px solid #cfe0d5!important;border-radius:8px!important;background:#fff!important;color:#164e3f!important;font-family:inherit;font-size:13px!important;font-weight:500!important;line-height:1.3!important;white-space:nowrap;text-decoration:none!important;cursor:pointer;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;-webkit-tap-highlight-color:transparent;transition:background .15s,border-color .15s}
+.crm-wa-btn::before{content:"";flex:0 0 auto;width:16px;height:16px;background-color:var(--crm-wa-ic);-webkit-mask:var(--crm-wa-svg) center/contain no-repeat;mask:var(--crm-wa-svg) center/contain no-repeat}
+.crm-wa-btn:hover{background:#f1f6f2!important;border-color:#a6beae!important}
+.crm-wa-btn:focus-visible{outline:3px solid #b49350;outline-offset:2px}
+.crm-wa-btn:disabled{opacity:.6;cursor:progress}
+.crm-wa-phone{--crm-wa-ic:#1fa855;--crm-wa-svg:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z'/%3E%3C/svg%3E");background:#f1faf4!important;border-color:#bfe0cb!important}
+.crm-wa-phone:hover{background:#e3f4e9!important;border-color:#8fc9a6!important}
+.crm-wa-crm{--crm-wa-svg:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/%3E%3C/svg%3E")}
+.crm-wa-main{--crm-wa-ic:#fff;background:#164e3f!important;border-color:#164e3f!important;color:#fff!important;font-weight:600!important}
+.crm-wa-main:hover{background:#0e3f32!important;border-color:#0e3f32!important}
+
+/* small pair: side by side when the card is wide enough, one under the other when it is not; never cut */
+.crm-wa-sm{flex:1 1 auto;min-height:28px;padding:0 7px!important;gap:4px;font-size:11px!important;border-radius:7px!important}
+.crm-wa-sm::before{width:13px;height:13px}
+.crm-wa-deal{flex-wrap:wrap}
+
+/* in an action row the pair is as tall as the buttons beside it */
+:is(.rp-actions,.cha-actions,.cfu-actions,.cps-files,.coh-paused-actions,.ip-wait-actions)>.crm-wa-btn{align-self:stretch}
+.cha-actions{flex-wrap:wrap;justify-content:flex-end}
+.cfu-actions>.crm-wa-btn{min-height:44px}
+
+/* «العقل موقوف عندهم» and «دراسة سعر»: the buttons sit under the text, so the text keeps the full width */
+.coh-paused>.coh-info{flex:1 1 100%}
+.coh-paused-actions{flex:1 1 100%}
+.coh-paused-actions .crm-wa-btn{flex:0 0 auto}
+
+/* «قائمة انتظار المستحقين»: name and note on one side, buttons on the other; they wrap under the text on a phone */
+.ip-clients li.ip-wait-row{flex-wrap:wrap;align-items:center;gap:8px 12px}
+.ip-wait-info{flex:1 1 260px;min-width:0;display:grid;gap:2px;justify-items:start}
+.ip-wait-info small{flex:none;overflow-wrap:anywhere}
+.ip-wait-actions{display:flex;flex-wrap:wrap;gap:8px;flex:0 0 auto}
+.ip-wait-actions>.btn-secondary{width:auto!important;white-space:nowrap}
+
+/* client file: beside «اتصال» */
+#cdActions .crm-wa-btn{min-height:38px}
+
+/* inside the CRM chat header */
+#page-whatsapp .wa-chat-head .crm-wa-btn{min-height:30px;padding:0 10px!important;font-size:12px!important}
+#page-whatsapp .wa-chat-head .crm-wa-btn::before{width:14px;height:14px}
+
+@media(max-width:600px){
+  .crm-wa-btn:not(.crm-wa-sm){min-height:44px;flex:1 1 auto}
+  .cha-actions>.btn-secondary{flex:1 1 auto}
+  .coh-paused-actions .crm-wa-btn{flex:1 1 auto}
+  .ip-wait-actions{flex:1 1 100%}
+  .ip-wait-actions>.btn-secondary{flex:1 1 auto}
+  #page-whatsapp .wa-chat-head .crm-wa-btn{min-height:34px;flex:0 0 auto}
+}

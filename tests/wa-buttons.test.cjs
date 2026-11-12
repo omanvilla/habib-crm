@@ -8,7 +8,30 @@ test('crmWaButtons gives «فتح في واتساب الجوال» and «فتح 
  const k=ctx.window.crmWaButtons({clientId:'x'});
  assert(k.includes('data-wa-phone="1"')&&k.includes('data-client="x"'),'no number at hand: looked up on tap');
  assert.equal(ctx.window.crmWaButtons({}),'');
- assert(index.includes('crm-wa-buttons.js?v=20261111-wa1"><'+String.fromCharCode(92)+'/script>'),'loaded inside the boot script with an escaped closing tag');
+ assert(index.includes('crm-wa-buttons.js?v=20261112-wa2"><'+String.fromCharCode(92)+'/script>'),'loaded inside the boot script with an escaped closing tag');
+});
+// 12 Nov 2026 (Ahmed: «ما جاي مرتب»): one look for the two buttons everywhere, and nothing cut on the narrow deal cards
+test('the two buttons carry their own look, not the page button classes',()=>{
+ const ctx={window:{},navigator:{userAgent:'Windows'},document:{addEventListener(){},querySelector(){return null;}}};vm.createContext(ctx);vm.runInContext(wa,ctx);
+ const css=fs.readFileSync('crm-wa-buttons.css','utf8');
+ const h=ctx.window.crmWaButtons({phone:'96890000000',conversationId:'c1',cls:'btn-primary'});
+ assert(h.includes('class="crm-wa-btn crm-wa-phone"')&&h.includes('class="crm-wa-btn crm-wa-crm"'));
+ assert(!/btn-primary|btn-secondary/.test(h),'the page button classes are dropped');
+ assert(ctx.window.crmWaButtons({clientId:'x',cls:'btn-secondary coh-go'}).includes('class="crm-wa-btn coh-go crm-wa-phone"'),'other classes stay');
+ const s=ctx.window.crmWaButtons({clientId:'x',cls:'btn-secondary crm-wa-small'});
+ assert(s.includes('class="crm-wa-btn crm-wa-sm crm-wa-phone"')&&s.includes('title="فتح في واتساب الجوال"')&&s.includes('>الجوال</button>'),'deal cards: short word, full words as the tooltip');
+ assert(s.includes('title="فتح في النظام"')&&s.includes('>النظام</button>'));
+ assert(css.includes('.crm-wa-btn{')&&css.includes('white-space:nowrap')&&css.includes('.crm-wa-phone{')&&css.includes('.crm-wa-crm{')&&css.includes('.crm-wa-sm{'));
+ assert(css.includes('.crm-wa-deal{flex-wrap:wrap}'),'on a narrow deal card the second button goes under the first, never cut');
+ assert(index.includes('<link rel="stylesheet" href="crm-wa-buttons.css?v=20261112-wa2">'));
+});
+test('the same two buttons in the follow-ups, the chat header, the waiting list and the client file',()=>{
+ const f=fs.readFileSync('crm-followups-today.js','utf8'),chat=fs.readFileSync('crm-whatsapp-chat.js','utf8'),ip=fs.readFileSync('crm-investment-projects.js','utf8'),base=fs.readFileSync('app-base-v15.html','utf8');
+ assert(f.includes('class="crm-wa-btn crm-wa-phone crm-wa-main cfu-open"')&&f.includes('class="crm-wa-btn crm-wa-crm cfu-crm" data-cfu="crm"'));
+ assert(chat.includes('<a class="crm-wa-btn crm-wa-phone" data-for="'));
+ assert(ip.includes('<li class="ip-wait-row"><div class="ip-wait-info">')&&ip.includes('</div><div class="ip-wait-actions">'),'the name no longer breaks letter by letter beside the buttons');
+ assert(base.includes("window.crmWaPhoneLink(c.phone_normalized||c.phone)")&&base.includes('<button type="button" class="crm-wa-btn crm-wa-crm" onclick="openClientWhatsAppHistory()">فتح في النظام</button>'),'client file: phone WhatsApp beside the CRM chat');
+ assert(/crm-whatsapp-chat\.js\?v=20261112-wa2/.test(index)&&/crm-followups-today\.js\?v=20261112-wa2/.test(index));
 });
 test('the two buttons are used on every chat button',()=>{
  for(const f of ['crm-hot-alerts.js','crm-owner-home.js','crm-owner-leads.js','crm-reply-approvals.js','crm-investment-projects.js'])assert(fs.readFileSync(f,'utf8').includes('crmWaButtons'),f);

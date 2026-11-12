@@ -3,7 +3,7 @@
  *  «فتح في واتساب الجوال»: WhatsApp Business on the phone (wa.me on a computer), like the daily follow-ups;
  *  «فتح في النظام»: the same chat in the CRM WhatsApp page.
  * With no phone or chat id at hand the button looks it up when pressed (chat → its customer number, client → its phone and
- * latest chat). Any sheet open over the home page closes first. */
+ * latest chat). Any sheet open over the home page closes first. The look is in crm-wa-buttons.css. */
 (function(){
   'use strict';
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
@@ -16,12 +16,20 @@
     return waLink(d);
   }
   window.crmWaPhoneLink=phoneLink;
+  // 12 Nov 2026 (Ahmed: «ما جاي مرتب»): the buttons carry their own look (crm-wa-buttons.css), the same in every place.
+  // A page's .btn-primary / .btn-secondary passed in cls is dropped. «crm-wa-small» in cls (or size:'sm') gives the small
+  // pair for narrow cards, with the short words «الجوال» / «النظام» and the full words as the tooltip.
+  const FULL={phone:'فتح في واتساب الجوال',crm:'فتح في النظام'},SHORT={phone:'الجوال',crm:'النظام'};
   window.crmWaButtons=function(o){
-    o=o||{};const cls=o.cls||'btn-secondary',conv=o.conversationId||'',client=o.clientId||'',link=phoneLink(o.phone);
+    o=o||{};const conv=o.conversationId||'',client=o.clientId||'',link=phoneLink(o.phone);
+    const extra=String(o.cls||'').split(/\s+/).filter(c=>c&&!/^btn-(primary|secondary)$/.test(c));
+    const small=o.size==='sm'||extra.indexOf('crm-wa-small')>=0;
+    const cls='crm-wa-btn'+(small?' crm-wa-sm':'')+extra.filter(c=>c!=='crm-wa-small').map(c=>' '+esc(c)).join('');
+    const tip=k=>small?' title="'+FULL[k]+'" aria-label="'+FULL[k]+'"':'',text=k=>small?SHORT[k]:FULL[k];
     const data=' data-conv="'+esc(conv)+'" data-client="'+esc(client)+'"';
-    const phoneBtn=link?'<a class="'+cls+' crm-wa-phone" href="'+esc(link)+'"'+(/^https:/.test(link)?' target="_blank"':'')+' rel="noopener noreferrer">فتح في واتساب الجوال</a>'
-      :(conv||client)?'<button type="button" class="'+cls+' crm-wa-phone" data-wa-phone="1"'+data+'>فتح في واتساب الجوال</button>':'';
-    const crmBtn=(conv||client)?'<button type="button" class="'+cls+' crm-wa-crm" data-wa-crm="1"'+data+'>فتح في النظام</button>':'';
+    const phoneBtn=link?'<a class="'+cls+' crm-wa-phone" href="'+esc(link)+'"'+(/^https:/.test(link)?' target="_blank"':'')+' rel="noopener noreferrer"'+tip('phone')+'>'+text('phone')+'</a>'
+      :(conv||client)?'<button type="button" class="'+cls+' crm-wa-phone" data-wa-phone="1"'+data+tip('phone')+'>'+text('phone')+'</button>':'';
+    const crmBtn=(conv||client)?'<button type="button" class="'+cls+' crm-wa-crm" data-wa-crm="1"'+data+tip('crm')+'>'+text('crm')+'</button>':'';
     return phoneBtn+crmBtn;
   };
   function closeSheets(){const x=document.querySelector('#cohSheet:not([hidden]) .coh-sheet-x');if(x)x.click();}

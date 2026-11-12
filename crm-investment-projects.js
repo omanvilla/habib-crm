@@ -54,11 +54,12 @@
     const box=byId('ipWait');if(!box)return;
     const label={muscat:'مسقط',barka:'بركاء'};
     box.innerHTML='<section class="card ip-card"><div class="ip-head"><div><h2>قائمة انتظار المستحقين <b dir="ltr">'+waitRows.length+'</b></h2><small>طرح المستحقين موقف حالياً. أول ما يفتح تواصل معهم وحطهم «تم التواصل»</small></div></div>'
-      +(waitRows.length?'<ul class="ip-clients">'+waitRows.map(w=>'<li><button type="button" class="ip-client" data-ip="client" data-id="'+esc(w.client_id)+'">'+esc((w.clients&&w.clients.name)||'عميل')+'</button><small>'+esc(label[w.route_key]||'')+' · آخر سؤال '+esc(day(w.last_asked_at))+'</small>'
+      +(waitRows.length?'<ul class="ip-clients">'+waitRows.map(w=>'<li class="ip-wait-row"><div class="ip-wait-info"><button type="button" class="ip-client" data-ip="client" data-id="'+esc(w.client_id)+'">'+esc((w.clients&&w.clients.name)||'عميل')+'</button><small>'+esc(label[w.route_key]||'')+' · آخر سؤال '+esc(day(w.last_asked_at))+'</small>'
         +(w.note?'<small dir="auto">'+esc(String(w.note).slice(0,140))+'</small>':'')
-        +(typeof window.crmWaButtons==='function'?window.crmWaButtons({conversationId:w.conversation_id,clientId:w.client_id})
+        // 12 Nov 2026 (Ahmed: «ما جاي مرتب»): the text keeps its own side and the buttons theirs (crm-wa-buttons.css)
+        +'</div><div class="ip-wait-actions">'+(typeof window.crmWaButtons==='function'?window.crmWaButtons({conversationId:w.conversation_id,clientId:w.client_id})
           :(w.conversation_id&&typeof openWhatsAppConversation==='function'?'<button type="button" class="btn-secondary" data-ip="wchat" data-id="'+esc(w.conversation_id)+'">فتح في النظام</button>':''))
-        +(canEdit()?'<button type="button" class="btn-secondary" data-ip="wdone" data-id="'+esc(w.id)+'">تم التواصل</button>':'')+'</li>').join('')+'</ul>':'<p class="ip-empty">ما في أحد في قائمة الانتظار</p>')
+        +(canEdit()?'<button type="button" class="btn-secondary" data-ip="wdone" data-id="'+esc(w.id)+'">تم التواصل</button>':'')+'</div></li>').join('')+'</ul>':'<p class="ip-empty">ما في أحد في قائمة الانتظار</p>')
       +'</section>';
   }
   function drawForm(){

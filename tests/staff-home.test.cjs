@@ -31,7 +31,7 @@ test('a staff account is greeted by its own name; the branch stays under the nam
  assert(base.includes("const label=currentProfile.full_name||branchLabel||currentProfile.email;"));
  assert(base.includes("$('userRole').textContent=roleAr(currentProfile.role)+(branchLabel?' · '+branchLabel:'');"));
  assert(base.includes("$('welcomeName').textContent=(currentProfile.full_name||'').split(' ')[0]||branchLabel||'بك';"));
- assert(/app-base-v15\.html\?v=20261112-voice2/.test(index));
+ assert(/app-base-v15\.html\?v=20261112-wa2/.test(index));
 });
 test('targets, performance, tasks and the responsible column name the person on the branch line (SQL83)',()=>{
  const base=fs.readFileSync('app-base-v15.html','utf8'),ops=fs.readFileSync('crm-operations-v6.js','utf8'),tasks=fs.readFileSync('crm-v18-task-priority-patch.js','utf8');
@@ -50,7 +50,7 @@ test('staff follow everyone like the owner, never the owner line (SQL85)',()=>{
  assert(s85.includes("WHERE v_owner OR (public.my_role() IN ('manager','agent','viewer') AND i.route_key IS DISTINCT FROM 'owner')"));
  assert(s85.includes('CASE WHEN v_owner THEN i.owner_instruction END'),'the owner instructions stay his');
  assert(!s85.includes('staff_is_branch_member'));
- assert(/crm-followups-today\.js\?v=20261112-ab1/.test(index));
+ assert(/crm-followups-today\.js\?v=20261112-wa2/.test(index));
 });
 test('a follow-up naming a property that left the market goes back to review (SQL86)',()=>{
  const s=fs.readFileSync('db/changes/86-followups-reread-unavailable.forward.sql','utf8');
