@@ -35,7 +35,7 @@ test('visits and owners tables: the two buttons; an owner chat is found by the n
  assert(h.includes('href="https://wa.me/96890000000"')&&h.includes('data-wa-crm="1" data-conv="" data-client="" data-phone="96890000000"'),'a number alone still gives the CRM button');
  assert(!ctx.window.crmWaButtons({phone:'96890000000',clientId:'x'}).includes('data-phone='),'with a client the chat is found by the client, as before');
  assert(wa.includes(".eq('customer_wa_id',d)")&&wa.includes("crm.dataset.phone||''"),'looked up when pressed, among the chats the account may see');
- assert(css.includes('.crm-grid .crm-grid-actions .crm-wa-btn{'),'no box inside a table row');
+ assert(css.includes('.crm-grid .crm-grid-actions .crm-wa-btn{'),'inside a table row the pair looks like the row\'s other actions');
  assert(/crm-simple-ui\.js\?v=20261112-wa3/.test(index));
 });
 test('the same two buttons in the follow-ups, the chat header, the waiting list and the client file',()=>{
