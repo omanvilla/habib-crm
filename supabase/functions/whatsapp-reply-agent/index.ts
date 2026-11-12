@@ -14,7 +14,11 @@ const DEBOUNCE_MS = Number(Deno.env.get("REPLY_DEBOUNCE_MS") || 35000); // wait 
 // Only these handoffs keep the agent out of the chat until Ahmed answers (negotiation, serious buyer, owner price study).
 // Any other handoff ("send photos", "call me", "not sure") no longer silences the agent: the next message is answered
 // and the open item stays on Ahmed's list.
-const HARD_HANDOFF = /^\s*(تفاوض|مشتري جاد|دراسة سعر)\s*:/;
+const HARD_HANDOFF = /^\s*(تفاوض|مشتري جاد|دراسة سعر|سؤال ما عندي جوابه)\s*:/;
+// R41 (Ahmed 12 Nov): a question whose answer is not written in front of the agent gets no reply at all; the chat goes back to Ahmed
+const UNKNOWN_Q = /^\s*سؤال ما عندي جوابه\s*:/;
+// R40 (Ahmed 12 Nov): people the office never answers; the chat leaves «العقل موقوف عندهم» for the ignored list
+const IGNORE_LABEL: Record<string, string> = { job: "طالب وظيفة", broker_signup: "يبي يتسجل وسيط عندنا", foreign_broker: "وسيط أو شركة من برا عمان", bank: "موظف بنك يعرض تعاون", service: "يعرض خدمة" };
 // Ahmed's strict rule (6 Nov): never promise the customer a reply ("بشوف وارد عليك"). Silence is better than a promise nobody keeps.
 // R12 (9 Nov, in code 10 Nov): first-person call promises too ("بتصل عليك", "بكلمك"). The one allowed sentence is R12's third-person
 // "اول ما يفضى يتصل فيك", which none of these match; "اول ما يتوفر بتواصل معك" is not a call promise and stays.
@@ -221,7 +225,8 @@ const schema = {
   type: "object", additionalProperties: false,
   properties: {
     reply_messages: { type: "array", items: { type: "string" } },
-    category: { type: "string", enum: ["buyer", "tenant", "investor", "seller", "general", "broker", "active_deal", "unclear"] },
+    category: { type: "string", enum: ["buyer", "tenant", "investor", "seller", "general", "broker", "active_deal", "unclear", "ignore"] },
+    ignore_kind: { type: ["string", "null"], enum: ["job", "broker_signup", "foreign_broker", "bank", "service", null] },
     source: { type: "string", enum: ["reel", "property_link", "image", "video", "ad", "referral", "direct", "unknown"] },
     intent: { type: "string" },
     budget_asked_now: { type: "boolean" },
@@ -277,7 +282,7 @@ const schema = {
     // R31 (Ahmed 11 Nov): the client asked about «المستحقين» units (stopped for now) and goes on the waiting list
     mustahiq_waitlist: { type: "boolean" },
   },
-  required: ["reply_messages", "category", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives", "close_other_branch", "owner_offer", "request", "seriousness", "seriousness_reason", "meeting", "client_name_stated", "name_declined", "mustahiq_waitlist"],
+  required: ["reply_messages", "category", "ignore_kind", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives", "close_other_branch", "owner_offer", "request", "seriousness", "seriousness_reason", "meeting", "client_name_stated", "name_declined", "mustahiq_waitlist"],
 };
 
 // The marketing text (property description, or the longest reel caption for it) is what the office
@@ -329,7 +334,9 @@ function propLine(p: any) {
   const TERMS: Record<string, string> = { daily: "يومي", weekly: "أسبوعي", monthly: "شهري", "3m": "3 شهور", "6m": "6 شهور", yearly: "سنة" };
   const terms = p.listing_purpose === "rent" ? ` | مدة الإيجار المسموحة: ${(p.rental_terms || []).length ? (p.rental_terms as string[]).map((t) => TERMS[t] || t).join(" او ") : "غير محددة (handoff اذا سأل عن مدة قصيرة)"}` : "";
   const rented = p.rented_units ? ` | المؤجر حالياً: ${p.rented_units}` : "";
-  return `- id=${p.id} | ${name} | ${bits}${terms}${rented} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? " | اللوكيشن متوفر (action=send_location)" : " | اللوكيشن غير متوفر"} | الفرع: ${p.branch_key === "muscat" ? "مسقط (رقم 71770030)" : p.branch_key === "barka" ? "بركاء (رقم 92344273)" : "غير محدد"}${p.video ? ` | رابط الفيديو (ترسله إذا طلب فيديو): ${p.video}` : ""}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}${p.marketing ? `\n  وصف الإعلان: ${short(p.marketing, 1600)}` : ""}`;
+  // R42 (Ahmed 12 Nov): a fixed price is answered after the visit; negotiable or not set goes to Ahmed (R16)
+  const nego = p.listing_purpose === "rent" ? "" : p.price_negotiable === "fixed" ? " | السعر: ثابت" : p.price_negotiable === "negotiable" ? " | السعر: قابل للتفاوض" : " | السعر: ما حدده أحمد";
+  return `- id=${p.id} | ${name} | ${bits}${terms}${rented}${nego} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? " | اللوكيشن متوفر (action=send_location)" : " | اللوكيشن غير متوفر"} | الفرع: ${p.branch_key === "muscat" ? "مسقط (رقم 71770030)" : p.branch_key === "barka" ? "بركاء (رقم 92344273)" : "غير محدد"}${p.video ? ` | رابط الفيديو (ترسله إذا طلب فيديو): ${p.video}` : ""}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}${p.marketing ? `\n  وصف الإعلان: ${short(p.marketing, 1600)}` : ""}`;
 }
 // The same neutral label (type, area, price) for visits, deals and properties no longer available: never the office title
 function neutralLabel(p: any) {
@@ -619,7 +626,7 @@ Deno.serve(async (req) => {
     const [histR, propsR, rulesR, priorR] = await Promise.all([
       db.from("whatsapp_messages").select("id,direction,message_type,body,transcript,media_id,actor_type,message_timestamp,matched_property_id,property_link_key,property_image_analysis,referral:raw_payload->referral")
         .eq("conversation_id", conv.id).lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(60),
-      db.from("properties").select("id,title,internal_name,type,area,wilayat,price,bedrooms,bathrooms,land_size,built_size,listing_purpose,public_details,description,map_url,visit_method,visit_instructions,lockbox_image_url,owner_id,branch_key,rental_terms,rented_units")
+      db.from("properties").select("id,title,internal_name,type,area,wilayat,price,bedrooms,bathrooms,land_size,built_size,listing_purpose,public_details,description,map_url,visit_method,visit_instructions,lockbox_image_url,owner_id,branch_key,rental_terms,rented_units,price_negotiable")
         .eq("company_id", msg.company_id).eq("status", "available").eq("archived", false),
       db.from("whatsapp_reply_rules").select("id,situation,approved_reply,category,auto_send,auto_match_regex").eq("company_id", msg.company_id).eq("active", true).order("created_at", { ascending: false }).limit(40),
       db.from("whatsapp_reply_drafts").select("analysis,status").eq("conversation_id", conv.id).in("status", ["sent", "approved", "edited"]),
@@ -987,6 +994,12 @@ Deno.serve(async (req) => {
     const aiP = await ai.json().catch(() => ({}));
     if (!ai.ok) throw new Error(aiP?.error?.message || `openai_${ai.status}`);
     const out = JSON.parse(aiP.output_text || aiP.output?.flatMap((x: any) => x?.content || []).find((x: any) => x?.type === "output_text")?.text || "{}");
+    // R40: nothing is said and nothing is handed to Ahmed; below the chat is muted for good and kept in the ignored list
+    const ignored = out.category === "ignore" && !!IGNORE_LABEL[String(out.ignore_kind || "")];
+    if (out.category === "ignore" && !ignored) out.category = "unclear";
+    if (ignored) { out.reply_messages = []; out.action = "none"; out.handoff_reason = null; }
+    // R41: «سؤال ما عندي جوابه: …» = silence and a hard handoff (the agent stays quiet in that chat until it is given back)
+    if (out.action === "handoff" && UNKNOWN_Q.test(String(out.handoff_reason || ""))) out.reply_messages = [];
     // R19 (Ahmed 10 Nov): a meeting is booked only once the client fixed both the day and the hour (and not in the past); then the
     // agent answers and Ahmed gets a soft handoff «اجتماع: …» with a task for that day. Without both it keeps asking (action none).
     // A plain handoff the model labelled «اجتماع:» is read the same way, so Ahmed never gets a meeting alert without a day and an hour.
@@ -1429,6 +1442,8 @@ Deno.serve(async (req) => {
     // R19: a booked meeting is a soft handoff «اجتماع: …» (Ahmed is alerted, the agent keeps answering simple questions)
     const meetingBooked = out.action === "book_meeting" && /^\s*اجتماع\s*:/.test(String(out.handoff_reason || ""));
     if (out.action === "handoff" || meetingBooked) Object.assign(convPatch, { human_handoff_required: true, handoff_reason: short(out.handoff_reason || out.intent, 500), handoff_updated_at: now });
+    if (ignored) Object.assign(convPatch, { agent_muted: true, agent_muted_reason: `متجاهل: ${IGNORE_LABEL[out.ignore_kind]}`, ignored_at: now, ignore_kind: out.ignore_kind,
+      human_handoff_required: false, handoff_reason: null, handoff_updated_at: now });
     // a handoff that only said "which property ?" is closed by the agent itself once it answers normally (8 Nov, Ahmed: it must not wait for him)
     if (out.action !== "handoff" && !meetingBooked && sentIds.length && out.reply_messages.length && conv.human_handoff_required && /مو واضح|ما عرفنا|أي عقار|اي عقار|العقار.*(واضح|محدد)/.test(String(conv.handoff_reason || "")) && !HARD_HANDOFF.test(String(conv.handoff_reason || ""))) {
       Object.assign(convPatch, { human_handoff_required: false, handoff_reason: null, handoff_updated_at: now });
