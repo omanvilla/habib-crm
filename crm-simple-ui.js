@@ -31,7 +31,8 @@
     return '<tr'+(overdue?' class="crm-grid-late"':'')+'>'
       +'<td class="'+(overdue?'crm-grid-overdue':'')+'"><bdi>'+esc(visitDate(v))+'</bdi>'+(v.viewing_time?' <small dir="ltr">'+esc(String(v.viewing_time).slice(0,5))+'</small>':'')+(overdue?' <span class="crm-grid-chip crm-grid-chip-late">متأخرة</span>':'')+'</td>'
       +'<td class="crm-grid-name">'+esc(v.property&&v.property.title||'عقار غير محدد')+(v.property&&v.property.area?' <small>'+esc(v.property.area)+'</small>':'')+'</td>'
-      +'<td>'+(v.client&&v.client_id?'<button type="button" class="crm-grid-link" onclick="viewClient(\''+esc(v.client_id)+'\')">'+esc(v.client.name)+'</button>':esc(v.client&&v.client.name||'—'))+'</td>'
+      // crm-grid-client: on a medium screen a very long name is cut with «…» (crm-wa-buttons.css), the full name is the tooltip
+      +'<td class="crm-grid-client" title="'+esc(v.client&&v.client.name||'')+'">'+(v.client&&v.client_id?'<button type="button" class="crm-grid-link" onclick="viewClient(\''+esc(v.client_id)+'\')">'+esc(v.client.name)+'</button>':esc(v.client&&v.client.name||'—'))+'</td>'
       +'<td>'+esc(branch||'—')+'</td>'
       +'<td><span class="viewing-status '+esc(v.status)+'">'+esc(statusLabels[v.status]||v.status||'—')+'</span>'+(v.ahmed_present===true?' <span class="crm-grid-chip">أحمد حاضر</span>':v.ahmed_present===false?' <span class="crm-grid-chip">زار لحاله</span>':'')+(v.created_via==='whatsapp_ai'?' <span class="crm-grid-chip">من واتساب</span>':'')+'</td>'
       // Today's and overdue scheduled visits open the quick result sheet (crm-quick-visit.js).
