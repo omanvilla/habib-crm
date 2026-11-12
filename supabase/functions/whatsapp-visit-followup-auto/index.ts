@@ -1225,6 +1225,31 @@ Deno.serve(async (req) => {
     const co = await db.from("whatsapp_automation_runtime").select("company_id").eq("mode", "live").limit(1).maybeSingle();
     return json({ ok: true, ...(await preview(co.data?.company_id, Number(input.offset) || 0)) });
   }
+  // a test of R39 on chosen chats (up to 12): where each client stands, the text inside the 24 hours and the template outside
+  // them, as a weekly request follow-up would get them today. Reads only: no row is created, changed or sent.
+  if (input?.preview_stage) {
+    const co = await db.from("whatsapp_automation_runtime").select("company_id").eq("mode", "live").limit(1).maybeSingle();
+    const companyId = co.data?.company_id;
+    const ids: string[] = (Array.isArray(input.preview_stage.conversation_ids) ? input.preview_stage.conversation_ids : []).map(String).slice(0, 12);
+    const available = await availableText(companyId);
+    const items: any[] = [];
+    for (let i = 0; i < ids.length; i += REVIEWS_AT_ONCE) {
+      await Promise.all(ids.slice(i, i + REVIEWS_AT_ONCE).map(async (cid) => {
+        try {
+          const c = await db.from("whatsapp_conversations").select("id,client_id,route_key").eq("id", cid).eq("company_id", companyId).maybeSingle();
+          if (!c.data) { items.push({ conversation: cid, error: "conversation_not_found" }); return; }
+          const x = { id: null, kind: "request_followup", client_id: c.data.client_id, conversation_id: c.data.id, route_key: c.data.route_key, template_name: "request_followup_ar_v2", messages: ["بخصوص طلبك", "لين الحين تبحث ؟"] };
+          const r = await judge("request", x, companyId, available);
+          const subject = String(r.subject || "").replace(/^\s*(بخصوص\s+)?طلبك\s+/, "").replace(/[؟?،,.!]/g, " ").replace(/\s+/g, " ").trim();
+          const t = r.decision === "followup" ? await stageTemplate(x, companyId, r, subject && subject.length <= 60 && !/[A-Za-z]/.test(subject) ? subject : "") : null;
+          items.push({ conversation: cid, held: await chatHeld(cid), decision: r.decision, stage: r.stage, stage_ar: STAGE_AR[String(r.stage)] || null, reason: short(r.reason, 220), text: r.decision === "followup" ? r.text : null,
+            subject: subject || null, offer: r.offer_label || null, auto_ok: !!r.auto_ok,
+            template: r.decision === "followup" ? (t?.template_name || "request_followup_ar_v2") : null, template_text: r.decision === "followup" ? (t?.messages || [`بخصوص طلبك ${subject}`, "لين الحين تبحث ؟"]).join(" / ") : null });
+        } catch (e) { items.push({ conversation: cid, error: String((e as any)?.message || e) }); }
+      }));
+    }
+    return json({ ok: true, items });
+  }
   const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Muscat", hour: "2-digit", hour12: false }).format(new Date()));
   if (hour < 9 || hour >= 21) return json({ ok: true, reason: "outside_hours" });
   const rts = await db.from("whatsapp_automation_runtime").select("company_id,mode,visit_followups_auto");
