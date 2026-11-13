@@ -173,18 +173,22 @@
   }
 
   async function open(){
-    const p=root.viewingProperty,generation=root.crmSessionGeneration,user=root.currentUser&&root.currentUser.id;
+    // currentUser, crmSessionGeneration, supa and currentCompany are page variables of app-base-v15.html (declared with let),
+    // not properties of window: they are read by name, as crm-operations-v6.js does.
+    const p=root.viewingProperty,generation=typeof crmSessionGeneration==='undefined'?undefined:crmSessionGeneration;
+    const user=typeof currentUser!=='undefined'&&currentUser?currentUser.id:null;
     if(!p||!user)return;
-    const mine=()=>typeof root.crmSessionCurrent!=='function'||root.crmSessionCurrent(generation,user);
+    const mine=()=>typeof crmSessionCurrent!=='function'||crmSessionCurrent(generation,user);
     try{
       const [ir,vr,mr]=await Promise.all([
-        root.supa.from('property_inquiries').select('client_id,has_inbound_inquiry,status,rejection_reason').eq('property_id',p.id),
-        root.supa.from('viewings').select('client_id,status,archived').eq('property_id',p.id),
-        root.supa.from('property_marketing_events').select('channel,event_type,published_at,views,plays,reach,total_interactions,last_synced_at,url').eq('property_id',p.id).order('published_at',{ascending:true})]);
+        supa.from('property_inquiries').select('client_id,has_inbound_inquiry,status,rejection_reason').eq('property_id',p.id),
+        supa.from('viewings').select('client_id,status,archived').eq('property_id',p.id),
+        supa.from('property_marketing_events').select('channel,event_type,published_at,views,plays,reach,total_interactions,last_synced_at,url').eq('property_id',p.id).order('published_at',{ascending:true})]);
       if(!mine())return;
       [ir,vr,mr].forEach(r=>{if(r.error)throw r.error;});
       if(!root.viewingProperty||root.viewingProperty.id!==p.id)return; // he moved to another property meanwhile
-      show(build(Object.assign({},p,{company_name:root.currentCompany&&root.currentCompany.name}),ir.data,vr.data,mr.data,new Date()));
+      const office=typeof currentCompany!=='undefined'&&currentCompany?currentCompany.name:'';
+      show(build(Object.assign({},p,{company_name:office}),ir.data,vr.data,mr.data,new Date()));
     }catch(error){if(mine())toast('تعذر إعداد التقرير: '+(error&&error.message||error),'error');}
   }
 

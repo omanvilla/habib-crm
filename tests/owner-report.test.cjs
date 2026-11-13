@@ -120,6 +120,25 @@ test('an error from an old session does not surface in the next account; a curre
   f.queries.forEach(q=>q.resolve({data:null,error:{message:'TEST read error'}}));await failing;
   assert.equal(f.shownNodes.length,0);assert.equal(f.toasts.length,1);assert.match(f.toasts[0][0],/تعذر إعداد التقرير: TEST read error/);
 });
+// On the real page currentUser, crmSessionGeneration, supa and currentCompany are «let» variables of app-base-v15.html, not
+// properties of window. The first version read them from window and the button did nothing (seen on the live page, 13 Nov).
+test('the report opens when the session variables are page variables, as in app-base-v15.html',async()=>{
+  const f=fixture(),c=f.context;
+  const kept={supa:c.supa};
+  for(const key of ['currentUser','crmSessionGeneration','supa','currentCompany'])delete c[key];
+  c.__supa=kept.supa;
+  vm.runInContext("let currentUser={id:'TEST-owner'},crmSessionGeneration=1,supa=__supa,currentCompany={name:'TEST Office'};",c);
+  c.crmSessionCurrent=(generation,user)=>vm.runInContext('crmSessionGeneration',c)===generation&&vm.runInContext('currentUser&&currentUser.id',c)===user;
+  assert.equal('currentUser' in c,false);assert.equal('supa' in c,false);
+  assert(/\blet currentUser\b/.test(base)&&/\blet crmSessionGeneration\b/.test(base)&&/\bconst supa\b/.test(base),'the page still declares them this way');
+  const opening=c.exportPropertyOwnerReport();
+  assert.equal(f.queries.length,3,'the three reads started');
+  f.queries.forEach(q=>q.resolve({data:[],error:null}));await opening;
+  assert.equal(f.shownNodes.length,1);assert(f.shownNodes[0].innerHTML.includes('TEST Office'));
+  const stale=c.exportPropertyOwnerReport();vm.runInContext('crmSessionGeneration++',c);
+  f.queries.slice(3).forEach(q=>q.resolve({data:[],error:null}));await stale;
+  assert.equal(f.shownNodes.length,1,'a report asked for by the earlier session is not drawn');
+});
 test('the report leaves the screen when the session is reset',async()=>{
   const f=fixture(),opening=f.context.exportPropertyOwnerReport();
   f.queries.forEach(q=>q.resolve({data:[],error:null}));await opening;assert.equal(f.shownNodes.length,1);
