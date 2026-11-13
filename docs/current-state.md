@@ -6,8 +6,9 @@ Updated 2026-11-13. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
-## 13 November 2026 — the red test on `main` (brain size ceiling), branch `claude/agent-brain-size-test-20261113`, waits for Ahmed's «نعم، ادمج»
+## 13 November 2026 — the red test on `main` (brain size ceiling), merged into main
 
+- **Merged** on 13 Nov after Ahmed's «نعم، ادمج» (fast-forward of `claude/agent-brain-size-test-20261113`; `main` had not moved from `fc693bc`). Only the test and this file changed: no sync, no deploy, the site and the pins are as they were.
 - **What was red.** One unit test, «brain and knowledge stay one template string the prompt sync can read» (`tests/agent-rules.test.cjs`). First red run: `8cfe964` (12 Nov, R44 «the fixed-price line is not volunteered»); `52ebaa7` was still green (CI runs 43266386229 green, 43266785771 red), then `efa74aa` … `fc693bc` red for the same reason.
 - **Why.** Not the shape: `brain.ts` and `knowledge.ts` are each one template literal (two backticks, no `${`). The last assertion of that test is a size ceiling, `body(brain).length < 66000`; the R44 line took the body from 65,944 to 66,080 (80 over).
 - **The change** (`13e4742`): the ceiling is 70,000, with a dated comment. One line of the test. `brain.ts`, `knowledge.ts`, `index.ts` and `agent-prompt-sync` are not touched, so what the agent is told is the same and nothing has to be synced or deployed. The ceiling is only a reminder to keep the brain compact: nothing downstream cuts by length (`agent-prompt-sync` takes the whole body, `compose_agent_brain` appends the lessons, the agent reads `content` whole). It was raised the same way on 11 Nov (60,000 → 66,000, `5dbb1eb`). The brain was not shortened to fit: shortening changes the wording of Ahmed's rules.
