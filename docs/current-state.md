@@ -6,6 +6,15 @@ Updated 2026-11-13. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 13 November 2026 — the red test on `main` (brain size ceiling), branch `claude/agent-brain-size-test-20261113`, waits for Ahmed's «نعم، ادمج»
+
+- **What was red.** One unit test, «brain and knowledge stay one template string the prompt sync can read» (`tests/agent-rules.test.cjs`). First red run: `8cfe964` (12 Nov, R44 «the fixed-price line is not volunteered»); `52ebaa7` was still green (CI runs 43266386229 green, 43266785771 red), then `efa74aa` … `fc693bc` red for the same reason.
+- **Why.** Not the shape: `brain.ts` and `knowledge.ts` are each one template literal (two backticks, no `${`). The last assertion of that test is a size ceiling, `body(brain).length < 66000`; the R44 line took the body from 65,944 to 66,080 (80 over).
+- **The change** (`13e4742`): the ceiling is 70,000, with a dated comment. One line of the test. `brain.ts`, `knowledge.ts`, `index.ts` and `agent-prompt-sync` are not touched, so what the agent is told is the same and nothing has to be synced or deployed. The ceiling is only a reminder to keep the brain compact: nothing downstream cuts by length (`agent-prompt-sync` takes the whole body, `compose_agent_brain` appends the lessons, the agent reads `content` whole). It was raised the same way on 11 Nov (60,000 → 66,000, `5dbb1eb`). The brain was not shortened to fit: shortening changes the wording of Ahmed's rules.
+- **The live agent was not affected.** Read only, 13 Nov: `whatsapp_agent_prompts` has `brain_base`, `brain` and `knowledge` at `8cfe964`; md5 of `brain_base` and of `knowledge` equal the md5 of the template bodies in the repo at `8cfe964` (66,071 characters = 66,080 UTF-16 units, 9 emoji), and `brain` = `brain_base` + the lessons. The two files have not changed since `8cfe964`, so the live prompts equal `main`. The sync does not look at CI, so the red test never blocked or cut it.
+- **Checked.** CI on the branch at `13e4742`: green (run 43462369917, all jobs). **Not done:** no merge, no `agent-prompt-sync`, no deploy, no dry run (no rule and no agent file changed).
+- **Next time the brain grows** past 70,000 this test goes red again: look for lines to merge or retire with Ahmed before raising it again.
+
 ## 13 November 2026 — «افتح اللابتوب» alerts for price study tasks (SQL99, commit 8622fd9), live, merged into main
 
 - **Merged** on 13 Nov after Ahmed's «نعم، ادمج» (fast-forward of `claude/price-study-laptop-alerts-20261113`; `main` had not moved). No front-end file changed, so the site is as it was; the pins stay on `8622fd9`.
