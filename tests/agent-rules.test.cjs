@@ -70,7 +70,9 @@ test('brain and knowledge stay one template string the prompt sync can read',()=
   assert(body(src).length>1000,name+' body is long enough for agent-prompt-sync');
  }
  // 11 Nov 2026: R25–R31 grew it past 60,000; no hard limit downstream (compose_agent_brain only appends the lessons)
- assert(body(brain).length<66000,'the brain stays compact (Ahmed\'s open notes are appended after it)');
+ // 13 Nov 2026: R44's fixed-price line (8cfe964) took it to 66,080 and this was the only red test on main. The brain was
+ // not shortened (its wording is Ahmed's rules); the live sync at 8cfe964 copied all of it (md5 of the body compared).
+ assert(body(brain).length<70000,'the brain stays compact (Ahmed\'s open notes are appended after it)');
 });
 test('R18: only the figures Ahmed wrote; any other price gets the "it depends" line and a meeting',()=>{
  assert(knowledge.includes('57,000'),'Iconic Tower studio from 57,000');
