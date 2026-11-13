@@ -6,7 +6,9 @@ Updated 2026-11-13. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
-## 13 November 2026 — «افتح اللابتوب» alerts for price study tasks (SQL99, commit 8622fd9), live, branch not merged
+## 13 November 2026 — «افتح اللابتوب» alerts for price study tasks (SQL99, commit 8622fd9), live, merged into main
+
+- **Merged** on 13 Nov after Ahmed's «نعم، ادمج» (fast-forward of `claude/price-study-laptop-alerts-20261113`; `main` had not moved). No front-end file changed, so the site is as it was; the pins stay on `8622fd9`.
 
 - **What Ahmed asked** (plan first, he approved it: «موافق، ابدأ»). The scheduled pricing tasks run on his laptop, so a study waits while it is closed. Three alerts to his own WhatsApp: (1) a new «دراسة سعر» task: the type, the area and the line «افتح اللابتوب وتطبيق Claude عشان يتسعر», added to an alert that already exists instead of a second one; (2) two hours with no study handed in (no row in `owner_price_studies`): once, «العقار لسه ما تسعّر، تأكد إن اللابتوب شغال»; (3) a study he rejected: the same as 1. (4) was a question only, nothing built: see PROJECT_HANDOFF.md (a Cowork task bound to the laptop has no confirmed outside trigger; a cloud task with an API trigger would work but loses the laptop browser and the project files). His choices: **every kind of property**, the two hours counted only from 07:00 to 23:00 Muscat time, nothing for the tasks that were already open, and **no test task in the real queue**.
 - **His standing rules from this day** (three Claude scheduled tasks work on the live CRM: «تسعير آلي: الأراضي» :13 and «تسعير آلي: العقارات الجاهزة» :37 on his laptop, «تنبيه التسعير: عقار جديد» :51 with a phone notification). Do not change the name, the inputs or the output columns of `crm_price_study_queue`, `_submit`, `_chat`, `_documents`, `_inspection`, `_status` (above all `property_kind`, `state`, `task_created_at`, `area`) without telling him first. Never open a test «دراسة سعر» task in the real queue: the tasks would price it.
