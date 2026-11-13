@@ -284,11 +284,14 @@ async function verifyDealWorkflow(page,role,report){
    // Download from the rendered property details, with synthetic repeated/cancelled visits.
    if(role==='owner'){
     await page.evaluate(()=>viewProperty(window.CRMPREVIEW.db.properties[0].id));await page.waitForTimeout(600);
+    // 13 Nov 2026: the button opens the report on the screen (crm-owner-report.js); the Excel file is one of its buttons.
+    await page.evaluate(()=>exportPropertyOwnerReport());await page.waitForSelector('#crmOwnerReport [data-cor="excel"]');
     const downloadPromise=page.waitForEvent('download');
-    await page.evaluate(()=>exportPropertyOwnerReport());
+    await page.click('#crmOwnerReport [data-cor="excel"]');
     const download=await downloadPromise;await download.saveAs(path.join(out,'owner-synthetic-report.csv'));
     const csv=fs.readFileSync(path.join(out,'owner-synthetic-report.csv'),'utf8');
-    assert(csv.includes('زيارات ألغيت'));const records=csv.split('\n').map(line=>line.replace(/"/g,'').split(','));const numberFor=label=>Number(records.find(r=>r[0]===label)?.[1]);assert.equal(numberFor('عملاء لديهم استفسار وارد مثبت'),1);assert.equal(numberFor('زيارات تمت'),2);assert.equal(numberFor('زيارات ألغيت'),1);report.checks.push('CSV downloaded through Chromium; synthetic property report');
+    assert(csv.includes('زيارات ألغيت'));const records=csv.split('\n').map(line=>line.replace(/"/g,'').split(','));const numberFor=label=>Number(records.find(r=>r[0]===label)?.[1]);assert.equal(numberFor('عملاء استفسروا عن العقار'),1);assert.equal(numberFor('زيارات تمت'),2);assert.equal(numberFor('زيارات ألغيت'),1);report.checks.push('CSV downloaded through Chromium; synthetic property report');
+    await page.click('#crmOwnerReport [data-cor="close"]');
    }
    await page.evaluate(()=>document.querySelectorAll('.modal-ov.on').forEach(modal=>closeModal(modal.id)));
    await verifyPropertyActions(page,role,report);

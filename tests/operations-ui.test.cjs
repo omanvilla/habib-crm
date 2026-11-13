@@ -62,35 +62,10 @@ test('empty employee list displays a clear empty state',async()=>{
   assert.match(f.nodes.get('employeePerformanceResults').innerHTML,/لا توجد فروع متاحة لهذا الحساب/);
 });
 
-function exportFixture(){
-  const f=fixture(),queries=[],downloads=[],toasts=[];
-  f.context.viewingProperty={id:'TEST-property',title:'TEST owner property',created_at:'2026-10-01'};
-  f.context.downloadCSV=(...args)=>downloads.push(args);
-  f.context.showToast=(...args)=>toasts.push(args);
-  f.context.supa.from=table=>{
-    const promise=new Promise(resolve=>queries.push({table,resolve}));
-    const query={select(){return query},eq(){return query},order(){return query},then:promise.then.bind(promise)};
-    return query;
-  };
-  return {...f,queries,downloads,toasts};
-}
-test('owner CSV downloads only while the session that requested it remains current',async()=>{
-  for(const changed of ['none','logout','switch-user','same-user-new-session']){
-    const f=exportFixture(),exporting=f.context.exportPropertyOwnerReport();
-    if(changed==='logout'){f.context.currentUser=null;f.context.crmSessionGeneration++;}
-    if(changed==='switch-user')f.context.currentUser={id:'TEST-other-user'};
-    if(changed==='same-user-new-session')f.context.crmSessionGeneration++;
-    f.queries.forEach(q=>q.resolve({data:[],error:null}));await exporting;
-    assert.equal(f.downloads.length,changed==='none'?1:0,changed);
-  }
+// The owner's property report and its session checks moved to crm-owner-report.js (tests/owner-report.test.cjs), 13 Nov 2026.
+test('the operations module no longer carries its own owner report',()=>{
+  assert(!source.includes('exportPropertyOwnerReport=')&&!source.includes("downloadCSV('تقرير-أداء-'"));
 });
-test('an owner CSV error from an old session does not surface in the next account',async()=>{
-  const f=exportFixture(),exporting=f.context.exportPropertyOwnerReport();
-  f.context.currentUser={id:'TEST-other-user'};f.context.crmSessionGeneration++;
-  f.queries.forEach(q=>q.resolve({data:null,error:{message:'TEST previous account error'}}));await exporting;
-  assert.equal(f.downloads.length,0);assert.equal(f.toasts.length,0);
-});
-
 
 test('report team uses the selected complete month and the same reservation and human-message metrics',async()=>{
   const f=fixture();

@@ -566,25 +566,7 @@
       else if(action==='clear-clients'){clientWorkFilter='all';renderClients();}
     }catch(err){showToast('تعذر فتح الإجراء: '+err.message,'error');}
   });
-  // An owner CSV is based on actual visits. Inferred visit interest is shown separately from inbound leads.
-  window.exportPropertyOwnerReport=async function(){
-    const p=window.viewingProperty,generation=crmSessionGeneration,user=currentUser&&currentUser.id;if(!p||!user)return;
-    try{const [ir,vr,mr]=await Promise.all([
-      supa.from('property_inquiries').select('client_id,has_inbound_inquiry,inquiry_count,status,rejection_reason').eq('property_id',p.id),
-      supa.from('viewings').select('client_id,status,archived').eq('property_id',p.id),
-      supa.from('property_marketing_events').select('channel,event_type,published_at,views,plays,reach,total_interactions,last_synced_at,url,notes').eq('property_id',p.id).order('created_at',{ascending:false})]);
-      if(!crmSessionCurrent(generation,user))return;
-      [ir,vr,mr].forEach(r=>{if(r.error)throw r.error});const inbound=(ir.data||[]).filter(x=>x.has_inbound_inquiry),visits=(vr.data||[]).filter(x=>!x.archived),marketing=mr.data||[],visitedClients=new Set(visits.filter(x=>x.status!=='cancelled').map(x=>x.client_id));
-      const rows=[['العقار',p.title],['المنطقة',p.area||''],['السعر',p.price||''],['تاريخ تسجيل العقار',dateText(p.created_at)],
-        ['عملاء لديهم استفسار وارد مثبت',new Set(inbound.map(x=>x.client_id)).size],['اهتمامات مستنتجة من زيارة',new Set((ir.data||[]).filter(x=>!x.has_inbound_inquiry&&visitedClients.has(x.client_id)).map(x=>x.client_id)).size],
-        ['زيارات حجزت',visits.filter(x=>x.status!=='cancelled').length],['زيارات تمت',visits.filter(x=>x.status==='done').length],
-        ['زيارات ألغيت',visits.filter(x=>x.status==='cancelled').length],['في التفاوض',inbound.filter(x=>x.status==='negotiation').length],['لم يناسبه',inbound.filter(x=>x.status==='not_suitable').length],[],
-        ['سجل التسويق'],['القناة','النشاط','التاريخ','المشاهدات','الوصول','التفاعلات','آخر تحديث','الرابط','ملاحظات']];
-      marketing.forEach(m=>rows.push([m.channel||'',m.event_type||'',dateText(m.published_at),m.views??m.plays??'غير متاح',m.reach??'غير متاح',m.total_interactions??'غير متاح',m.last_synced_at?dateText(m.last_synced_at):'لم يحدث',m.url||'',m.notes||'']));
-      if(!crmSessionCurrent(generation,user))return;
-      downloadCSV('تقرير-أداء-'+(p.title||'العقار'),[],rows);
-    }catch(e){if(crmSessionCurrent(generation,user))showToast('تعذر إعداد التقرير: '+e.message,'error')}
-  };
+  // The report for the owner of a property (exportPropertyOwnerReport) moved to crm-owner-report.js on 13 Nov 2026.
   addPerformance();
   if(currentUser)mountTargetDashboard();
   if(window.crmDashboardPending){window.crmDashboardPending=false;window.loadDashboard();}
