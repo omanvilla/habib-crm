@@ -70,6 +70,7 @@
   const partial=(s,count,word)=>s.known&&s.known<count?word+' متاحة لـ '+num(s.known)+' من '+num(count)+' منشورات':'';
   const period=m=>(m.start?'من '+day(m.start)+' إلى '+day(m.today)+(m.days?' ('+num(m.days)+' يوم)':''):'حتى '+day(m.today));
   const priceText=m=>m.price==null?'':num(m.price)+' ر.ع'+(m.rent?' (إيجار)':'');
+  const reasonLine=r=>r.label===OTHER_REASON?r.label:'السبب: '+r.label;
   const fileName=m=>'تقرير-أداء-'+String(m.title||'العقار').replace(/[\\/:*?"<>|]+/g,' ').trim();
 
   function html(m){
@@ -95,7 +96,7 @@
       +(m.visits.noShow?line('حجز ولم يحضر',num(m.visits.noShow)):'')+(m.visits.cancelled?line('زيارات ألغيت',num(m.visits.cancelled)):'')
       +(m.feedback.negotiation?line('عملاء في التفاوض',num(m.feedback.negotiation)):'')+'</tbody></table></section>';
     if(m.feedback.notSuitable)h+='<section><h2>ملاحظات العملاء</h2><table class="cor-lines"><tbody>'+line('عملاء قالوا إن العقار لم يناسبهم',num(m.feedback.notSuitable))
-      +m.feedback.reasons.map(r=>line('السبب: '+r.label,num(r.count))).join('')+'</tbody></table></section>';
+      +m.feedback.reasons.map(r=>line(reasonLine(r),num(r.count))).join('')+'</tbody></table></section>';
     return h+'<footer class="cor-end">أُعد هذا التقرير من سجلات المكتب بتاريخ '+esc(day(m.today))+'.</footer></article>';
   }
 
@@ -127,7 +128,7 @@
       ['عملاء استفسروا عن العقار',m.clients.inbound],['عملاء زاروا بدون استفسار مسجل قبلها',m.clients.visitOnly],
       ['زيارات تمت',m.visits.done],['زيارات مجدولة',m.visits.scheduled],['حجز ولم يحضر',m.visits.noShow],['زيارات ألغيت',m.visits.cancelled],
       ['عملاء في التفاوض',m.feedback.negotiation],['لم يناسبهم العقار',m.feedback.notSuitable]];
-    m.feedback.reasons.forEach(r=>rows.push(['السبب: '+r.label,r.count]));
+    m.feedback.reasons.forEach(r=>rows.push([reasonLine(r),r.count]));
     rows.push([],['سجل التسويق'],['القناة','النشاط','التاريخ','المشاهدات','الوصول','التفاعلات','الرابط']);
     mk.posts.forEach(r=>rows.push([r.label,r.event,r.published?day(r.published):'',r.views==null?NA:r.views,r.reach==null?NA:r.reach,r.interactions==null?NA:r.interactions,r.url]));
     return rows;
