@@ -65,7 +65,7 @@ test('alert 3: the moment a study becomes rejected, for its latest version on an
   const trg=fwd.slice(fwd.indexOf('FUNCTION crm_repair_private.price_study_on_reject()'),fwd.indexOf('REVOKE ALL ON FUNCTION crm_repair_private.price_study_on_reject()'));
   assert(trg.includes("perform crm_repair_private.price_study_call(jsonb_build_object('action', 'requeue_alert', 'study_id', NEW.id), 60000);"));
   assert(trg.includes('exception when others then\n  return NEW;'),'never blocks his decision');
-  const rq=fwd.slice(fwd.indexOf('FUNCTION public.crm_price_study_requeued(uuid)'),fwd.indexOf('REVOKE ALL ON FUNCTION public.crm_price_study_requeued(uuid)'));
+  const rq=fwd.slice(fwd.indexOf('FUNCTION public.crm_price_study_requeued(p_study_id uuid)'),fwd.indexOf('REVOKE ALL ON FUNCTION public.crm_price_study_requeued(uuid)'));
   assert(rq.includes("where s.id = p_study_id and s.status = 'rejected'"));
   assert(rq.includes("and t.title ilike 'دراسة سعر%' and not coalesce(t.done, false)"));
   assert(rq.includes("where x.task_id = s.task_id and x.status <> 'cancelled' and x.version > s.version)"));
