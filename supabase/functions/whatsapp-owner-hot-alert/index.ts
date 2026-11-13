@@ -101,6 +101,9 @@ async function forwardMedia(tokens: string[], phoneId: string, to: string, m: an
   return await metaSend(tokens, phoneId, to, { type: kind, [kind]: body });
 }
 const OWNER_KINDS: Record<string, string> = { land: "أرض", villa: "فيلا", house: "بيت", building: "مبنى", apartment: "شقة", farm: "مزرعة", shop: "محل", chalet: "شاليه", rest_house: "استراحة" };
+// SQL99 (Ahmed 13 Nov 2026): the scheduled tasks «تسعير آلي: الأراضي» and «تسعير آلي: العقارات الجاهزة» price the open studies
+// from his laptop, so the report of every new study ends with this line (in the same message, no second alert).
+const LAPTOP_LINE = "افتح اللابتوب وتطبيق Claude عشان يتسعر";
 async function priceStudy(convId: string, n: number, total: number, force: boolean, queuedId = "") {
   const c = await db.from("whatsapp_conversations").select("id,company_id,client_id,route_key,customer_name,customer_phone,customer_wa_id,human_handoff_required,handoff_reason,handoff_updated_at,meta_phone_number_id,ai_summary,agent_note").eq("id", convId).maybeSingle();
   const conv: any = c.data;
@@ -155,7 +158,8 @@ async function priceStudy(convId: string, n: number, total: number, force: boole
   const results: any[] = [];
   // Ahmed 11 Nov: the parts of one client arrived mixed with the next one. WhatsApp does not keep the order of messages
   // sent back to back, so every part waits for the one before it (a pause after each, longer after a video or document).
-  const first = await metaText(tokens, phoneId, to, short(head, 3900));
+  const laptop = `\n${LAPTOP_LINE}`;
+  const first = await metaText(tokens, phoneId, to, short(head, 3900 - laptop.length) + laptop);
   results.push({ part: "details", ok: !!first.id, error: first.error });
   if (first.id) {
     await pause(3000);

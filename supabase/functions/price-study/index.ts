@@ -9,6 +9,8 @@
 //                  outside the 24-hour window an approved template asks first and the study follows the owner's answer
 //   owner_inbound  the owner answered: deliver a waiting study, or read whether the price did not suit him
 //   template       submit the template to Meta for both numbers / refresh its status
+//   unpriced_tick  SQL99: a task two counted hours old with no study handed in → Ahmed is told once to check the laptop
+//   requeue_alert  SQL99: Ahmed rejected a study → he is told it is back in the queue and to open the laptop
 // Owner net, commission and the internal report never leave the owner-only table and bucket: no message carries them.
 // Nothing goes to an owner before Ahmed's approval, and while price_study_send_mode is «test» only the runtime test numbers
 // receive anything.
@@ -454,6 +456,45 @@ async function heldTick(secret: string) {
   return out;
 }
 
+// ---------- «افتح اللابتوب» alerts (SQL99, Ahmed 13 Nov 2026) ----------
+// The scheduled tasks «تسعير آلي: الأراضي» and «تسعير آلي: العقارات الجاهزة» run on Ahmed's laptop, so a property waits while
+// the laptop is closed. Which task or study is due, the counted two hours and «once» are all decided in SQL99
+// (crm_price_study_unpriced_due, crm_price_study_requeued); here the text is only built and sent to Ahmed's own number.
+// The line added to the report of a new study is in whatsapp-owner-hot-alert. Nothing here reaches an owner.
+const LAPTOP_LINE = "افتح اللابتوب وتطبيق Claude عشان يتسعر";
+const KIND_AR: Record<string, string> = { land: "أرض", plot: "أرض", villa: "فيلا", house: "بيت", building: "مبنى", apartment: "شقة", farm: "مزرعة", shop: "محل", chalet: "شاليه", rest_house: "استراحة" };
+// the type as the owner offer has it (in Arabic), else «أرض» or «مبنى» as Claude's queue calls it; then the area
+const propertyLine = (r: any) => [KIND_AR[String(r?.kind_raw || "").trim().toLowerCase()] || String(r?.kind_raw || "").trim() || String(r?.property_kind || "").trim() || "عقار", [r?.area, r?.wilayat].filter(Boolean).join(" ، ")].filter(Boolean).join(" · ");
+// two counted hours after a task was opened and still no study handed in: once per task
+async function unpricedTick(secret: string) {
+  const q = await db.rpc("crm_price_study_unpriced_due");
+  if (q.error) return [{ error: short(q.error.message, 200) }];
+  const out: any[] = [];
+  for (const r of (q.data || []) as any[]) {
+    const told = await tellAhmed(secret, r.company_id, r.branch === "barka" ? "barka" : "muscat", [
+      "⏰ العقار لسه ما تسعّر، تأكد إن اللابتوب شغال",
+      `العقار: ${propertyLine(r)}`,
+      r.branch ? `الفرع: ${branchAr(r.branch)}` : "",
+    ].filter(Boolean).join("\n"), `price_study_unpriced:${r.task_id}`);
+    out.push({ task_id: r.task_id, told_ahmed: told.sent });
+    await pause(1500);
+  }
+  return out;
+}
+// Ahmed rejected a study (it is back in Claude's queue): the type, the area and the same line as a new study
+async function requeueAlert(studyId: string, secret: string) {
+  const q = await db.rpc("crm_price_study_requeued", { p_study_id: studyId });
+  if (q.error) return { study_id: studyId, error: short(q.error.message, 200) };
+  const r: any = (q.data || [])[0];
+  if (!r) return { study_id: studyId, skipped: "not_a_rejected_study_of_an_open_task_or_already_told" };
+  const told = await tellAhmed(secret, r.company_id, r.branch === "barka" ? "barka" : "muscat", [
+    `🔁 دراسة سعر رجعت للقائمة${r.branch ? ` · ${branchAr(r.branch)}` : ""}`,
+    `العقار: ${propertyLine(r)}`,
+    LAPTOP_LINE,
+  ].join("\n"), `price_study_requeued:${studyId}`);
+  return { study_id: studyId, told_ahmed: told.sent };
+}
+
 // ---------- the template at Meta ----------
 async function templates(action: "create" | "status", companyId: string) {
   const out: any[] = [];
@@ -511,6 +552,8 @@ Deno.serve(async (req) => {
     if (action === "send") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await sendStudy(id, "approved") }) : json({ ok: false, error: "study_id_required" }, 400); }
     if (action === "owner_inbound") { const id = uuid(body?.conversation_id); return id ? json({ ok: true, result: await ownerInbound(id, uuid(body?.message_id), secret) }) : json({ ok: false, error: "conversation_id_required" }, 400); }
     if (action === "held_tick") return json({ ok: true, results: await heldTick(secret) });
+    if (action === "unpriced_tick") return json({ ok: true, results: await unpricedTick(secret) });
+    if (action === "requeue_alert") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await requeueAlert(id, secret) }) : json({ ok: false, error: "study_id_required" }, 400); }
     if (action === "template") {
       const c = await db.from("whatsapp_automation_runtime").select("company_id").limit(1).maybeSingle();
       if (!c.data?.company_id) return json({ ok: false, error: "company_missing" }, 500);
