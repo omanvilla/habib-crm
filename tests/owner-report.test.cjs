@@ -46,6 +46,8 @@ const model=()=>fixture().context.crmOwnerReport.build({title:'TEST owner proper
 
 test('the numbers: period, totals, visits by what happened, clients counted apart',()=>{
   const m=model();
+  assert.equal(m.place,'TEST area ، TEST wilayat');
+  assert.equal(fixture().context.crmOwnerReport.build({title:'TEST',area:'بركاء الرميس',wilayat:'بركاء',created_at:'2026-10-13T08:00:00+00:00'},[],[],[],NOW).place,'بركاء الرميس','a wilayat the area already names is not repeated');
   assert.equal(m.startKind,'registered');assert.equal(m.days,31,'13 Oct to 13 Nov by the Muscat calendar');
   assert.equal(m.marketing.count,3);
   assert.deepEqual(JSON.parse(JSON.stringify(m.marketing.views)),{total:49604,known:2},'plays stand in for views; the post with no number is not a zero');

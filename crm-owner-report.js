@@ -53,7 +53,9 @@
     const channels=[];
     posts.forEach(r=>{let c=channels.find(x=>x.channel===r.channel);if(!c){c={channel:r.channel,label:r.label,rows:[]};channels.push(c);}c.rows.push(r);});
     const synced=posts.map(r=>r.synced&&Date.parse(r.synced)).filter(Boolean);
-    return {company:p.company_name||'',title:p.title||'العقار',place:[p.area,p.wilayat].map(x=>String(x||'').trim()).filter((x,i,a)=>x&&a.indexOf(x)===i).join(' ، '),
+    // «بركاء الرميس» already names the wilayat: it is not written twice
+    const area=String(p.area||'').trim(),wilayat=String(p.wilayat||'').trim();
+    return {company:p.company_name||'',title:p.title||'العقار',place:[area,area.includes(wilayat)?'':wilayat].filter(Boolean).join(' ، '),
       price:known(p.price)&&Number(p.price)>0?Number(p.price):null,rent:p.listing_purpose==='rent',
       start:start?start.toISOString():null,startKind:agreed?'agreement':'registered',today:today.toISOString(),days,
       marketing:{count:posts.length,views:sum(posts,'views'),reach:sum(posts,'reach'),interactions:sum(posts,'interactions'),
@@ -80,7 +82,7 @@
     h+='<section><h2>التسويق</h2>';
     if(!mk.count)h+='<p class="cor-empty">لا توجد منشورات مسجلة لهذا العقار حتى الآن.</p>';
     else{
-      h+='<table class="cor-lines"><tbody>'+mk.channels.map(c=>line(c.label,num(c.count)+' منشور · '+(c.views.known?num(c.views.total)+' مشاهدة':'المشاهدات '+NA))).join('')
+      h+='<table class="cor-lines"><tbody>'+mk.channels.map(c=>line(c.label,'المنشورات: '+num(c.count)+' · المشاهدات: '+(c.views.known?num(c.views.total):NA))).join('')
         +line('مجموع التفاعلات (إعجاب، تعليق، مشاركة، حفظ)',total(mk.interactions))+'</tbody></table>';
       h+='<div class="cor-wrap"><table class="cor-posts"><thead><tr><th>القناة</th><th>التاريخ</th><th>المشاهدات</th><th>الوصول</th><th>التفاعلات</th><th>الرابط</th></tr></thead><tbody>'
         +mk.posts.map(r=>'<tr><td>'+esc(r.label)+(r.event!==EVENT.publish?' · '+esc(r.event):'')+'</td><td>'+esc(day(r.published))+'</td><td>'+esc(shown(r.views))+'</td><td>'+esc(shown(r.reach))+'</td><td>'+esc(shown(r.interactions))+'</td><td>'
@@ -104,7 +106,7 @@
     if(priceText(m))out.push('السعر المعروض: '+priceText(m));
     out.push('مدة التسويق: '+period(m),'','التسويق','• منشورات وإعلانات: '+num(mk.count));
     if(mk.count){
-      mk.channels.forEach(c=>out.push('• '+c.label+': '+num(c.count)+' منشور، '+(c.views.known?num(c.views.total)+' مشاهدة':'المشاهدات '+NA)));
+      mk.channels.forEach(c=>out.push('• '+c.label+': المنشورات '+num(c.count)+'، المشاهدات '+(c.views.known?num(c.views.total):NA)));
       out.push('• مجموع المشاهدات: '+total(mk.views)+(partial(mk.views,mk.count,'المشاهدات')?' ('+partial(mk.views,mk.count,'المشاهدات')+')':''),'• مجموع التفاعلات: '+total(mk.interactions));
     }
     out.push('','العملاء والزيارات','• عملاء استفسروا عن العقار: '+num(m.clients.inbound));
