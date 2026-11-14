@@ -1240,6 +1240,36 @@ Deno.serve(async (req) => {
         out.guard_project_figure = true;
       }
     }
+    // ---- 14 Nov 2026, batch 3 ----
+    // R12: a clear call request is never answered with words: no reply, and Ahmed gets «طلب اتصال:». The one exception stays with
+    // the brain: a client who says he already tried to call and nobody answered gets the allowed sentence.
+    const CALL_ASK = /(^|\s)(اتصل|اتصلوا|دق|دقوا|رن)\s*(علي|عليي|عليّ|بي|فيني|فيي|عليه)(\s|$|[.!،,؟?])|ممكن\s*(رقمك|تتصل|اتصال)|متى\s*(تتصل|تتصلون|بتتصل)|(ابي|ابغى|ابغا|اريد|أريد|ابيك|اباك)\s*(تتصل|اتصال|احد يتصل|أحد يتصل)|(احسن|أحسن|الافضل|الأفضل)\s*(اتصل|تتصل|اتصال)/;
+    const CALL_TRIED = /(حاولت|اتصلت|دقيت|رنيت|اتصلنا)[^\n]{0,30}(ما|ولا|محد|ماحد)/;
+    const callReason = /^\s*طلب اتصال/.test(String(out.handoff_reason || ""));
+    if (CALL_ASK.test(burstSaid) && !CALL_TRIED.test(burstSaid) && !ignored && out.action !== "book_meeting"
+      && !(out.action === "handoff" && (callReason || HARD_HANDOFF.test(String(out.handoff_reason || ""))))) {
+      texts = []; out.action = "handoff"; out.handoff_reason = short(`طلب اتصال: ${out.intent || out.crm_note || "العميل طلب اتصال"}`, 300);
+      out.guard_call_request = true;
+    }
+    // R10 / R20: an owner who says the property belongs to heirs, or is mortgaged or lived in, is declined with the fixed lines and
+    // asked for nothing. Only on his own clear words (never on «ما فيه رهن» / «فاضي»), and never in a chat where the office wrote
+    // itself (the property Ahmed brought is the written exception).
+    if (out.category === "seller" && !review && !texts.some((t) => DECLINE_RE.test(t)) && out.action !== "handoff"
+      && !history.some((h: any) => h.direction === "outbound" && h.actor_type === "human")) {
+      const ownerSaid = history.filter((h: any) => h.direction === "inbound").slice(-8).map((h: any) => String(h.transcript || h.body || "")).join("\n");
+      const neg = (re: RegExp) => new RegExp(`(^|\\s)(ما|مو|مب|ماهو|مافي|بدون|لا|ولا|ليس|غير|مش)\\s*(هو\\s*|هي\\s*|في\\s*|فيه\\s*|عليه\\s*|عليها\\s*|فيها\\s*)?(${re.source})`);
+      const HEIRS = /(مال|حق|ملك|باسم|بين)\s*(ال)?ورث|(البيت|العقار|الارض|الأرض|الفيلا|المزرعة)\s*(هذا\s*|هذي\s*)?(ال)?ورث|للورث|ورثة\s*(ابو|أبو|والد|المرحوم)|تركة|تركه/;
+      const MORTGAGED = /مرهون|مرهونة|(عليه|عليها|فيه|فيها|في)\s*رهن/;
+      const OCCUPIED = /ساكنين\s*(فيه|فيها|في البيت)|(انا|أنا|احنا|نحن)\s*(ساكن|ساكنين)|مسكون|مسكونة/;
+      const says = (re: RegExp) => re.test(ownerSaid) && !neg(re).test(ownerSaid);
+      const heirs = says(HEIRS), held = says(MORTGAGED) || says(OCCUPIED);
+      if (heirs || held) {
+        texts = [heirs ? "نعتذر منك احنا ما نستلم عقارات الورثة" : "نعتذر منك احنا ما نستلم عقارات مرهونة او مسكونة", "الله يسعدك 🌷"];
+        out.action = "none"; out.guard_owner_decline = heirs ? "heirs" : "mortgaged_or_occupied";
+      }
+    }
+    // R23, measured only: a soft handoff that leaves the customer with no reply is marked, so it can be counted
+    if (out.action === "handoff" && !texts.length && !HARD_HANDOFF.test(String(out.handoff_reason || "")) && !/^\s*طلب اتصال/.test(String(out.handoff_reason || ""))) out.soft_handoff_no_reply = true;
     // Ahmed 14 Nov: «حصلت» / «اشتريت» after our «لين الحين تبحث ؟» means the search is over. No reply and no «مبروك»; the
     // client's active requests are closed further down and Ahmed gets a note in the CRM. «ما حصلت» is not that.
     let lastOutBody = "";
@@ -1334,6 +1364,8 @@ Deno.serve(async (req) => {
         const re = new RegExp(rule.auto_match_regex, "i");
         ruleAuto = texts2.length > 0 && (rule.auto_match_regex.startsWith("^") ? texts2.every((t: string) => re.test(t)) : texts2.some((t: string) => re.test(t)));
       } catch (_) { ruleAuto = false; }
+      // 14 Nov: a pinned reply never goes out over a reply a code guard just corrected (the pinned text is applied after the guards)
+      if (ruleAuto && (out.search_stopped || Object.keys(out).some((k) => k.startsWith("guard_")))) ruleAuto = false;
       // the pinned wording is sent as it is, with no link preview (the send list is rebuilt from it below)
       if (ruleAuto) out.reply_messages = String(pickedVariant[rule.id].reply).split("\n").map((t) => t.trim()).filter(Boolean).slice(0, 3);
     }

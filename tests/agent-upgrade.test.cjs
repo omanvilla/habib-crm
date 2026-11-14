@@ -245,6 +245,38 @@ test('14 Nov decisions: «حصلت» after «لين الحين تبحث ؟» clo
  assert(brain.includes('هذي الامور الافضل تطلع عليها بنفسك لما تزور المنطقة'));
  assert(brain.includes('المسموح بس (أحمد 14 نوفمبر) جملتين ثابتات'));
 });
+test('14 Nov guards, batch 3: call request (R12), owner declines (R10 / R20), a pinned reply never over a guarded reply',()=>{
+ const block=agent.slice(at('    // ---- 14 Nov 2026, batch 3 ----'),at('    // Ahmed 14 Nov: «حصلت» / «اشتريت» after our'))
+  .replace(/\((\w+): (?:string|any|RegExp)\)/g,'($1)');
+ const run=(said,o={})=>{
+  const out={action:'none',handoff_reason:null,category:'buyer',intent:'x',crm_note:'',...(o.out||{})};
+  const history=[...(o.before||[]),...[].concat(said).map((b)=>({direction:'inbound',body:b}))];
+  return new Function('out','texts','history','burstSaid','ignored','HARD_HANDOFF','DECLINE_RE','short','review',block+'\nreturn {out,texts};')
+   (out,o.texts||['تمام'],history,[].concat(said).join(' '),false,re('HARD_HANDOFF'),re('DECLINE_RE'),(s)=>String(s),false);
+ };
+ // R12
+ for(const said of ['ممكن تتصل علي','اتصل علي لو سمحت','ممكن رقمك','متى تتصلون','ابي احد يتصل','احسن اتصل']){
+  const r=run(said);assert.deepEqual(r.texts,[],said);assert.equal(r.out.action,'handoff',said);assert.match(r.out.handoff_reason,/^طلب اتصال:/,said);}
+ let r=run('حاولت اتصل فيك وما رديت');assert.deepEqual(r.texts,['تمام'],'the allowed sentence stays with the brain');
+ r=run('اتصلت على المالك امس');assert.equal(r.out.guard_call_request,undefined);
+ r=run('كلمني عن البيت');assert.equal(r.out.guard_call_request,undefined,'«كلمني عن» is not a call request');
+ r=run('اتصل علي',{out:{action:'handoff',handoff_reason:'تفاوض: يبي آخر سعر'}});assert.equal(r.out.handoff_reason,'تفاوض: يبي آخر سعر');
+ // R10 / R20: only the owner's own clear words
+ const S={out:{category:'seller'},texts:['ارسل الكروكي اذا ما عليك امر']};
+ r=run('البيت مال ورثة',S);assert.deepEqual(r.texts,['نعتذر منك احنا ما نستلم عقارات الورثة','الله يسعدك 🌷']);assert.equal(r.out.guard_owner_decline,'heirs');
+ r=run('البيت مرهون للبنك',S);assert.deepEqual(r.texts,['نعتذر منك احنا ما نستلم عقارات مرهونة او مسكونة','الله يسعدك 🌷']);
+ r=run('احنا ساكنين فيه بس ممكن تنسيق للزيارة',S);assert.equal(r.out.guard_owner_decline,'mortgaged_or_occupied');
+ for(const said of ['لا ما فيه رهن والبيت فاضي','مو مرهون','بدون رهن','البيت مو مال ورثة','ما في رهن'])
+  {r=run(said,S);assert.equal(r.out.guard_owner_decline,undefined,said);assert.deepEqual(r.texts,S.texts,said);}
+ r=run('البيت مرهون',{...S,before:[{direction:'outbound',actor_type:'human',body:'متفقين مع صاحبه'}]});
+ assert.equal(r.out.guard_owner_decline,undefined,'a chat the office wrote in is left alone (the property Ahmed brought)');
+ r=run('البيت مرهون',{out:{category:'buyer'},texts:['تمام']});assert.equal(r.out.guard_owner_decline,undefined,'a buyer talking about his own mortgage is not an owner');
+ r=run('البيت مرهون',{...S,texts:['نعتذر منك احنا ما نستلم عقارات مرهونة او مسكونة']});assert.equal(r.out.guard_owner_decline,undefined,'already declined by the model');
+ // R23 is only measured
+ r=run('طيب',{out:{action:'handoff',handoff_reason:'يبي يعرف موعد التسليم'},texts:[]});assert.equal(r.out.soft_handoff_no_reply,true);
+ // the pinned reply
+ assert.match(agent,/if \(ruleAuto && \(out\.search_stopped \|\| Object\.keys\(out\)\.some\(\(k\) => k\.startsWith\("guard_"\)\)\)\) ruleAuto = false;/);
+});
 test('R48: the visit watcher books no new visit from the other branch number, and book_viewing counts as serving',()=>{
  assert.match(agent,/select\("id,type,area,price,bedrooms,land_size,listing_purpose,branch_key"\)/);
  assert.match(agent,/cv\.data!\.route_key !== prop\.branch_key\) return \{ \.\.\.out, applied: false, why: "other_branch" \}/);
