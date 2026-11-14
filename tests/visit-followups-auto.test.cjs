@@ -227,6 +227,9 @@ test('R60 / R63 / R64: refused area, valuation raise and owner contact are held 
  assert.equal(r.text,'السلام عليكم بخصوص طلبك شقة في الخوير لين الحين تبحث ؟');assert.equal(r.auto_ok,false);assert.equal(r.guard,'guard_unsure_answer');assert(r.reason.startsWith('(R41)'));
  r=notesGuard(o({text:'السلام عليكم ما عندنا سبب مؤكد لانخفاض الايجار متى يناسبك تزور ؟'}),false,'','',[], '','');assert.equal(r.decision,'skip');assert.equal(r.text,null);
  r=notesGuard(o({text:'السلام عليكم عندنا شقة في الخوير تحب ارسلك تفاصيلها ؟'}),false,'','',[], '','x');assert.equal(r.guard,undefined);
+ // seen in the dry run of 14 Nov: «ما عندنا تفاصيل مكتوبة عن السبب ونقدر نوضح لك من المالك»
+ r=notesGuard(o({text:'السلام عليكم بخصوص سؤالك عن سبب انخفاض الإيجار ما عندنا تفاصيل مكتوبة عن السبب متى يناسبك تزور البيت ؟'}),false,'','',[], '','بخصوص طلبك بيت الحيل الجنوبية لين الحين تبحث ؟');
+ assert.equal(r.guard,'guard_unsure_answer');assert.equal(r.text,'السلام عليكم بخصوص طلبك بيت الحيل الجنوبية لين الحين تبحث ؟');
  assert(fn.includes('notesGuard(out, group, clientSaid, officeSaid, refusedAreas, offerLabel, kind === "request"'));
  assert(fn.includes('- الموقع ما ناسبه (R60')&&fn.includes('- رفع التثمين (R63')&&fn.includes('- رقم صاحب العقار (R64'));
 });

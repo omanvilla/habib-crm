@@ -326,7 +326,7 @@ const R60_PLACE = /موقع|بعيد|المنطقه|منطقه/;
 const refusedPlace = (v: any) => v?.status === "done" && (String(v.rejection_reason || "") === "location" || ((v.liked === false || String(v.client_feedback || "") === "disliked") && R60_PLACE.test(normAr(`${v.rejection_reason || ""} ${v.outcome_note || ""}`))));
 const R64_OWNER = /\[contacts\]|(تواصل|نسق|تنسق|كلم)\s*(مع\s*)?(المالك|صاحب العقار|صاحب البيت)/;
 const R64_WHEN = /متي\s*يناسبك(م)?\s*(تزور|تشوف|تعاين|نزور)/;
-const R41_UNSURE = /ما\s*(عندي|عندنا|معي|معنا)\s*(تاكيد|معلومه|سبب|جواب|علم)|مو\s*متاكد|ما\s*ادري|ما\s*اعرف|غير\s*مؤكد/;
+const R41_UNSURE = /ما\s*(عندي|عندنا|معي|معنا)\s*(تاكيد|معلومه|معلومات|تفاصيل|سبب|جواب|علم)|مو\s*متاكد|ما\s*ادري|ما\s*اعرف|غير\s*مؤكد/;
 function notesGuard(out: any, group: boolean, clientSaid: string, officeSaid: string, refusedAreas: string[], offerLabel: string, fallback = "") {
   if (out.decision !== "skip" && R63_VALUATION.test(normAr(String(clientSaid || "").split("\n").slice(-12).join("\n")))) {
     out.reason = short(`(R63) موضوعه رفع التثمين عشان يغطي قرضه الشخصي وهذا ما عندنا، ما يحتاج متابعة. ${out.reason || ""}`, 300);
