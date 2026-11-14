@@ -70,7 +70,7 @@ test('the look and the versions',()=>{
   for(const f of ['crm-wa-buttons.js','crm-wa-buttons.css'])assert(index.includes(f+'?v=20261114-note2'),f);
   // seen in the signed-in browser on 14 Nov: a sixth action made the visits table's fixed actions column cover the status
   // column on a medium screen, so there the table keeps its five actions
-  assert(/@media \(min-width:641px\) and \(max-width:1400px\)\{[^@]*#page-viewings \.crm-grid \.crm-grid-actions \.crm-wa-note\{display:none!important\}/.test(css));
+  assert(/@media \(min-width:641px\) and \(max-width:1400px\)\{[^@]*#page-viewings td\.crm-grid-actions \.crm-wa-note\{display:none!important\}/.test(css));
   // and «النظام» on a deal card did nothing (the card stops the click): the pair listens in the capture phase too
   assert(wa.includes("if(crm){e.preventDefault();e.stopPropagation();window.crmOpenCrmChat(")&&wa.includes("if(ph){e.preventDefault();e.stopPropagation();ph.disabled=true;")&&/\n  \},true\);\n\}\)\(\);\s*$/.test(wa));
   assert(/crm-owner-home\.js\?v=20261114-/.test(index));
