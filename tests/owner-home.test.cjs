@@ -22,9 +22,33 @@ test('the old dashboard is never painted for the owner before the home (boot gat
  assert.match(css,/html\.coh-boot #page-dash:not\(\.coh-on\)>\*\{display:none!important\}/);
  assert.match(js,/if\(hasHome\(\)&&!last\)armGate\(\);else if\(!hasHome\(\)\)releaseGate\(\);/);
  assert.match(js,/timer:setTimeout\(releaseGate,8000\)/,'the gate never holds the page longer than 8 s');
- assert.match(js,/\}finally\{if\(seq===sequence\)releaseGate\(\);\}/,'the gate opens after the first load whatever its result');
+ assert.match(js,/\}finally\{if\(seq===sequence&&\(ok\|\|!retryLater\(\)\)\)releaseGate\(\);\}/,'the gate opens after the first load; a failed one is retried and the 8 s timer still opens it');
  const ops=fs.readFileSync('crm-operations-v6.js','utf8');
  assert.equal((ops.match(/if\(window\.crmHomeFirst\)\{await window\.crmHomeFirst;/g)||[]).length,2,'old dashboard reads wait for the home');
+});
+// 14 Nov 2026 (Ahmed, signed in as staff, saw the old dashboard): two causes, both held here.
+test('a failed first load of the home is read again by itself, a bounded number of times',()=>{
+ const body=js.slice(js.indexOf('function retryLater(){'),js.indexOf('function render(){'));
+ assert(body.includes('if(last||!hasHome()||retries>=10)return false;'),'never after a success, never without end');
+ assert(body.includes("retryTimer=setTimeout(()=>{if(!last&&hasHome())load().catch(()=>{});},[2000,4000,8000][retries]||15000);"));
+ assert(js.includes('ok=true;retries=0;clearTimeout(retryTimer);'),'a success stops the retries');
+ // the retry logic itself, run as plain JS
+ let last=null,retries=0,retryTimer=null,calls=[];const hasHome=()=>true,load=()=>Promise.resolve();
+ const setTimeout=(f,ms)=>{calls.push(ms);return calls.length;},clearTimeout=()=>{};
+ const retryLater=eval('('+body.slice(0,body.lastIndexOf('}')+1)+')');
+ for(let i=0;i<12;i++)retryLater();
+ assert.deepEqual(calls,[2000,4000,8000,15000,15000,15000,15000,15000,15000,15000]);
+ assert.equal(retryLater(),false);
+});
+test('the app starting before the modules arrived still gets the home (empty cache after a publication)',()=>{
+ assert(index.includes(`h=h.replace('<html lang="ar" dir="rtl">','<html lang="ar" dir="rtl" class="coh-boot">');`),'the old dashboard is hidden from the first paint');
+ assert(fs.readFileSync('app-base-v15.html','utf8').includes('<html lang="ar" dir="rtl">'),'the tag index.html replaces is there');
+ assert(js.includes("if(appOpen()){if(hasHome())armGate();else releaseGate();}"),'the gate gets its 8 s timer even when applyRoleVisibility ran before this file');
+ const tail=index.slice(index.indexOf('window.APP_VERSION='));
+ assert(tail.includes('if(a&&a.classList.contains("visible")&&typeof loadDashboard==="function")loadDashboard();'),'every wrapper of loadDashboard gets its first run');
+ assert(tail.includes('if(!window.crmOwnerHomeRefresh)document.documentElement.classList.remove("coh-boot")'),'a missing home file never leaves the page blank');
+ assert(index.indexOf('crm-visit-key.js?v=')<index.indexOf('window.APP_VERSION='),'that call is the last script');
+ assert(!/<\/script>/.test(tail.split("document.open()")[0].replace(/<\\\/script>/g,'')),'closing tags stay escaped inside the boot text');
 });
 test('visits without a result stay one tap away (owner decision 6 Nov: the AI records them)',()=>{
  assert(js.includes('زيارات يتابعها الذكاء الاصطناعي')&&js.includes('data-kind="visits"'));

@@ -282,7 +282,7 @@
   async function load(){
     const page=byId('page-dash'),box=mount();if(!page||!box){releaseGate();return;}
     if(!hasHome()||typeof supa==='undefined'){box.hidden=true;page.classList.remove('coh-on');releaseGate();return;}
-    const seq=++sequence,owner=isOwner();
+    const seq=++sequence,owner=isOwner();let ok=false;
     try{
       // The follow-up count is read together with the rest (it is lighter), so its tile is there on the first draw.
       const fu=typeof window.crmFollowupsRefresh==='function'?Promise.race([window.crmFollowupsRefresh(),new Promise(r=>setTimeout(r,1500))]):null;
@@ -297,13 +297,26 @@
       usage=[];
       if(pz&&!pz.error&&pz.data)paused=pz.data;
       if(home.error||!home.data){if(!last){box.hidden=true;page.classList.remove('coh-on');}return;}
+      ok=true;retries=0;clearTimeout(retryTimer);
       last={data:home.data,pending:pending||0,twins:twinGroups&&!twinGroups.error?twinGroups.data:[]};
       render();
       box.hidden=false;page.classList.add('coh-on');
       // after the first draw, so the home never waits for it
       readAutoNotes().then(list=>{if(seq!==sequence||list==null)return;autoNotes=list;drawAuto();});
       supa.rpc('crm_whatsapp_usage').then(r=>{if(seq!==sequence||!r||r.error)return;usage=r.data||[];drawUsage();});
-    }finally{if(seq===sequence)releaseGate();}
+    }finally{if(seq===sequence&&(ok||!retryLater()))releaseGate();}
+  }
+  /* 14 Nov 2026 (Ahmed, signed in as staff: «يفتحلي الصفحه كذا»): the database restarted at 16:04, the first read of the
+   * home failed and the old dashboard stayed until the page was reloaded by hand. A failed first load is now read again
+   * by itself (after 2, 4 and 8 seconds, then every 15 seconds, about two minutes in all). The gate keeps its placeholder
+   * while a retry is waiting, never longer than its own 8 seconds; after that the old page shows and the home replaces
+   * it as soon as a read succeeds. */
+  let retries=0,retryTimer=null;
+  function retryLater(){
+    if(last||!hasHome()||retries>=10)return false;
+    clearTimeout(retryTimer);
+    retryTimer=setTimeout(()=>{if(!last&&hasHome())load().catch(()=>{});},[2000,4000,8000][retries]||15000);
+    retries++;return true;
   }
   function render(){
     if(!last)return;
@@ -390,4 +403,13 @@
   window.crmOwnerHomeRefresh=()=>load().catch(()=>{});
   const loadDash=window.loadDashboard;
   if(typeof loadDash==='function')window.loadDashboard=function(){const r=loadDash.apply(this,arguments);window.crmOwnerHomeRefresh();return r;};
+  /* 14 Nov 2026: the app starts (init() in the base page) while these files are still arriving. With an empty cache
+   * (first visit after a publication) the account, applyRoleVisibility and the first loadDashboard could all finish
+   * before this file was there to wrap them: no gate, no load, and the old dashboard stayed for the whole visit.
+   * index.html now writes the page with .coh-boot already on <html> (the old dashboard is never painted first), this
+   * file arms the gate itself when the app is already open, and the last script of index.html calls loadDashboard once
+   * more in that case, so every module that wraps it gets its first run. An account with no home role gives the class
+   * back at once. */
+  const appOpen=()=>{const a=byId('appScreen');return !!(a&&a.classList.contains('visible'));};
+  if(appOpen()){if(hasHome())armGate();else releaseGate();}
 })();

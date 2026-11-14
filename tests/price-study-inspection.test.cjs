@@ -72,7 +72,7 @@ test('the screen: the box on cards whose task is open and inside the task window
   assert(ui.includes("<p class=\"cps-private\">داخلية للمكتب، ما توصل للمالك</p>"));
   assert(home.includes("if(sheetKind==='studies'){if(typeof window.crmPriceStudiesDraw==='function')window.crmPriceStudiesDraw(body);"));
   assert(index.includes('crm-price-studies.css?v=20261112-insp1')&&index.includes('crm-price-studies.js?v=20261114-ps1'));
-  assert(index.includes('crm-owner-home.js?v=20261114-ps1'),'crm-owner-home.js moved on with R40, then SQL102');
+  assert(index.includes('crm-owner-home.js?v=20261114-boot1'),'crm-owner-home.js moved on with R40, then SQL102');
 });
 test('«أعد الدراسة بعد المعاينة» only while the study waits for approval, through the existing rejection',()=>{
   assert(ui.includes("+(open?'<div class=\"cps-restudy\"><button type=\"button\" class=\"btn-secondary\" data-cps=\"restudy\" data-id=\"'+id+'\">أعد الدراسة بعد المعاينة</button>'"));
