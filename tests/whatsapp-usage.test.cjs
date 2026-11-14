@@ -42,7 +42,7 @@ test('the home page draws the card after the first draw and escapes what it show
   h=draw([{route_key:'muscat',used:850,free_limit:1000,blocked:false}]);assert(h.includes('قرّب يخلص المجاني'));
   h=draw([{route_key:'owner',used:5,free_limit:1000}]);assert.equal(h,'','only the two branch numbers');
   assert.equal(draw([]),'');
-  assert.match(read('index.html'),/crm-owner-home\.js\?v=20261114-use1/);
+  assert.match(read('index.html'),/crm-owner-home\.js\?v=20261114-note1/);
 });
 test('the agent does not read its own undelivered messages as said to the customer (14 Nov, 131042)',()=>{
   const agent=read('supabase/functions/whatsapp-reply-agent/index.ts');

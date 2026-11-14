@@ -33,7 +33,10 @@
     const phoneBtn=link?'<a class="'+cls+' crm-wa-phone" href="'+esc(link)+'"'+(/^https:/.test(link)?' target="_blank"':'')+' rel="noopener noreferrer"'+tip('phone')+'>'+text('phone')+'</a>'
       :(conv||client)?'<button type="button" class="'+cls+' crm-wa-phone" data-wa-phone="1"'+data+tip('phone')+'>'+text('phone')+'</button>':'';
     const crmBtn=(conv||client||byPhone)?'<button type="button" class="'+cls+' crm-wa-crm" data-wa-crm="1"'+data+tip('crm')+'>'+text('crm')+'</button>':'';
-    return phoneBtn+crmBtn;
+    // R58 (14 Nov 2026, Ahmed: «يكون بالمرة موجود في كل مكان»): «ملاحظة لـ Claude» beside the pair, for the owner and staff
+    // (crm-claude-note.js). note:false where the place has its own note button with more context.
+    const noteBtn=o.note!==false&&typeof window.crmClaudeNoteBtn==='function'?window.crmClaudeNoteBtn({conv:conv,client:client,phone:o.phone,name:o.name,small:small,cls:extra.filter(c=>c!=='crm-wa-small').join(' ')}):'';
+    return phoneBtn+crmBtn+noteBtn;
   };
   function closeSheets(){const x=document.querySelector('#cohSheet:not([hidden]) .coh-sheet-x');if(x)x.click();}
   async function latestChat(clientId){

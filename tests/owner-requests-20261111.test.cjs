@@ -29,12 +29,13 @@ test('voice note: bin while recording, delete after, ➤ while recording sends',
 // Ahmed, 11 Nov 2026 (evening): «كمّل يا عقل» makes the agent read the chat and carry on now; price studies stay with him.
 test('resume: owner home asks the agent to carry on, pricing rows have no resume, every row has a Claude note',()=>{
  assert.match(home,/waInboxInvoke\(\{action:'clear_handoff',conversation_id:id,resume:true\}\)/);
- // R27 (11 Nov): staff resume too; price studies are never theirs, notes for Claude stay the owner's
+ // R27 (11 Nov): staff resume too; price studies are never theirs (notes for Claude were the owner's until R58)
  // SQL94: a chat whose study already went to the owner sits with the other paused chats; staff still get no resume on it
  assert(home.includes(`(pricing||!canResume()||(!isOwner()&&isStudyChat(i))?'':'<button type="button" class="btn-primary coh-go" data-coh="presume"`));
  // 11 Nov (later): staff see price studies too («حتى دراسة تسعير اريد تظهر للموظف»); still no resume on them
  assert(home.includes("const pricingItems=()=>canResume()?paused.items.filter(isPricing):[];"));
- assert(home.includes(`(isOwner()?'<button type="button" class="btn-secondary coh-go" data-coh="pnote"`));
+ // R58 (14 Nov): the note for Claude is the staff's too, so the button is no longer behind isOwner()
+ assert(home.includes(`+'<button type="button" class="btn-secondary coh-go" data-coh="pnote"`)&&!home.includes(`isOwner()?'<button type="button" class="btn-secondary coh-go" data-coh="pnote"`));
  assert.match(home,/data-coh="pnote"/);assert.match(home,/window\.crmClaudeNote\(\{conversation_id:b\.dataset\.id/);
  assert(home.includes('العقل ما قدر يكمل: '),'a failed resume tells Ahmed why and the chat stays in his list');
 });

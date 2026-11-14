@@ -8,7 +8,7 @@ test('crmWaButtons gives «فتح في واتساب الجوال» and «فتح 
  const k=ctx.window.crmWaButtons({clientId:'x'});
  assert(k.includes('data-wa-phone="1"')&&k.includes('data-client="x"'),'no number at hand: looked up on tap');
  assert.equal(ctx.window.crmWaButtons({}),'');
- assert(index.includes('crm-wa-buttons.js?v=20261112-wa3"><'+String.fromCharCode(92)+'/script>'),'loaded inside the boot script with an escaped closing tag');
+ assert(index.includes('crm-wa-buttons.js?v=20261114-note1"><'+String.fromCharCode(92)+'/script>'),'loaded inside the boot script with an escaped closing tag');
 });
 // 12 Nov 2026 (Ahmed: «ما جاي مرتب»): one look for the two buttons everywhere, and nothing cut on the narrow deal cards
 test('the two buttons carry their own look, not the page button classes',()=>{
@@ -23,7 +23,7 @@ test('the two buttons carry their own look, not the page button classes',()=>{
  assert(s.includes('title="فتح في النظام"')&&s.includes('>النظام</button>'));
  assert(css.includes('.crm-wa-btn{')&&css.includes('white-space:nowrap')&&css.includes('.crm-wa-phone{')&&css.includes('.crm-wa-crm{')&&css.includes('.crm-wa-sm{'));
  assert(css.includes('.crm-wa-deal{flex-wrap:wrap}'),'on a narrow deal card the second button goes under the first, never cut');
- assert(index.includes('<link rel="stylesheet" href="crm-wa-buttons.css?v=20261112-wa5">'));
+ assert(index.includes('<link rel="stylesheet" href="crm-wa-buttons.css?v=20261114-note1">'));
 });
 // 12 Nov 2026 (Ahmed: «نعم حوّلها»): the old single «واتساب» link in the visits and owners tables is the same pair
 test('visits and owners tables: the two buttons; an owner chat is found by the number',()=>{
@@ -51,7 +51,7 @@ test('the same two buttons in the follow-ups, the chat header, the waiting list 
  assert(chat.includes('<a class="crm-wa-btn crm-wa-phone" data-for="'));
  assert(ip.includes('<li class="ip-wait-row"><div class="ip-wait-info">')&&ip.includes('</div><div class="ip-wait-actions">'),'the name no longer breaks letter by letter beside the buttons');
  assert(base.includes("window.crmWaPhoneLink(c.phone_normalized||c.phone)")&&base.includes('<button type="button" class="crm-wa-btn crm-wa-crm" onclick="openClientWhatsAppHistory()">فتح في النظام</button>'),'client file: phone WhatsApp beside the CRM chat');
- assert(/crm-whatsapp-chat\.js\?v=20261114-ogg1/.test(index)&&/crm-followups-today\.js\?v=20261112-wa2/.test(index));
+ assert(/crm-whatsapp-chat\.js\?v=20261114-ogg1/.test(index)&&/crm-followups-today\.js\?v=20261114-note1/.test(index));
 });
 test('the two buttons are used on every chat button',()=>{
  for(const f of ['crm-hot-alerts.js','crm-owner-home.js','crm-owner-leads.js','crm-reply-approvals.js','crm-investment-projects.js'])assert(fs.readFileSync(f,'utf8').includes('crmWaButtons'),f);

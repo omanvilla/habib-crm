@@ -132,11 +132,11 @@
       +(i.last_message?'<small class="coh-note">آخر رسالة منه: <span dir="auto">'+esc(i.last_message)+'</span></small>':'')
       +(i.summary?'<small class="coh-note">'+esc(i.summary)+'</small>':'')+'</div>'
       // 11 Nov 2026 (Ahmed): the phone's WhatsApp and the CRM chat, side by side (crm-wa-buttons.js)
-      +'<div class="coh-paused-actions">'+(typeof window.crmWaButtons==='function'?window.crmWaButtons({phone:i.phone,conversationId:i.conversation_id,clientId:i.client_id,cls:'btn-secondary coh-go'})
+      +'<div class="coh-paused-actions">'+(typeof window.crmWaButtons==='function'?window.crmWaButtons({phone:i.phone,conversationId:i.conversation_id,clientId:i.client_id,cls:'btn-secondary coh-go',note:false})
         :'<button type="button" class="btn-secondary coh-go" data-coh="popen" data-id="'+esc(i.conversation_id)+'">افتح المحادثة</button>')
       // 11 Nov (Ahmed): a price study always stays with him, so no «كمّل يا عقل» there; every row can carry a note for Claude
-      // notes for Claude are the owner's lessons (crm_owner_notes), so staff do not get that button
-      +(isOwner()?'<button type="button" class="btn-secondary coh-go" data-coh="pnote" data-id="'+esc(i.conversation_id)+'" data-name="'+esc(i.name||'')+'">ملاحظة لـ Claude</button>':'')
+      // R58 (14 Nov, Ahmed): staff get the note button too, the same as his (this row's own button carries the pause reason)
+      +'<button type="button" class="btn-secondary coh-go" data-coh="pnote" data-id="'+esc(i.conversation_id)+'" data-name="'+esc(i.name||'')+'">ملاحظة لـ Claude</button>'
       +(pricing||!canResume()||(!isOwner()&&isStudyChat(i))?'':'<button type="button" class="btn-primary coh-go" data-coh="presume" data-id="'+esc(i.conversation_id)+'">كمّل يا عقل</button>')
       // R40: «تجاهل نهائي» = no reply and no follow-up ever, and the chat leaves this list
       +(pricing||!canResume()||isStudyChat(i)?'':'<button type="button" class="btn-secondary coh-go coh-ignore" data-coh="pignore" data-id="'+esc(i.conversation_id)+'">تجاهل نهائي</button>')

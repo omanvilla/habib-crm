@@ -24,7 +24,7 @@ test('the home page draws for staff from crm_staff_home and keeps the owner-only
  assert(js.includes("supa.rpc('crm_owner_home')"));
  assert(js.includes("(isOwner()?'<button type=\"button\" class=\"coh-more\" data-coh=\"nav\" data-nav=\"reports\">التقارير الكاملة</button>':'')"),'reports (money) stay owner-only');
  assert(js.includes('if(!owner){paused={items:[],total:0};autoNotes=[];}'),'a staff session never shows the owner\'s lists left in the tab');
- assert(/crm-owner-home\.js\?v=20261114-use1/.test(index));
+ assert(/crm-owner-home\.js\?v=20261114-note1/.test(index));
 });
 test('a staff account is greeted by its own name; the branch stays under the name (Ahmed 11 Nov)',()=>{
  const base=fs.readFileSync('app-base-v15.html','utf8');
@@ -50,7 +50,7 @@ test('staff follow everyone like the owner, never the owner line (SQL85)',()=>{
  assert(s85.includes("WHERE v_owner OR (public.my_role() IN ('manager','agent','viewer') AND i.route_key IS DISTINCT FROM 'owner')"));
  assert(s85.includes('CASE WHEN v_owner THEN i.owner_instruction END'),'the owner instructions stay his');
  assert(!s85.includes('staff_is_branch_member'));
- assert(/crm-followups-today\.js\?v=20261112-wa2/.test(index));
+ assert(/crm-followups-today\.js\?v=20261114-note1/.test(index));
 });
 test('a follow-up naming a property that left the market goes back to review (SQL86)',()=>{
  const s=fs.readFileSync('db/changes/86-followups-reread-unavailable.forward.sql','utf8');
