@@ -6,6 +6,16 @@ Updated 2026-11-14. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 14 November 2026 — agent guards, batch 1: rules that were words only are held by code — **published**
+
+- **What Ahmed asked.** «ليش العقل كل مرة يغلط … لازم نشوف حل، ما على كل مرة نعدل نفس الاشياء», then «نعم، ابدأ» twice (the inventory, then the first batch) and «نعم، ادمج».
+- **The inventory (read only).** Of R1 to R48: 3 fully held by code (R1, R5, R29), 21 partly, 10 words in `brain.ts` only (R4, R10, R15, R18, R20, R22, R32, R34, R42, R44), 14 process / data. 27 of the 31 partly or words-only rules have an absolute part code can check. The brain also holds written tensions (thanks, «مبروك» after «حصل», «المالك» / «صاحب العقار», several wordings for «ما عندي جواب», promise wordings, a pinned reply applied after most filters).
+- **Batch 1** (`whatsapp-reply-agent/index.ts` only, no rule text changed, `brain.ts` untouched, no prompt sync; each guard marks `analysis.guard_*`): R16 (a client who saw the property is never told «شوف العقار أول»; `SAID_VISITED` knows «مشيت شفت» / «مريت عليه»), R24 (withdrawn is «حالياً ما متوفره», not «انباع»), R34 (photo promise or offer removed; an empty reply becomes «السموحة ما عندنا صور» + «عندنا الفيديو بس», wording by Claude from the rule, told to Ahmed), R44 (two banned questions removed, «حي عاصم» written «الرميس»), R9 / R22 (a short line naming a project on the Barka number is removed whatever the category; the ad and «قريب من …» lines are left), R48 (the visit watcher books no new visit from the other branch number; `book_viewing` counts as serving). Details in `docs/agent-rules.md` under the rules table.
+- **Checked.** CI green on `48b9b37` (two new tests in `tests/agent-upgrade.test.cjs`, the guard block is run with cases). Inline dry run on the dry-run copy pinned to `48b9b37`, 27 real messages (20 latest chats and 7 chats where these mistakes had happened): all 200, replies as before, **no guard fired** because the model did not repeat the mistakes in that run; the guards are proven by the unit tests only.
+- **Live.** `main` at `48b9b37`; `whatsapp-reply-agent` v66 → `48b9b37` (was `65ceec7`); dry-run copy v27 → `48b9b37`.
+- **Still open from the inventory.** R18 (project figures on the Muscat number), R2 (a discount answered before a visit with no handoff), R42, R23, R11 (location before a time), R45 / R30 / R12, R10 / R20, the pinned reply order, and the written tensions, which wait for Ahmed one by one. How often each rule was really broken in past chats was not measured.
+- **Rollback.** Pin `whatsapp-reply-agent` back to `65ceec7`.
+
 ## 14 November 2026 — R48: a property of the other branch is not served on this number (code guard) — **published**
 
 - **What Ahmed said.** A customer wrote to the Muscat number about a Barka property (the Somhan villa, chat `42b53d11`) and the agent answered him there with the location and a visit; it should have sent him to the Barka number. «شوف ايش الخلل أو التعارض وصلحه».
