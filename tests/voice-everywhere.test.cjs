@@ -6,12 +6,12 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const read=p=>fs.readFileSync(p,'utf8').replace(/\r\n/g,'\n');
 const voice=read('crm-voice-input.js'),base=read('app-base-v15.html'),index=read('index.html'),fn=read('supabase/functions/crm-voice-transcribe/index.ts');
 const modules=['crm-claude-note.js','crm-deal-workflow.js','crm-quick-visit.js','crm-rented-units.js','crm-investment-projects.js','crm-reply-approvals.js',
-  'crm-followups-today.js','crm-followup-variants.js','crm-property-archive.js','crm-owner-home.js','crm-price-studies.js'].map(read).join('\n');
+  'crm-followups-today.js','crm-followup-variants.js','crm-property-archive.js','crm-owner-home.js','crm-price-studies.js','crm-visit-key.js'].map(read).join('\n');
 const all=base+'\n'+modules+'\n'+voice;
 const boxes=vm.runInNewContext(voice.match(/const BOXES=\[[\s\S]*?\]\.join\(','\);/)[0]+';BOXES').split(',');
 
 test('every free-text box of the CRM is on the list, and every id on the list is a real box',()=>{
-  const ids=['cnText','cNotes','aText','ifNote','crmAskTextBox','pDesc','pPublicDetails','pRentedUnitsText','pdDecisionNote','pmNotes','piRejectNotes','piLastMessage','piFollowupNote',
+  const ids=['cnText','cNotes','aText','ifNote','crmAskTextBox','pDesc','pPublicDetails','pRentedUnitsText','pVisitInstructions','pdDecisionNote','pmNotes','piRejectNotes','piLastMessage','piFollowupNote',
     'vOwnerNote','vOutcomeNote','vNotes','cqvNote','dLostReasonNote','dNotes','dwLostWords','dwNotes','dpLegalNotes','dpNotes','tNotes','evNotes','oNotes','exNotes','waMsgArea','ipNotes'];
   for(const id of ids){assert(boxes.includes('#'+id),id+' has the button');assert(new RegExp('<textarea[^>]*\\bid="'+id+'"').test(all),id+' is a text box in the source');}
   assert.deepEqual(boxes.filter(b=>b.startsWith('#')).map(b=>b.slice(1)).sort(),ids.slice().sort(),'no id on the list that is not checked here');
@@ -62,6 +62,6 @@ test('the follow-up reason is asked in a window that can hold the button, with t
   assert(base.includes(":prompt(reasonText);if(!reason||!reason.trim()||viewingClient!==client)return;"),'the client on screen must still be the one asked about');
   assert(voice.includes('window.crmAskText=function(o){'));
   assert(voice.includes("document.body.append(m);attach(box);box.focus();"));
-  for(const f of ['crm-voice-input.js','crm-reply-approvals.css'])assert(index.includes(f+'?v=20261112-voice2'),f);
+  assert(index.includes('crm-reply-approvals.css?v=20261112-voice2')&&index.includes('crm-voice-input.js?v=20261114-vk1'));
   assert(index.includes('app-base-v15.html?v=20261114-util1'),'the base page moved on with the WhatsApp buttons of 12 Nov');
 });

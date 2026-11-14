@@ -19,7 +19,7 @@
   const BOXES=[
     '#cnText','.rp-instr-text','.cfu-instr-text','textarea[data-insp-note]','textarea[data-cps-note]','textarea[data-cps-msg]', // notes for Claude, AI instructions, price studies
     '#cNotes','#aText','#ifNote','#crmAskTextBox',                                             // client: notes, activity, follow-up result, reason asked in a window
-    '#pDesc','#pPublicDetails','#pRentedUnitsText','#pdDecisionNote','#pmNotes','.cpa-field textarea', // property: description, public details, rented units, decision, marketing, archive note
+    '#pDesc','#pPublicDetails','#pRentedUnitsText','#pVisitInstructions','#pdDecisionNote','#pmNotes','.cpa-field textarea', // property: description, public details, rented units, visit instructions, decision, marketing, archive note
     '#piRejectNotes','#piLastMessage','#piFollowupNote',                                       // property inquiry
     '#vOwnerNote','#vOutcomeNote','#vNotes','#cqvNote',                                        // visits
     '#dLostReasonNote','#dNotes','#dwLostWords','#dwNotes','#dpLegalNotes','#dpNotes',         // deals and deposits: the button only, the forms are unchanged
