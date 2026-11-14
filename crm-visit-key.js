@@ -124,34 +124,56 @@
     const used=(Array.isArray(photos)?photos:[]).some(x=>typeof x==='string'?x.includes(path):(x&&(x.path===path||String(x.url||'').includes(path))));
     return used?null:path;
   }
+  const pause=ms=>new Promise(r=>setTimeout(r,ms));
+  // one row, one update; a busy database right after the property's own save gets a second and a third try
+  async function write(id,patch){
+    let last=null;
+    for(let i=0;i<3;i++){
+      if(i)await pause(1500);
+      const r=await supa.from('properties').update(patch).eq('id',id).select('id');
+      if(!r.error){if(!(r.data||[]).length)throw new Error('العقار ما انحفظ أو حسابك ما يقدر يعدله');return;}
+      last=r.error;
+    }
+    throw last;
+  }
+  async function upload(snap){
+    const cid=await ensureCompany();let last=null;
+    for(let i=0;i<3;i++){
+      if(i)await pause(1500);
+      const path=cid+'/'+snap.id+'/'+crmNewId()+'.'+IMAGE_EXT[snap.file.type];
+      const up=await supa.storage.from(BUCKET).upload(path,snap.file,{contentType:snap.file.type,cacheControl:'3600',upsert:false});
+      if(!up.error)return path;
+      last=up.error;
+    }
+    throw new Error(last&&last.message||'تعذر الرفع');
+  }
   async function persist(snap){
-    let uploaded=null;
+    const text=Object.keys(snap.changes).length>0;let textSaved=false,uploaded=null;
     try{
-      const patch=Object.assign({},snap.changes);
-      if(snap.file){
-        const cid=await ensureCompany();
-        const path=cid+'/'+snap.id+'/'+crmNewId()+'.'+IMAGE_EXT[snap.file.type];
-        const up=await supa.storage.from(BUCKET).upload(path,snap.file,{contentType:snap.file.type,cacheControl:'3600',upsert:false});
-        if(up.error)throw new Error('ما انرفعت صورة الصندوق: '+up.error.message);
-        uploaded=path;
-        const pub=supa.storage.from(BUCKET).getPublicUrl(path);
-        patch.lockbox_image_url=httpsUrl(pub.data&&pub.data.publicUrl)||null;
-        if(!patch.lockbox_image_url)throw new Error('رابط الصورة غير صالح');
-      }else if(snap.remove)patch.lockbox_image_url=null;
-      const r=await supa.from('properties').update(patch).eq('id',snap.id).select('id');
-      if(r.error)throw r.error;
-      if(!(r.data||[]).length)throw new Error('العقار ما انحفظ أو حسابك ما يقدر يعدله');
-      uploaded=null;
-      if('lockbox_image_url' in patch&&snap.old&&snap.old!==patch.lockbox_image_url){
-        const gone=ownPath(snap.old,snap);
-        if(gone)try{await supa.storage.from(BUCKET).remove([gone]);}catch(_e){}
+      // the method and the instructions first, so a photo that fails never loses what was typed
+      if(text){await write(snap.id,snap.changes);textSaved=true;}
+      if(snap.file||snap.remove){
+        const patch={};
+        if(snap.file){
+          uploaded=await upload(snap);
+          const pub=supa.storage.from(BUCKET).getPublicUrl(uploaded);
+          patch.lockbox_image_url=httpsUrl(pub.data&&pub.data.publicUrl)||null;
+          if(!patch.lockbox_image_url)throw new Error('رابط الصورة غير صالح');
+        }else patch.lockbox_image_url=null;
+        await write(snap.id,patch);
+        uploaded=null;
+        if(snap.old&&snap.old!==patch.lockbox_image_url){
+          const gone=ownPath(snap.old,snap);
+          if(gone)try{await supa.storage.from(BUCKET).remove([gone]);}catch(_e){}
+        }
       }
       toast('انحفظت بيانات الزيارة والمفتاح','success');
-      if(window.viewingProperty&&window.viewingProperty.id===snap.id)detail();
     }catch(e){
       if(uploaded)try{await supa.storage.from(BUCKET).remove([uploaded]);}catch(_e){}
-      toast('انحفظ العقار، لكن تعذر حفظ الزيارة والمفتاح: '+(e&&e.message||e),'error');
+      const why=(e&&e.message||e);
+      toast(textSaved?'انحفظت طريقة الزيارة والتعليمات، لكن صورة الصندوق ما انحفظت: '+why+'. افتح العقار وارفعها مرة ثانية':'انحفظ العقار، لكن تعذر حفظ الزيارة والمفتاح: '+why+'. افتح العقار وعدلها مرة ثانية','error');
     }
+    if(window.viewingProperty&&window.viewingProperty.id===snap.id)detail().catch(()=>{});
   }
 
   // ---- the property page ---------------------------------------------------------------------------

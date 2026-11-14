@@ -9,7 +9,7 @@ const cut=(from,to)=>vk.slice(vk.indexOf(from),vk.indexOf(to,vk.indexOf(from)));
 
 test('the module is loaded by the page, after the property modules, with the closing tag escaped',()=>{
   new vm.Script(vk);
-  assert(index.includes('<script src="crm-calls-meetings.js?v=20261114-ccm1"><\\/script><script src="crm-visit-key.js?v=20261114-vk1"><\\/script><script>window.APP_VERSION='));
+  assert(index.includes('<script src="crm-calls-meetings.js?v=20261114-ccm1"><\\/script><script src="crm-visit-key.js?v=20261114-vk2"><\\/script><script>window.APP_VERSION='));
   assert.match(index,/crm-voice-input\.js\?v=20261114-vk1/);
   assert.equal(index.split('</script>').length-1,1,'only the page\'s own closing tag is unescaped');
 });
@@ -30,7 +30,8 @@ test('nothing existing is changed: the columns are written only when the person 
   assert(vk.includes("if(snap&&modal&&!modal.classList.contains('on'))await persist(snap);"),'only after the property\'s own save closed the window');
   assert(vk.includes("if(r.error||!r.data){note('تعذر تحميل بيانات الزيارة لهذا العقار؛ ما راح يتغير فيها شي."));
   assert.equal((vk.match(/\.update\(/g)||[]).length,1);
-  assert(vk.includes("supa.from('properties').update(patch).eq('id',snap.id).select('id');"));
+  assert(vk.includes("supa.from('properties').update(patch).eq('id',id).select('id');"));
+  assert(vk.includes("if(text){await write(snap.id,snap.changes);textSaved=true;}"),'what was typed is saved before the photo is tried');
   assert(!/\.(insert|upsert|delete|rpc)\(/.test(vk),'one row, one update, nothing else');
   // the patch can only hold the three columns
   assert.deepEqual([...new Set([...vk.matchAll(/(?:changes|patch)\.([a-z_]+)=/g)].map(m=>m[1]))].sort(),['lockbox_image_url','visit_instructions','visit_method']);
@@ -39,7 +40,7 @@ test('the key box photo goes where the property photos go, and replacing it neve
   assert(vk.includes("const BUCKET='property-images'")&&vk.includes("const path=cid+'/'+snap.id+'/'+crmNewId()+'.'+IMAGE_EXT[snap.file.type];"),'the path the storage policy accepts');
   assert(vk.includes("upload(path,snap.file,{contentType:snap.file.type,cacheControl:'3600',upsert:false})"));
   assert(vk.includes("if(uploaded)try{await supa.storage.from(BUCKET).remove([uploaded]);}catch(_e){}"),'a photo whose save failed is not left behind');
-  const ownPath=new Function('BUCKET','PUBLIC_MARK',cut('  function ownPath(','  async function persist(')+';return ownPath;')('property-images','/storage/v1/object/public/property-images/');
+  const ownPath=new Function('BUCKET','PUBLIC_MARK',cut('  function ownPath(','  const pause=')+';return ownPath;')('property-images','/storage/v1/object/public/property-images/');
   const url=p=>'https://x.supabase.co/storage/v1/object/public/property-images/'+p;
   assert.equal(ownPath(url('co/p1/a.jpg'),{id:'p1',images:null}),'co/p1/a.jpg');
   assert.equal(ownPath(url('co/p2/a.jpg'),{id:'p1',images:null}),null,'another property');
@@ -84,4 +85,20 @@ test('each function of the page is wrapped once',()=>{
   assert(vk.includes("const done={edit:false,open:false,save:false,page:false};"));
   for(const k of ['edit','open','save','page'])assert(new RegExp("if\\(!done\\."+k+"&&typeof window\\.[A-Za-z]+==='function'\\)\\{\\n      const orig=window\\.[A-Za-z]+;done\\."+k+"=true;").test(vk),k);
   assert(vk.includes("if(!hook()){const timer=setInterval(()=>{if(hook())clearInterval(timer);},500);}"));
+});
+test('the save in use for the property form sends every box the form shows (found 14 Nov: four boxes were never saved)',()=>{
+  // crm-v17-patch.js replaces the base saveProperty; unit name, price after the visit, electricity and water were only in the base one
+  const save=v17.slice(v17.indexOf('window.saveProperty=async function(){'),v17.indexOf('var oldOpen=window.openModal;'));
+  assert(save.includes("unit_label:el('pUnitLabel')?el('pUnitLabel').value.trim()||null:null,"));
+  assert(save.includes("price_negotiable:el('pPriceNego')?(el('pPriceNego').value||null):null,"));
+  assert(save.includes("electricity_connected:el('pElectricity')?(el('pElectricity').value||null):null,water_connected:el('pWater')?(el('pWater').value||null):null,"));
+  for(const id of ['pUnitLabel','pPriceNego','pElectricity','pWater'])assert(base.includes('id="'+id+'"')&&base.includes("$('"+id+"').value=p."),id+' is on the form and filled when a property is opened');
+  assert.match(index,/crm-v17-patch\.js\?v=20261114-save1/);
+});
+test('saving an existing property never clears its owner because the owner list was empty on screen (found 14 Nov)',()=>{
+  // the list of owners is filled a few seconds after the page opens; a save before that sent owner_id null
+  const save=v17.slice(v17.indexOf('window.saveProperty=async function(){'),v17.indexOf('var oldOpen=window.openModal;'));
+  assert(save.includes("if(window.editingProperty&&!ownerId)delete data.owner_id;"));
+  assert(save.indexOf("delete data.owner_id;")<save.indexOf("crmDataFrom('properties').update(data)"),'before the row is written');
+  assert(save.includes("if(!window.editingProperty&&!ownerId)throw new Error('اختر المالك أو أضف مالكاً');"),'a new property still needs its owner');
 });
