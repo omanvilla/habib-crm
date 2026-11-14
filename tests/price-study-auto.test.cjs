@@ -130,7 +130,8 @@ test('R37: a declined property (heirs, mortgaged, occupied) closes its owner off
   assert(agent.includes('if (!review && out.action === "handoff" && /^دراسة سعر/.test(String(out.handoff_reason || "")) && !out.reply_messages.some((t: string) => DECLINE_RE.test(t))) {'));
   const why=(reply,said)=>{const mortgaged=/مرهون|رهن/.test(said),occupied=/مسكون|ساكن|مستأجر|مأجر|مؤجر/.test(said);
     return /ورث|ترك[ةه]/.test(reply)?'ورثة':mortgaged&&occupied?'مرهون ومسكون':mortgaged?'مرهون':occupied?'مسكون':'مرهون أو مسكون';};
-  assert(agent.includes('const why = /ورث|ترك[ةه]/.test(reply) ? "ورثة" : mortgaged && occupied ? "مرهون ومسكون" : mortgaged ? "مرهون" : occupied ? "مسكون" : "مرهون أو مسكون";'));
+  // R56 (14 Nov): the apology for a property outside Muscat and Barka is a decline too, with its own reason
+  assert(agent.includes('const why = OUT_OF_AREA_SAID.test(reply) ? "خارج مسقط وبركاء" : /ورث|ترك[ةه]/.test(reply) ? "ورثة" : mortgaged && occupied ? "مرهون ومسكون" : mortgaged ? "مرهون" : occupied ? "مسكون" : "مرهون أو مسكون";'));
   assert.equal(why('نعتذر منك احنا ما نستلم عقارات الورثة',''),'ورثة');
   assert.equal(why('نعتذر منك احنا ما نستلم عقارات مرهونة او مسكونة','البيت عليه رهن للبنك'),'مرهون');
   assert.equal(why('نعتذر منك احنا ما نستلم عقارات مرهونة او مسكونة','ساكنين فيه الحين'),'مسكون');
