@@ -1,10 +1,41 @@
 # Habib CRM — current state
 
-Updated 2026-11-13. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
+Updated 2026-11-14. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
 > **Date note.** The sections headed «12 November 2026» below (and «12 Nov» / «12 نوفمبر» in R32–R35, SQL90/91 comments, file
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
+
+## 14 November 2026 — R45 meetings, R46 keys, R47 every visit asked, staff lists, call log, daily visits message (SQL100)
+
+- **What Ahmed asked** (five changes, then three more the same morning). Decisions he took in the chat: a meeting request gets
+  **no reply**, the agent stops and he answers (R45); the confirmation goes from a button where he can change the time; the
+  agent keeps inviting investors but never asks or sets a time; the key question comes after the full details and after
+  «فاضي وبدون رهن» (R46); after a visit the question goes to everyone except: opinion already said, sold / withdrawn,
+  negotiation (R47). Rules R45–R47 are in `docs/agent-rules.md`.
+- **Done without code.** (1) The «دراسة سعر» of the Shakhakhit South villa (94k, task `31c82b4b`) is closed: the waiting study
+  `2a143f37` is `cancelled` (nothing reaches the owner), the task done, the owner offer `closed` with the reason. The chat
+  handoff was left as it is (Ahmed's). (2) Scheduled task «رسالة زيارات اليوم» (cloud, Sun and Mon 06:30 Muscat): reads the
+  day's events in the «مبيعات» calendar, matches each owner by phone with the CRM (owner offers, properties, the last location
+  the owner sent, visit method), and sends one header plus one message per stop to Ahmed's own WhatsApp through
+  `notify_owner` (`event_key` `daily_visits:<date>:<n>`, once a day, in order, other branch number if one fails).
+- **SQL100** (`db/changes/100-meetings-keys-visits-calls.forward.sql`, md5 check on the replaced body): `owner_leads.visit_method`
+  / `visit_instructions`; `crm_fast_visit_candidates` without the open-handoff / staff-typed / client-wrote / later-visit
+  exclusions and anchored on the visit time (only a muted chat or a negotiation handoff hold it); `crm_visits_unasked(day)`;
+  `crm_log_call(...)` and `crm_calls_today()`.
+- **Agent** (`whatsapp-reply-agent`): `HARD_HANDOFF` includes «اجتماع»; `MEETING_ASK` turns any meeting / «طلب موعد» request into
+  a silent «اجتماع: الاسم المكان التاريخ الوقت الموضوع (ينتظر تأكيدك)»; owner_offer has `visit_method` / `visit_instructions`,
+  saved on the offer and on the owner's property when its way in is empty. `brain.ts` 66,8xx characters (ceiling 70,000).
+- **Follow-ups** (`whatsapp-visit-followup-auto`): after a visit `sendOne` holds back only for a muted chat or negotiation; the
+  review text names the three exceptions. **Hot alert**: the meeting line now says the agent did not answer and points to the
+  button.
+- **Front end** `crm-calls-meetings.js/.css` (`?v=20261114-ccm1`): «📞 سجّل اتصال n/20» on the client screen (chips: who,
+  result, next step, short note), «أكّد الموعد» in a meeting task's details (day, hour, place, editable message, sends through
+  `crmSendWhatsApp`, then the task is done), «👀 معاينات أمس بدون متابعة من العقل» above «متابعة اليوم».
+- **Checked.** Unit tests (780 pass; the one red «calendar list groups…» is red on `main` too, date-dependent, not touched).
+  SQL100 run from the committed file inside rolled-back transactions on the live database: candidates 1, the staff list for 12
+  Nov returned 2 rows with their reasons, a call logged as the Barka staff account counted 1/20, the same key replays.
+- **Not checked yet**: see the publish notes below this line when they are added.
 
 ## 13 November 2026 (night) — the property report for its owner: on the screen first, then PDF / WhatsApp text / Excel — **published, merged into `main`**
 
