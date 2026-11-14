@@ -252,8 +252,10 @@ const schema = {
         price: { type: ["number", "null"] }, land_size: { type: ["number", "null"] }, built_size: { type: ["number", "null"] },
         // R46 (Ahmed 14 Nov): how we get in when Ahmed comes to inspect (open / key in a lockbox / the owner or someone opens)
         visit_method: { type: ["string", "null"], enum: ["open", "lockbox", "office", null] }, visit_instructions: { type: ["string", "null"] },
+        // SQL101 (Ahmed 14 Nov): the owner's answer about electricity and water, asked once with the key question
+        electricity: { type: ["string", "null"], enum: ["yes", "no", null] }, water: { type: ["string", "null"], enum: ["yes", "no", null] },
       },
-      required: ["kind", "area", "wilayat", "price", "land_size", "built_size", "visit_method", "visit_instructions"],
+      required: ["kind", "area", "wilayat", "price", "land_size", "built_size", "visit_method", "visit_instructions", "electricity", "water"],
     }] },
     request: { anyOf: [{ type: "null" }, {
       type: "object", additionalProperties: false,
@@ -339,7 +341,9 @@ function propLine(p: any) {
   const rented = p.rented_units ? ` | المؤجر حالياً: ${p.rented_units}` : "";
   // R42 (Ahmed 12 Nov): a fixed price is answered after the visit; negotiable or not set goes to Ahmed (R16)
   const nego = p.listing_purpose === "rent" ? "" : p.price_negotiable === "fixed" ? " | السعر: ثابت" : p.price_negotiable === "negotiable" ? " | السعر: قابل للتفاوض" : " | السعر: ما حدده أحمد";
-  return `- id=${p.id} | ${name} | ${bits}${terms}${rented}${nego} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? " | اللوكيشن متوفر (action=send_location)" : " | اللوكيشن غير متوفر"} | الفرع: ${p.branch_key === "muscat" ? "مسقط (رقم 71770030)" : p.branch_key === "barka" ? "بركاء (رقم 92344273)" : "غير محدد"}${p.video ? ` | رابط الفيديو (ترسله إذا طلب فيديو): ${p.video}` : ""}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}${p.marketing ? `\n  وصف الإعلان: ${short(p.marketing, 1600)}` : ""}`;
+  // SQL101 / R52 (Ahmed 14 Nov): electricity and water, said only when the office or the owner recorded them
+  const util = `${p.electricity_connected === "yes" ? " | الكهرباء: موصلة" : p.electricity_connected === "no" ? " | الكهرباء: غير موصلة" : ""}${p.water_connected === "yes" ? " | الماء: موصل" : p.water_connected === "no" ? " | الماء: غير موصل" : ""}`;
+  return `- id=${p.id} | ${name} | ${bits}${terms}${rented}${nego}${util} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? " | اللوكيشن متوفر (action=send_location)" : " | اللوكيشن غير متوفر"} | الفرع: ${p.branch_key === "muscat" ? "مسقط (رقم 71770030)" : p.branch_key === "barka" ? "بركاء (رقم 92344273)" : "غير محدد"}${p.video ? ` | رابط الفيديو (ترسله إذا طلب فيديو): ${p.video}` : ""}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}${p.marketing ? `\n  وصف الإعلان: ${short(p.marketing, 1600)}` : ""}`;
 }
 // The same neutral label (type, area, price) for visits, deals and properties no longer available: never the office title
 function neutralLabel(p: any) {
@@ -634,7 +638,7 @@ Deno.serve(async (req) => {
     const [histR, propsR, rulesR, priorR] = await Promise.all([
       db.from("whatsapp_messages").select("id,direction,message_type,body,transcript,media_id,actor_type,message_timestamp,matched_property_id,property_link_key,property_image_analysis,referral:raw_payload->referral")
         .eq("conversation_id", conv.id).lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(60),
-      db.from("properties").select("id,title,internal_name,type,area,wilayat,price,bedrooms,bathrooms,land_size,built_size,listing_purpose,public_details,description,map_url,visit_method,visit_instructions,lockbox_image_url,owner_id,branch_key,rental_terms,rented_units,price_negotiable")
+      db.from("properties").select("id,title,internal_name,type,area,wilayat,price,bedrooms,bathrooms,land_size,built_size,listing_purpose,public_details,description,map_url,visit_method,visit_instructions,lockbox_image_url,owner_id,branch_key,rental_terms,rented_units,price_negotiable,electricity_connected,water_connected")
         .eq("company_id", msg.company_id).eq("status", "available").eq("archived", false),
       db.from("whatsapp_reply_rules").select("id,situation,approved_reply,category,auto_send,auto_match_regex").eq("company_id", msg.company_id).eq("active", true).order("created_at", { ascending: false }).limit(40),
       db.from("whatsapp_reply_drafts").select("analysis,status").eq("conversation_id", conv.id).in("status", ["sent", "approved", "edited"]),
@@ -1371,9 +1375,21 @@ Deno.serve(async (req) => {
         // R46: the owner's answer to «المفتاح وين يكون ؟» is kept on the offer (SQL100 columns) and never wiped by a later empty answer
         if (o.visit_method && ["open", "lockbox", "office"].includes(o.visit_method)) row.visit_method = o.visit_method;
         if (String(o.visit_instructions || "").trim()) row.visit_instructions = short(o.visit_instructions, 300);
+        // SQL101: electricity and water as the owner said them; an empty answer never wipes a saved one
+        if (["yes", "no"].includes(o.electricity)) row.electricity_connected = o.electricity;
+        if (["yes", "no"].includes(o.water)) row.water_connected = o.water;
         if ((ex.data || []).length) await db.from("owner_leads").update(row).eq("id", ex.data![0].id);
         else await db.from("owner_leads").insert({ ...row, company_id: msg.company_id, client_id: client.id, conversation_id: conv.id });
         await db.rpc("crm_match_owner_leads");
+        // SQL101: a property of this owner already in the CRM takes the electricity / water answer where the office left it empty
+        if (row.electricity_connected || row.water_connected) {
+          const ow2 = await db.from("owners").select("id,phone").eq("company_id", msg.company_id).limit(2000);
+          const ids2 = (ow2.data || []).filter((x: any) => digits(x.phone).slice(-8) && digits(x.phone).slice(-8) === to.slice(-8)).map((x: any) => x.id);
+          if (ids2.length) {
+            if (row.electricity_connected) await db.from("properties").update({ electricity_connected: row.electricity_connected }).in("owner_id", ids2).eq("archived", false).is("electricity_connected", null);
+            if (row.water_connected) await db.from("properties").update({ water_connected: row.water_connected }).in("owner_id", ids2).eq("archived", false).is("water_connected", null);
+          }
+        }
         // R46: a property of this owner already in the CRM without a way in gets the same answer (never over what the office wrote)
         if (row.visit_method || row.visit_instructions) {
           const ow = await db.from("owners").select("id,phone").eq("company_id", msg.company_id).limit(2000);

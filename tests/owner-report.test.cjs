@@ -152,7 +152,7 @@ test('loaded after the operations module, printed alone, and the button no longe
   assert(index.includes('crm-owner-report.js?v=20261113-rep1'+close),'inside the boot script with an escaped closing tag');
   assert(index.indexOf('crm-owner-report.js?v=')>index.indexOf('crm-operations-v6.js?v='),'after crmResetOperations exists');
   assert(index.includes('<link rel="stylesheet" href="crm-owner-report.css?v=20261113-rep1">'));
-  assert(index.includes('app-base-v15.html?v=20261113-rep1')&&index.includes('crm-operations-v6.js?v=20261113-rep1'));
+  assert(index.includes('app-base-v15.html?v=20261114-util1')&&index.includes('crm-operations-v6.js?v=20261113-rep1'));
   assert(base.includes('onclick="exportPropertyOwnerReport()">📤 تقرير المالك</button>')&&!base.includes('تقرير المالك CSV'));
   assert(css.includes('body.cor-printing>*:not(#crmOwnerReport){display:none!important}')&&css.includes('body.cor-printing .cor-bar,body.cor-printing .cor-hint{display:none!important}'));
   assert(!/fetch\(|whatsapp-send|functions\/v1/.test(source),'the module sends nothing anywhere');

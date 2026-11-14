@@ -41,5 +41,5 @@ test('R42: the price can be fixed or negotiable; the agent reads it and the form
   assert(agent.includes('p.price_negotiable === "fixed" ? " | السعر: ثابت"'));
   assert(brain.includes('"بالنسبة للسعر نعم ثابت لهذه [الفيلا / البيت / الشقة / الأرض]"'));
   assert(base.includes('id="pPriceNego"')&&base.includes("price_negotiable:$('pPriceNego')?($('pPriceNego').value||null):null,"));
-  assert(base.includes('"relisted_at", "unit_label", "price_negotiable"]')&&base.includes('relisted_at,unit_label,price_negotiable"'));
+  assert(base.includes('"relisted_at", "unit_label", "price_negotiable", "electricity_connected", "water_connected"]')&&base.includes('relisted_at,unit_label,price_negotiable,electricity_connected,water_connected"'));
 });
