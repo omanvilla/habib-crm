@@ -26,3 +26,18 @@ test('R35: investors are followed up, not skipped; subject fills the template; R
   assert(fn.includes('.eq("template_name", "request_followup_ar_v2")'));
   assert(fn.includes('لا تعد بصور أبداً ولا تسأل "أرسل لك الصور ؟"'));
 });
+// SQL105 / R65 (14 Nov 2026, note a4f6f4dc): a question about ownership for a foreigner belongs to the investors lane.
+test('SQL105 adds foreign ownership to the investors lane, guarded and mirrored',()=>{
+  const f5=fs.readFileSync('db/changes/105-followup-lane-foreign-ownership.forward.sql','utf8');
+  const r5=fs.readFileSync('db/changes/105-followup-lane-foreign-ownership.rollback.sql','utf8');
+  assert.equal(f5,fs.readFileSync('supabase/migrations/20261114180000_followup_lane_foreign_ownership_20261114.sql','utf8'));
+  assert(f5.includes('SQL105 (')&&f5.includes("'71de97d313d9c8dd21efe767a7a78d12'"),'refuses a followup_lane changed since SQL91');
+  const oldList="c_old constant text := 'تملك حر|التملك الحر|';";
+  assert(f5.includes(oldList)&&r5.includes(oldList)&&fwd.includes('تملك حر|التملك الحر|إقامة'),'the SQL91 list is the one replaced');
+  const m=f5.match(/c_new constant text := '([^']+)';/);assert(m);assert(r5.includes(m[0]),'the rollback takes out exactly what was added');
+  // the added words, as the JS engine reads the same pattern (Postgres \s = JS \s here)
+  const added=new RegExp(m[1].replace('تملك حر|التملك الحر|','').replace(/\|$/,''));
+  for(const s of ['سأل عن تملك الأجنبي والمواقع','هلا بخصوص تملك لاجنبي','تملك الاجانب','شقة للأجانب','لغير العمانيين'])assert(added.test(s),s);
+  for(const s of ['بيت الحيل الجنوبية','شقة في المعبيلة','متى يناسبك تزور'])assert(!added.test(s),s);
+  assert(f5.includes('EXECUTE replace(v_def, c_old, c_new);')&&r5.includes('EXECUTE replace(v_def, c_new, c_old);'));
+});

@@ -96,7 +96,7 @@ const REVIEW_RULES = `أنت تراجع متابعة عميل لمكتب عقا�
 - متابعة بعد زيارة لعقار مكتوب جنبه "(انباع)" أو "(انحجز)" أو "(ما عاد متوفر)" (R44، أحمد 12 نوفمبر: أمير الرحبي وعبدالله الحارثي): skip. لا تسأله "كيف شفت" عن عقار انباع، رسالة «انحجز/انباع» الجماعية هي اللي توصله. وكذلك أي عميل موضوعه مع أحمد خلص (زار وسأل السعر النهائي ورد عليه أحمد، أو مشتري جاد) وانباع العقار: skip.
 - "مشيت شفته" أو "رحت شفته" أو "مريت عليه" أو "شفته" = زار وشاف العقار (R44، مازن). إذا بعدها سأل "في عندك بيوت ثانية ؟" أو "غيره ؟" فهو visited_no_fit: لا تسأله عن انطباعه، اعرض الأقرب من القائمة غير اللي شافه (offer_no)، وإذا ما عرفنا وش يبي subject = "بيت ثاني في [المنطقة]".
 - إذا تواصلنا معه أكثر من مرة في نفس الموضوع وما رد (حتى لو من أشهر): skip، ولا تكتب له مرة ثانية. نفس الحال في أي متابعة ثانية بنفس الوضع، بدون ما ينتظر أحمد.
-- مواضيع الاستثمار والمشاريع (مدينة السلطان هيثم، وادي زها، الآيكونيك، عايدة، اليزن، المستحقين، التملك الحر، الإقامة) (R35، أحمد 12 نوفمبر): ما تنترك، لها قائمة المستثمرين على رقم مسقط. المتابعة تكمل موضوعه: الأرقام المكتوبة في المعرفة بس (R18)، والعزيمة لاجتماع مع المطور في مكتبه (الأهلي صبور في العذيبة، دار جلوبال عند دار الأوبرا لعايدة) (R33). ممنوع أسئلة الاستبيان مثل "الشراء عندك للسكن ولا للاستثمار ؟" و"تفضل تبحث عن فيلا مستقلة ولا نوع ثاني". العمل بعد الشراء: skip.
+- مواضيع الاستثمار والمشاريع (مدينة السلطان هيثم، وادي زها، الآيكونيك، عايدة، اليزن، المستحقين، التملك الحر، تملك الأجنبي أو غير العماني (R65)، الإقامة) (R35، أحمد 12 نوفمبر): ما تنترك، لها قائمة المستثمرين على رقم مسقط. المتابعة تكمل موضوعه: الأرقام المكتوبة في المعرفة بس (R18)، والعزيمة لاجتماع مع المطور في مكتبه (الأهلي صبور في العذيبة، دار جلوبال عند دار الأوبرا لعايدة) (R33). ممنوع أسئلة الاستبيان مثل "الشراء عندك للسكن ولا للاستثمار ؟" و"تفضل تبحث عن فيلا مستقلة ولا نوع ثاني". العمل بعد الشراء: skip.
 - التبادل (عقار بعقار): skip، الموضوع غير مناسب.
 - ممنوع أي كلمة إنجليزية أو رمز برمجي (مثل twin_villa أو villa أو apartment) في النص لعميل يكتب بالعربي. اكتب العقار بالاسم اللي يعرفه العميل بالعربي (مثل "فيلا الشخاخيط") وبدون ذكر نوع غريب.
 - إذا ما في محادثة مسجلة للعميل (سجل قديم أو نموذج من الموقع وما كلمنا): decision=skip وreason "عميل بدون محادثة واتساب، يحتاج اتصال منك" بدون نص.
@@ -110,6 +110,11 @@ const REVIEW_RULES = `أنت تراجع متابعة عميل لمكتب عقا�
 - الموقع ما ناسبه (R60، ملاحظة 14 نوفمبر): عميل زار عقار وقال موقعه بعيد أو المنطقة ما تناسبه = ما تناسبه كل عقاراتنا في نفس المنطقة. لا تعرض عليه عقار ثاني في نفس المنطقة ولا "عندنا فيلا ثانية في ..." نفسها، حتى لو اللي شافه انباع. إذا في القائمة شي في منطقة ثانية يقارب طلبه اعرضه، وإلا wait_for_match.
 - رفع التثمين (R63، ملاحظة 14 نوفمبر): عميل موضوعه يدور أحد يرفع له التثمين أو تثمين عالي يغطي قرضه الشخصي: هذا ما عندنا. skip، بدون متابعة عقارية وبدون "لين الحين تبحث".
 - رقم صاحب العقار (R64، ملاحظة 14 نوفمبر): إذا المكتب أرسل له رقم صاحب العقار أو جهة الاتصال أو قال له "تواصل مع المالك مباشرة للزيارة"، الزيارة صارت بينه وبين المالك: لا تسأله "متى يناسبك تزور ؟". اسأله هل قدر يزور العقار، بالاسم.
+- عرض بركاء على عميل رقم مسقط (R66، أحمد 14 نوفمبر، يعدّل R22): حدد المنطقة اللي يبحث فيها أول. "اذا تقبل بركاء عندنا ..." بس لمن قال إنه يبحث في المعبيلة أو منطقة قريبة من بركاء. اللي يبحث في منطقة ثانية من مسقط (خاصة بميزانية عالية): wait_for_match، ننتظر له شي في مسقط قريب من ميزانيته. وإذا ما قال المنطقة: اسأله "في أي منطقة تبحث ؟".
+- سؤال عن السوق (R67، ملاحظة 14 نوفمبر): عميل آخر كلامه سؤال عام عن السوق (ليش الإيجارات أو الأسعار منخفضة أو مرتفعة في المنطقة، وش السبب) يحتاج دراسة سوق: skip، بدون "متى يناسبك تزور" وبدون "لين الحين تبحث".
+- ما رد على تأكيد الموعد (R68، أحمد 14 نوفمبر، يعدّل R39): عميل أرسلنا له "نأكد موعد زيارة ..." وما رد بعدها بأي شي وما في زيارة مسجلة تمت: ما زار وما هو مهتم. skip، لا "كيف شفت" ولا "تحب نحدد موعد ثاني".
+- لغة العميل (R69، أحمد 14 نوفمبر): إذا مكتوب تحت "العميل يكتب بالإنجليزي" اكتب text كله بالإنجليزي البسيط، يبدأ بـ "Hello" وبدون "السلام عليكم"، سطر أو سطرين وسؤال واحد ينتهي بـ "?". reason و subject يبقون بالعربي.
+- جاوب سؤاله (R70، ملاحظة 14 نوفمبر): عميل سأل سؤال وما وصله جواب، وجوابه مكتوب قدامك (تفاصيل العقار، أو "معرفة المشاريع" إذا موجودة تحت: أرقامها بس، R18): text يجاوب سؤاله أول وبعدها سؤال واحد يكمل. المتابعة ما تسأل "اسمك الكريم ؟" أبداً.
 
 وضع العميل (R39، أحمد 12 نوفمبر): قبل القرار اقرأ "ملف العميل من النظام" (زياراته وصفقاته وطلباته) مع المحادثة كاملة، وحدد في stage وين وصل. كل عميل ياخذ رسالة على حسب وضعه، مو نفس الرسالة للكل، واللي جاوب على سؤال ما ينعاد عليه:
 - asked_no_visit: سأل وما زار. (القواعد فوق: "متى يناسبك تزور ؟" إذا ما سألناه، وسكوته بعد التفاصيل جواب.)
@@ -249,27 +254,45 @@ async function review(item: any, companyId: string, available: string, fixed: st
   try { const bh = await db.rpc("crm_client_behavior_text", { p_client: item.client_id }); if (!bh.error && bh.data) behavior = String(bh.data); } catch (_) { /* optional */ }
   let other = "";
   for (const c of others.data || []) other += `\nمحادثته على رقم ${c.route_key === "barka" ? "بركاء" : "مسقط"}:\n${await chatOf(c.id, 12)}\n`;
+  // the client's own lines and the office's, for the code guards in judge() (removed there, never stored)
+  const clientLines = saidBy(chat, "العميل");
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
+  // R69: a client who writes in English only is answered in English
+  const english = writesEnglish(clientLines);
+  // R70 / R18: the project facts Ahmed wrote, only when the chat is about a project
+  const facts = PROJECT_TALK.test(normAr(`${about} ${fixed} ${chat}`)) ? await projectKnowledge() : "";
   const ai = await fetch("https://api.openai.com/v1/responses", {
     method: "POST", headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: OPENAI_MODEL, store: false, reasoning: { effort: "low" }, instructions: REVIEW_RULES.replace("{fixed}", fixed),
-      input: `تاريخ اليوم: ${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date())}\nسبب وجوده في القائمة: ${about}\nالاسم المسجل من الواتساب، يفيد بس لمعرفة إذا امرأة: ${person.data?.name || "غير معروف"}\nرقمنا اللي نتابع منه: ${item.route_key === "barka" ? "بركاء" : "مسقط"}${behavior ? `\n\n${behavior}\n(المتجوّل ما نتابعه بنفس الأسلوب: اسأله وش يبحث بالضبط. الساخن أولوية. البارد متابعة متباعدة. غير المعقول طلبه: لا تتابع.)` : ""}${file ? `\n\n${file}` : ""}${learnt ? `\n\nدروس من صاحب المكتب من أوامر سابقة (طبقها إذا الموقف مشابه):\n${learnt}` : ""}${instruction ? `\n\nالنص الحالي للمتابعة (اللي يشوفه أحمد الحين): ${current || "لا يوجد"}\n\nأمر صاحب المكتب على هذي المتابعة (أهم من أي قاعدة فوق): ${instruction}\nكيف تفهم الأمر: أحمد يتكلم بلهجته وأحياناً بالصوت، فالأمر ممكن يجي غير مرتب. افهم قصده الحقيقي، ولا تنقل كلامه حرفياً ولا تلصقه في الرسالة. غالباً هو تصحيح للنص الحالي: (1) "بدل X اكتب Y" أو "لا تكتب X" يعني غيّر هذا الجزء بس وخل باقي النص مثل ما هو. (2) "لا تقول كذا قل كذا" يعني استبدل المعنى. (3) قاعدة عامة (مثل: لا تكتب كلمات إنجليزية لعميل عربي) طبقها على هذي الرسالة وعلى أي كلمة إنجليزية فيها. (4) تغيير الهدف (مثل: اسأله متى يناسبه يزور) اكتب النص من جديد. الناتج رسالة مرتبة بلهجة المكتب وبنفس القواعد الثابتة، مو نسخة من كلام أحمد. إذا يقول إن المتابعة ما لها داعي قرارك skip. لا تخالف الممنوعات ولا تكتب معلومة مو مكتوبة قدامك، وإذا يقول وش انقال في رسالة صوتية صدقه. في reason اكتب بسطر وش فهمت منه وش غيرت.` : ""}\n\nالعقارات المتاحة الآن:\n${available || "لا يوجد"}${groups ? `\n\nوحدات انحجزت ولها وحدة متاحة من نفس المجموعة (R38):\n${groups}` : ""}\n\nالمحادثة:\n${chat || "ما في محادثة مسجلة"}\n${other}`,
+      input: `تاريخ اليوم: ${today}\nسبب وجوده في القائمة: ${about}\nالاسم المسجل من الواتساب، يفيد بس لمعرفة إذا امرأة: ${person.data?.name || "غير معروف"}\nرقمنا اللي نتابع منه: ${item.route_key === "barka" ? "بركاء" : "مسقط"}${english ? "\nالعميل يكتب بالإنجليزي: اكتب text بالإنجليزي (R69)." : ""}${facts ? `\n\nمعرفة المشاريع (كتبها أحمد؛ الأرقام اللي فيها بس، R18):\n${facts}` : ""}${behavior ? `\n\n${behavior}\n(المتجوّل ما نتابعه بنفس الأسلوب: اسأله وش يبحث بالضبط. الساخن أولوية. البارد متابعة متباعدة. غير المعقول طلبه: لا تتابع.)` : ""}${file ? `\n\n${file}` : ""}${learnt ? `\n\nدروس من صاحب المكتب من أوامر سابقة (طبقها إذا الموقف مشابه):\n${learnt}` : ""}${instruction ? `\n\nالنص الحالي للمتابعة (اللي يشوفه أحمد الحين): ${current || "لا يوجد"}\n\nأمر صاحب المكتب على هذي المتابعة (أهم من أي قاعدة فوق): ${instruction}\nكيف تفهم الأمر: أحمد يتكلم بلهجته وأحياناً بالصوت، فالأمر ممكن يجي غير مرتب. افهم قصده الحقيقي، ولا تنقل كلامه حرفياً ولا تلصقه في الرسالة. غالباً هو تصحيح للنص الحالي: (1) "بدل X اكتب Y" أو "لا تكتب X" يعني غيّر هذا الجزء بس وخل باقي النص مثل ما هو. (2) "لا تقول كذا قل كذا" يعني استبدل المعنى. (3) قاعدة عامة (مثل: لا تكتب كلمات إنجليزية لعميل عربي) طبقها على هذي الرسالة وعلى أي كلمة إنجليزية فيها. (4) تغيير الهدف (مثل: اسأله متى يناسبه يزور) اكتب النص من جديد. الناتج رسالة مرتبة بلهجة المكتب وبنفس القواعد الثابتة، مو نسخة من كلام أحمد. إذا يقول إن المتابعة ما لها داعي قرارك skip. لا تخالف الممنوعات ولا تكتب معلومة مو مكتوبة قدامك، وإذا يقول وش انقال في رسالة صوتية صدقه. في reason اكتب بسطر وش فهمت منه وش غيرت.` : ""}\n\nالعقارات المتاحة الآن:\n${available || "لا يوجد"}${groups ? `\n\nوحدات انحجزت ولها وحدة متاحة من نفس المجموعة (R38):\n${groups}` : ""}\n\nالمحادثة:\n${chat || "ما في محادثة مسجلة"}\n${other}`,
       text: { format: { type: "json_schema", name: "followup_review", strict: true, schema: reviewSchema } } }),
   });
   const p = await ai.json().catch(() => ({}));
   if (!ai.ok) throw new Error(p?.error?.message || `openai_${ai.status}`);
   const out = JSON.parse(p.output_text || p.output?.flatMap((x: any) => x?.content || []).find((x: any) => x?.type === "output_text")?.text || "{}");
-  out.text = out.text ? String(out.text).replace(/[،,!]/g, " ").replace(/\.(\s|$)/g, "$1").replace(/\s*[؟?]/g, " ؟").replace(/\s+/g, " ").trim() : null;
+  // R70: the name question is taken out first, so the one-question cut below keeps the client's subject, not «اسمك الكريم ؟»
+  out.text = out.text ? String(out.text).replace(NAME_Q, " ").replace(/[،,!]/g, " ").replace(/\.(\s|$)/g, "$1").replace(/\s*[؟?]/g, " ؟").replace(/\s+/g, " ").trim() : null;
   if (out.text) out.text = out.text.replace(/\s*عزيزتي\s*/g, " ").replace(/\s+/g, " ").trim();
-  if (out.text && !out.text.startsWith("السلام عليكم")) out.text = `السلام عليكم ${out.text}`;
-  { const ar = arabicOnly(out.text); out.text = ar.text; if (ar.latin) { out.auto_ok = false; out.reason = short(`${out.reason} (فيه كلمة إنجليزية، راجعها قبل الإرسال)`, 300); } }
-  // one question only
-  if (out.text && out.text.includes("؟")) out.text = out.text.slice(0, out.text.indexOf("؟") + 1);
+  if (out.text === "") out.text = english ? null : "السلام عليكم";
+  if (english) {
+    // R69: an English text keeps its own greeting and «?»; the Arabic-only rule is for clients who write Arabic
+    if (out.text) out.text = out.text.replace(/\s*؟/g, " ?");
+    if (out.text && out.text.includes("?")) out.text = out.text.slice(0, out.text.indexOf("?") + 1);
+  } else {
+    if (out.text && !out.text.startsWith("السلام عليكم")) out.text = `السلام عليكم ${out.text}`;
+    { const ar = arabicOnly(out.text); out.text = ar.text; if (ar.latin) { out.auto_ok = false; out.reason = short(`${out.reason} (فيه كلمة إنجليزية، راجعها قبل الإرسال)`, 300); } }
+    // one question only
+    if (out.text && out.text.includes("؟")) out.text = out.text.slice(0, out.text.indexOf("؟") + 1);
+  }
+  out.english = english;
+  // R68: the visit confirmation of an earlier day that the client never answered
+  out.confirm_unanswered = confirmUnanswered(chat, today);
   // an unread voice note near the end means nobody knows what was said; he decides, never the automatic send
   if (chat.split("\n").slice(-6).some((l: string) => l.includes("[رسالة صوتية قديمة ما انقرت]"))) out.auto_ok = false;
   // R55: the client's own lines, for the code guard in judge() (removed there, never stored)
-  out.client_said = chat.split("\n").filter((l: string) => /^\[[^\]]*\] العميل: /.test(l)).map((l: string) => l.replace(/^\[[^\]]*\] العميل: /, "")).join("\n");
+  out.client_said = clientLines;
   // R64: the office's own lines, for notesGuard in judge() (removed there, never stored)
-  out.office_said = chat.split("\n").filter((l: string) => /^\[[^\]]*\] المكتب: /.test(l)).map((l: string) => l.replace(/^\[[^\]]*\] المكتب: /, "")).join("\n");
+  out.office_said = saidBy(chat, "المكتب");
   return out;
 }
 
@@ -369,6 +392,110 @@ function notesGuard(out: any, group: boolean, clientSaid: string, officeSaid: st
   return out;
 }
 
+// R66 to R70 (the six open «ملاحظة لـ Claude» notes of the evening of 14 Nov 2026; Ahmed chose on each conflict), held by code
+// after the review answers, like the guards above. Never over an instruction given on that follow-up, never on a message
+// prepared for everyone.
+// R68: the office asked «نأكد موعد زيارة …» on an earlier day, the client never wrote again and no visit of his is recorded
+//      done: he did not come and is not interested. No follow-up at all (changes R39: no «تحب نحدد لك موعد ثاني ؟»).
+// R67: the client's last words are a general market question (why rents or prices are low or high in the area). That needs a
+//      market study; no follow-up.
+// R66: on the Muscat number a Barka property is offered («اذا تقبل بركاء…») only to a client who said he looks in المعبيلة or
+//      near Barka (changes R22). Another Muscat area: wait for a match in Muscat. No area said: ask where he looks first.
+// R18 in a follow-up (R70): a line about a project carries only the figures Ahmed wrote in knowledge.ts.
+const R68_CONFIRM = /^\[(\d{4}-\d{2}-\d{2})\] المكتب: .*ن[أا]كد موعد زيار/;
+function confirmUnanswered(chat: unknown, today: string) {
+  const lines = String(chat ?? "").split("\n");
+  let at = -1, day = "";
+  lines.forEach((l, i) => { const m = l.match(R68_CONFIRM); if (m) { at = i; day = m[1]; } });
+  return at >= 0 && day < today && !lines.slice(at + 1).some((l) => /^\[[^\]]*\] العميل: /.test(l));
+}
+const R67_WHAT = "(ايجار|ايجارات|اسعار|السوق)", R67_HOW = "(منخفض|قليل|رخيص|نازل|طايح|مرتفع|غالي|عالي)", R67_WHY = "(ليش|ليه|السبب|سبب)";
+const R67_MARKET = new RegExp(`${R67_WHAT}[^\\n]{0,40}${R67_HOW}[^\\n]{0,40}${R67_WHY}|${R67_WHY}[^\\n]{0,40}${R67_WHAT}[^\\n]{0,40}${R67_HOW}`);
+const R67_STAGES = ["asked_no_visit", "budget_lower", "other_area", "not_buyer", "unclear"];
+const R66_NEAR = /معبيل|بركاء|بركا(?![ء-ي])/;
+const R66_OFFER = /(تقبل|يناسبك|تناسبك)\s*(في\s*)?بركاء|في\s*بركاء/;
+const R18_PROJECT = /السلطان هيثم|وادي زها|ايكونيك|عايده|اليزن|صبور|المستحقين|المطور|مشروع|مقدم/;
+const R18_ALLOWED = ["57", "57000", "30", "2026", "50", "50000", "200", "200000", "2", "10", "0"];
+const figuresOf = (t: unknown) => (r55Norm(t).match(/\d[\d,٬]*/g) || []).map((n) => n.replace(/[,٬]/g, ""));
+// o: { group, route, clientSaid, confirmUnanswered, visitedDone, offerBranch, barkaAreas, fallback }
+function eveningGuard(out: any, o: any) {
+  if (o.group || out.decision === "skip") return out;
+  const stage = String(out.stage || "");
+  if (o.confirmUnanswered && !o.visitedDone && !["visited_liked", "visited_no_fit", "negotiating"].includes(stage)) {
+    out.reason = short(`(R68) أكدنا عليه موعد الزيارة وما رد بأي شي، فهو مو مهتم: ما يتابع. ${out.reason || ""}`, 300);
+    out.decision = "skip"; out.text = null; out.auto_ok = false; out.offer_no = null; out.stage = "booked_no_show"; out.guard = "guard_no_confirm";
+    return out;
+  }
+  if (R67_STAGES.includes(stage) && R67_MARKET.test(normAr(String(o.clientSaid || "").split("\n").slice(-3).join(" ")))) {
+    out.reason = short(`(R67) آخر كلامه سؤال عام عن السوق يحتاج دراسة، ما يتابع الحين. ${out.reason || ""}`, 300);
+    out.decision = "skip"; out.text = null; out.auto_ok = false; out.offer_no = null; out.guard = "guard_market_question";
+    return out;
+  }
+  if (out.decision !== "followup" || !out.text) return out;
+  const t = normAr(out.text), i = t.indexOf("عندنا");
+  if (o.route === "muscat") {
+    const barka = [...new Set((o.barkaAreas || []).flatMap(areaWords))];
+    const offers = R66_OFFER.test(t) || o.offerBranch === "barka" || (i >= 0 && areaWords(t.slice(i)).some((w: string) => barka.includes(w)));
+    const said = normAr(o.clientSaid);
+    if (offers && !(R66_NEAR.test(said) || areaWords(said).some((w: string) => barka.includes(w)))) {
+      out.auto_ok = false; out.offer_no = null; out.guard = "guard_barka_offer";
+      if ((out.request?.areas || []).length) {
+        out.reason = short(`(R66) يبحث في مسقط مو قريب من بركاء، ما نعرض عليه بركاء: ننتظر له شي في مسقط قريب من ميزانيته. ${out.reason || ""}`, 300);
+        out.decision = "wait_for_match"; out.text = null;
+      } else {
+        const subject = String(out.subject || "").replace(/^\s*(بخصوص\s+)?طلبك\s+/, "").replace(/[؟?،,.!]/g, " ").replace(/\s+/g, " ").trim();
+        out.text = `السلام عليكم ${subject && subject.length <= 60 && !/[A-Za-z]/.test(subject) ? `بخصوص طلبك ${subject} ` : ""}في أي منطقة تبحث ؟`;
+        out.reason = short(`(R66) ما حدد المنطقة اللي يبحث فيها، نسأله عنها قبل ما نعرض بركاء. ${out.reason || ""}`, 300);
+      }
+      return out;
+    }
+  }
+  if (!Number.isInteger(out.offer_no) && R18_PROJECT.test(t) && figuresOf(out.text).some((n: string) => !R18_ALLOWED.includes(n))) {
+    const base = String(o.fallback || "").replace(/\s+/g, " ").trim();
+    if (base && !bareText(base) && !figuresOf(base).some((n: string) => !R18_ALLOWED.includes(n))) out.text = base.startsWith("السلام عليكم") ? base : `السلام عليكم ${base}`;
+    else { out.decision = "skip"; out.text = null; }
+    out.auto_ok = false; out.guard = "guard_project_figure";
+    out.reason = short(`(R18) النص كان فيه رقم عن مشروع مو من أرقام أحمد، انشال. ${out.reason || ""}`, 300);
+  }
+  return out;
+}
+// R69 (Ahmed 14 Nov 2026): a client who writes to us in English only gets his follow-up in English. Meta's templates are Arabic,
+// so nothing goes to him by itself past the 24 hours (auto_ok=false): the office sends from the phone. If the text still came
+// out Arabic (the model, or a guard's Arabic wording) a fixed English line goes instead.
+const writesEnglish = (clientSaid: unknown) => { const s = String(clientSaid ?? "").replace(/https?:\/\/\S+/g, " "); return /[A-Za-z]{2,}/.test(s) && !/[ء-ي]/.test(s); };
+const EN_VISIT = "Hello what did you think of the property after your visit ?", EN_REQUEST = "Hello are you still looking for a property ?";
+function languageGuard(out: any, english: boolean, kind: string, group: boolean) {
+  if (!english || group || out.decision !== "followup") return out;
+  const arabic = !out.text || /[ء-ي]/.test(out.text);
+  if (arabic) { out.text = kind === "visit" ? EN_VISIT : EN_REQUEST; out.guard = out.guard || "guard_language"; }
+  out.auto_ok = false; out.lang = "en";
+  out.reason = short(`(R69) العميل يكتب بالإنجليزي: النص بلغته${arabic ? " (النص طلع عربي فانبدل بسطر إنجليزي ثابت)" : ""}، والقالب العربي ما ينرسل له لحاله. ${out.reason || ""}`, 300);
+  return out;
+}
+// What one side wrote in the chat text the review read («[date] العميل: …»), every line of a message with several lines too
+// (before 14 Nov only the first line of each message was kept, so a question on a later line was not seen by the guards)
+function saidBy(chat: unknown, who: string) {
+  const keep: string[] = [];
+  let on = false;
+  for (const l of String(chat ?? "").split("\n")) {
+    const m = l.match(/^\[[^\]]*\] (العميل|المكتب): (.*)$/);
+    if (m) { on = m[1] === who; if (on) keep.push(m[2]); } else if (on) keep.push(l);
+  }
+  return keep.join("\n");
+}
+// R70: the name question is never part of a follow-up (14 Nov: a text that began with it was cut down to it alone)
+const NAME_Q = /(ممكن\s*)?(اسمك|الاسم)\s*الكريم\s*[؟?]?/g;
+// R70 / R18: what Ahmed wrote about the projects (knowledge.ts, synced into whatsapp_agent_prompts), read once a minute and
+// given to the review only when the chat is about a project, so an unanswered project question is answered from it
+let knowledgeCache = { at: 0, text: "" };
+async function projectKnowledge() {
+  if (Date.now() - knowledgeCache.at < 60000) return knowledgeCache.text;
+  const r = await db.from("whatsapp_agent_prompts").select("content").eq("key", "knowledge").maybeSingle();
+  knowledgeCache = { at: Date.now(), text: short(r.data?.content, 7000) };
+  return knowledgeCache.text;
+}
+const PROJECT_TALK = /السلطان هيثم|وادي زها|ايكونيك|عايده|اليزن|صبور|المستحقين|المطور|مشروع|تملك|اقامه|مقدم|استثمار|freehold|residen|invest|payment|project/i;
+
 // What the client said he wants goes on his open request, so a matching listing finds him. Staff notes are kept.
 async function saveRequest(companyId: string, item: any, wanted: any, reason: string) {
   const now = new Date().toISOString();
@@ -420,24 +547,34 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
   delete out.office_said;
   if (!instruction) {
     const group = kind === "request" && ["property_sold", "new_listing"].includes(String(x.kind));
-    let refusedAreas: string[] = [];
-    if (out.decision === "followup" && x.client_id) {
+    let refusedAreas: string[] = [], visitedDone = false;
+    if (out.decision !== "skip" && x.client_id) {
       const vr = await db.from("viewings").select("status,liked,client_feedback,rejection_reason,outcome_note,properties(area)").eq("company_id", companyId).eq("client_id", x.client_id).eq("archived", false).order("viewing_date", { ascending: false }).limit(8);
-      refusedAreas = (vr.data || []).filter(refusedPlace).map((v: any) => String(v.properties?.area || "")).filter(Boolean);
+      refusedAreas = out.decision === "followup" ? (vr.data || []).filter(refusedPlace).map((v: any) => String(v.properties?.area || "")).filter(Boolean) : [];
+      visitedDone = (vr.data || []).some((v: any) => v.status === "done");
     }
     const l = await availableList(companyId);
-    const offerLabel = Number.isInteger(out.offer_no) && out.offer_no > 0 && l.text === available ? l.labels[out.offer_no - 1] || "" : "";
+    const sameList = Number.isInteger(out.offer_no) && out.offer_no > 0 && l.text === available;
+    const offerLabel = sameList ? l.labels[out.offer_no - 1] || "" : "";
+    const offerBranch = sameList ? l.branches[out.offer_no - 1] || "" : "";
     const subj = String(out.subject || "").replace(/^\s*(بخصوص\s+)?طلبك\s+/, "").replace(/[؟?،,.!]/g, " ").replace(/\s+/g, " ").trim();
+    const fallback = kind === "request" && subj && subj.length <= 60 && !/[A-Za-z]/.test(subj) ? `بخصوص طلبك ${subj} لين الحين تبحث ؟` : fixed;
     notesGuard(out, group, clientSaid, officeSaid, refusedAreas, offerLabel, kind === "request" && subj && subj.length <= 60 && !/[A-Za-z]/.test(subj) ? `بخصوص طلبك ${subj} لين الحين تبحث ؟` : fixed);
+    // R66, R67, R68 and R18 in a follow-up (the notes of the evening of 14 Nov)
+    eveningGuard(out, { group, route: String(x.route_key || ""), clientSaid, confirmUnanswered: !!out.confirm_unanswered, visitedDone, offerBranch, barkaAreas: l.barkaAreas, fallback });
   }
-  if (kind === "visit") out.text = namedVisitQuestion(out.text, name);
+  const english = !!out.english;
+  delete out.english; delete out.confirm_unanswered;
+  if (kind === "visit" && !english) out.text = namedVisitQuestion(out.text, name);
   // R39: a client who already gave his opinion is never asked the step-1 opinion question again by the fixed template
   if (kind === "visit" && Number(x.step) === 1 && ["visited_liked", "visited_no_fit"].includes(String(out.stage))) out.auto_ok = false;
   // R39: the offered property is taken from the very list the review read (same snapshot), by its number
   out.offer_label = "";
   if (Number.isInteger(out.offer_no) && out.offer_no > 0) { const l = await availableList(companyId); if (l.text === available) out.offer_label = l.labels[out.offer_no - 1] || ""; }
   // R36: a step-1 follow-up on a test wording asks the same opinion question in that wording (his instruction still wins)
-  if (kind === "visit" && Number(x.step) === 1 && !instruction) out.text = variantVisitQuestion(out.text, name, await variantFor(companyId, "visit_step1", x.variant_label));
+  if (kind === "visit" && Number(x.step) === 1 && !instruction && !english) out.text = variantVisitQuestion(out.text, name, await variantFor(companyId, "visit_step1", x.variant_label));
+  // R69: an English-writing client gets his text in English and nothing goes to him by itself (never over an instruction)
+  if (!instruction) languageGuard(out, english, kind, kind === "request" && ["property_sold", "new_listing"].includes(String(x.kind)));
   return out;
 }
 
@@ -584,7 +721,7 @@ async function applyDecision(kind: "visit" | "request", x: any, companyId: strin
 
 // The available list the review reads. R39: every line carries a number («[3]») the review returns in offer_no, so an offer
 // outside the 24 hours names a property that really is on the list (labels[n - 1]), never one the model made up.
-let availableCache = { at: 0, company: "", text: "", labels: [] as string[], shortRent: false };
+let availableCache = { at: 0, company: "", text: "", labels: [] as string[], branches: [] as string[], barkaAreas: [] as string[], shortRent: false };
 // R55: the allowed rent terms, in the reply agent's words, so the review knows a short rent is not on the list
 const RENT_TERMS: Record<string, string> = { daily: "يومي", weekly: "أسبوعي", monthly: "شهري", "3m": "3 شهور", "6m": "6 شهور", yearly: "سنة" };
 const rentTerms = (p: any) => p.listing_purpose === "rent" && (p.rental_terms || []).length ? ` | مدة الإيجار المسموحة: ${(p.rental_terms as string[]).map((t) => RENT_TERMS[t] || t).join(" او ")}` : "";
@@ -593,11 +730,12 @@ const takesShortRent = (p: any) => p.listing_purpose === "rent" && ((p.rental_te
 const priceShort = (p: unknown) => { const n = Number(p || 0); return n >= 1000 ? `${String(Math.round(n / 100) / 10)} الف` : `${n} ريال`; };
 async function availableList(companyId: string) {
   if (availableCache.company === companyId && Date.now() - availableCache.at < 60000) return availableCache;
-  const props = await db.from("properties").select("type,area,price,bedrooms,listing_purpose,public_details,rented_units,rental_terms").eq("company_id", companyId).eq("status", "available").eq("archived", false).order("area").order("price").order("id");
+  const props = await db.from("properties").select("type,area,price,bedrooms,listing_purpose,public_details,rented_units,rental_terms,branch_key").eq("company_id", companyId).eq("status", "available").eq("archived", false).order("area").order("price").order("id");
   const rows = props.data || [];
   const text = rows.map((p: any, i: number) => `- [${i + 1}] ${typeAr(p.type)} ${p.listing_purpose === "rent" ? "للإيجار" : "للبيع"} في ${p.area} بـ ${Number(p.price || 0).toLocaleString("en-US")} ${p.bedrooms ? `${p.bedrooms} غرف` : ""}${rentTerms(p)}${p.rented_units ? ` | المؤجر حالياً: ${short(p.rented_units, 200)}` : ""}${p.public_details ? ` | التفاصيل: ${short(p.public_details, 700).replace(/\n+/g, " / ")}` : ""}`).join("\n");
   const labels = rows.map((p: any) => `${typeAr(p.type)}${p.listing_purpose === "rent" ? " للإيجار" : ""} في ${p.area} بـ ${priceShort(p.price)}`.replace(/\s+/g, " ").trim());
-  availableCache = { at: Date.now(), company: companyId, text, labels, shortRent: rows.some(takesShortRent) };
+  // R66: which branch each listed property belongs to, and the areas of the Barka ones
+  availableCache = { at: Date.now(), company: companyId, text, labels, branches: rows.map((p: any) => String(p.branch_key || "")), barkaAreas: [...new Set(rows.filter((p: any) => p.branch_key === "barka").map((p: any) => String(p.area || "")).filter(Boolean))], shortRent: rows.some(takesShortRent) };
   return availableCache;
 }
 async function availableText(companyId: string) {

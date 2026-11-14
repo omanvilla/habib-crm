@@ -174,7 +174,7 @@ test('R55: a rest house booked for a day gets no follow-up, and rent-or-buy is n
  assert(fn.includes('shortRentGuard(out, clientSaid, (await availableList(companyId)).shortRent, fallback);'));
  assert(fn.includes('if (!instruction && !(kind === "request" && ["property_sold", "new_listing"].includes(String(x.kind)))) {'));
  assert(fn.includes('delete out.client_said;'));
- assert(fn.includes('shortRent: rows.some(takesShortRent)')&&fn.includes('${rentTerms(p)}')&&fn.includes('rented_units,rental_terms")'));
+ assert(fn.includes('shortRent: rows.some(takesShortRent)')&&fn.includes('${rentTerms(p)}')&&fn.includes('rented_units,rental_terms,branch_key")'));
  assert(fn.includes('- الإيجار القصير (R55، أحمد 14 نوفمبر)')&&fn.includes('لا تسأل "للإيجار أو الشراء ؟" أبداً إذا العميل قال قصده'));
  assert(fn.includes('decision: r.decision, guard: r.guard || null, stage: r.stage'));
 });
@@ -240,4 +240,101 @@ test('R60 / R63 / R64: refused area, valuation raise and owner contact are held 
  assert.equal(r.guard,'guard_unsure_answer');assert.equal(r.text,'السلام عليكم بخصوص طلبك بيت الحيل الجنوبية لين الحين تبحث ؟');
  assert(fn.includes('notesGuard(out, group, clientSaid, officeSaid, refusedAreas, offerLabel, kind === "request"'));
  assert(fn.includes('- الموقع ما ناسبه (R60')&&fn.includes('- رفع التثمين (R63')&&fn.includes('- رقم صاحب العقار (R64'));
+});
+// R65 to R70 (the six open «ملاحظة لـ Claude» notes of the evening of 14 Nov 2026; Ahmed chose on the three conflicts):
+// R66 Barka is offered on the Muscat number only to a client who looks near Barka, R67 a market question gets no follow-up,
+// R68 a client who never answered the visit confirmation is not followed, R69 an English-writing client gets English,
+// R70 the name question is never part of a follow-up and a project line carries Ahmed's figures only (R18).
+test('R66 / R67 / R68 / R18: the evening notes of 14 Nov are held by code after the review',()=>{
+ const pick=(start,end)=>{const a=fn.indexOf(start);assert(a>=0,start);return fn.slice(a,fn.indexOf(end,a)+end.length);};
+ const src=[pick('const short =','\n'),pick('const normAr','\n'),pick('const r55Norm','\n'),pick('const R60_GENERIC','\n'),pick('const areaWords','\n'),pick('const BARE_TEXT','\n'),pick('const bareText','\n'),
+  pick('const R68_CONFIRM','\n'),pick('function confirmUnanswered','\n}\n'),pick('const R67_WHAT','\n'),pick('const R67_MARKET','\n'),pick('const R67_STAGES','\n'),pick('const R66_NEAR','\n'),pick('const R66_OFFER','\n'),
+  pick('const R18_PROJECT','\n'),pick('const R18_ALLOWED','\n'),pick('const figuresOf','\n'),pick('function eveningGuard','\n}\n')].join('\n')
+  .replace('(v: unknown, n = 500)','(v, n = 500)').replace('(chat: unknown, today: string)','(chat, today)').replace('(out: any, o: any)','(out, o)').replace(/\((\w+): (?:unknown|string|any)\)/g,'($1)');
+ const {eveningGuard,confirmUnanswered,R67_MARKET,normAr,figuresOf}=new Function(src+';return {eveningGuard,confirmUnanswered,R67_MARKET,normAr,figuresOf};')();
+ const o=(x)=>({decision:'followup',text:'السلام عليكم بخصوص طلبك لين الحين تبحث ؟',subject:null,reason:'',stage:'asked_no_visit',auto_ok:true,offer_no:null,request:null,...x});
+ const c=(x)=>({group:false,route:'muscat',clientSaid:'',confirmUnanswered:false,visitedDone:false,offerBranch:'',barkaAreas:['الصومحان الجنوبية','الرميس','الشخاخيط'],fallback:'بخصوص طلبك عقار في مدينة السلطان هيثم لين الحين تبحث ؟',...x});
+ // R68: the confirmation of an earlier day with nothing from the client after it
+ const chat=['[2026-11-11] العميل: ممكن الحين','[2026-11-11] المكتب: يناسبك بكره ؟','[2026-11-11] العميل: زين تمام','[2026-11-12] المكتب: السلام عليكم نأكد موعد زيارة العقار في الحيل الجنوبية اليوم الساعة 10:41 الصبح ؟'].join('\n');
+ assert.equal(confirmUnanswered(chat,'2026-11-14'),true);
+ assert.equal(confirmUnanswered(chat,'2026-11-12'),false,'the day of the visit itself is too early');
+ assert.equal(confirmUnanswered(chat+'\n[2026-11-12] العميل: تمام جاي','2026-11-14'),false);
+ assert.equal(confirmUnanswered('[2026-11-11] العميل: السلام عليكم','2026-11-14'),false);
+ let r=eveningGuard(o({stage:'visited_not_asked',text:'السلام عليكم كيف شفت بيت الحيل الجنوبية وايش انطباعك عنه ؟'}),c({confirmUnanswered:true}));
+ assert.equal(r.decision,'skip');assert.equal(r.text,null);assert.equal(r.auto_ok,false);assert.equal(r.guard,'guard_no_confirm');assert(r.reason.startsWith('(R68)'));assert.equal(r.stage,'booked_no_show');
+ r=eveningGuard(o({stage:'booked_no_show',text:'السلام عليكم بخصوص موعد زيارتك تحب نحدد لك موعد ثاني ؟'}),c({confirmUnanswered:true}));assert.equal(r.decision,'skip');
+ r=eveningGuard(o({stage:'visited_not_asked'}),c({confirmUnanswered:true,visitedDone:true}));assert.equal(r.decision,'followup','a visit recorded done is still asked');
+ r=eveningGuard(o({stage:'visited_no_fit'}),c({confirmUnanswered:true}));assert.equal(r.decision,'followup');
+ r=eveningGuard(o({}),c({confirmUnanswered:true,group:true}));assert.equal(r.decision,'followup','a message for everyone is not touched');
+ // R67: the last words are a market question
+ const hss='السلام عليكم\nتفاصيل أكثر  والموقع  وعدد الشقق\nحاليا أشوف الأرقام والموقع \nومخطط الشقق وأسعار الإيجارات فالمنطقه\n\nألايجار منخفض جدا إيش السبب';
+ r=eveningGuard(o({text:'السلام عليكم بخصوص سؤالك عن انخفاض إيجار الشقق متى يناسبك تزور وتشوف البيت ؟'}),c({clientSaid:hss}));
+ assert.equal(r.decision,'skip');assert.equal(r.text,null);assert.equal(r.guard,'guard_market_question');assert(r.reason.startsWith('(R67)'));
+ for(const s of ['ليش الايجارات نازله في الحيل','اسعار الفلل مرتفعه في الخوض وش السبب'])assert(R67_MARKET.test(normAr(s)),s);
+ for(const s of ['كم الايجار','ليش السعر غالي','الايجار كم بالشهر','متى اقدر ازور'])assert(!R67_MARKET.test(normAr(s)),s);
+ r=eveningGuard(o({}),c({clientSaid:'الايجار منخفض ايش السبب\nطيب\nتمام\nمتى اقدر ازور البيت'}));assert.equal(r.decision,'followup','an old market question does not stop a later one');
+ r=eveningGuard(o({stage:'visited_liked'}),c({clientSaid:hss}));assert.equal(r.decision,'followup');
+ // R66: Barka on the Muscat number
+ const barka='السلام عليكم بخصوص طلبك بيت بحدود 85 الف اذا تقبل بركاء عندنا فيلا في الصومحان الجنوبية بـ 69 الف تحب ارسلك تفاصيلها ؟';
+ r=eveningGuard(o({text:barka,subject:'بيت بحدود 85 الف'}),c({clientSaid:'بغيت اشتري بيت اخي\nطيب طابقين\nبس بسعر ٨٠ او ٨٥'}));
+ assert.equal(r.guard,'guard_barka_offer');assert.equal(r.decision,'followup');assert.equal(r.auto_ok,false);assert(r.reason.startsWith('(R66)'));
+ assert.equal(r.text,'السلام عليكم بخصوص طلبك بيت بحدود 85 الف في أي منطقة تبحث ؟','no area said: he is asked where he looks');
+ r=eveningGuard(o({text:barka,request:{areas:['فلج الشام'],property_types:[],budget_max:85000,must_haves:[]}}),c({clientSaid:'ابي بيت في فلج الشام بحدود 85'}));
+ assert.equal(r.decision,'wait_for_match');assert.equal(r.text,null);assert.equal(r.guard,'guard_barka_offer');assert(r.reason.startsWith('(R66)'));
+ r=eveningGuard(o({text:barka,request:{areas:['المعبيلة']}}),c({clientSaid:'ابي بيت في المعبيله الجنوبيه'}));assert.equal(r.guard,undefined,'المعبيلة is near Barka');assert.equal(r.text,barka);
+ r=eveningGuard(o({text:barka}),c({clientSaid:'كم سعر فيلا الرميس'}));assert.equal(r.guard,undefined,'he asked about a Barka area himself');
+ r=eveningGuard(o({text:barka}),c({clientSaid:'ابي بيت في فلج الشام',route:'barka'}));assert.equal(r.guard,undefined,'the Barka number is not touched');
+ r=eveningGuard(o({text:'السلام عليكم عندنا فيلا بـ 69 الف تحب ارسلك تفاصيلها ؟',offer_no:4,request:{areas:['الخوض']}}),c({clientSaid:'ابي فيلا في الخوض',offerBranch:'barka'}));assert.equal(r.decision,'wait_for_match','the offered property is a Barka one');
+ r=eveningGuard(o({text:'السلام عليكم عندنا فيلا في الشخاخيط بـ 69 الف تحب ارسلك تفاصيلها ؟',request:{areas:['الحيل']}}),c({clientSaid:'ابي فيلا في الحيل'}));assert.equal(r.decision,'wait_for_match','a Barka area by its name');
+ r=eveningGuard(o({text:'السلام عليكم عندنا بيت في الحيل الجنوبية بـ 130 الف تحب ارسلك تفاصيله ؟',offer_no:2}),c({clientSaid:'ابي بيت في الحيل',offerBranch:'muscat'}));assert.equal(r.guard,undefined);
+ // R18 in a follow-up: a project line with a figure Ahmed did not write
+ r=eveningGuard(o({text:'السلام عليكم شقق مدينة السلطان هيثم تبدأ من 20,800 يناسبك نرتب لك اجتماع مع المطور ؟'}),c({}));
+ assert.equal(r.guard,'guard_project_figure');assert.equal(r.auto_ok,false);assert.equal(r.text,'السلام عليكم بخصوص طلبك عقار في مدينة السلطان هيثم لين الحين تبحث ؟');assert(r.reason.startsWith('(R18)'));
+ r=eveningGuard(o({text:'السلام عليكم شقق وادي زها من 35 الف يناسبك ؟'}),c({fallback:''}));assert.equal(r.decision,'skip');assert.equal(r.text,null);
+ const ok='السلام عليكم العرض في مدينة السلطان هيثم بدون دفعة مقدمة وساري لين 30 نوفمبر 2026 يناسبك نرتب لك اجتماع مع المطور ؟';
+ r=eveningGuard(o({text:ok}),c({}));assert.equal(r.guard,undefined);assert.equal(r.text,ok);
+ r=eveningGuard(o({text:'السلام عليكم الاستوديو في الآيكونيك تاور من 57,000 يناسبك ؟'}),c({}));assert.equal(r.guard,undefined);
+ r=eveningGuard(o({text:'السلام عليكم عندنا فيلا في الخوض بـ 120 الف تحب ارسلك تفاصيلها ؟',offer_no:3}),c({clientSaid:'الخوض'}));assert.equal(r.guard,undefined,'a listed property keeps its price');
+ assert.deepEqual(figuresOf('من ٥٧,٠٠٠ لين 30 نوفمبر 2026'),['57000','30','2026']);
+ // wiring and the words the review reads
+ assert(fn.includes('eveningGuard(out, { group, route: String(x.route_key || ""), clientSaid, confirmUnanswered: !!out.confirm_unanswered, visitedDone, offerBranch, barkaAreas: l.barkaAreas, fallback });'));
+ assert(fn.includes('out.confirm_unanswered = confirmUnanswered(chat, today);'));
+ assert(fn.includes('rental_terms,branch_key")'));
+ for(const k of ['- عرض بركاء على عميل رقم مسقط (R66','- سؤال عن السوق (R67','- ما رد على تأكيد الموعد (R68','- لغة العميل (R69','- جاوب سؤاله (R70','تملك الأجنبي أو غير العماني (R65)'])assert(fn.includes(k),k);
+});
+test('R69 / R70: an English-writing client gets English, and the name question never stays in a follow-up',()=>{
+ const pick=(start,end)=>{const a=fn.indexOf(start);assert(a>=0,start);return fn.slice(a,fn.indexOf(end,a)+end.length);};
+ const src=[pick('const short =','\n'),pick('const writesEnglish','\n'),pick('const EN_VISIT','\n'),pick('function languageGuard','\n}\n'),pick('function saidBy','\n}\n'),pick('const NAME_Q','\n')].join('\n')
+  .replace('(v: unknown, n = 500)','(v, n = 500)').replace('(out: any, english: boolean, kind: string, group: boolean)','(out, english, kind, group)').replace('(chat: unknown, who: string)','(chat, who)').replace('const keep: string[] = [];','const keep = [];').replace(/\((\w+): (?:unknown|string|any)\)/g,'($1)');
+ const {writesEnglish,languageGuard,saidBy,NAME_Q,EN_REQUEST,EN_VISIT}=new Function(src+';return {writesEnglish,languageGuard,saidBy,NAME_Q,EN_REQUEST,EN_VISIT};')();
+ assert.equal(writesEnglish('hy\napartment 250\nwifi is included?\nokey'),true);
+ assert.equal(writesEnglish('السلام عليكم\nok'),false,'one Arabic line is enough to stay Arabic');
+ assert.equal(writesEnglish('https://www.instagram.com/reel/abc'),false,'a link alone is no language');
+ assert.equal(writesEnglish(''),false);
+ const o=(x)=>({decision:'followup',text:'Hello are you still interested in the apartment ?',reason:'سأل عن الإنترنت',auto_ok:true,...x});
+ let r=languageGuard(o({}),true,'request',false);
+ assert.equal(r.text,'Hello are you still interested in the apartment ?');assert.equal(r.auto_ok,false,'the Arabic template never goes by itself');assert.equal(r.lang,'en');assert(r.reason.startsWith('(R69)'));assert.equal(r.guard,undefined);
+ r=languageGuard(o({text:'السلام عليكم بخصوص طلبك شقة لين الحين تبحث ؟'}),true,'request',false);assert.equal(r.text,EN_REQUEST);assert.equal(r.guard,'guard_language');assert.equal(r.auto_ok,false);
+ r=languageGuard(o({text:'السلام عليكم كيف شفت الشقة وايش انطباعك عنها ؟'}),true,'visit',false);assert.equal(r.text,EN_VISIT);
+ r=languageGuard(o({text:null}),true,'request',false);assert.equal(r.text,EN_REQUEST);
+ r=languageGuard(o({text:'السلام عليكم لين الحين تبحث ؟'}),false,'request',false);assert.equal(r.text,'السلام عليكم لين الحين تبحث ؟');assert.equal(r.auto_ok,true,'an Arabic-writing client is not touched');
+ r=languageGuard(o({decision:'skip',text:null}),true,'request',false);assert.equal(r.text,null);assert.equal(r.lang,undefined);
+ r=languageGuard(o({text:'نزل عندنا بيت'}),true,'request',true);assert.equal(r.text,'نزل عندنا بيت','a message for everyone keeps its wording');
+ for(const t of [EN_REQUEST,EN_VISIT])assert(/^Hello [a-z ]+ \?$/.test(t),t);
+ // every line of a message with several lines belongs to the one who wrote it
+ const chat='[2026-11-05] العميل: حاليا أشوف الأرقام\nومخطط الشقق\n\nألايجار منخفض جدا إيش السبب\n[2026-11-05] المكتب: وعليكم السلام\nللبيع منزل\n[2026-11-06] العميل: تمام';
+ assert.equal(saidBy(chat,'العميل'),'حاليا أشوف الأرقام\nومخطط الشقق\n\nألايجار منخفض جدا إيش السبب\nتمام');
+ assert.equal(saidBy(chat,'المكتب'),'وعليكم السلام\nللبيع منزل');
+ // R70: the name question is taken out before the one-question cut
+ const strip=(t)=>t.replace(NAME_Q,' ').replace(/\s+/g,' ').trim();
+ assert.equal(strip('اسمك الكريم ؟ العرض في مدينة السلطان هيثم بدون دفعة مقدمة يناسبك نرتب لك اجتماع ؟'),'العرض في مدينة السلطان هيثم بدون دفعة مقدمة يناسبك نرتب لك اجتماع ؟');
+ assert.equal(strip('السلام عليكم ممكن اسمك الكريم ؟'),'السلام عليكم');
+ assert.equal(strip('السلام عليكم متى يناسبك تزور ؟'),'السلام عليكم متى يناسبك تزور ؟');
+ const rv=fn.slice(fn.indexOf('async function review('),fn.indexOf('// R55 (Ahmed 14 Nov 2026'));
+ assert(rv.indexOf('.replace(NAME_Q, " ")')>0&&rv.indexOf('.replace(NAME_Q, " ")')<rv.indexOf('// one question only'),'before the cut');
+ assert(rv.includes('if (out.text === "") out.text = english ? null : "السلام عليكم";'));
+ assert(rv.includes('const english = writesEnglish(clientLines);')&&rv.includes('العميل يكتب بالإنجليزي: اكتب text بالإنجليزي (R69).'));
+ assert(rv.includes('معرفة المشاريع (كتبها أحمد؛ الأرقام اللي فيها بس، R18)')&&rv.includes('await projectKnowledge()'));
+ assert(fn.includes('if (kind === "visit" && !english) out.text = namedVisitQuestion(out.text, name);'));
+ assert(fn.includes('if (!instruction) languageGuard(out, english, kind,'));
 });

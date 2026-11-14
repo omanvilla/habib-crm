@@ -671,3 +671,25 @@ test('R62: a question about a YouTube channel gets «على الطبيعة» and
  assert(brain.includes('سؤال عن قناة يوتيوب أو فيديو يوتيوب للعقار (R62)')&&brain.includes(LINES[0]));
  assert(brain.includes('- (R60) عميل زار عقار وقال موقعه بعيد'));
 });
+// R66 (Ahmed 14 Nov 2026, note 85d613bb; changes R22): a client of the Muscat number who looks in فلج الشام with 85 الف was
+// offered a villa in Barka. Barka is offered there only to a client who said he looks in المعبيلة or near Barka.
+test('R66: on the Muscat number Barka is offered only to a client who looks near Barka, held by code',()=>{
+ const block=agent.slice(at('    // ---- R66 (Ahmed 14 Nov 2026'),at('    // ---- R62 (note of 14 Nov 2026')).replace(/\((\w+): (?:string|any)\)/g,'($1)');
+ const near=new Function(pick('const R66_GENERIC','\n')+pick('function nearBarka','\n}\n').replace('(said: unknown, barkaAreas: unknown[])','(said, barkaAreas)').replace(/\((\w+): (?:unknown|string|any)\)/g,'($1)')+'\nreturn nearBarka;')();
+ const guard=new Function('out','texts','conv','history','props','R66_BARKA_OFFER','R66_DETAILS_ASK','nearBarka',block+'\nreturn {out,texts};');
+ const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
+ const props=[{branch_key:'barka',area:'الصومحان الجنوبية'},{branch_key:'barka',area:'الرميس'},{branch_key:'muscat',area:'الحيل الجنوبية'}];
+ const offer=['في الحيل والموالح حالياً ما عندنا بهالحدود','بس اذا تقبل بركاء عندنا في الشخاخيط توين فيلا 6 غرف بـ 69 الف','تحب ارسلك تفاصيلها ؟'];
+ const run=(said,o={})=>guard({action:'none',request:{areas:['الحيل']},...(o.out||{})},o.texts||offer.slice(),{route_key:o.route||'muscat'},said.map((b)=>({direction:'inbound',body:b})).concat([{direction:'outbound',body:'في المعبيلة ما عندنا'}]),props,re('R66_BARKA_OFFER'),re('R66_DETAILS_ASK'),near);
+ let r=run(['ابي بيت في الحيل او الموالح','70 - 75 الف']);
+ assert.deepEqual(r.texts,[offer[0],'اول ما يتوفر بتواصل معك']);assert.equal(r.out.guard_barka_offer,true);
+ r=run(['ابي اشتري بيت','بسعر 80 او 85'],{out:{request:null}});assert.deepEqual(r.texts,[offer[0],'في اي منطقة تبحث ؟'],'no area yet: he is asked where he looks');
+ // near Barka: المعبيلة, the word بركاء, or the area of a listed Barka property in his own words
+ for(const said of [['اريد ف منطقة اقرب للمعبيله'],['عادي حتى بركاء'],['كم سعر فيلا الرميس']]){r=run(said);assert.deepEqual(r.texts,offer,said[0]);assert.equal(r.out.guard_barka_offer,undefined);}
+ // the Barka number, a handoff, and a reply with no Barka offer are not touched; what the office wrote does not count as his words
+ r=run(['ابي بيت في الحيل'],{route:'barka'});assert.deepEqual(r.texts,offer);
+ r=run(['ابي بيت في الحيل'],{out:{action:'handoff'}});assert.deepEqual(r.texts,offer);
+ r=run(['ابي بيت في الحيل'],{texts:['عندنا بيت في الحيل الجنوبية بـ 130 الف','تحب ارسلك تفاصيله ؟']});assert.deepEqual(r.texts,['عندنا بيت في الحيل الجنوبية بـ 130 الف','تحب ارسلك تفاصيله ؟']);
+ assert.equal(near('ابي بيت في فلج الشام',props.map((p)=>p.area)),false);assert.equal(near('شقة في المعبيلة الجنوبية',[]),true);assert.equal(near('بركات الله عليك',[]),false);
+ assert(brain.includes('(R66) على رقم مسقط بركاء تنعرض بس لمن قال إنه يبحث في المعبيلة أو قريب من بركاء'));
+});

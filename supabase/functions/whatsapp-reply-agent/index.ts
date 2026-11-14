@@ -18,6 +18,17 @@ const DEBOUNCE_MS = Number(Deno.env.get("REPLY_DEBOUNCE_MS") || 35000); // wait 
 const HARD_HANDOFF = /^\s*(تفاوض|مشتري جاد|دراسة سعر|سؤال ما عندي جوابه|اجتماع)\s*:/;
 // R61: a question about a contest (we run none). R62: a question about a YouTube channel or video of the property.
 const CONTEST_ASK = /مسابق[ةه]|المسابقات/;
+// R66 (Ahmed 14 Nov 2026, changes R22): a Barka property is offered on the Muscat number only to a client who said he looks
+// in المعبيلة or near Barka (the word بركاء, or the area of a listed Barka property, in his own messages)
+const R66_BARKA_OFFER = /(تقبل|تقبلين|يناسبك|تناسبك)\s*(في\s*)?بركاء/;
+const R66_DETAILS_ASK = /تحب(ين)?\s*[اأ]رسل(ك|ج)?\s*(لك\s*)?تفاصيل/;
+const R66_GENERIC = ["بركاء", "مسقط", "ولايه", "منطقه", "شماليه", "جنوبيه", "شرقيه", "غربيه"];
+function nearBarka(said: unknown, barkaAreas: unknown[]) {
+  const n = (s: unknown) => String(s ?? "").replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه");
+  const words = (s: unknown) => n(s).split(/[^ء-ي]+/).map((w) => w.replace(/^ال/, "")).filter((w) => w.length > 2 && !R66_GENERIC.includes(w));
+  const t = n(said), mine = words(said);
+  return /معبيل|بركاء|بركا(?![ء-ي])/.test(t) || (barkaAreas || []).flatMap(words).some((w) => mine.includes(w));
+}
 const YOUTUBE_ASK = /يوتيوب|يوتوب|youtube/i;
 const YOUTUBE_LINES = ["الافضل تشوف العقار على الطبيعة احسن من الفيديو والصور", "متى يناسبك تزور ؟"];
 // R41 (Ahmed 12 Nov): a question whose answer is not written in front of the agent gets no reply at all; the chat goes back to Ahmed
@@ -1342,6 +1353,18 @@ Deno.serve(async (req) => {
       const onlyClosing = texts.every((t) => t.length < 25 && /العفو|الله يسعدك|مبروك|تسلم|حياك/.test(t));
       const visitHandled = history.some((h: any) => h.direction === "outbound" && /تزور|زيار|المالك مباشرة|نسق مع المالك|\[contacts\]/.test(String(h.body || "") + (h.message_type === "contacts" ? "[contacts]" : "")));
       if (texts.length && !onlyClosing && !waitsBank && (hasAd || sentAd) && !asksVisit && out.action === "none" && !visitHandled) texts.push("متى يناسبك تزور ؟");
+    }
+    // ---- R66 (Ahmed 14 Nov 2026, note 85d613bb; changes R22): Barka is not offered to every client of the Muscat number ----
+    // «اذا تقبل بركاء عندنا …» and «تحب ارسلك تفاصيلها ؟» are taken out unless he said he looks in المعبيلة or near Barka. A client
+    // who named his area gets «اول ما يتوفر بتواصل معك» (R53); one who has not is asked where he looks. Not over a handoff.
+    if (conv.route_key === "muscat" && out.action === "none" && texts.some((t) => t.length <= 250 && R66_BARKA_OFFER.test(t))) {
+      const saidAll = history.filter((h: any) => h.direction === "inbound").map((h: any) => String(h.transcript || h.body || "")).join(" ");
+      if (!nearBarka(saidAll, props.filter((p: any) => p.branch_key === "barka").map((p: any) => p.area))) {
+        texts = texts.filter((t) => !(t.length <= 250 && (R66_BARKA_OFFER.test(t) || R66_DETAILS_ASK.test(t))));
+        const line = (out.request?.areas || []).length ? "اول ما يتوفر بتواصل معك" : "في اي منطقة تبحث ؟";
+        if (!texts.includes(line)) texts.push(line);
+        out.guard_barka_offer = true;
+      }
     }
     // ---- R62 (note of 14 Nov 2026, مرام, chat KLD): «عندك قناة في يوتيوب ؟» about a property ----
     // The reel is the whole video; the answer is the fixed pair «الافضل تشوف العقار على الطبيعة…» + the visit question, like the

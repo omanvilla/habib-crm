@@ -189,7 +189,7 @@ test('a visit follow-up asks the client about the property by name, never a gene
  assert.equal(namedVisitQuestion('السلام عليكم كيف شفت فيلا الشخاخيط ؟ عجبتك ولا ما ناسبتك ؟','فيلا الشخاخيط'),'السلام عليكم كيف شفت فيلا الشخاخيط وايش انطباعك عنها ؟');
  assert.equal(namedVisitQuestion('السلام عليكم كيف لقيت الفيلا ؟',''),'السلام عليكم كيف شفت الفيلا وايش انطباعك عنه ؟');
  assert.equal(namedVisitQuestion('السلام عليكم قدرت تشوف العقار ؟',''),'السلام عليكم قدرت تشوف العقار ؟');
- assert(fn.includes('if (kind === "visit") out.text = namedVisitQuestion(out.text, name);'));
+ assert(fn.includes('if (kind === "visit" && !english) out.text = namedVisitQuestion(out.text, name);'));
  assert(fn.includes('ممنوع سؤال عام مثل "قدرت تشوف العقار ؟"'));
 });
 // Audit 10 Nov: the lessons are stored oldest first, and the review kept the first 6,000 characters, so Ahmed's newest were cut.

@@ -99,7 +99,7 @@ test('B: the opinion question takes the test wording; a text written for one cli
 });
 test('the follow-up function touches nothing for A and records which wording really went',()=>{
   assert(fn.includes('if (!l || l === "A") return null;'),'A and unlabelled rows read no wording');
-  assert(fn.includes('if (kind === "visit" && Number(x.step) === 1 && !instruction) out.text = variantVisitQuestion('),'his instruction still wins');
+  assert(fn.includes('if (kind === "visit" && Number(x.step) === 1 && !instruction && !english) out.text = variantVisitQuestion('),'his instruction still wins');
   assert(fn.includes('const went = await sentVisitLabel(f, service, body).catch(() => undefined);'));
   assert(fn.includes('...(went === undefined ? {} : { variant_label: went })'));
   assert(fn.includes('...(q.variant_label ? { variant_label: null } : {})'),'review text inside the window is no wording\'s result');
