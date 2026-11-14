@@ -127,3 +127,54 @@ test('R21: once per chat, 18 to 23 hours after his last words, behind the same g
  assert(fn.includes('await sendInWindow(rt.company_id, numbers, out);\n    // R21')&&fn.includes('\n    await thinkingFollowups(rt.company_id, numbers, out);\n'),'after the visit_followups_auto switch, inside the sending hours');
  assert(fn.includes('if (input?.preview_thinking) {')&&fn.includes('.filter(Boolean), {}, true);'));
 });
+// R55 (Ahmed 14 Nov 2026 «نعم، سوّها», from Maram's note of 11 Nov): a short rent the office does not have (a rest house booked
+// for a day) gets no follow-up, and «للإيجار أو الشراء ؟» is never asked a client who already said which. Held by code.
+test('R55: a rest house booked for a day gets no follow-up, and rent-or-buy is not asked again',()=>{
+ const pick=(start,end)=>{const a=fn.indexOf(start);assert(a>=0,start);return fn.slice(a,fn.indexOf(end,a)+end.length);};
+ const src=[pick('const short =','\n'),pick('const normAr','\n'),pick('const R55_RENT','\n'),pick('const R55_BUY','\n'),pick('const R55_LEISURE','\n'),pick('const R55_BOOK','\n'),pick('const R55_SHORT','\n'),pick('const R55_DATE','\n'),pick('const R55_ASK','\n'),pick('const R55_STAGES','\n'),pick('const r55Norm','\n'),pick('function shortRentGuard','\n}\n'),pick('const takesShortRent','\n')].join('\n')
+  .replace('(v: unknown, n = 500)','(v, n = 500)').replace('(out: any, clientSaid: string, shortRentAvailable: boolean, fallback: string)','(out, clientSaid, shortRentAvailable, fallback)').replace(/\((\w+): (?:unknown|string|any)\)/g,'($1)');
+ const {shortRentGuard,takesShortRent}=new Function(src+';return {shortRentGuard,takesShortRent};')();
+ const o=(x)=>({decision:'followup',text:null,subject:null,reason:'',stage:'asked_no_visit',auto_ok:true,offer_no:null,...x});
+ const run=(x,said,shortAvailable=false,fallback='بخصوص طلبك استراحة لين الحين تبحث ؟')=>shortRentGuard(o(x),said,shortAvailable,fallback);
+ // Maram's client (8b3d1cca): «شي حجز تاريخ 2026/11/26», «استراحة», and the follow-up asked rent or buy
+ const booked='السلام عليكم\nاخبارك عساك طيب\nمن فضلك شي حجز تاريخ \n2026/11/26\nلك الشكر\nاستراحة\nمن فضلك ارسل تفاصيل المرافق';
+ const ask='السلام عليكم الاستراحة للإيجار أو الشراء ؟';
+ let r=run({text:ask,subject:'استراحة',reason:'سأل عن استراحة'},booked);
+ assert.equal(r.decision,'skip');assert.equal(r.text,null);assert.equal(r.auto_ok,false);assert.equal(r.guard,'guard_short_rent');assert(r.reason.startsWith('(R55)'));
+ r=run({decision:'wait_for_match',reason:'يبحث عن استراحة للإيجار بتاريخ 26 نوفمبر وما عندنا'},booked);
+ assert.equal(r.decision,'skip','no «اول ما يتوفر» for a short rent');assert.equal(r.guard,'guard_short_rent');
+ r=run({decision:'wait_for_match',reason:'يبي شقة إيجار يومي'},'عندكم شقة ايجار يومي ؟');assert.equal(r.decision,'skip');
+ r=run({text:'السلام عليكم لين الحين تبحث عن استراحة ؟'},'ابي حجز استراحة ٢٦/١١');assert.equal(r.decision,'skip','Arabic digits');
+ // a short rent IS on the list: the review decides, only the rent-or-buy question goes
+ r=run({text:ask,subject:'استراحة'},booked,true);
+ assert.equal(r.decision,'followup');assert.equal(r.text,'السلام عليكم بخصوص طلبك استراحة لين الحين تبحث ؟');assert.equal(r.auto_ok,false);assert.equal(r.guard,'guard_rent_or_buy');
+ // the review already said skip, or the follow-up is about something else: untouched
+ r=run({decision:'skip',reason:'موضوعه انتهى'},booked);assert.equal(r.guard,undefined);assert.equal(r.reason,'موضوعه انتهى');
+ r=run({text:'السلام عليكم كيف شفت فيلا الرميس وايش انطباعك عنها ؟',subject:'فيلا الرميس',reason:'زار فيلا الرميس',stage:'visited_not_asked'},booked);
+ assert.equal(r.decision,'followup');assert.equal(r.guard,undefined);
+ r=run({text:'السلام عليكم متى يناسبك تزور فيلا الرميس ؟',subject:'فيلا الرميس',reason:'سأل عن فيلا الرميس'},booked);
+ assert.equal(r.decision,'followup','a later subject that is not the rent');assert.equal(r.guard,undefined);
+ // never a buyer, a visit booking, a yearly tenant who visits tonight, or «اليومين»
+ for(const said of ['كم سعر الاستراحة اللي للبيع ؟\nابي ازورها بتاريخ 20/11','ابي احجز موعد زيارة للاستراحة بتاريخ 20/11','ابي اشتري استراحة يوم واحد اشوفها','عندكم استراحة ؟']){
+  r=run({text:'السلام عليكم متى يناسبك تزور الاستراحة ؟',subject:'استراحة',reason:'سأل عن الاستراحة'},said);assert.equal(r.decision,'followup',said);assert.equal(r.guard,undefined,said);}
+ for(const said of ['ابي شقة للايجار\nاقدر اشوفها الليله ؟','ابي بيت ايجار بمر عليكم اليومين الجايه']){
+  r=run({text:'السلام عليكم متى يناسبك تزور الشقة ؟',subject:'شقة للإيجار',reason:'يبي شقة للإيجار'},said);assert.equal(r.decision,'followup',said);assert.equal(r.guard,undefined,said);}
+ // rent or buy: removed when he said which, kept when he never did
+ for(const q of ['السلام عليكم البيت للايجار ولا للشراء ؟','السلام عليكم قصدك ايجار لو شراء ؟','السلام عليكم تبحث عن شراء او ايجار ؟']){
+  r=run({text:q,subject:'بيت في بركاء'},'ابي بيت للإيجار في بركاء',false,'بخصوص طلبك بيت في بركاء لين الحين تبحث ؟');
+  assert.equal(r.text,'السلام عليكم بخصوص طلبك بيت في بركاء لين الحين تبحث ؟',q);assert.equal(r.guard,'guard_rent_or_buy',q);assert.equal(r.auto_ok,false);}
+ r=run({text:'السلام عليكم البيت للايجار ولا للشراء ؟'},'ابي اشتري بيت',false,'');assert.equal(r.decision,'skip','nothing left to send');assert.equal(r.text,null);
+ r=run({text:ask,subject:'استراحة'},'عندكم استراحة ؟');assert.equal(r.text,ask,'he never said which: the question stays');assert.equal(r.guard,undefined);
+ // which rents take a day or a week
+ assert.equal(takesShortRent({listing_purpose:'rent',rental_terms:['6m','yearly'],type:'apartment'}),false);
+ assert.equal(takesShortRent({listing_purpose:'rent',rental_terms:['daily'],type:'apartment'}),true);
+ assert.equal(takesShortRent({listing_purpose:'rent',rental_terms:null,type:'resthouse'}),true,'terms not written = not refused');
+ assert.equal(takesShortRent({listing_purpose:'sale',rental_terms:null,type:'resthouse'}),false);
+ // wired in: after the review, not over an instruction, not on a message prepared for everyone; the list shows the terms
+ assert(fn.includes('shortRentGuard(out, clientSaid, (await availableList(companyId)).shortRent, fallback);'));
+ assert(fn.includes('if (!instruction && !(kind === "request" && ["property_sold", "new_listing"].includes(String(x.kind)))) {'));
+ assert(fn.includes('delete out.client_said;'));
+ assert(fn.includes('shortRent: rows.some(takesShortRent)')&&fn.includes('${rentTerms(p)}')&&fn.includes('rented_units,rental_terms")'));
+ assert(fn.includes('- الإيجار القصير (R55، أحمد 14 نوفمبر)')&&fn.includes('لا تسأل "للإيجار أو الشراء ؟" أبداً إذا العميل قال قصده'));
+ assert(fn.includes('decision: r.decision, guard: r.guard || null, stage: r.stage'));
+});

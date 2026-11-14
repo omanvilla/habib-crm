@@ -105,6 +105,8 @@ const REVIEW_RULES = `أنت تراجع متابعة عميل لمكتب عقا�
 - الكلام واضح وصحيح (R35): جملة كاملة مفهومة عن الموضوع اللي سأل عنه العميل بالضبط، بدون كلمات ناقصة أو مركبة غلط (مثل "تفضل تبحث عن فيلا مستقلة نوع ثاني من الوحدات"). إذا سأل سؤال وجوابه مكتوب في تفاصيل العقار (المساحة، الغرف، الإيجار): text يجاوبه ويسأل سؤال واحد بعده. إذا جوابه مو مكتوب: لا تعيد سؤاله عليه ("كم المساحة المتبقية ؟")، اكتب "بخصوص سؤالك عن ..." وسؤال يكمل مثل "متى يناسبك تزور وتشوفه ؟".
 - عميل رد خلال أقل من 24 ساعة: القرار followup والنص جاهز يرسل مباشرة، مو للانتظار.
 - طلب غرفة وصالة أو شقة وما رجع: اسأل بس "لين الحين تبحث عن غرفة وصالة ؟" بدون كلمة "جديدة". أي رسالة "نزل عندنا" لمن سأل عن نفس الشقة قبل: اسأل بس "لين الحين تبحث عن شقق للإيجار ؟".
+- الإيجار القصير (R55، أحمد 14 نوفمبر): عميل يطلب حجز أو إيجار ليوم أو ليلة أو ويكند أو بتاريخ محدد (استراحة، شاليه، مزرعة) وما في القائمة إيجار مدته المسموحة يومي أو أسبوعي: skip، بدون wait_for_match وبدون "اول ما يتوفر". "حجز" استراحة بتاريخ يعني إيجار، مو شراء.
+- لا تسأل "للإيجار أو الشراء ؟" أبداً إذا العميل قال قصده أو واضح من كلامه (R55).
 
 وضع العميل (R39، أحمد 12 نوفمبر): قبل القرار اقرأ "ملف العميل من النظام" (زياراته وصفقاته وطلباته) مع المحادثة كاملة، وحدد في stage وين وصل. كل عميل ياخذ رسالة على حسب وضعه، مو نفس الرسالة للكل، واللي جاوب على سؤال ما ينعاد عليه:
 - asked_no_visit: سأل وما زار. (القواعد فوق: "متى يناسبك تزور ؟" إذا ما سألناه، وسكوته بعد التفاصيل جواب.)
@@ -261,6 +263,45 @@ async function review(item: any, companyId: string, available: string, fixed: st
   if (out.text && out.text.includes("؟")) out.text = out.text.slice(0, out.text.indexOf("؟") + 1);
   // an unread voice note near the end means nobody knows what was said; he decides, never the automatic send
   if (chat.split("\n").slice(-6).some((l: string) => l.includes("[رسالة صوتية قديمة ما انقرت]"))) out.auto_ok = false;
+  // R55: the client's own lines, for the code guard in judge() (removed there, never stored)
+  out.client_said = chat.split("\n").filter((l: string) => /^\[[^\]]*\] العميل: /.test(l)).map((l: string) => l.replace(/^\[[^\]]*\] العميل: /, "")).join("\n");
+  return out;
+}
+
+// R55 (Ahmed 14 Nov 2026 «نعم، سوّها», from Maram's note of 11 Nov: a client asked to book a rest house for 26 Nov and his
+// follow-up read «الاستراحة للإيجار أو الشراء ؟»). Held by code after the review answers, on the client's own lines (normAr):
+// (1) a short rent of a rest house, chalet or farm (a booking with a date, a day, a night, a weekend) while no available rent
+//     accepts a day or a week: no follow-up. skip, not wait_for_match: the brain says no «اول ما يتوفر» for a short rent.
+//     Never for a client who spoke of buying, visited, has a visit booked or is negotiating, and only when the follow-up
+//     itself is about that rent.
+// (2) «للإيجار أو الشراء ؟» is never asked when the client already said which: the row's own wording goes instead and
+//     it waits for the office (auto_ok=false).
+// Not applied over an instruction given on that follow-up, nor to a message prepared for everyone.
+const R55_RENT = /ايجار|اجار|استاجر|تاجير|مستاجر/;
+const R55_BUY = /شراء|اشتري|بشتري|نشتري|تملك|للبيع/;
+const R55_LEISURE = /استراح|شاليه|مزرع/;
+const R55_BOOK = /(حجز|احجز|نحجز|حجوزات)(?!\s*(موعد|زياره|معاينه))/;
+const R55_SHORT = /(^|\s)(ال)?يومي(ه)?(?=\s|$)|باليوم|يوم واحد|ليله (وحده|واحده)|ليلتين|ويكند|نهايه الاسبوع|مبيت/;
+const R55_DATE = /\d{1,4}\s*[\/\-.]\s*\d{1,2}|تاريخ/;
+const R55_ASK = /(ايجار|اجار)\s+(او|ولا|لو|ام|والا)\s+(ال|لل)?(شراء|بيع|تملك)|(شراء|بيع|تملك)\s+(او|ولا|لو|ام|والا)\s+(ال|لل)?(ايجار|اجار)/;
+const R55_STAGES = ["asked_no_visit", "budget_lower", "other_area", "not_buyer", "unclear"];
+const r55Norm = (s: unknown) => normAr(s).replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
+function shortRentGuard(out: any, clientSaid: string, shortRentAvailable: boolean, fallback: string) {
+  const said = r55Norm(clientSaid);
+  const shortAsk = !R55_BUY.test(said) && ((R55_LEISURE.test(said) && (R55_SHORT.test(said) || (R55_BOOK.test(said) && R55_DATE.test(said)))) || (R55_RENT.test(said) && R55_SHORT.test(said)));
+  const about = r55Norm(`${out.text || ""} ${out.subject || ""} ${out.reason || ""}`);
+  if (shortAsk && !shortRentAvailable && out.decision !== "skip" && R55_STAGES.includes(String(out.stage)) && (R55_LEISURE.test(about) || R55_RENT.test(about) || R55_BOOK.test(about))) {
+    out.reason = short(`(R55) يبي إيجار قصير بيوم أو تاريخ محدد وما عندنا إيجار بهالمدة، ما يحتاج متابعة. ${out.reason || ""}`, 300);
+    out.decision = "skip"; out.text = null; out.auto_ok = false; out.offer_no = null; out.guard = "guard_short_rent";
+    return out;
+  }
+  if (out.decision === "followup" && out.text && R55_ASK.test(r55Norm(out.text)) && (shortAsk || R55_RENT.test(said) || R55_BUY.test(said))) {
+    const base = String(fallback || "").replace(/\s+/g, " ").trim();
+    if (base) out.text = base.startsWith("السلام عليكم") ? base : `السلام عليكم ${base}`;
+    else { out.decision = "skip"; out.text = null; }
+    out.auto_ok = false; out.guard = "guard_rent_or_buy";
+    out.reason = short(`(R55) انشال سؤال «إيجار أو شراء» لأن العميل قال قصده. ${out.reason || ""}`, 300);
+  }
   return out;
 }
 
@@ -302,6 +343,14 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
   if (kind === "request" && x.kind === "property_sold") about = `رسالة جماعية لكل من سأل عن عقار انحجز أو انباع (${short(x.summary, 150) || "عقار"}). النص اللي ينتظر موافقة أحمد وما يتغير: "${fixed}". قرارك followup إذا الرسالة تناسب وضع هذا العميل (واكتب text نفس النص)، و skip إذا ما تناسبه: اشترى أو حصل، قال ما يبغى، زار وقال ما ناسبه، موضوعه انتهى، مو عميل يبحث، أو في تفاوض. auto_ok=false.`;
   if (kind === "request" && x.kind === "new_listing") about = `رسالة جماعية عن عقار جديد نزل ممكن يناسب طلبه (${short(x.summary, 150) || "طلبه"}). النص اللي ينتظر موافقة أحمد وما يتغير: "${fixed}". قرارك followup إذا لين الحين يبحث والعقار يناسب اللي قاله (واكتب text نفس النص)، و skip إذا ما يناسبه أو موضوعه انتهى أو في تفاوض. auto_ok=false.`;
   const out = await review(x, companyId, available, fixed, about, instruction, x.owner_text || fixed);
+  // R55: the short-rent guard, before anything else reads the decision
+  const clientSaid = String(out.client_said || "");
+  delete out.client_said;
+  if (!instruction && !(kind === "request" && ["property_sold", "new_listing"].includes(String(x.kind)))) {
+    const subject = String(out.subject || "").replace(/^\s*(بخصوص\s+)?طلبك\s+/, "").replace(/[؟?،,.!]/g, " ").replace(/\s+/g, " ").trim();
+    const fallback = kind === "request" && subject && subject.length <= 60 && !/[A-Za-z]/.test(subject) ? `بخصوص طلبك ${subject} لين الحين تبحث ؟` : fixed;
+    shortRentGuard(out, clientSaid, (await availableList(companyId)).shortRent, fallback);
+  }
   if (kind === "visit") out.text = namedVisitQuestion(out.text, name);
   // R39: a client who already gave his opinion is never asked the step-1 opinion question again by the fixed template
   if (kind === "visit" && Number(x.step) === 1 && ["visited_liked", "visited_no_fit"].includes(String(out.stage))) out.auto_ok = false;
@@ -456,15 +505,20 @@ async function applyDecision(kind: "visit" | "request", x: any, companyId: strin
 
 // The available list the review reads. R39: every line carries a number («[3]») the review returns in offer_no, so an offer
 // outside the 24 hours names a property that really is on the list (labels[n - 1]), never one the model made up.
-let availableCache = { at: 0, company: "", text: "", labels: [] as string[] };
+let availableCache = { at: 0, company: "", text: "", labels: [] as string[], shortRent: false };
+// R55: the allowed rent terms, in the reply agent's words, so the review knows a short rent is not on the list
+const RENT_TERMS: Record<string, string> = { daily: "يومي", weekly: "أسبوعي", monthly: "شهري", "3m": "3 شهور", "6m": "6 شهور", yearly: "سنة" };
+const rentTerms = (p: any) => p.listing_purpose === "rent" && (p.rental_terms || []).length ? ` | مدة الإيجار المسموحة: ${(p.rental_terms as string[]).map((t) => RENT_TERMS[t] || t).join(" او ")}` : "";
+// a rent that takes a day or a week; a rest house, chalet or farm for rent with no terms written counts too (not known = not refused)
+const takesShortRent = (p: any) => p.listing_purpose === "rent" && ((p.rental_terms || []).some((t: string) => t === "daily" || t === "weekly") || (!(p.rental_terms || []).length && ["resthouse", "chalet", "farm"].includes(String(p.type || "").toLowerCase())));
 const priceShort = (p: unknown) => { const n = Number(p || 0); return n >= 1000 ? `${String(Math.round(n / 100) / 10)} الف` : `${n} ريال`; };
 async function availableList(companyId: string) {
   if (availableCache.company === companyId && Date.now() - availableCache.at < 60000) return availableCache;
-  const props = await db.from("properties").select("type,area,price,bedrooms,listing_purpose,public_details,rented_units").eq("company_id", companyId).eq("status", "available").eq("archived", false).order("area").order("price").order("id");
+  const props = await db.from("properties").select("type,area,price,bedrooms,listing_purpose,public_details,rented_units,rental_terms").eq("company_id", companyId).eq("status", "available").eq("archived", false).order("area").order("price").order("id");
   const rows = props.data || [];
-  const text = rows.map((p: any, i: number) => `- [${i + 1}] ${typeAr(p.type)} ${p.listing_purpose === "rent" ? "للإيجار" : "للبيع"} في ${p.area} بـ ${Number(p.price || 0).toLocaleString("en-US")} ${p.bedrooms ? `${p.bedrooms} غرف` : ""}${p.rented_units ? ` | المؤجر حالياً: ${short(p.rented_units, 200)}` : ""}${p.public_details ? ` | التفاصيل: ${short(p.public_details, 700).replace(/\n+/g, " / ")}` : ""}`).join("\n");
+  const text = rows.map((p: any, i: number) => `- [${i + 1}] ${typeAr(p.type)} ${p.listing_purpose === "rent" ? "للإيجار" : "للبيع"} في ${p.area} بـ ${Number(p.price || 0).toLocaleString("en-US")} ${p.bedrooms ? `${p.bedrooms} غرف` : ""}${rentTerms(p)}${p.rented_units ? ` | المؤجر حالياً: ${short(p.rented_units, 200)}` : ""}${p.public_details ? ` | التفاصيل: ${short(p.public_details, 700).replace(/\n+/g, " / ")}` : ""}`).join("\n");
   const labels = rows.map((p: any) => `${typeAr(p.type)}${p.listing_purpose === "rent" ? " للإيجار" : ""} في ${p.area} بـ ${priceShort(p.price)}`.replace(/\s+/g, " ").trim());
-  availableCache = { at: Date.now(), company: companyId, text, labels };
+  availableCache = { at: Date.now(), company: companyId, text, labels, shortRent: rows.some(takesShortRent) };
   return availableCache;
 }
 async function availableText(companyId: string) {
@@ -484,7 +538,7 @@ async function preview(companyId: string, offset: number) {
   const items: any[] = [];
   for (let i = 0; i < jobs.length; i += REVIEWS_AT_ONCE) {
     await Promise.all(jobs.slice(i, i + REVIEWS_AT_ONCE).map(async ([kind, x]) => {
-      try { const r = await judge(kind, x, companyId, available); items.push({ kind, id: x.id, client: nameOf.get(x.client_id), route: x.route_key, decision: r.decision, stage: r.stage, offer: r.offer_label || null, subject: r.subject, auto_ok: !!r.auto_ok, reason: short(r.reason, 200), text: r.text, request: r.request }); }
+      try { const r = await judge(kind, x, companyId, available); items.push({ kind, id: x.id, client: nameOf.get(x.client_id), route: x.route_key, decision: r.decision, guard: r.guard || null, stage: r.stage, offer: r.offer_label || null, subject: r.subject, auto_ok: !!r.auto_ok, reason: short(r.reason, 200), text: r.text, request: r.request }); }
       catch (e) { items.push({ kind, id: x.id, client: nameOf.get(x.client_id), error: String((e as any)?.message || e) }); }
     }));
   }
@@ -1254,7 +1308,7 @@ Deno.serve(async (req) => {
           const r = await judge("request", x, companyId, available);
           const subject = String(r.subject || "").replace(/^\s*(بخصوص\s+)?طلبك\s+/, "").replace(/[؟?،,.!]/g, " ").replace(/\s+/g, " ").trim();
           const t = r.decision === "followup" ? await stageTemplate(x, companyId, r, subject && subject.length <= 60 && !/[A-Za-z]/.test(subject) ? subject : "") : null;
-          items.push({ conversation: cid, held: await chatHeld(cid), decision: r.decision, stage: r.stage, stage_ar: STAGE_AR[String(r.stage)] || null, reason: short(r.reason, 220), text: r.decision === "followup" ? r.text : null,
+          items.push({ conversation: cid, held: await chatHeld(cid), decision: r.decision, guard: r.guard || null, stage: r.stage, stage_ar: STAGE_AR[String(r.stage)] || null, reason: short(r.reason, 220), text: r.decision === "followup" ? r.text : null,
             subject: subject || null, offer: r.offer_label || null, auto_ok: !!r.auto_ok,
             template: r.decision === "followup" ? (t?.template_name || "request_followup_ar_v2") : null, template_text: r.decision === "followup" ? (t?.messages || [`بخصوص طلبك ${subject}`, "لين الحين تبحث ؟"]).join(" / ") : null });
         } catch (e) { items.push({ conversation: cid, error: String((e as any)?.message || e) }); }
