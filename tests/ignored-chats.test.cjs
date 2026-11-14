@@ -10,7 +10,13 @@ const home=read('crm-owner-home.js');
 const base=read('app-base-v15.html');
 test('R40: the agent marks jobs, broker sign-ups, foreign brokers, banks and service offers as ignored and says nothing',()=>{
   assert(agent.includes('"unclear", "ignore"]'));
-  assert(agent.includes('ignore_kind: { type: ["string", "null"], enum: ["job", "broker_signup", "foreign_broker", "bank", "service", null] }'));
+  assert(agent.includes('ignore_kind: { type: ["string", "null"], enum: ["job", "broker_signup", "foreign_broker", "bank", "service", "contest", null] }'));
+  // R61 (note of 14 Nov 2026): a question about a contest is ignored too, held by code, and kept in the list as «other»
+  assert(agent.includes('contest: "يسأل عن مسابقة"')&&agent.includes('ignore_kind: out.ignore_kind === "contest" ? "other" : out.ignore_kind,'));
+  assert(agent.includes('out.category = "ignore"; out.ignore_kind = "contest"; out.guard_contest = true;'));
+  const CONTEST=new RegExp(agent.match(/const CONTEST_ASK = \/(.+)\/;/)[1]);
+  assert(CONTEST.test('متى تبدأ المسابقة؟')&&CONTEST.test('في مسابقه عندكم')&&!CONTEST.test('ابي فيلا في الرميس'));
+  assert(brain.includes('contest: يسأل عن مسابقة'));
   assert(agent.includes('required: ["reply_messages", "category", "ignore_kind",'));
   assert(agent.includes('if (ignored) { out.reply_messages = []; out.action = "none"; out.handoff_reason = null; }'));
   assert(agent.includes('agent_muted: true, agent_muted_reason: `متجاهل: ${IGNORE_LABEL[out.ignore_kind]}`, ignored_at: now'));

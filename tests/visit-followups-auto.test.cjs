@@ -178,3 +178,50 @@ test('R55: a rest house booked for a day gets no follow-up, and rent-or-buy is n
  assert(fn.includes('- الإيجار القصير (R55، أحمد 14 نوفمبر)')&&fn.includes('لا تسأل "للإيجار أو الشراء ؟" أبداً إذا العميل قال قصده'));
  assert(fn.includes('decision: r.decision, guard: r.guard || null, stage: r.stage'));
 });
+
+// R60 / R63 / R64 (the open «ملاحظة لـ Claude» notes of 14 Nov 2026): a client who refused a place is not offered the same
+// area again, a client looking for a higher bank valuation gets no follow-up, and a client who was given the owner's number
+// is asked whether he visited, not when he will. Held by code after the review answers.
+test('R60 / R63 / R64: refused area, valuation raise and owner contact are held by code',()=>{
+ const pick=(start,end)=>{const a=fn.indexOf(start);assert(a>=0,start);return fn.slice(a,fn.indexOf(end,a)+end.length);};
+ const src=[pick('const short =','\n'),pick('const normAr','\n'),pick('const R63_VALUATION','\n'),pick('const R60_GENERIC','\n'),pick('const areaWords','\n'),pick('const R60_PLACE','\n'),pick('const refusedPlace','\n'),pick('const R64_OWNER','\n'),pick('const R64_WHEN','\n'),pick('function notesGuard','\n}\n')].join('\n')
+  .replace('(v: unknown, n = 500)','(v, n = 500)').replace('(out: any, group: boolean, clientSaid: string, officeSaid: string, refusedAreas: string[], offerLabel: string)','(out, group, clientSaid, officeSaid, refusedAreas, offerLabel)').replace(/\((\w+): (?:unknown|string|any)\)/g,'($1)');
+ const {notesGuard,refusedPlace,areaWords}=new Function(src+';return {notesGuard,refusedPlace,areaWords};')();
+ const o=(x)=>({decision:'followup',text:'السلام عليكم بخصوص طلبك لين الحين تبحث ؟',subject:null,reason:'',stage:'asked_no_visit',auto_ok:true,offer_no:null,...x});
+ // R63: «عندك حد يرفع التثمين» in his last lines = no follow-up; an ordinary valuation question of an owner is not that
+ let r=notesGuard(o({}),false,'السلام عليكم\nعندك حد يرفع التثمين ابا اخذ هالفيلا\nعندي 40 الف شخصي ابا اغطيهم كلهم مع السكني','',[], '');
+ assert.equal(r.decision,'skip');assert.equal(r.text,null);assert.equal(r.guard,'guard_valuation');assert(r.reason.startsWith('(R63)'));
+ r=notesGuard(o({}),false,'ابي تثمين للارض كم تسوى','',[], '');assert.equal(r.decision,'followup');
+ r=notesGuard(o({}),false,['يرفع التثمين'].concat(Array(12).fill('كم سعر الفيلا')).join('\n'),'',[], '');assert.equal(r.decision,'followup');
+ // R60: the visit that was refused for its place
+ assert.equal(refusedPlace({status:'done',rejection_reason:'location'}),true);
+ assert.equal(refusedPlace({status:'done',liked:false,outcome_note:'جميلة لكن موقعها بعيد عن الدوام'}),true);
+ assert.equal(refusedPlace({status:'done',liked:false,rejection_reason:'finishing',outcome_note:'عيوب في التشطيب'}),false);
+ assert.equal(refusedPlace({status:'cancelled',rejection_reason:'location'}),false);
+ assert.deepEqual(areaWords('بركاء الرميس'),['رميس']);
+ // offered by number: same area = wait for a match; another area stays
+ r=notesGuard(o({stage:'visited_no_fit',offer_no:3,text:'السلام عليكم عندنا فيلا ثانية تحب ارسلك تفاصيلها ؟'}),false,'موقعها بعيد','',['بركاء الرميس'],'فيلا في الرميس بـ 59 الف');
+ assert.equal(r.decision,'wait_for_match');assert.equal(r.text,null);assert.equal(r.offer_no,null);assert.equal(r.guard,'guard_refused_location');assert(r.reason.startsWith('(R60)'));
+ r=notesGuard(o({stage:'visited_no_fit',offer_no:5}),false,'موقعها بعيد','',['بركاء الرميس'],'فيلا في الصومحان بـ 69 الف');
+ assert.equal(r.decision,'followup');
+ // offered in words (the 12 Nov text), and a message prepared for everyone leaves his row
+ r=notesGuard(o({text:'السلام عليكم الفيلا اللي سألت عنها في الرميس انباعت بس عندنا فيلا ثانية في الرميس بـ 59 الف تحب ارسلك تفاصيلها ؟'}),false,'','',['الرميس'],'');
+ assert.equal(r.decision,'wait_for_match');
+ r=notesGuard(o({text:'السلام عليكم نزل عندنا بيت في الرميس تحب ارسلك تفاصيله ؟'}),true,'','',['بركاء الرميس'],'');
+ assert.equal(r.decision,'skip');
+ // naming the property he saw is not an offer, and no refused visit = nothing changes
+ r=notesGuard(o({text:'السلام عليكم كيف شفت فيلا الرميس وايش انطباعك عنها ؟'}),false,'','',['الرميس'],'');assert.equal(r.decision,'followup');
+ r=notesGuard(o({offer_no:3}),false,'','',[],'فيلا في الرميس بـ 59 الف');assert.equal(r.decision,'followup');
+ // R64: the owner's contact went out, so the question is «did you visit», and it waits for the office
+ r=notesGuard(o({text:'السلام عليكم بخصوص البيت في الحيل الجنوبية متى يناسبك تزوره ؟',subject:'بيت الحيل الجنوبية'}),false,'تمام اخوي','[contacts]\nتواصل مع المالك مباشرة للزيارة',[], '');
+ assert.equal(r.text,'السلام عليكم بخصوص بيت الحيل الجنوبية قدرت تزور العقار ؟');assert.equal(r.auto_ok,false);assert.equal(r.guard,'guard_owner_contact');assert.equal(r.decision,'followup');
+ r=notesGuard(o({text:'السلام عليكم متى يناسبك تزورين البيت ؟'}),false,'','نسقي مع صاحب العقار',[], '');
+ assert.equal(r.text,'السلام عليكم متى يناسبك تزورين البيت ؟');
+ r=notesGuard(o({text:'السلام عليكم متى يناسبك تزورين البيت ؟'}),false,'','تواصل مع صاحب العقار',[], '');
+ assert.equal(r.text,'السلام عليكم قدرتي تزورين العقار ؟');
+ r=notesGuard(o({text:'السلام عليكم بخصوص البيت متى يناسبك تزوره ؟'}),false,'','تمام البيت مفتوح',[], '');
+ assert.equal(r.text,'السلام عليكم بخصوص البيت متى يناسبك تزوره ؟');
+ // wiring and the words the review reads
+ assert(fn.includes('notesGuard(out, group, clientSaid, officeSaid, refusedAreas, offerLabel);'));
+ assert(fn.includes('- الموقع ما ناسبه (R60')&&fn.includes('- رفع التثمين (R63')&&fn.includes('- رقم صاحب العقار (R64'));
+});

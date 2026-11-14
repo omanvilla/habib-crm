@@ -107,6 +107,9 @@ const REVIEW_RULES = `أنت تراجع متابعة عميل لمكتب عقا�
 - طلب غرفة وصالة أو شقة وما رجع: اسأل بس "لين الحين تبحث عن غرفة وصالة ؟" بدون كلمة "جديدة". أي رسالة "نزل عندنا" لمن سأل عن نفس الشقة قبل: اسأل بس "لين الحين تبحث عن شقق للإيجار ؟".
 - الإيجار القصير (R55، أحمد 14 نوفمبر): عميل يطلب حجز أو إيجار ليوم أو ليلة أو ويكند أو بتاريخ محدد (استراحة، شاليه، مزرعة) وما في القائمة إيجار مدته المسموحة يومي أو أسبوعي: skip، بدون wait_for_match وبدون "اول ما يتوفر". "حجز" استراحة بتاريخ يعني إيجار، مو شراء.
 - لا تسأل "للإيجار أو الشراء ؟" أبداً إذا العميل قال قصده أو واضح من كلامه (R55).
+- الموقع ما ناسبه (R60، ملاحظة 14 نوفمبر): عميل زار عقار وقال موقعه بعيد أو المنطقة ما تناسبه = ما تناسبه كل عقاراتنا في نفس المنطقة. لا تعرض عليه عقار ثاني في نفس المنطقة ولا "عندنا فيلا ثانية في ..." نفسها، حتى لو اللي شافه انباع. إذا في القائمة شي في منطقة ثانية يقارب طلبه اعرضه، وإلا wait_for_match.
+- رفع التثمين (R63، ملاحظة 14 نوفمبر): عميل موضوعه يدور أحد يرفع له التثمين أو تثمين عالي يغطي قرضه الشخصي: هذا ما عندنا. skip، بدون متابعة عقارية وبدون "لين الحين تبحث".
+- رقم صاحب العقار (R64، ملاحظة 14 نوفمبر): إذا المكتب أرسل له رقم صاحب العقار أو جهة الاتصال أو قال له "تواصل مع المالك مباشرة للزيارة"، الزيارة صارت بينه وبين المالك: لا تسأله "متى يناسبك تزور ؟". اسأله هل قدر يزور العقار، بالاسم.
 
 وضع العميل (R39، أحمد 12 نوفمبر): قبل القرار اقرأ "ملف العميل من النظام" (زياراته وصفقاته وطلباته) مع المحادثة كاملة، وحدد في stage وين وصل. كل عميل ياخذ رسالة على حسب وضعه، مو نفس الرسالة للكل، واللي جاوب على سؤال ما ينعاد عليه:
 - asked_no_visit: سأل وما زار. (القواعد فوق: "متى يناسبك تزور ؟" إذا ما سألناه، وسكوته بعد التفاصيل جواب.)
@@ -265,6 +268,8 @@ async function review(item: any, companyId: string, available: string, fixed: st
   if (chat.split("\n").slice(-6).some((l: string) => l.includes("[رسالة صوتية قديمة ما انقرت]"))) out.auto_ok = false;
   // R55: the client's own lines, for the code guard in judge() (removed there, never stored)
   out.client_said = chat.split("\n").filter((l: string) => /^\[[^\]]*\] العميل: /.test(l)).map((l: string) => l.replace(/^\[[^\]]*\] العميل: /, "")).join("\n");
+  // R64: the office's own lines, for notesGuard in judge() (removed there, never stored)
+  out.office_said = chat.split("\n").filter((l: string) => /^\[[^\]]*\] المكتب: /.test(l)).map((l: string) => l.replace(/^\[[^\]]*\] المكتب: /, "")).join("\n");
   return out;
 }
 
@@ -301,6 +306,49 @@ function shortRentGuard(out: any, clientSaid: string, shortRentAvailable: boolea
     else { out.decision = "skip"; out.text = null; }
     out.auto_ok = false; out.guard = "guard_rent_or_buy";
     out.reason = short(`(R55) انشال سؤال «إيجار أو شراء» لأن العميل قال قصده. ${out.reason || ""}`, 300);
+  }
+  return out;
+}
+
+// R60, R63, R64 (the open «ملاحظة لـ Claude» notes of 14 Nov 2026, turned into rules the code holds after the review answers):
+// R63: a client whose subject is finding someone to raise the bank valuation so it covers his personal loan (we do not do
+//      that): no follow-up. Read on his last lines only, so an old question does not stop a later, ordinary one.
+// R60: a client who visited and said the place is far / the area does not suit him is never offered another property in
+//      that same area (a second villa in الرميس to a client who refused الرميس). The refused areas come from his recorded
+//      visits. A follow-up of his own waits for a match; a message prepared for everyone is taken off his row.
+// R64: once the office gave the owner's number or contact card («تواصل مع المالك مباشرة للزيارة»), the visit is between the
+//      client and the owner: «متى يناسبك تزور ؟» becomes «قدرت تزور العقار ؟» and waits for the office.
+// Not applied over an instruction given on that follow-up (the caller skips it then).
+const R63_VALUATION = /(يرفع|ترفع|يرفعون|نرفع|رفع|يزيد|يزود|يزيدون)\s*(لي\s*|لنا\s*)?(ال)?تثمين|تثمين\s*(عالي|مرتفع|اعلي)|(اغطي|يغطي|تغطي|نغطي|اغطيهم|تغطيه)[^\n]{0,40}(شخصي|قرضي|القرض)/;
+const R60_GENERIC = ["بركاء", "مسقط", "سيب", "بوشر", "عامرات", "مطرح", "قريات", "ولايه", "منطقه", "شماليه", "جنوبيه", "شرقيه", "غربيه"];
+const areaWords = (s: unknown) => normAr(s).split(/[^ء-ي]+/).map((w) => w.replace(/^ال/, "")).filter((w) => w.length > 2 && !R60_GENERIC.includes(w));
+const R60_PLACE = /موقع|بعيد|المنطقه|منطقه/;
+const refusedPlace = (v: any) => v?.status === "done" && (String(v.rejection_reason || "") === "location" || ((v.liked === false || String(v.client_feedback || "") === "disliked") && R60_PLACE.test(normAr(`${v.rejection_reason || ""} ${v.outcome_note || ""}`))));
+const R64_OWNER = /\[contacts\]|(تواصل|نسق|تنسق|كلم)\s*(مع\s*)?(المالك|صاحب العقار|صاحب البيت)/;
+const R64_WHEN = /متي\s*يناسبك(م)?\s*(تزور|تشوف|تعاين|نزور)/;
+function notesGuard(out: any, group: boolean, clientSaid: string, officeSaid: string, refusedAreas: string[], offerLabel: string) {
+  if (out.decision !== "skip" && R63_VALUATION.test(normAr(String(clientSaid || "").split("\n").slice(-12).join("\n")))) {
+    out.reason = short(`(R63) موضوعه رفع التثمين عشان يغطي قرضه الشخصي وهذا ما عندنا، ما يحتاج متابعة. ${out.reason || ""}`, 300);
+    out.decision = "skip"; out.text = null; out.auto_ok = false; out.offer_no = null; out.guard = "guard_valuation";
+    return out;
+  }
+  const refused = [...new Set((refusedAreas || []).flatMap(areaWords))];
+  if (refused.length && out.decision === "followup") {
+    const t = normAr(out.text || ""), i = t.indexOf("عندنا");
+    const offered = offerLabel ? areaWords(offerLabel) : i >= 0 ? areaWords(t.slice(i)) : [];
+    const hit = offered.find((w: string) => refused.includes(w));
+    if (hit) {
+      out.reason = short(`(R60) زار وقال الموقع ما ناسبه، ما نعرض عليه عقار ثاني في نفس المنطقة. ${out.reason || ""}`, 300);
+      out.decision = group ? "skip" : "wait_for_match"; out.text = null; out.auto_ok = false; out.offer_no = null; out.stage = "visited_no_fit"; out.guard = "guard_refused_location";
+      return out;
+    }
+  }
+  if (!group && out.decision === "followup" && out.text && R64_OWNER.test(normAr(officeSaid)) && R64_WHEN.test(normAr(out.text))) {
+    const she = /تزورين|تشوفين|تعاينين/.test(out.text);
+    const subject = String(out.subject || "").replace(/^\s*(بخصوص\s+)?طلبك\s+/, "").replace(/[؟?،,.!]/g, " ").replace(/\s+/g, " ").trim();
+    out.text = `السلام عليكم ${subject && subject.length <= 60 && !/[A-Za-z]/.test(subject) ? `بخصوص ${subject} ` : ""}${she ? "قدرتي تزورين" : "قدرت تزور"} العقار ؟`;
+    out.auto_ok = false; out.guard = "guard_owner_contact";
+    out.reason = short(`(R64) انرسل له رقم صاحب العقار، فالسؤال هل زار مو متى يزور. ${out.reason || ""}`, 300);
   }
   return out;
 }
@@ -350,6 +398,20 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
     const subject = String(out.subject || "").replace(/^\s*(بخصوص\s+)?طلبك\s+/, "").replace(/[؟?،,.!]/g, " ").replace(/\s+/g, " ").trim();
     const fallback = kind === "request" && subject && subject.length <= 60 && !/[A-Za-z]/.test(subject) ? `بخصوص طلبك ${subject} لين الحين تبحث ؟` : fixed;
     shortRentGuard(out, clientSaid, (await availableList(companyId)).shortRent, fallback);
+  }
+  // R60 / R63 / R64: the notes guard (a message prepared for everyone is read for R60 too; never over an instruction)
+  const officeSaid = String(out.office_said || "");
+  delete out.office_said;
+  if (!instruction) {
+    const group = kind === "request" && ["property_sold", "new_listing"].includes(String(x.kind));
+    let refusedAreas: string[] = [];
+    if (out.decision === "followup" && x.client_id) {
+      const vr = await db.from("viewings").select("status,liked,client_feedback,rejection_reason,outcome_note,properties(area)").eq("company_id", companyId).eq("client_id", x.client_id).eq("archived", false).order("viewing_date", { ascending: false }).limit(8);
+      refusedAreas = (vr.data || []).filter(refusedPlace).map((v: any) => String(v.properties?.area || "")).filter(Boolean);
+    }
+    const l = await availableList(companyId);
+    const offerLabel = Number.isInteger(out.offer_no) && out.offer_no > 0 && l.text === available ? l.labels[out.offer_no - 1] || "" : "";
+    notesGuard(out, group, clientSaid, officeSaid, refusedAreas, offerLabel);
   }
   if (kind === "visit") out.text = namedVisitQuestion(out.text, name);
   // R39: a client who already gave his opinion is never asked the step-1 opinion question again by the fixed template

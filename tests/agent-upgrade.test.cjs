@@ -649,3 +649,25 @@ test('R56: a property outside Muscat and Barka is declined with the fixed lines,
  assert(brain.includes('- مناطق الشغل (R56، أحمد 14 نوفمبر)'));for(const l of L)assert(brain.includes('"'+l+'"'),l);
  assert(brain.includes('بدون دراسة سعر أبداً'));assert(!brain.includes('بركاء مع بركاء والمصنعة'));
 });
+
+// R62 (note of 14 Nov 2026, chat KLD: «او فيديوا اذا عندك قناة ف يوتوب»): the answer is the fixed pair, like the photo request.
+test('R62: a question about a YouTube channel gets «على الطبيعة» and the visit question, held by code',()=>{
+ const block=agent.slice(at('    // ---- R62 (note of 14 Nov 2026'),at('    // ---- R56 (Ahmed 14 Nov 2026)')).replace(/\((\w+): (?:string|any)\)/g,'($1)');
+ const guard=new Function('out','texts','burstSaid','prop','visitedIds','YOUTUBE_ASK','YOUTUBE_LINES',block+'\nreturn {out,texts};');
+ const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
+ const YT=re('YOUTUBE_ASK'),LINES=['الافضل تشوف العقار على الطبيعة احسن من الفيديو والصور','متى يناسبك تزور ؟'];
+ assert(agent.includes('const YOUTUBE_LINES = ["'+LINES[0]+'", "'+LINES[1]+'"];'));
+ const ad='استراحة في الرميس '.repeat(20);
+ const run=(texts,o={})=>guard({action:'none',category:'buyer',...(o.out||{})},texts,o.said===undefined?'ممكن تفاصيل الفلا او فيديوا اذا عندك قناة ف يوتوب':o.said,o.prop===undefined?{id:'p1'}:o.prop,new Set(o.visited||[]),YT,LINES);
+ let r=run([ad]);assert.deepEqual(r.texts,[ad,...LINES]);assert.equal(r.out.guard_youtube,true);
+ r=run([ad,'متى يناسبك تزور ؟']);assert.deepEqual(r.texts,[ad,...LINES]);
+ r=run(['ما عندنا قناة يوتيوب','متى يناسبك تزور ؟']);assert.deepEqual(r.texts,LINES);
+ r=run([ad,LINES[0],LINES[1]]);assert.deepEqual(r.texts,[ad,...LINES]);assert.equal(r.out.guard_youtube,undefined);
+ // not without a property, not after a visit, not over a handoff or a location going out, not for another question
+ for(const o of [{prop:null},{visited:['p1']},{out:{action:'handoff'}},{out:{action:'send_location'}},{out:{category:'seller'}},{said:'ممكن تفاصيل الفيلا'}]){
+  r=run([ad],o);assert.deepEqual(r.texts,[ad]);assert.equal(r.out.guard_youtube,undefined);}
+ r=run([],{});assert.deepEqual(r.texts,[]);
+ for(const s of ['عندكم قناة يوتيوب','شفته في اليوتوب','YouTube channel ?'])assert(YT.test(s),s);
+ assert(brain.includes('سؤال عن قناة يوتيوب أو فيديو يوتيوب للعقار (R62)')&&brain.includes(LINES[0]));
+ assert(brain.includes('- (R60) عميل زار عقار وقال موقعه بعيد'));
+});

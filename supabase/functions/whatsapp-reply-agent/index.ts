@@ -16,10 +16,14 @@ const DEBOUNCE_MS = Number(Deno.env.get("REPLY_DEBOUNCE_MS") || 35000); // wait 
 // and the open item stays on Ahmed's list.
 // R45 (Ahmed 14 Nov): a meeting request («اجتماع:») silences the agent too; Ahmed answers the client himself
 const HARD_HANDOFF = /^\s*(تفاوض|مشتري جاد|دراسة سعر|سؤال ما عندي جوابه|اجتماع)\s*:/;
+// R61: a question about a contest (we run none). R62: a question about a YouTube channel or video of the property.
+const CONTEST_ASK = /مسابق[ةه]|المسابقات/;
+const YOUTUBE_ASK = /يوتيوب|يوتوب|youtube/i;
+const YOUTUBE_LINES = ["الافضل تشوف العقار على الطبيعة احسن من الفيديو والصور", "متى يناسبك تزور ؟"];
 // R41 (Ahmed 12 Nov): a question whose answer is not written in front of the agent gets no reply at all; the chat goes back to Ahmed
 const UNKNOWN_Q = /^\s*سؤال ما عندي جوابه\s*:/;
 // R40 (Ahmed 12 Nov): people the office never answers; the chat leaves «العقل موقوف عندهم» for the ignored list
-const IGNORE_LABEL: Record<string, string> = { job: "طالب وظيفة", broker_signup: "يبي يتسجل وسيط عندنا", foreign_broker: "وسيط أو شركة من برا عمان", bank: "موظف بنك يعرض تعاون", service: "يعرض خدمة" };
+const IGNORE_LABEL: Record<string, string> = { job: "طالب وظيفة", broker_signup: "يبي يتسجل وسيط عندنا", foreign_broker: "وسيط أو شركة من برا عمان", bank: "موظف بنك يعرض تعاون", service: "يعرض خدمة", contest: "يسأل عن مسابقة" };
 // Ahmed's strict rule (6 Nov): never promise the customer a reply ("بشوف وارد عليك"). Silence is better than a promise nobody keeps.
 // R12 (9 Nov, in code 10 Nov): first-person call promises too ("بتصل عليك", "بكلمك"). The one allowed sentence is R12's third-person
 // "اول ما يفضى يتصل فيك", which none of these match; "اول ما يتوفر بتواصل معك" is not a call promise and stays.
@@ -246,7 +250,7 @@ const schema = {
   properties: {
     reply_messages: { type: "array", items: { type: "string" } },
     category: { type: "string", enum: ["buyer", "tenant", "investor", "seller", "general", "broker", "active_deal", "unclear", "ignore"] },
-    ignore_kind: { type: ["string", "null"], enum: ["job", "broker_signup", "foreign_broker", "bank", "service", null] },
+    ignore_kind: { type: ["string", "null"], enum: ["job", "broker_signup", "foreign_broker", "bank", "service", "contest", null] },
     source: { type: "string", enum: ["reel", "property_link", "image", "video", "ad", "referral", "direct", "unknown"] },
     intent: { type: "string" },
     budget_asked_now: { type: "boolean" },
@@ -1029,6 +1033,16 @@ Deno.serve(async (req) => {
     if (!ai.ok) throw new Error(aiP?.error?.message || `openai_${ai.status}`);
     const out = JSON.parse(aiP.output_text || aiP.output?.flatMap((x: any) => x?.content || []).find((x: any) => x?.type === "output_text")?.text || "{}");
     // R40: nothing is said and nothing is handed to Ahmed; below the chat is muted for good and kept in the ignored list
+    // R61 (note of 14 Nov 2026 on a chat that asked «متى تبدأ المسابقة؟»): the office runs no contest. Whoever asks about one,
+    // with no property in the chat, is ignored for good like R40, whatever the model chose. Kept in the list as «other».
+    {
+      let from = 0;
+      history.forEach((h: any, i: number) => { if (h.direction === "outbound") from = i + 1; });
+      const asked = history.slice(from).filter((h: any) => h.direction === "inbound").map((h: any) => String(h.transcript || h.body || "")).join(" ");
+      if (CONTEST_ASK.test(asked) && !out.property_id && !history.some((h: any) => h.matched_property_id) && ["general", "unclear", "ignore"].includes(out.category) && !IGNORE_LABEL[String(out.ignore_kind || "")]) {
+        out.category = "ignore"; out.ignore_kind = "contest"; out.guard_contest = true;
+      }
+    }
     const ignored = out.category === "ignore" && !!IGNORE_LABEL[String(out.ignore_kind || "")];
     if (out.category === "ignore" && !ignored) out.category = "unclear";
     if (ignored) { out.reply_messages = []; out.action = "none"; out.handoff_reason = null; }
@@ -1328,6 +1342,16 @@ Deno.serve(async (req) => {
       const onlyClosing = texts.every((t) => t.length < 25 && /العفو|الله يسعدك|مبروك|تسلم|حياك/.test(t));
       const visitHandled = history.some((h: any) => h.direction === "outbound" && /تزور|زيار|المالك مباشرة|نسق مع المالك|\[contacts\]/.test(String(h.body || "") + (h.message_type === "contacts" ? "[contacts]" : "")));
       if (texts.length && !onlyClosing && !waitsBank && (hasAd || sentAd) && !asksVisit && out.action === "none" && !visitHandled) texts.push("متى يناسبك تزور ؟");
+    }
+    // ---- R62 (note of 14 Nov 2026, مرام, chat KLD): «عندك قناة في يوتيوب ؟» about a property ----
+    // The reel is the whole video; the answer is the fixed pair «الافضل تشوف العقار على الطبيعة…» + the visit question, like the
+    // photo request (R34). Only for a buyer or tenant on an available property he has not visited, when the reply is a plain
+    // one (no handoff, no location going out). The branch rule (R48) still runs after this and takes the visit question out.
+    if (YOUTUBE_ASK.test(burstSaid) && texts.length && prop && !visitedIds.has(prop.id) && ["buyer", "tenant"].includes(out.category) && out.action === "none"
+      && !texts.some((t) => /على الطبيع[ةه]/.test(t))) {
+      texts = texts.filter((t) => !(t.length < 90 && /(تزور|تزورون|تزورين|يناسبك)\s*؟/.test(t)) && !(t.length <= 250 && YOUTUBE_ASK.test(t)));
+      texts.push(...YOUTUBE_LINES);
+      out.guard_youtube = true;
     }
     // ---- R56 (Ahmed 14 Nov 2026): a property outside Muscat and Barka is declined, whatever the model wrote ----
     // Also over a «دراسة سعر:» handoff (13 Nov: two lands in Salalah were sent to pricing). Not over another handoff, not when
@@ -1690,7 +1714,7 @@ Deno.serve(async (req) => {
     // R45: a meeting request is a hard handoff «اجتماع: …» (Ahmed is alerted and answers; the agent stays out of the chat)
     const meetingBooked = out.action === "book_meeting" && /^\s*اجتماع\s*:/.test(String(out.handoff_reason || ""));
     if (out.action === "handoff" || meetingBooked) Object.assign(convPatch, { human_handoff_required: true, handoff_reason: short(out.handoff_reason || out.intent, 500), handoff_updated_at: now });
-    if (ignored) Object.assign(convPatch, { agent_muted: true, agent_muted_reason: `متجاهل: ${IGNORE_LABEL[out.ignore_kind]}`, ignored_at: now, ignore_kind: out.ignore_kind,
+    if (ignored) Object.assign(convPatch, { agent_muted: true, agent_muted_reason: `متجاهل: ${IGNORE_LABEL[out.ignore_kind]}`, ignored_at: now, ignore_kind: out.ignore_kind === "contest" ? "other" : out.ignore_kind,
       human_handoff_required: false, handoff_reason: null, handoff_updated_at: now });
     // a handoff that only said "which property ?" is closed by the agent itself once it answers normally (8 Nov, Ahmed: it must not wait for him)
     if (out.action !== "handoff" && !meetingBooked && sentIds.length && out.reply_messages.length && conv.human_handoff_required && /مو واضح|ما عرفنا|أي عقار|اي عقار|العقار.*(واضح|محدد)/.test(String(conv.handoff_reason || "")) && !HARD_HANDOFF.test(String(conv.handoff_reason || ""))) {
