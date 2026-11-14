@@ -6,6 +6,18 @@ Updated 2026-11-14. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 14 November 2026 — voice notes recorded in the CRM chat never reached the customer (131053): now Ogg/Opus
+
+- **What Ahmed asked.** «ليش ما تنرسل الرسالة من النظام؟» with a screenshot of a voice note marked ⚠, then «نعم، أصلحها».
+- **Found (read only).** Every voice note recorded with the chat's 🎤 failed: two in all (11 Nov and 14 Nov, two chats, Muscat number), both `audio/mp4` from Chrome's MediaRecorder. Meta accepted the upload and the message, then the status webhook said `failed`, error **131053 «Media upload error»** («Media file scrutiny … mediaEngineStatus: 0»). The CRM had said «تم الإرسال». Voice notes from the WhatsApp Business app and typed text from the CRM arrive.
+- **The change** (front end only, `crm-whatsapp-chat.js?v=20261114-ogg1`; no SQL, no edge function):
+  - A recording that is not already Ogg is decoded and re-encoded in the browser to **Ogg/Opus mono 48 kHz, 32 kbit/s** (`toOggOpus`: WebCodecs `AudioEncoder` + a small Ogg page writer) and attached as `voice-….ogg`. Only where the browser can play Ogg (Chrome, Edge, Firefox, new Safari); elsewhere the old path stays. If the conversion fails the old file is attached and a warning is shown.
+  - A message Meta refused shows «⚠ لم تصل للعميل» in words under the bubble, and the open chat shows a red toast when a sent message turns to failed.
+- **Checked.** In the Claude browser pane (Chromium), with the same code: a 4-second tone recorded by `MediaRecorder` as `audio/mp4;codecs=mp4a.40.2` (the chat's own type list) → 16 KB Ogg in 40 ms; the browser decoded it back (3.93 s, 448 Hz measured for a 440 Hz tone) and an `<audio>` element read its duration. Unit tests for the Ogg page header and checksum.
+- **Not checked.** A real send: no message goes to a customer in a test, so **Meta's acceptance of the new file is not proven** until Ahmed records one to a number of his own. The real microphone, the phone, Safari. The audio object is sent without `voice: true`, so it may show as an audio file rather than a voice-note bubble.
+- **Still open.** (a) The reason of a failure is not stored: `processStatus` in `whatsapp-webhook` keeps only `delivery_status`; the code is only in `whatsapp_webhook_events`. (b) **131042 «Business eligibility payment issue»** (account currency not configured): 43 reply-agent texts on the Barka number failed with it between 13 Nov 14:56 and 14 Nov 05:41 Muscat time (17 chats), and 87 templates since 8 Nov on both numbers. Only Ahmed can fix it, in Meta Business billing.
+- **Rollback.** Revert the commit (front end only).
+
 ## 14 November 2026 — R45 meetings, R46 keys, R47 every visit asked, staff lists, call log, daily visits message (SQL100)
 
 - **What Ahmed asked** (five changes, then three more the same morning). Decisions he took in the chat: a meeting request gets

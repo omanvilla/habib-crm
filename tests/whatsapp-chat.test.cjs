@@ -31,6 +31,32 @@ test('voice recording uses only formats WhatsApp accepts',()=>{
   assert.match(ui,/\['audio\/ogg;codecs=opus','audio\/mp4;codecs=mp4a\.40\.2','audio\/mp4'\]/);
   assert(!/audio\/webm/.test(ui));
 });
+test('a recorded voice note is re-encoded to Ogg/Opus before it is attached (WhatsApp refused Chrome MP4, 131053)',()=>{
+  assert.match(ui,/async function toOggOpus\(blob\)/);
+  assert.match(ui,/codec:'opus',sampleRate:RATE,numberOfChannels:1/);
+  assert.match(ui,/if\(mime!=='audio\/ogg'&&canPlayOgg\(\)\)/);
+  assert.match(ui,/out=await toOggOpus\(blob\);outMime='audio\/ogg';/);
+  assert.match(ui,/new Blob\(pages,\{type:'audio\/ogg'\}\)/);
+  assert.match(index,/crm-whatsapp-chat\.js\?v=20261114-ogg1/);
+});
+test('Ogg pages carry a valid header and checksum',()=>{
+  const src=ui.slice(ui.indexOf('const OGG_CRC='),ui.indexOf('async function toOggOpus'));
+  const oggPage=new Function(src+';return oggPage;')();
+  const big=new Uint8Array(600).fill(7),page=oggPage(0x01020304,5,96000,4,[new Uint8Array([1,2,3]),big]);
+  assert.equal(Buffer.from(page.subarray(0,4)).toString('latin1'),'OggS');
+  assert.equal(page[5],4);assert.equal(page[26],4,'3 bytes = 1 segment, 600 bytes = 255+255+90');
+  assert.deepEqual([...page.subarray(27,31)],[3,255,255,90]);
+  assert.equal(page.length,27+4+603);
+  const v=new DataView(page.buffer);assert.equal(v.getUint32(6,true),96000);assert.equal(v.getUint32(18,true),5);
+  // checksum recomputed bit by bit (polynomial 0x04c11db7, no reflection) with the CRC field zeroed
+  const stored=v.getUint32(22,true),copy=Uint8Array.from(page);copy.fill(0,22,26);
+  let c=0;for(const x of copy){c=(c^(x<<24))>>>0;for(let j=0;j<8;j++)c=((c&0x80000000)?((c<<1)^0x04c11db7):(c<<1))>>>0;}
+  assert.equal(stored,c);
+});
+test('a message WhatsApp refused after accepting it is shown in words and announced',()=>{
+  assert.match(ui,/wa2-tick fail" title="[^"]+">⚠ لم تصل للعميل</);
+  assert.match(ui,/m\.direction==='outbound'&&m\.delivery_status==='failed'&&old\.delivery_status!=='failed'\)showToast\(/);
+});
 test('voice notes, videos and files stream as bytes so files above 16 MB open',()=>{
   assert.match(ui,/action:'media_stream'/);
   assert.match(inbox,/if \(action === "media_stream"\)/);

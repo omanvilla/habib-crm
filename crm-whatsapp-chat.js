@@ -23,7 +23,7 @@
   function ticks(m){
     if(m.direction!=='outbound')return '';
     const s=String(m.delivery_status||'');
-    if(s==='failed')return '<span class="wa2-tick fail" title="لم تُرسل">⚠</span>';
+    if(s==='failed')return '<span class="wa2-tick fail" title="واتساب رفض هذه الرسالة ولم تصل للعميل">⚠ لم تصل للعميل</span>';
     if(s==='read')return '<span class="wa2-tick read" title="قُرئت">✓✓</span>';
     if(s==='delivered')return '<span class="wa2-tick" title="وصلت">✓✓</span>';
     return '<span class="wa2-tick" title="أُرسلت">✓</span>';
@@ -271,6 +271,60 @@
     if(typeof MediaRecorder!=='function')return '';
     return ['audio/ogg;codecs=opus','audio/mp4;codecs=mp4a.40.2','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t))||'';
   }
+  // 14 Nov 2026: Chrome records MP4, and WhatsApp accepted then refused both voice notes sent that way
+  // (error 131053 «Media upload error», 11 and 14 Nov). The recording is re-encoded here to Ogg/Opus mono,
+  // WhatsApp's own voice-note format, before it is attached. Browsers that cannot play Ogg keep the old path.
+  const OGG_CRC=(()=>{const t=new Uint32Array(256);for(let i=0;i<256;i++){let r=i<<24;for(let j=0;j<8;j++)r=(r&0x80000000)?((r<<1)^0x04c11db7):(r<<1);t[i]=r>>>0;}return t;})();
+  function oggPage(serial,seq,granule,flags,packets){
+    const lacing=[];let size=0;
+    for(const p of packets){let n=p.length;size+=n;while(n>=255){lacing.push(255);n-=255;}lacing.push(n);}
+    const page=new Uint8Array(27+lacing.length+size),v=new DataView(page.buffer);
+    page.set([0x4f,0x67,0x67,0x53,0,flags]);
+    v.setUint32(6,granule>>>0,true);v.setUint32(10,Math.floor(granule/4294967296),true);
+    v.setUint32(14,serial,true);v.setUint32(18,seq,true);page[26]=lacing.length;page.set(lacing,27);
+    let o=27+lacing.length;for(const p of packets){page.set(p,o);o+=p.length;}
+    let c=0;for(let i=0;i<page.length;i++)c=((c<<8)^OGG_CRC[((c>>>24)^page[i])&255])>>>0;
+    v.setUint32(22,c,true);
+    return page;
+  }
+  async function toOggOpus(blob){
+    if(typeof AudioEncoder!=='function'||typeof AudioData!=='function'||typeof OfflineAudioContext!=='function')throw new Error('no_encoder');
+    const RATE=48000,cfg={codec:'opus',sampleRate:RATE,numberOfChannels:1,bitrate:32000};
+    const ok=await AudioEncoder.isConfigSupported(cfg);if(!ok||!ok.supported)throw new Error('no_opus');
+    const dec=await new OfflineAudioContext(1,1,RATE).decodeAudioData(await blob.arrayBuffer());   // decoded at 48 kHz
+    const pcm=new Float32Array(dec.length),chs=dec.numberOfChannels;
+    for(let c=0;c<chs;c++){const d=dec.getChannelData(c);for(let i=0;i<d.length;i++)pcm[i]+=d[i]/chs;}
+    if(!pcm.length)throw new Error('empty');
+    const packets=[];let head=null,failed=null;
+    const enc=new AudioEncoder({output:(chunk,meta)=>{
+      const b=new Uint8Array(chunk.byteLength);chunk.copyTo(b);packets.push({b,n:Math.round((chunk.duration||20000)*RATE/1e6)});
+      const d=meta&&meta.decoderConfig&&meta.decoderConfig.description;
+      if(d&&!head)head=d instanceof ArrayBuffer?new Uint8Array(d.slice(0)):new Uint8Array(d.buffer.slice(d.byteOffset,d.byteOffset+d.byteLength));
+    },error:e=>{failed=e;}});
+    enc.configure(cfg);
+    for(let i=0;i<pcm.length;i+=RATE){
+      const part=pcm.slice(i,Math.min(pcm.length,i+RATE));
+      const frame=new AudioData({format:'f32-planar',sampleRate:RATE,numberOfFrames:part.length,numberOfChannels:1,timestamp:Math.round(i/RATE*1e6),data:part});
+      enc.encode(frame);frame.close();
+    }
+    await enc.flush();enc.close();
+    if(failed)throw failed;if(!packets.length)throw new Error('empty');
+    const txt=s=>new TextEncoder().encode(s);
+    let opusHead=head&&head.length>=19&&String.fromCharCode(...head.subarray(0,8))==='OpusHead'?head:null;
+    if(!opusHead){opusHead=new Uint8Array(19);opusHead.set(txt('OpusHead'));opusHead[8]=1;opusHead[9]=1;const hv=new DataView(opusHead.buffer);hv.setUint16(10,312,true);hv.setUint32(12,RATE,true);}
+    const preskip=opusHead[10]|(opusHead[11]<<8),vendor=txt('habib-crm');
+    const tags=new Uint8Array(8+4+vendor.length+4);tags.set(txt('OpusTags'));new DataView(tags.buffer).setUint32(8,vendor.length,true);tags.set(vendor,12);
+    const serial=(Math.random()*4294967296)>>>0,total=preskip+pcm.length,pages=[oggPage(serial,0,0,2,[opusHead]),oggPage(serial,1,0,0,[tags])];
+    let seq=2,granule=0,group=[],segs=0;
+    const flush=last=>{if(!group.length)return;pages.push(oggPage(serial,seq++,last?Math.min(granule,total):granule,last?4:0,group));group=[];segs=0;};
+    for(const p of packets){
+      const need=Math.floor(p.b.length/255)+1;
+      if(segs+need>255||group.length>=50)flush(false);
+      group.push(p.b);segs+=need;granule+=p.n;
+    }
+    flush(true);
+    return new Blob(pages,{type:'audio/ogg'});
+  }
   // mode: 'keep' = preview before sending (⏹), 'send' = send at once (➤), 'discard' = bin (🗑).
   function stopRecording(mode){
     if(!recorder)return;
@@ -291,8 +345,18 @@
       const mode=recAfterStop||'keep';recAfterStop=null;
       if(mode==='discard'){recChunks=[];syncButtons();showToast('انحذفت الصوتية ولم تُرسل','success');return;}
       if(Date.now()-recStart<800||!blob.size){syncButtons();return;}
-      const f=new File([blob],'voice-'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+(mime==='audio/ogg'?'.ogg':'.m4a'),{type:mime});
-      pick(f).then(()=>{if(mode==='send'&&pending&&pending.kind==='audio')sendMedia();});};
+      const stamp='voice-'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+      (async()=>{
+        let out=blob,outMime=mime;
+        if(mime!=='audio/ogg'&&canPlayOgg()){
+          if(mic)mic.disabled=true;
+          try{out=await toOggOpus(blob);outMime='audio/ogg';}
+          catch(e){console.warn('[wa2] voice to ogg',e);showToast('تعذر تجهيز الصوتية بصيغة واتساب، وقد يرفضها واتساب. لو ما وصلت أرسلها من تطبيق واتساب.','error');}
+          finally{if(mic)mic.disabled=false;}
+        }
+        await pick(new File([out],stamp+(outMime==='audio/ogg'?'.ogg':'.m4a'),{type:outMime}));
+        if(mode==='send'&&pending&&pending.kind==='audio')sendMedia();
+      })();};
     recorder.start();
     const mic=$('wa2MicBtn');if(mic){mic.classList.add('rec');const tick=()=>{const s=Math.floor((Date.now()-recStart)/1000);mic.textContent='⏹ '+Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};tick();recTimer=setInterval(tick,500);}
     syncButtons();
@@ -351,7 +415,10 @@
       const known=new Map(waInboxMessages.map(m=>[m.id,m]));let changed=false,incoming=false;
       for(const m of data.messages||[]){const old=known.get(m.id);
         if(!old){known.set(m.id,m);changed=true;if(m.direction==='inbound')incoming=true;}
-        else if(old.delivery_status!==m.delivery_status||old.transcript!==m.transcript){Object.assign(old,m);changed=true;}}
+        else if(old.delivery_status!==m.delivery_status||old.transcript!==m.transcript){
+          // WhatsApp accepts a message first and may refuse it seconds later: say so, the «تم الإرسال» toast is already gone.
+          if(m.direction==='outbound'&&m.delivery_status==='failed'&&old.delivery_status!=='failed')showToast('واتساب رفض رسالة في هذه المحادثة ولم تصل للعميل. شوف علامة ⚠ وأعد إرسالها.','error');
+          Object.assign(old,m);changed=true;}}
       if(!changed)return;
       const body=$('waChatBody'),atBottom=body&&body.scrollHeight-body.scrollTop-body.clientHeight<120;
       waInboxMessages=[...known.values()].sort((a,b)=>String(a.message_timestamp).localeCompare(String(b.message_timestamp))||Number(a.ingestion_seq||0)-Number(b.ingestion_seq||0));

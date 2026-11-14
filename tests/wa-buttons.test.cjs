@@ -51,7 +51,7 @@ test('the same two buttons in the follow-ups, the chat header, the waiting list 
  assert(chat.includes('<a class="crm-wa-btn crm-wa-phone" data-for="'));
  assert(ip.includes('<li class="ip-wait-row"><div class="ip-wait-info">')&&ip.includes('</div><div class="ip-wait-actions">'),'the name no longer breaks letter by letter beside the buttons');
  assert(base.includes("window.crmWaPhoneLink(c.phone_normalized||c.phone)")&&base.includes('<button type="button" class="crm-wa-btn crm-wa-crm" onclick="openClientWhatsAppHistory()">فتح في النظام</button>'),'client file: phone WhatsApp beside the CRM chat');
- assert(/crm-whatsapp-chat\.js\?v=20261112-wa2/.test(index)&&/crm-followups-today\.js\?v=20261112-wa2/.test(index));
+ assert(/crm-whatsapp-chat\.js\?v=20261114-ogg1/.test(index)&&/crm-followups-today\.js\?v=20261112-wa2/.test(index));
 });
 test('the two buttons are used on every chat button',()=>{
  for(const f of ['crm-hot-alerts.js','crm-owner-home.js','crm-owner-leads.js','crm-reply-approvals.js','crm-investment-projects.js'])assert(fs.readFileSync(f,'utf8').includes('crmWaButtons'),f);
