@@ -2,7 +2,7 @@
 
 Owner: Ahmed Habib Al Balushi. Use Arabic for owner-facing summaries. Repository `omanvilla/habib-crm`; Supabase `dmsckqjkcnsfmnzfjczz`. Never commit credentials, customer records or private screenshots.
 
-**New session? Read [docs/handoff-20261111.md](docs/handoff-20261111.md) first**: how Ahmed works, the safe change/publish routine on this machine, live pins and what is still open (written 11 Nov 2026 at the end of a long session).
+**New session? Read [docs/handoff-20261114.md](docs/handoff-20261114.md) first** (14 Nov 2026: where the work stands, what Ahmed decided about rules held by code, what is open), then [docs/handoff-20261111.md](docs/handoff-20261111.md) for the routine: how Ahmed works, the safe change/publish routine on this machine, live pins and what is still open (written 11 Nov 2026 at the end of a long session).
 
 Before changes read this file, `docs/current-state.md`, and [the detailed operating rules](docs/operating-rules-v15-20261021.md). Those business, account, financial, attribution, privacy and interface rules remain binding; they were moved verbatim to keep this entry point short. The explicit new Instagram authorization below supplements them. Latest owner instructions always take precedence.
 
