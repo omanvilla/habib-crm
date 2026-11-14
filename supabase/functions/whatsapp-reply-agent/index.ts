@@ -52,7 +52,26 @@ const BOUGHT_RE = /(اشتري|اشترينا|اشتريت|شرينا|شريت|�
 const NOT_A_VISIT_Q = /فيديو|الصور|صور البيت|صور الفيلا|الرابط|الريل|الاعلان|الإعلان/;
 // R10 / R20 (8 and 10 Nov): an owner is declined politely (heirs, occupied, mortgaged); this reply always goes out.
 // A bare «نعتذر منك» (sorry for the delay) is not a decline.
-const DECLINE_RE = /ما\s*(نقدر\s*)?(نستلم|نقبل|نتعامل\s*مع)|(نعتذر|المعذر[هة])[^\n]{0,40}(ورث|مرهون|مسكون|ساكنين)/;
+const DECLINE_RE = /ما\s*(نقدر\s*)?(نستلم|نقبل|نتعامل\s*مع)|(نعتذر|المعذر[هة])[^\n]{0,40}(ورث|مرهون|مسكون|ساكنين)|نشتغل\s*في\s*مسقط\s*وبركاء\s*فقط/;
+// R56 (Ahmed 14 Nov 2026): the office works in Muscat governorate and wilayat Barka only, because a land or a building must be
+// seen on site. An owner (or a broker) who offers a property anywhere else gets these lines, is asked for nothing, and no
+// price study is opened (the lines match DECLINE_RE, so R37 closes the offer). The place is read from what the model wrote
+// in owner_offer: a wilayat name outside the two, never when a Muscat or Barka name stands beside it. Names that are also
+// plain words (نخل، صور، منح…) count only as the whole wilayat field.
+const OUT_OF_AREA_LINES = ["نعتذر منك احنا حالياً نشتغل في مسقط وبركاء فقط", "اذا عندك عقار في مسقط ارسله على رقم مسقط 71770030 واذا في بركاء على رقم بركاء 92344273"];
+const OUT_OF_AREA_SAID = /نشتغل\s*في\s*مسقط\s*وبركاء\s*فقط/;
+const areaNorm = (s: unknown) => String(s ?? "").replace(/[ً-ٰٟـ]/g, "").replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/[^ء-ي\s]/g, " ").replace(/\s+/g, " ").trim();
+const IN_AREA = /(^| )(ال)?(بركاء|بركا|بركه|مسقط|سيب|بوشر|مطرح|عامرات|قريات|حيل|خوض|معبيله|موالح|خوير|غبره|عذيبه|قرم|انصب|سيفه|يتي|روي|وطيه)( |$)|مدينه السلطان/;
+const OUT_AREA = /(^| )(ال)?(صلاله|ظفار|مرباط|ثمريت|مسندم|خصب|بريمي|نزوي|بهلاء|بهلا|ازكي|سمائل|سمايل|بدبد|جبل الاخضر|صحار|شناص|صحم|خابوره|سويق|رستاق|عوابي|وادي المعاول|وادي المعلول|مصنعه|جعلان|ابراء|مضيبي|سناو|عبري|دقم|هيماء)( |$)/;
+const OUT_WILAYAT = ["طاقه", "رخيوت", "ضلكوت", "مزيونه", "مقشن", "شليم", "سدح", "دبا", "بخا", "مدحاء", "محضه", "سنينه", "منح", "حمراء", "ادم", "لوي", "نخل", "صور", "كامل", "كامل والوافي", "مصيره", "ابرا", "بديه", "قابل", "وادي بني خالد", "دماء والطائيين", "ينقل", "ضنك", "هيما", "محوت", "جازر", "داخليه", "شرقيه", "ظاهره", "وسطي", "شمال الباطنه"];
+function outsideArea(area: unknown, wilayat: unknown) {
+  const all = areaNorm(`${area || ""} ${wilayat || ""}`);
+  if (!all || IN_AREA.test(all)) return "";
+  const m = all.match(OUT_AREA);
+  if (m) return m[3];
+  const w = areaNorm(wilayat).replace(/^(ولايه|محافظه) /, "").replace(/^ال/, "");
+  return OUT_WILAYAT.includes(w) ? w : "";
+}
 const ALLOWED_ORIGINS = ["https://omanvilla.github.io"]; // the approval screen asks for a rewrite from here
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -1310,6 +1329,18 @@ Deno.serve(async (req) => {
       const visitHandled = history.some((h: any) => h.direction === "outbound" && /تزور|زيار|المالك مباشرة|نسق مع المالك|\[contacts\]/.test(String(h.body || "") + (h.message_type === "contacts" ? "[contacts]" : "")));
       if (texts.length && !onlyClosing && !waitsBank && (hasAd || sentAd) && !asksVisit && out.action === "none" && !visitHandled) texts.push("متى يناسبك تزور ؟");
     }
+    // ---- R56 (Ahmed 14 Nov 2026): a property outside Muscat and Barka is declined, whatever the model wrote ----
+    // Also over a «دراسة سعر:» handoff (13 Nov: two lands in Salalah were sent to pricing). Not over another handoff, not when
+    // the lines are already in the reply, and never in a chat where the office wrote itself (a property Ahmed brought).
+    if (out.category === "seller" && !texts.some((t) => OUT_OF_AREA_SAID.test(t)) && (out.action !== "handoff" || /^\s*دراسة سعر/.test(String(out.handoff_reason || "")))
+      && !history.some((h: any) => h.direction === "outbound" && h.actor_type === "human")) {
+      const place = outsideArea(out.owner_offer?.area, out.owner_offer?.wilayat);
+      if (place) {
+        const salam = texts.find((t) => /^وعليكم السلام/.test(String(t).trim()));
+        texts = [...(salam ? [salam] : []), ...OUT_OF_AREA_LINES, ...(salam ? [] : ["الله يسعدك 🌷"])];
+        out.action = "none"; out.handoff_reason = null; out.guard_owner_area = place;
+      }
+    }
     // the visit question is its own message, never glued to the end of an ad (7 Nov, Ahmed)
     texts = texts.flatMap((t) => {
       const lines = t.split("\n");
@@ -1484,7 +1515,7 @@ Deno.serve(async (req) => {
         const reply = out.reply_messages.join(" ");
         const ownerSaid = `${history.filter((h: any) => h.direction === "inbound").slice(-8).map((h: any) => String(h.transcript || h.body || "")).join(" ")} ${out.crm_note || ""}`;
         const mortgaged = /مرهون|رهن/.test(ownerSaid), occupied = /مسكون|ساكن|مستأجر|مأجر|مؤجر/.test(ownerSaid);
-        const why = /ورث|ترك[ةه]/.test(reply) ? "ورثة" : mortgaged && occupied ? "مرهون ومسكون" : mortgaged ? "مرهون" : occupied ? "مسكون" : "مرهون أو مسكون";
+        const why = OUT_OF_AREA_SAID.test(reply) ? "خارج مسقط وبركاء" : /ورث|ترك[ةه]/.test(reply) ? "ورثة" : mortgaged && occupied ? "مرهون ومسكون" : mortgaged ? "مرهون" : occupied ? "مسكون" : "مرهون أو مسكون";
         analysis.owner_offer_closed = why;
         const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
         const openLeads = await db.from("owner_leads").select("id,notes").eq("conversation_id", conv.id).eq("status", "open");

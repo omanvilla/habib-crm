@@ -193,7 +193,13 @@ async function priceStudy(convId: string, n: number, total: number, force: boole
 // after a report is queued) sends the oldest one only when nothing is being sent and the last one finished 2+ minutes ago.
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const GAP_MS = 2 * 60 * 1000;
+// R57 (Ahmed 14 Nov 2026: «لا تخليه يرسل لي دراسة سعر بهذه الطريقة، يرسل لي من بعد ما يخلص الدراسة»): the report of a NEW
+// study is no longer sent to his WhatsApp. Pricing is automatic now, so the one message he gets is «📊 دراسة سعر جاهزة
+// لموافقتك» (price-study, when the study is handed in). Nothing new is queued here, by the trigger or by a batch; the code
+// of the report stays for the day he wants it back (set this to true). The two-hour «العقار لسه ما تسعّر» alert is separate.
+const PRICE_STUDY_REPORT = false;
 async function enqueuePriceStudy(convId: string, n: number, total: number, force: boolean, seq: number) {
+  if (!PRICE_STUDY_REPORT) return { conversation_id: convId, skipped: "report_off" };
   const c = await db.from("whatsapp_conversations").select("id,company_id,client_id,route_key,handoff_reason,handoff_updated_at").eq("id", convId).maybeSingle();
   const conv: any = c.data;
   if (!conv) return { conversation_id: convId, error: "conversation_not_found" };

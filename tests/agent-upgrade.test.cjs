@@ -606,3 +606,46 @@ test('R33: each project meeting is at its developer (Aida at Dar Global by the O
  assert(brain.includes('كل مشروع اجتماعه عند مطوره (R33، أحمد 12 نوفمبر)، أبداً في الموالح'));
  assert(brain.includes('عايدة (دار جلوبال) في مكتبهم عند دار الأوبرا'));
 });
+
+// R56 (Ahmed 14 Nov 2026): the office works in Muscat and Barka only. An owner (or a broker) offering a property anywhere
+// else gets the fixed apology with both numbers, is asked for nothing, and no price study is opened. Held by code.
+test('R56: a property outside Muscat and Barka is declined with the fixed lines, also over a price study handoff',()=>{
+ const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
+ const src=[pick('const OUT_OF_AREA_LINES = ',';\n'),pick('const OUT_OF_AREA_SAID = ',';\n'),pick('const areaNorm = ',';\n'),pick('const IN_AREA = ',';\n'),pick('const OUT_AREA = ',';\n'),pick('const OUT_WILAYAT = ',';\n'),pick('function outsideArea','\n}\n')].join('')
+  .replace('(s: unknown)','(s)').replace('(area: unknown, wilayat: unknown)','(area, wilayat)');
+ const lib=new Function(src+';return {OUT_OF_AREA_LINES,OUT_OF_AREA_SAID,outsideArea};')();
+ const L=lib.OUT_OF_AREA_LINES,where=lib.outsideArea;
+ assert.deepEqual(L,['نعتذر منك احنا حالياً نشتغل في مسقط وبركاء فقط','اذا عندك عقار في مسقط ارسله على رقم مسقط 71770030 واذا في بركاء على رقم بركاء 92344273']);
+ // outside
+ assert.equal(where('جرزيز','صلالة'),'صلاله');assert.equal(where('المصنعة',null),'مصنعه');assert.equal(where('ودام الساحل','المصنعه'),'مصنعه');
+ assert.equal(where('','ولاية الرستاق'),'رستاق');assert.equal(where('السويق',''),'سويق');assert.equal(where(null,'نزوى'),'نزوي');assert.equal(where('','البريمي'),'بريمي');
+ assert.equal(where('الاشخرة','جعلان بني بو علي'),'جعلان');assert.equal(where('','محافظة الداخلية'),'داخليه');assert.equal(where('','طاقة'),'طاقه');
+ assert.equal(where(null,'نخل'),'نخل');assert.equal(where('حي النهضة','صور'),'صور');
+ // Muscat governorate and Barka, an unknown place, and names that are also plain words
+ for(const [a,w] of [['الرميس','بركاء'],['السوادي','ولاية بركاء'],['الحيل الجنوبية','السيب'],['المعبيلة الجنوبية',null],['الخوض 6','Seeb'],['مرتفعات العامرات',''],['مسفاة','بوشر'],['جبل السيفة',null],['','قريات'],['','مطرح'],['',''],[null,null],['','Muscat'],['جرزيز',null],['مزرعة نخل',null],['مزرعة نخل','بركاء'],['ارسل صور',null],['المصنعة قريب بركاء',null]])
+  assert.equal(where(a,w),'',a+' / '+w);
+ // the guard
+ const block=agent.slice(at('    // ---- R56 (Ahmed 14 Nov 2026)'),at('    // the visit question is its own message')).replace(/\((\w+): (?:string|any)\)/g,'($1)');
+ const run=(offer,o={})=>{const out={category:'seller',action:'none',handoff_reason:null,owner_offer:offer,...(o.out||{})};
+  return new Function('out','texts','history','OUT_OF_AREA_LINES','OUT_OF_AREA_SAID','outsideArea',block+'\nreturn {out,texts};')
+   (out,o.texts||['ارسل الكروكي والملكية والسعر اللي في بالك اذا ما عليك امر'],o.history||[{direction:'inbound',body:'عندي ارض للبيع'},{direction:'outbound',actor_type:'automated',body:'اسمك الكريم ؟'}],L,lib.OUT_OF_AREA_SAID,where);};
+ // 13 Nov, the two lands in Salalah on the Barka number: the model handed them to pricing
+ let r=run({area:'جرزيز',wilayat:'صلالة'},{out:{action:'handoff',handoff_reason:'دراسة سعر: قطعتين أرض سكنية في جرزيز صلالة'},texts:['تمام وصلت','بنطلع على المنطقة والاسعار الحالية ونرجع لك بدراسة للسعر']});
+ assert.deepEqual(r.texts,[...L,'الله يسعدك 🌷']);assert.equal(r.out.action,'none');assert.equal(r.out.handoff_reason,null);assert.equal(r.out.guard_owner_area,'صلاله');
+ r=run({area:'المصنعة',wilayat:null},{texts:['وعليكم السلام ورحمة الله وبركاته','اسمك الكريم ؟','ارسل الكروكي والملكية']});
+ assert.deepEqual(r.texts,['وعليكم السلام ورحمة الله وبركاته',...L],'three lines at most, the greeting kept');assert.equal(r.out.guard_owner_area,'مصنعه');
+ // not touched: our areas, a buyer, no offer, a chat the office wrote in, another handoff, the lines already there
+ r=run({area:'الرميس',wilayat:'بركاء'});assert.equal(r.out.guard_owner_area,undefined);assert.equal(r.texts.length,1);
+ r=run({area:'جرزيز',wilayat:'صلالة'},{out:{category:'buyer'}});assert.equal(r.out.guard_owner_area,undefined);
+ r=run(null);assert.equal(r.out.guard_owner_area,undefined);
+ r=run({area:'جرزيز',wilayat:'صلالة'},{history:[{direction:'inbound',body:'عندي ارض'},{direction:'outbound',actor_type:'human',body:'هلا ارسل الكروكي'}]});assert.equal(r.out.guard_owner_area,undefined,'a property Ahmed brought');
+ r=run({area:'جرزيز',wilayat:'صلالة'},{out:{action:'handoff',handoff_reason:'اجتماع: المالك يبي يمر المكتب'},texts:[]});assert.equal(r.out.guard_owner_area,undefined);assert.equal(r.out.action,'handoff');
+ r=run({area:'جرزيز',wilayat:'صلالة'},{texts:[...L]});assert.equal(r.out.guard_owner_area,undefined);assert.deepEqual(r.texts,L);
+ // the apology is a decline: R37 closes the offer with its reason and no price study task is opened
+ const DECLINE=re('DECLINE_RE');assert(DECLINE.test(L[0]));assert(!DECLINE.test('عندنا عقارات في مسقط وبركاء'));
+ assert(agent.includes('const why = OUT_OF_AREA_SAID.test(reply) ? "خارج مسقط وبركاء" : '));
+ assert(agent.indexOf('    // ---- R56 (Ahmed 14 Nov 2026)')<agent.indexOf('    out.reply_messages = texts.slice(0, 3);'),'before the reply is cut to three lines');
+ // the brain says the same two sentences, and no alternative from Musanaah any more
+ assert(brain.includes('- مناطق الشغل (R56، أحمد 14 نوفمبر)'));for(const l of L)assert(brain.includes('"'+l+'"'),l);
+ assert(brain.includes('بدون دراسة سعر أبداً'));assert(!brain.includes('بركاء مع بركاء والمصنعة'));
+});

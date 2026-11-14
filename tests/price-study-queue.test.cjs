@@ -21,3 +21,11 @@ test('SQL92 schedules the tick every minute and is mirrored',()=>{
   assert(fwd.includes("cron.schedule('owner_price_study_tick', '* * * * *'"));
   assert(fwd.includes('"action":"price_study_tick"'));
 });
+// R57 (Ahmed 14 Nov 2026): pricing is automatic, so the report of a NEW study no longer goes to his WhatsApp. The message
+// he gets is the ready one from price-study.
+test('R57: the report of a new study is not queued any more; the ready message is the one Ahmed gets',()=>{
+ assert(fn.includes('const PRICE_STUDY_REPORT = false;'));
+ const a=fn.indexOf('async function enqueuePriceStudy(');assert(a>=0);
+ assert(fn.slice(a,a+260).includes('if (!PRICE_STUDY_REPORT) return { conversation_id: convId, skipped: "report_off" };'),'before any read or insert');
+ assert(fs.readFileSync('supabase/functions/price-study/index.ts','utf8').includes('📊 دراسة سعر جاهزة لموافقتك'));
+});
