@@ -144,7 +144,7 @@ test('R48: a property of the other branch is not served on this number, the cust
 });
 
 test('14 Nov guards: rules that were words only are held by code (R16, R24, R34, R44, R9 on the Barka number)',async()=>{
- const block=agent.slice(at('    const SEE_FIRST = '),at('    // the ad text goes once per conversation'))
+ const block=agent.slice(at('    const SEE_FIRST = '),at('    // ---- 14 Nov 2026, batch 2 ----'))
   .replace(/\((\w+): (?:string|any)\)/g,'($1)').replace(/new Set<string>/g,'new Set').replace('const named: boolean[]','const named');
  const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
  const guards=new AsyncFunction('out','texts','history','visitedIds','SAID_VISITED','r16Seen','prop','short','goneRows','reels','linkedSold','linkedAvailable','groupTalk','SOLD_RE','conv','msg','mentionsProject',block+'\nreturn {out,texts};');
@@ -184,6 +184,47 @@ test('14 Nov guards: rules that were words only are held by code (R16, R24, R34,
  r=await run(['توين فيلا في الشخاخيط في موقع قريب من مسقط ومدينة السلطان هيثم']);
  assert.equal(r.texts.length,1);
  r=await run(['في مدينة السلطان هيثم عرض بدون دفعة مقدمة'],{route:'muscat'});assert.equal(r.texts.length,1);
+});
+test('14 Nov guards, batch 2: price talk before a visit, location before a time, meeting time, project figures',async()=>{
+ const block=agent.slice(at('    // ---- 14 Nov 2026, batch 2 ----'),at('    // the ad text goes once per conversation'))
+  .replace(/\((\w+): (?:string|any|number)\)/g,'($1)').replace(/\((\w+): any, (\w+): number\)/g,'($1, $2)').replace('const bad: boolean[]','const bad');
+ const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
+ const guards=new AsyncFunction('out','texts','history','visitedIds','SAID_VISITED','SEE_FIRST','r16Seen','prop','visits','conv','msg','mentionsProject',block+'\nreturn {out,texts};');
+ const PROJECT=/مدينة السلطان هيثم|عايدة|اليزن/,SEE_FIRST=/شوف[يوا]{0,2}\s*(العقار|البيت|الفيلا|الشقة|المكان)\s*(أول|اول)/;
+ const run=(texts,o={})=>guards({action:'none',handoff_reason:null,category:'buyer',property_id:null,viewing_date:null,viewing_time:null,...(o.out||{})},texts,
+  o.history||[{direction:'outbound',body:'وعليكم السلام'},{direction:'inbound',body:o.said||'كم السعر'}],new Set(o.visited||[]),re('SAID_VISITED'),SEE_FIRST,async()=>o.r16||null,
+  o.prop||null,o.visits||[],{route_key:o.route||'barka'},{company_id:'c'},async(_c,t)=>PROJECT.test(t.join(' ')));
+ const SEE='شوف العقار أول واذا ناسبك نتكلم في السعر',ASK='متى يناسبك تزور ؟';
+ // R2 / R42 before a visit: the price stays, «ثابت» goes; a discount question gets the two lines
+ let r=await run(['السعر 59 الف وهو ثابت','ان شاء الله برسلك الموقع',ASK]);
+ assert.deepEqual(r.texts,['السعر 59 الف','ان شاء الله برسلك الموقع',ASK]);assert.equal(r.out.guard_price_before_visit,true);
+ r=await run(['السعر قابل للتفاوض بشي بسيط'],{said:'كم آخر سعر ؟'});
+ assert.deepEqual(r.texts,[SEE,ASK]);
+ // after a visit, or a negotiation the model handed over, nothing is touched
+ r=await run(['بالنسبة للسعر نعم ثابت'],{said:'زرت البيت كم آخر سعر'});assert.deepEqual(r.texts,['بالنسبة للسعر نعم ثابت']);
+ r=await run(['بالنسبة للسعر نعم ثابت'],{r16:'انرسل له اللوكيشن'});assert.deepEqual(r.texts,['بالنسبة للسعر نعم ثابت']);
+ r=await run(['السعر قابل للتفاوض'],{out:{action:'handoff',handoff_reason:'تفاوض: x'}});assert.deepEqual(r.texts,['السعر قابل للتفاوض']);
+ r=await run(['السعر 59 الف',ASK]);assert.deepEqual(r.texts,['السعر 59 الف',ASK]);assert.equal(r.out.guard_price_before_visit,undefined);
+ // R11: no location before the client said when; a day, an hour, «الحين» or a booked visit is enough
+ r=await run(['البيت مفتوح تقدر تشوفه'],{out:{action:'send_location'},said:'ارسل اللوكيشن لو سمحت'});
+ assert.equal(r.out.action,'none');assert.deepEqual(r.texts,['ان شاء الله برسلك الموقع',ASK]);
+ for(const o of [{said:'بجي بكره الصبح'},{said:'انا طالع الحين'},{out:{action:'send_location',viewing_date:'2026-11-15'}},{visits:[{property_id:'p',status:'scheduled'}]}]){
+  r=await run(['البيت مفتوح تقدر تشوفه'],{said:'ارسل اللوكيشن',...o,out:{action:'send_location',...(o.out||{})}});
+  assert.equal(r.out.action,'send_location');assert.deepEqual(r.texts,['البيت مفتوح تقدر تشوفه']);
+ }
+ // R45: the invitation ends with «يناسبك ؟», no day or hour is asked and nothing is confirmed
+ r=await run(['الافضل نرتب لك اجتماع مع المطور في مكتبهم','أي يوم يناسبك ؟'],{route:'muscat',out:{category:'investor'}});
+ assert.deepEqual(r.texts,['الافضل نرتب لك اجتماع مع المطور في مكتبهم','يناسبك ؟']);
+ r=await run(['تمام نشوفك في المكتب بكره'],{route:'muscat'});assert.deepEqual(r.texts,[]);
+ r=await run([ASK]);assert.deepEqual(r.texts,[ASK],'the property visit question is not a meeting');
+ // R18: only Ahmed's figures about a project on the Muscat number
+ const FIX='الاسعار تختلف حسب الوحدة والمساحة والمرحلة';
+ r=await run(['التاون هاوس في مدينة السلطان هيثم يبدأ من 85 الف'],{route:'muscat',out:{category:'investor'}});
+ assert.deepEqual(r.texts,[FIX]);assert.equal(r.out.guard_project_figure,true);
+ r=await run(['الاستوديو في الآيكونيك تاور من 57 الف بنظام فندقي','في مدينة السلطان هيثم عرض بدون دفعة مقدمة لين 30 نوفمبر','في مدينة السلطان هيثم الشراء بـ ٥٠ الف وفوق يعطي إقامة'],{route:'muscat',out:{category:'investor'}});
+ assert.equal(r.texts.length,3);assert.equal(r.out.guard_project_figure,undefined);
+ r=await run(['عندنا شقة في الخوض بـ 45 الف'],{route:'muscat'});assert.deepEqual(r.texts,['عندنا شقة في الخوض بـ 45 الف'],'a listed property is not a project');
+ r=await run(['فيلا في المعبيلة قريب من مدينة السلطان هيثم بـ 85 الف'],{route:'muscat'});assert.equal(r.texts[0].includes('85'),true);
 });
 test('R48: the visit watcher books no new visit from the other branch number, and book_viewing counts as serving',()=>{
  assert.match(agent,/select\("id,type,area,price,bedrooms,land_size,listing_purpose,branch_key"\)/);

@@ -1176,6 +1176,66 @@ Deno.serve(async (req) => {
         if (!texts.length && out.action === "none") { out.action = "handoff"; out.handoff_reason = "العقل كان بيذكر مشروع على رقم بركاء (R9)، راجع المحادثة"; }
       }
     }
+    // ---- 14 Nov 2026, batch 2 ----
+    let burstStart = 0;
+    history.forEach((h: any, i: number) => { if (h.direction === "outbound") burstStart = i + 1; });
+    const burstSaid = history.slice(burstStart).filter((h: any) => h.direction === "inbound").map((h: any) => String(h.transcript || h.body || "")).join(" ");
+    // R2 / R42: before a visit the agent does not talk about the price being fixed or negotiable, and a discount question gets
+    // «شوف العقار أول» + the visit question. The price itself stays; only the negotiation words are taken out.
+    const NEGO_SAID = /قابل\s*للتفاوض|غير\s*قابل|يتفاوض|نتفاوض|ننزل|ينزل\s*(السعر|شوي)|نخصم|خصم|(آخر|اخر)\s*سعر|السعر\s*النهائي|(السعر\s*)?(وهو\s*|وهي\s*)?ثابت/;
+    const NEGO_ASK = /قابل\s*للتفاوض|تفاوض|ينزل|تنزل|خصم|(آخر|اخر)\s*سعر|السعر\s*النهائي|نهائي|في(ه)?\s*مجال/;
+    if (!out.visit_first && !out.guard_see_first && ["buyer", "tenant"].includes(out.category) && out.action !== "handoff"
+      && texts.some((t) => t.length <= 250 && NEGO_SAID.test(t) && !SEE_FIRST.test(t))) {
+      const visitedThis = out.property_id ? visitedIds.has(out.property_id) : visitedIds.size > 0;
+      const saidVisited = history.some((h: any) => h.direction === "inbound" && SAID_VISITED.test(String(h.transcript || h.body || "")));
+      if (!visitedThis && !saidVisited && !(await r16Seen(out.property_id || null))) {
+        texts = texts.flatMap((t) => {
+          if (t.length > 250 || !NEGO_SAID.test(t) || SEE_FIRST.test(t)) return [t];
+          const kept = /[0-9٠-٩]/.test(t) ? t.replace(/\s*(و\s*)?(هو\s*|هي\s*|السعر\s*)?(ثابت|غير\s*قابل\s*للتفاوض|قابل\s*للتفاوض)[^\n]*/g, "").trim() : "";
+          return kept && !NEGO_SAID.test(kept) ? [kept] : [];
+        });
+        if (NEGO_ASK.test(burstSaid) && !texts.some((t) => SEE_FIRST.test(t))) texts.push("شوف العقار أول واذا ناسبك نتكلم في السعر");
+        if (!texts.some((t) => /(تزور|تزورون|تزورين)\s*؟/.test(t)) && !["send_location", "send_owner_number", "send_lockbox", "book_viewing"].includes(out.action)) texts.push("متى يناسبك تزور ؟");
+        out.guard_price_before_visit = true;
+      }
+    }
+    // R11: the location, the lockbox or the owner's number never goes out before the client said when he is coming
+    if (["send_location", "send_owner_number", "send_lockbox"].includes(out.action)) {
+      const TIME_SAID = /اليوم|الحين|الان|الآن|بكر|باكر|بعد|العصر|الصبح|الصباح|المغرب|الظهر|الليل|المسا|الساع|طالع|جاي|في الطريق|وصلت|وصلنا|السبت|ال[اأ]حد|ال[اإ]ثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمعة|[0-9٠-٩]/;
+      const recentIn = history.filter((h: any) => h.direction === "inbound").slice(-6).map((h: any) => String(h.transcript || h.body || "")).join(" ");
+      const booked = visits.some((v: any) => (!prop || v.property_id === prop.id) && ["scheduled", "confirmed", "postponed"].includes(v.status));
+      if (!out.viewing_date && !out.viewing_time && !booked && !TIME_SAID.test(recentIn)) {
+        out.action = "none"; out.guard_location_before_time = true;
+        texts = texts.filter((t) => !/تقدر\s*تشوف|مفتوح|المفتاح|الرمز/.test(t));
+        if (!texts.some((t) => /(تزور|تزورون|تزورين)\s*؟/.test(t))) texts = [...texts.slice(0, 1), "ان شاء الله برسلك الموقع", "متى يناسبك تزور ؟"];
+      }
+    }
+    // R45: the agent never asks for or proposes a day or an hour for a meeting, and never confirms one; the invitation ends with «يناسبك ؟»
+    const MEETING_WORD = /اجتماع|نجتمع|المطور|تمر\s*(علينا\s*)?المكتب|في\s*المكتب|مكتبهم|اونلاين|أونلاين/;
+    if (texts.some((t) => t.length <= 250 && MEETING_WORD.test(t))) {
+      const before = texts.join("\n");
+      texts = texts.filter((t) => !(t.length <= 250 && MEETING_WORD.test(t) && /نشوفك|تم\s*الحجز|تم\s*ت[اأ]كيد|الموعد\s*مؤكد|موعدنا/.test(t)))
+        .map((t) => (t.length <= 250 && MEETING_WORD.test(t) ? t.replace(/(أي|اي)\s*(يوم|وقت)\s*يناسبك\s*؟?|متى\s*يناسبك\s*؟?|الساعة\s*كم\s*يناسبك\s*؟?/g, "يناسبك ؟")
+          : /^\s*((أي|اي)\s*(يوم|وقت)|متى)\s*يناسبك\s*؟?\s*$/.test(t) ? "يناسبك ؟" : t));
+      if (texts.join("\n") !== before) out.guard_meeting_time = true;
+    }
+    // R18: on the Muscat number a line about a project carries only the figures Ahmed wrote (57 الف, the offer's date, the
+    // residency figures). Any other figure about a project is replaced by the fixed line.
+    if (conv.route_key === "muscat" && texts.length) {
+      const ALLOWED_NUM = new Set(["57", "57000", "30", "2026", "50", "50000", "200", "200000", "2", "10", "0", "71770030", "92344273"]);
+      const western = (s: string) => s.replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
+      const fixedLine = "الاسعار تختلف حسب الوحدة والمساحة والمرحلة";
+      const bad: boolean[] = [];
+      for (const t of texts) {
+        const nums = (western(t).match(/\d[\d,٬]*/g) || []).map((n) => n.replace(/[,٬]/g, ""));
+        bad.push(t.length <= 250 && !/https?:\/\//.test(t) && !/قريب|قرب|تبعد|دقيقة|دقايق|دقائق/.test(t) && nums.some((n) => !ALLOWED_NUM.has(n))
+          && (/الآيكونيك|الايكونيك|وادي\s*زها|المطور/.test(t) || await mentionsProject(msg.company_id, [t])));
+      }
+      if (bad.some(Boolean)) {
+        texts = texts.map((t, i) => (bad[i] ? fixedLine : t)).filter((t, i, a) => a.indexOf(t) === i);
+        out.guard_project_figure = true;
+      }
+    }
     // the ad text goes once per conversation: if a long office message about this property already went out, drop it
     if (prop) {
       const priceKey = prop.price ? String(Math.round(Number(prop.price) / 1000)) : "";
