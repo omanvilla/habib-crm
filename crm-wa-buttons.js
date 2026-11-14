@@ -64,8 +64,10 @@
   }
   document.addEventListener('click',e=>{
     const crm=e.target.closest('[data-wa-crm]');
-    if(crm){e.preventDefault();window.crmOpenCrmChat(crm.dataset.conv||'',crm.dataset.client||'',crm.dataset.phone||'').catch(()=>{if(typeof showToast==='function')showToast('ما قدرت أفتح المحادثة','error');});return;}
+    if(crm){e.preventDefault();e.stopPropagation();window.crmOpenCrmChat(crm.dataset.conv||'',crm.dataset.client||'',crm.dataset.phone||'').catch(()=>{if(typeof showToast==='function')showToast('ما قدرت أفتح المحادثة','error');});return;}
     const ph=e.target.closest('[data-wa-phone]');
-    if(ph){e.preventDefault();ph.disabled=true;phoneOf(ph.dataset.conv||'',ph.dataset.client||'').then(p=>{ph.disabled=false;const l=phoneLink(p);if(!l){if(typeof showToast==='function')showToast('ما في رقم لهذا العميل','error');return;}if(/^https:/.test(l))window.open(l,'_blank','noopener');else window.location.href=l;}).catch(()=>{ph.disabled=false;});}
-  });
+    if(ph){e.preventDefault();e.stopPropagation();ph.disabled=true;phoneOf(ph.dataset.conv||'',ph.dataset.client||'').then(p=>{ph.disabled=false;const l=phoneLink(p);if(!l){if(typeof showToast==='function')showToast('ما في رقم لهذا العميل','error');return;}if(/^https:/.test(l))window.open(l,'_blank','noopener');else window.location.href=l;}).catch(()=>{ph.disabled=false;});}
+  // in the capture phase (14 Nov 2026, seen in the browser): a deal card stops the click before it reaches the document, so
+  // «النظام» on the card did nothing; and the card or row under the button must not open
+  },true);
 })();

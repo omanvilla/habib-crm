@@ -8,7 +8,7 @@ test('crmWaButtons gives «فتح في واتساب الجوال» and «فتح 
  const k=ctx.window.crmWaButtons({clientId:'x'});
  assert(k.includes('data-wa-phone="1"')&&k.includes('data-client="x"'),'no number at hand: looked up on tap');
  assert.equal(ctx.window.crmWaButtons({}),'');
- assert(index.includes('crm-wa-buttons.js?v=20261114-note1"><'+String.fromCharCode(92)+'/script>'),'loaded inside the boot script with an escaped closing tag');
+ assert(index.includes('crm-wa-buttons.js?v=20261114-note2"><'+String.fromCharCode(92)+'/script>'),'loaded inside the boot script with an escaped closing tag');
 });
 // 12 Nov 2026 (Ahmed: «ما جاي مرتب»): one look for the two buttons everywhere, and nothing cut on the narrow deal cards
 test('the two buttons carry their own look, not the page button classes',()=>{
@@ -23,7 +23,7 @@ test('the two buttons carry their own look, not the page button classes',()=>{
  assert(s.includes('title="فتح في النظام"')&&s.includes('>النظام</button>'));
  assert(css.includes('.crm-wa-btn{')&&css.includes('white-space:nowrap')&&css.includes('.crm-wa-phone{')&&css.includes('.crm-wa-crm{')&&css.includes('.crm-wa-sm{'));
  assert(css.includes('.crm-wa-deal{flex-wrap:wrap}'),'on a narrow deal card the second button goes under the first, never cut');
- assert(index.includes('<link rel="stylesheet" href="crm-wa-buttons.css?v=20261114-note1">'));
+ assert(index.includes('<link rel="stylesheet" href="crm-wa-buttons.css?v=20261114-note2">'));
 });
 // 12 Nov 2026 (Ahmed: «نعم حوّلها»): the old single «واتساب» link in the visits and owners tables is the same pair
 test('visits and owners tables: the two buttons; an owner chat is found by the number',()=>{

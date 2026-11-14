@@ -50,6 +50,9 @@
    actions column does not cover the status column */
 @media (min-width:641px) and (max-width:1400px){
   #page-viewings .crm-grid td.crm-grid-client{max-width:124px;overflow:hidden;text-overflow:ellipsis}
+  /* seen in the browser on 14 Nov: a sixth action made the fixed actions column 54px wider and it covered the status
+     column, so on a medium screen the visits table keeps its five actions; the note is one tap away in «النظام» */
+  #page-viewings .crm-grid .crm-grid-actions .crm-wa-note{display:none!important}
 }
 
 /* client file: beside «اتصال» */
