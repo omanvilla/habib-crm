@@ -6,6 +6,15 @@ Updated 2026-11-14. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 14 November 2026 — agent guards, batch 2: price talk before a visit, location before a time, meeting time, project figures — **published**
+
+- **Ahmed.** «نعم، كمل», then «نعم، ادمج» after the dry-run result.
+- **The change** (`whatsapp-reply-agent/index.ts` only, after batch 1; no rule text changed, no prompt sync): R2 / R42 (`guard_price_before_visit`: before a visit a buyer or tenant is not told «ثابت» / «قابل للتفاوض»; the price stays, a discount question gets «شوف العقار أول…» + the visit question), R11 (`guard_location_before_time`: no location, lockbox or owner number unless a day, an hour, «الحين» or a booked visit exists), R45 / R30 (`guard_meeting_time`: «أي يوم يناسبك ؟» in meeting talk becomes «يناسبك ؟», confirming lines removed), R18 (`guard_project_figure`: on the Muscat number a short project line with a figure outside `ALLOWED_NUM` becomes «الاسعار تختلف حسب الوحدة والمساحة والمرحلة»). **A new allowed project figure must be added to `ALLOWED_NUM` in the code as well as to `knowledge.ts`** (Ahmed was told).
+- **Checked.** CI green on `40a8a2a` (test «14 Nov guards, batch 2» runs the block with cases). Inline dry run on the dry-run copy pinned to `40a8a2a`, 40 real messages (20 latest chats, 10 investor chats on the Muscat number, chats with a location or price talk): all 200, replies as before; `guard_project_figure` fired once (an investor line became the fixed line, the invitation followed), the other guards did not fire in that run.
+- **Live.** `main` at `40a8a2a`; `whatsapp-reply-agent` v67 → `40a8a2a` (was `48b9b37`); dry-run copy v28 → `40a8a2a`.
+- **Still open.** R12 (call request), R23 (silence and handoff), R10 / R20 (heirs, mortgaged, occupied: the «property Ahmed brought himself» exception must be read first), the pinned reply applied after most filters, and the written tensions in the brain, which wait for Ahmed.
+- **Rollback.** Pin `whatsapp-reply-agent` back to `48b9b37`.
+
 ## 14 November 2026 — agent guards, batch 1: rules that were words only are held by code — **published**
 
 - **What Ahmed asked.** «ليش العقل كل مرة يغلط … لازم نشوف حل، ما على كل مرة نعدل نفس الاشياء», then «نعم، ابدأ» twice (the inventory, then the first batch) and «نعم، ادمج».
