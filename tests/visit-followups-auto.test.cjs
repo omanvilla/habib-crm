@@ -184,8 +184,8 @@ test('R55: a rest house booked for a day gets no follow-up, and rent-or-buy is n
 // is asked whether he visited, not when he will. Held by code after the review answers.
 test('R60 / R63 / R64: refused area, valuation raise and owner contact are held by code',()=>{
  const pick=(start,end)=>{const a=fn.indexOf(start);assert(a>=0,start);return fn.slice(a,fn.indexOf(end,a)+end.length);};
- const src=[pick('const short =','\n'),pick('const normAr','\n'),pick('const R63_VALUATION','\n'),pick('const R60_GENERIC','\n'),pick('const areaWords','\n'),pick('const R60_PLACE','\n'),pick('const refusedPlace','\n'),pick('const R64_OWNER','\n'),pick('const R64_WHEN','\n'),pick('function notesGuard','\n}\n')].join('\n')
-  .replace('(v: unknown, n = 500)','(v, n = 500)').replace('(out: any, group: boolean, clientSaid: string, officeSaid: string, refusedAreas: string[], offerLabel: string)','(out, group, clientSaid, officeSaid, refusedAreas, offerLabel)').replace(/\((\w+): (?:unknown|string|any)\)/g,'($1)');
+ const src=[pick('const short =','\n'),pick('const normAr','\n'),pick('const R63_VALUATION','\n'),pick('const R60_GENERIC','\n'),pick('const areaWords','\n'),pick('const R60_PLACE','\n'),pick('const refusedPlace','\n'),pick('const R64_OWNER','\n'),pick('const R64_WHEN','\n'),pick('const R41_UNSURE','\n'),pick('function notesGuard','\n}\n')].join('\n')
+  .replace('(v: unknown, n = 500)','(v, n = 500)').replace('(out: any, group: boolean, clientSaid: string, officeSaid: string, refusedAreas: string[], offerLabel: string, fallback = "")','(out, group, clientSaid, officeSaid, refusedAreas, offerLabel, fallback = "")').replace(/\((\w+): (?:unknown|string|any)\)/g,'($1)');
  const {notesGuard,refusedPlace,areaWords}=new Function(src+';return {notesGuard,refusedPlace,areaWords};')();
  const o=(x)=>({decision:'followup',text:'السلام عليكم بخصوص طلبك لين الحين تبحث ؟',subject:null,reason:'',stage:'asked_no_visit',auto_ok:true,offer_no:null,...x});
  // R63: «عندك حد يرفع التثمين» in his last lines = no follow-up; an ordinary valuation question of an owner is not that
@@ -222,6 +222,11 @@ test('R60 / R63 / R64: refused area, valuation raise and owner contact are held 
  r=notesGuard(o({text:'السلام عليكم بخصوص البيت متى يناسبك تزوره ؟'}),false,'','تمام البيت مفتوح',[], '');
  assert.equal(r.text,'السلام عليكم بخصوص البيت متى يناسبك تزوره ؟');
  // wiring and the words the review reads
- assert(fn.includes('notesGuard(out, group, clientSaid, officeSaid, refusedAreas, offerLabel);'));
+ // R41 in a follow-up: an answer we do not have is never written; the row's own wording goes and waits for the office
+ r=notesGuard(o({text:'السلام عليكم بخصوص سؤالك عن الواي فاي ما عندي تأكيد إذا شامل أو لا متى يناسبك تزور الشقة وتشوفها ؟'}),false,'','',[], '','بخصوص طلبك شقة في الخوير لين الحين تبحث ؟');
+ assert.equal(r.text,'السلام عليكم بخصوص طلبك شقة في الخوير لين الحين تبحث ؟');assert.equal(r.auto_ok,false);assert.equal(r.guard,'guard_unsure_answer');assert(r.reason.startsWith('(R41)'));
+ r=notesGuard(o({text:'السلام عليكم ما عندنا سبب مؤكد لانخفاض الايجار متى يناسبك تزور ؟'}),false,'','',[], '','');assert.equal(r.decision,'skip');assert.equal(r.text,null);
+ r=notesGuard(o({text:'السلام عليكم عندنا شقة في الخوير تحب ارسلك تفاصيلها ؟'}),false,'','',[], '','x');assert.equal(r.guard,undefined);
+ assert(fn.includes('notesGuard(out, group, clientSaid, officeSaid, refusedAreas, offerLabel, kind === "request"'));
  assert(fn.includes('- الموقع ما ناسبه (R60')&&fn.includes('- رفع التثمين (R63')&&fn.includes('- رقم صاحب العقار (R64'));
 });

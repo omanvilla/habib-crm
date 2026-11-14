@@ -326,7 +326,8 @@ const R60_PLACE = /موقع|بعيد|المنطقه|منطقه/;
 const refusedPlace = (v: any) => v?.status === "done" && (String(v.rejection_reason || "") === "location" || ((v.liked === false || String(v.client_feedback || "") === "disliked") && R60_PLACE.test(normAr(`${v.rejection_reason || ""} ${v.outcome_note || ""}`))));
 const R64_OWNER = /\[contacts\]|(تواصل|نسق|تنسق|كلم)\s*(مع\s*)?(المالك|صاحب العقار|صاحب البيت)/;
 const R64_WHEN = /متي\s*يناسبك(م)?\s*(تزور|تشوف|تعاين|نزور)/;
-function notesGuard(out: any, group: boolean, clientSaid: string, officeSaid: string, refusedAreas: string[], offerLabel: string) {
+const R41_UNSURE = /ما\s*(عندي|عندنا|معي|معنا)\s*(تاكيد|معلومه|سبب|جواب|علم)|مو\s*متاكد|ما\s*ادري|ما\s*اعرف|غير\s*مؤكد/;
+function notesGuard(out: any, group: boolean, clientSaid: string, officeSaid: string, refusedAreas: string[], offerLabel: string, fallback = "") {
   if (out.decision !== "skip" && R63_VALUATION.test(normAr(String(clientSaid || "").split("\n").slice(-12).join("\n")))) {
     out.reason = short(`(R63) موضوعه رفع التثمين عشان يغطي قرضه الشخصي وهذا ما عندنا، ما يحتاج متابعة. ${out.reason || ""}`, 300);
     out.decision = "skip"; out.text = null; out.auto_ok = false; out.offer_no = null; out.guard = "guard_valuation";
@@ -342,6 +343,16 @@ function notesGuard(out: any, group: boolean, clientSaid: string, officeSaid: st
       out.decision = group ? "skip" : "wait_for_match"; out.text = null; out.auto_ok = false; out.offer_no = null; out.stage = "visited_no_fit"; out.guard = "guard_refused_location";
       return out;
     }
+  }
+  // R41 in a follow-up (seen 14 Nov on the Muscat list: «ما عندي تأكيد إذا شامل أو لا», «ما عندنا سبب مؤكد»): an answer we
+  // do not have is never written to the client. The row's own wording goes instead and it waits for the office.
+  if (!group && out.decision === "followup" && out.text && R41_UNSURE.test(normAr(out.text))) {
+    const base = String(fallback || "").replace(/\s+/g, " ").trim();
+    if (base) out.text = base.startsWith("السلام عليكم") ? base : `السلام عليكم ${base}`;
+    else { out.decision = "skip"; out.text = null; }
+    out.auto_ok = false; out.guard = "guard_unsure_answer";
+    out.reason = short(`(R41) النص كان فيه «ما عندي تأكيد»، انشال: سؤاله يحتاج جوابك. ${out.reason || ""}`, 300);
+    return out;
   }
   if (!group && out.decision === "followup" && out.text && R64_OWNER.test(normAr(officeSaid)) && R64_WHEN.test(normAr(out.text))) {
     const she = /تزورين|تشوفين|تعاينين/.test(out.text);
@@ -411,7 +422,8 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
     }
     const l = await availableList(companyId);
     const offerLabel = Number.isInteger(out.offer_no) && out.offer_no > 0 && l.text === available ? l.labels[out.offer_no - 1] || "" : "";
-    notesGuard(out, group, clientSaid, officeSaid, refusedAreas, offerLabel);
+    const subj = String(out.subject || "").replace(/^\s*(بخصوص\s+)?طلبك\s+/, "").replace(/[؟?،,.!]/g, " ").replace(/\s+/g, " ").trim();
+    notesGuard(out, group, clientSaid, officeSaid, refusedAreas, offerLabel, kind === "request" && subj && subj.length <= 60 && !/[A-Za-z]/.test(subj) ? `بخصوص طلبك ${subj} لين الحين تبحث ؟` : fixed);
   }
   if (kind === "visit") out.text = namedVisitQuestion(out.text, name);
   // R39: a client who already gave his opinion is never asked the step-1 opinion question again by the fixed template
