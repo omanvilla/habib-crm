@@ -66,13 +66,13 @@ test('Claude gets the note, the date and 6-hour links to the photos of that task
 test('the screen: the box on cards whose task is open and inside the task windows, owner only',()=>{
   new vm.Script(ui);new vm.Script(voice);new vm.Script(home);
   assert(ui.includes("+(i.task_id&&!['sent','sending','waiting_owner'].includes(i.status)?inspBox(i.task_id)"));
-  assert(ui.includes("if(!ids.length||!isOwner()||typeof supa==='undefined')return;"));
-  assert(ui.includes("if(!(modal.classList.contains('on')&&isOwner()&&ID.test(id)&&/^دراسة سعر/.test(title))){el.hidden=true;el.innerHTML='';delete el.dataset.task;return;}"));
+  assert(ui.includes("if(!ids.length||!canSee()||typeof supa==='undefined')return;"));
+  assert(ui.includes("if(!(modal.classList.contains('on')&&canSee()&&ID.test(id)&&/^دراسة سعر/.test(title))){el.hidden=true;el.innerHTML='';delete el.dataset.task;return;}"));
   assert(ui.includes("supa.rpc('crm_price_study_inspection_save',{p_task_id:t,"));
-  assert(ui.includes("<p class=\"cps-private\">لك فقط، ما يشوفها الموظف ولا المالك</p>"));
+  assert(ui.includes("<p class=\"cps-private\">داخلية للمكتب، ما توصل للمالك</p>"));
   assert(home.includes("if(sheetKind==='studies'){if(typeof window.crmPriceStudiesDraw==='function')window.crmPriceStudiesDraw(body);"));
   for(const f of ['crm-price-studies.js','crm-price-studies.css'])assert(index.includes(f+'?v=20261112-insp1'),f);
-  assert(index.includes('crm-owner-home.js?v=20261114-note1'),'crm-owner-home.js moved on with R40, then SQL102');
+  assert(index.includes('crm-owner-home.js?v=20261114-ps1'),'crm-owner-home.js moved on with R40, then SQL102');
 });
 test('«أعد الدراسة بعد المعاينة» only while the study waits for approval, through the existing rejection',()=>{
   assert(ui.includes("+(open?'<div class=\"cps-restudy\"><button type=\"button\" class=\"btn-secondary\" data-cps=\"restudy\" data-id=\"'+id+'\">أعد الدراسة بعد المعاينة</button>'"));

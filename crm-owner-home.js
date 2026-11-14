@@ -10,7 +10,7 @@
   const isOwner=()=>typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.role==='owner';
   /* Staff home (11 Nov 2026, Ahmed: "the whole system the same for the employee, except what the rules keep from
    * staff"). Any active staff account gets this same page from crm_staff_home (SQL81, its own row level security).
-   * Owner-only parts stay out: approvals, paused chats and price studies, owner offers, problems, twins, videos,
+   * Owner-only parts stay out: approvals, owner offers (paused chats since R27, price studies since R59 are the staff's too), problems, twins, videos,
    * agent reply counts and the Reports link (reports hold money). */
   const isStaff=()=>typeof currentProfile!=='undefined'&&currentProfile&&['manager','agent','viewer'].includes(currentProfile.role);
   const hasHome=()=>isOwner()||isStaff();
@@ -21,7 +21,7 @@
   const STAFF_KIND={unknown_q:'سؤال ما يعرف جوابه',negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرار',muted:'مكتوم عنهم',manual_reply:'انرد عليها من المكتب'};
   const KIND=new Proxy({},{get:(_,k)=>(isOwner()?OWNER_KIND:STAFF_KIND)[k],ownKeys:()=>Object.keys(OWNER_KIND),getOwnPropertyDescriptor:()=>({enumerable:true,configurable:true})});
   const TITLES={followups:'متابعة اليوم',paused:'العقل موقوف عندهم',pricing:'دراسة سعر: ملاك ينتظرون تسعيرك',studies:'دراسات سعر تنتظر موافقتك',visits:'زيارات يتابعها الذكاء الاصطناعي',problems:'مشاكل تحتاج انتباه'};
-  let sequence=0,sheetKind=null,pausedFilter='all',paused={items:[],total:0},last=null,ignoredOpen=false,ignoredList=null;
+  let sequence=0,sheetKind=null,pausedFilter='all',pricingBranch='all',paused={items:[],total:0},last=null,ignoredOpen=false,ignoredList=null;
   /* «دراسة سعر:» handoffs (11 Nov 2026, Ahmed): owners waiting for a price have their own tile and list, so the
    * paused list keeps only chats that need another decision. Display only: the hold, the reason text and
    * «كمّل يا عقل» are unchanged (crm_paused_chats still returns them as kind=negotiation). */
@@ -140,8 +140,8 @@
       +(pricing||!canResume()||(!isOwner()&&isStudyChat(i))?'':'<button type="button" class="btn-primary coh-go" data-coh="presume" data-id="'+esc(i.conversation_id)+'">كمّل يا عقل</button>')
       // R40: «تجاهل نهائي» = no reply and no follow-up ever, and the chat leaves this list
       +(pricing||!canResume()||isStudyChat(i)?'':'<button type="button" class="btn-secondary coh-go coh-ignore" data-coh="pignore" data-id="'+esc(i.conversation_id)+'">تجاهل نهائي</button>')
-      +(pricing&&isOwner()?'<button type="button" class="btn-primary coh-go" data-coh="pprice" data-id="'+esc(i.conversation_id)+'">ارسل السعر للمالك</button>':'')+'</div>'
-      +(pricing&&isOwner()?priceForm(i):'')+'</li>').join('');
+      +(pricing&&canResume()?'<button type="button" class="btn-primary coh-go" data-coh="pprice" data-id="'+esc(i.conversation_id)+'">ارسل السعر للمالك</button>':'')+'</div>'
+      +(pricing&&canResume()?priceForm(i):'')+'</li>').join('');
   }
   /* 12 Nov 2026 (Ahmed: «سوي زر يكون افضل»): the priced answer goes back to the owner from the chat's branch number, through
    * the same CRM send as the chat (crmSendWhatsApp → whatsapp-send: 24 h window, one send per text, recorded in the chat).
@@ -193,7 +193,12 @@
   function pricingHtml(){
     const items=pricingItems();
     if(!items.length)return '<p class="coh-empty">ما في ملاك ينتظرون تسعير الحين</p>';
-    return '<p class="coh-since">ملاك أرسلوا عقاراتهم والعقل وقف لين تحدد السعر. افتح المحادثة وسعّر، وبعدها «كمّل يا عقل»</p><ul class="coh-list">'+pausedRows(items,true)+'</ul>';
+    // R59 (14 Nov 2026, Ahmed): each branch on its own, like the daily follow-ups; the price goes out from that branch's number
+    const n=k=>items.filter(i=>i.route_key===k).length;
+    if(pricingBranch!=='all'&&!n(pricingBranch))pricingBranch='all';
+    const tabs=[['all','الكل',items.length],['barka','بركاء',n('barka')],['muscat','مسقط',n('muscat')]]
+      .map(([k,l,c])=>'<button type="button" class="cfu-tab'+(pricingBranch===k?' on':'')+'" data-coh="prbranch" data-v="'+k+'" aria-pressed="'+(pricingBranch===k)+'">'+l+' <b dir="ltr">'+c+'</b></button>').join('');
+    return '<p class="coh-since">ملاك أرسلوا عقاراتهم والعقل وقف لين تحدد السعر. افتح المحادثة وسعّر، وبعدها «كمّل يا عقل»</p><div class="cfu-tabs coh-ptabs">'+tabs+'</div><ul class="coh-list">'+pausedRows(items.filter(i=>pricingBranch==='all'||i.route_key===pricingBranch),true)+'</ul>';
   }
   function drawSheet(){
     if(!sheetKind||sheetKind==='followups')return;
@@ -281,11 +286,11 @@
     try{
       // The follow-up count is read together with the rest (it is lighter), so its tile is there on the first draw.
       const fu=typeof window.crmFollowupsRefresh==='function'?Promise.race([window.crmFollowupsRefresh(),new Promise(r=>setTimeout(r,1500))]):null;
-      // SQL94: the price studies waiting for his approval are read with the rest (owner only), so their tile is there on the first draw
-      const ps=owner&&typeof window.crmPriceStudiesRefresh==='function'?Promise.race([window.crmPriceStudiesRefresh().catch(()=>0),new Promise(r=>setTimeout(r,2500))]):null;
+      // SQL94: the price studies waiting for approval are read with the rest, so their tile is there on the first draw (R59, SQL104: staff too)
+      const ps=(owner||canResume())&&typeof window.crmPriceStudiesRefresh==='function'?Promise.race([window.crmPriceStudiesRefresh().catch(()=>0),new Promise(r=>setTimeout(r,2500))]):null;
       const [home,pending,twinGroups,pz]=await Promise.all(owner
         ?[supa.rpc('crm_owner_home'),typeof window.crmPendingReplies==='function'?window.crmPendingReplies().catch(()=>0):0,supa.rpc('crm_property_twins'),supa.rpc('crm_paused_chats'),fu,ps]
-        :[supa.rpc('crm_staff_home'),0,null,canResume()?supa.rpc('crm_paused_chats'):null,fu]);
+        :[supa.rpc('crm_staff_home'),0,null,canResume()?supa.rpc('crm_paused_chats'):null,fu].concat(ps));
       if(seq!==sequence)return;
       // a staff session never keeps the owner's lists from an earlier session in the same tab
       if(!owner){paused={items:[],total:0};autoNotes=[];}
@@ -328,6 +333,7 @@
     if(act==='sheet')openSheet(b.dataset.kind);
     else if(act==='sclose')closeSheet();
     else if(act==='pfilter'){pausedFilter=b.dataset.v||'all';drawSheet();}
+    else if(act==='prbranch'){pricingBranch=b.dataset.v||'all';drawSheet();}
     else if(act==='ptoggle-ignored'){ignoredOpen=!ignoredOpen;if(ignoredOpen)loadIgnored();else drawSheet();}
     else if(act==='pignore'||act==='punignore'){
       const id=b.dataset.id,on=act==='pignore';if(b.disabled)return;b.disabled=true;

@@ -66,7 +66,8 @@ test('pressing it finds the chat among the chats the account may see, and no car
 
 test('the look and the versions',()=>{
   assert(css.includes('.crm-wa-note{')&&/\.crm-wa-note\{[^}]*--crm-wa-svg:url\(/.test(css),'its own line icon, never an empty square');
-  for(const f of ['crm-claude-note.js','crm-wa-buttons.js','crm-wa-buttons.css','crm-followups-today.js','crm-owner-home.js'])assert(index.includes(f+'?v=20261114-note1'),f);
+  for(const f of ['crm-claude-note.js','crm-wa-buttons.js','crm-wa-buttons.css','crm-followups-today.js'])assert(index.includes(f+'?v=20261114-note1'),f);
+  assert(/crm-owner-home\.js\?v=20261114-/.test(index));
   assert(index.indexOf('crm-wa-buttons.js?v=')<index.indexOf('crm-claude-note.js?v='));
 });
 

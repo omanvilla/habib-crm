@@ -4,17 +4,22 @@
  * «price-studies» (owner-only storage policy), and owner net, commission and the internal report never go to the owner of the
  * property or to staff. «موافق» sends the message and the owner report from the chat's branch number (price-study edge
  * function); «رفض مع ملاحظة» returns the task to Claude with the note. A WhatsApp alert links here with ?study=<id>.
- * The home page shows the tile and the sheet (crm-owner-home.js asks this file for the count and the list). */
+ * The home page shows the tile and the sheet (crm-owner-home.js asks this file for the count and the list).
+ * R59 (14 Nov 2026, Ahmed: «اريد الموظفين ايضا يقدروا يشوفوا… يشوفوا ويرسلوا من ارقام الافرع»): what is said above about
+ * «owner only» is now the owner and the staff (manager, agent), by SQL104: they see the same screen with every number and
+ * both reports, approve or reject, and save the office inspection. The list has branch tabs (الكل / بركاء / مسقط). Nothing
+ * of it ever goes to the owner of the property except the approved message and the owner report. */
 (function(){
   'use strict';
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
   const num=v=>v==null||v===''?'—':Number(v).toLocaleString('en-US');
-  const isOwner=()=>typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.role==='owner';
+  // R59 (14 Nov 2026, Ahmed, SQL104): the owner and the staff (manager, agent) see the studies, decide them and save the inspection
+  const canSee=()=>typeof currentProfile!=='undefined'&&currentProfile&&['owner','manager','agent'].includes(currentProfile.role);
   const toast=(m,t)=>{if(typeof showToast==='function')showToast(m,t);};
   const ID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const ROUTE={barka:'بركاء',muscat:'مسقط'};
   const when=v=>{try{return new Date(v).toLocaleString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}catch(_){return '';}};
-  let data={items:[],send_mode:'test'},sequence=0,focusId=null;
+  let data={items:[],send_mode:'test'},sequence=0,focusId=null,branch='all';
   const waiting=()=>data.items.filter(i=>i.status==='awaiting_approval');
   const HOLD={test_mode_hold:'وافقت عليها. الإرسال للملاك في وضع التجربة، فما انرسلت. تنرسل لما يتفعّل الإرسال وتضغط «ارسل الحين»',
     sending_off:'وافقت عليها، والإرسال للملاك موقف',
@@ -23,7 +28,7 @@
   const REACTION={accepted:'المالك وافق على السعر',price_rejected:'السعر ما ناسب المالك',counter_offer:'المالك طلب سعر ثاني'};
 
   async function refresh(){
-    if(!isOwner()||typeof supa==='undefined'){data={items:[],send_mode:'test'};return 0;}
+    if(!canSee()||typeof supa==='undefined'){data={items:[],send_mode:'test'};return 0;}
     const seq=++sequence;
     const r=await supa.rpc('crm_price_studies_pending');
     if(seq!==sequence)return waiting().length;
@@ -63,7 +68,7 @@
   function inspHtml(t){
     const s=saved(t),d=drafts[t]||{},note=d.note!=null?d.note:(s.note||''),date=d.date!=null?d.date:(s.inspected_at||today());
     return '<div class="cps-insp-head" data-insp-head>'+inspHead(t)+'</div>'
-      +'<p class="cps-private">لك فقط، ما يشوفها الموظف ولا المالك</p>'
+      +'<p class="cps-private">داخلية للمكتب، ما توصل للمالك</p>'
       +'<label class="cps-label">تاريخ المعاينة<input class="fi" type="date" dir="ltr" data-insp-date="'+esc(t)+'" value="'+esc(date)+'" max="'+today()+'"></label>'
       +'<div class="cps-label"><span>ملاحظتك: اكتبها أو سجّلها بصوتك وتتحول كتابة</span>'
       +'<textarea class="fi" rows="4" dir="auto" maxlength="6000" aria-label="ملاحظة المعاينة" data-insp-note="'+esc(t)+'" placeholder="وش شفت في المعاينة: حالة البناء، الموقع، الشارع، وأي شي يأثر على السعر">'+esc(note)+'</textarea></div>'
@@ -87,7 +92,7 @@
   }
   async function loadInsp(ids){
     ids=[...new Set((ids||[]).filter(x=>x&&ID.test(x)))];
-    if(!ids.length||!isOwner()||typeof supa==='undefined')return;
+    if(!ids.length||!canSee()||typeof supa==='undefined')return;
     const r=await supa.from('owner_price_study_inspections').select('task_id,note,inspected_at,photos').in('task_id',ids);
     if(r.error)return;
     const got={};(r.data||[]).forEach(x=>{got[x.task_id]={note:x.note||'',inspected_at:x.inspected_at||'',photos:Array.isArray(x.photos)?x.photos:[],exists:true};});
@@ -200,7 +205,7 @@
     const modal=document.getElementById(kind==='edit'?'mTask':'mTaskDetails'),el=taskSlot(kind);if(!modal||!el)return;
     const seen=window.viewingTaskDetails&&window.viewingTaskDetails.task||{};
     const id=String(kind==='edit'?(window.editingTask||''):(seen.id||'')),title=String(kind==='edit'?((document.getElementById('tTitle')||{}).value||''):(seen.title||''));
-    if(!(modal.classList.contains('on')&&isOwner()&&ID.test(id)&&/^دراسة سعر/.test(title))){el.hidden=true;el.innerHTML='';delete el.dataset.task;return;}
+    if(!(modal.classList.contains('on')&&canSee()&&ID.test(id)&&/^دراسة سعر/.test(title))){el.hidden=true;el.innerHTML='';delete el.dataset.task;return;}
     if(el.dataset.task===id&&!el.hidden)return;
     el.dataset.task=id;el.hidden=false;el.innerHTML=inspBox(id);
     loadInsp([id]).catch(()=>{});
@@ -240,7 +245,7 @@
       +'<small class="cps-facts">السعر اللي في بال المالك: <b dir="ltr">'+num(i.owner_price)+'</b></small>'
       +(note?'<p class="cps-note">'+esc(note)+'</p>':'')
       +'<div class="cps-nums">'+cell('القيمة السوقية',i.market_value)+cell('سعر العرض',i.asking_price)+cell('هامش التفاوض',i.negotiation_margin)+'</div>'
-      +'<p class="cps-private">لك فقط، ما يوصل للمالك ولا يشوفه الموظف</p>'
+      +'<p class="cps-private">داخلي للمكتب، ما يوصل للمالك</p>'
       +'<div class="cps-nums">'+cell('صافي المالك',i.owner_net,true)+cell('العمولة',i.commission,true)+'</div>'
       +'<div class="cps-files"><button type="button" class="btn-secondary" data-cps="file" data-path="'+esc(i.owner_report_path||'')+'">تقرير المالك PDF</button>'
       +'<button type="button" class="btn-secondary" data-cps="file" data-path="'+esc(i.internal_report_path||'')+'">التقرير الداخلي PDF</button>'
@@ -265,8 +270,13 @@
     if(!data.items.length)return '<p class="coh-empty">ما في دراسات تنتظر موافقتك الحين</p>';
     const mode=data.send_mode==='live'?'':'<p class="cps-mode">'+(data.send_mode==='off'?'الإرسال للملاك موقف. الموافقة تنحفظ وما ينرسل شي'
       :'وضع التجربة: الموافقة تنحفظ، والإرسال يوصل رقمك التجريبي بس. الملاك ما يوصلهم شي لين يتفعّل الإرسال')+'</p>';
-    return mode+'<p class="coh-since">راجع الأرقام والتقريرين. «موافق» يرسل الرسالة وتقرير المالك من رقم الفرع ويقفل المهمة. ما ينرسل شي قبل موافقتك</p>'
-      +'<ul class="coh-list cps-list">'+data.items.map(card).join('')+'</ul>';
+    // R59 (14 Nov 2026, Ahmed): each branch on its own, like the daily follow-ups; a study goes out from its chat's branch number
+    const n=k=>data.items.filter(i=>i.route_key===k).length;
+    if(branch!=='all'&&!n(branch))branch='all';
+    const tabs=[['all','الكل',data.items.length],['barka','بركاء',n('barka')],['muscat','مسقط',n('muscat')]]
+      .map(([k,l,c])=>'<button type="button" class="cfu-tab'+(branch===k?' on':'')+'" data-cps="tab" data-v="'+k+'" aria-pressed="'+(branch===k)+'">'+l+' <b dir="ltr">'+c+'</b></button>').join('');
+    return mode+'<p class="coh-since">راجع الأرقام والتقريرين. «موافق» يرسل الرسالة وتقرير المالك من رقم الفرع ويقفل المهمة. ما ينرسل شي قبل الموافقة</p>'
+      +'<div class="cfu-tabs coh-ptabs">'+tabs+'</div><ul class="coh-list cps-list">'+data.items.filter(i=>branch==='all'||i.route_key===branch).map(card).join('')+'</ul>';
   }
   // 12 Nov 2026: the list is not drawn again under his hands (typing, recording, a kept recording, photos uploading), and a
   // rejection note or an edited message he has not sent yet survives a new draw
@@ -328,6 +338,7 @@
     else if(act==='approve')decide(b,true).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});
     else if(act==='reject'){const f=document.querySelector('[data-cps-reject="'+CSS.escape(b.dataset.id)+'"]');if(f){f.hidden=!f.hidden;if(!f.hidden){const t=f.querySelector('textarea');if(t)t.focus();}}}
     else if(act==='reject-send')decide(b,false).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});
+    else if(act==='tab'){branch=b.dataset.v||'all';redraw(true);}
     else if(act==='restudy')restudy(b).catch(()=>{b.disabled=false;b.textContent='أعد الدراسة بعد المعاينة';toast('ما رجعت. جرب مرة ثانية','error');});
   });
   document.addEventListener('click',e=>{
@@ -339,7 +350,7 @@
   });
   document.addEventListener('crm-price-studies-updated',()=>redraw());
 
-  window.crmPriceStudiesCount=()=>isOwner()?waiting().length:0;
+  window.crmPriceStudiesCount=()=>canSee()?waiting().length:0;
   window.crmPriceStudiesRefresh=refresh;
   window.crmPriceStudiesHtml=()=>{const body=document.getElementById('cohSheetBody');if(body)body.dataset.cps='1';return html();};
   // the home page draws the sheet through this, so a new draw never lands on a note being written or recorded
@@ -358,7 +369,7 @@
       const ready=typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.company_id;
       if(ready&&typeof window.crmOwnerHomeOpenSheet==='function'){
         clearInterval(timer);try{sessionStorage.removeItem(KEY);}catch(_){}
-        if(!isOwner())return;
+        if(!canSee())return;
         focusId=id;
         refresh().then(()=>{window.crmOwnerHomeOpenSheet('studies');const c=document.querySelector('[data-cps-card="'+CSS.escape(id)+'"]');if(c&&c.scrollIntoView)c.scrollIntoView({block:'start'});});
       }else if(tries>1200)clearInterval(timer);

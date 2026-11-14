@@ -118,7 +118,7 @@ test('the approval screen compiles, is owner-only and is loaded after the home p
   assert(index.indexOf('crm-price-studies.js?v=')>index.indexOf('crm-owner-home.js?v='));
   assert(index.includes('crm-price-studies.css?v='));
   assert(!/<\/script><script src="crm-price-studies/.test(index),'closing tags inside the boot string stay escaped');
-  assert(ui.includes("if(!isOwner()||typeof supa==='undefined'){data={items:[],send_mode:'test'};return 0;}"));
+  assert(ui.includes("if(!canSee()||typeof supa==='undefined'){data={items:[],send_mode:'test'};return 0;}"));
   assert(ui.includes("supa.rpc('crm_price_study_decide',args)"));
   assert(ui.includes("supa.storage.from('price-studies').createSignedUrl(path,600)"));
   assert(home.includes("if(st0){todo+=st0;t.push(tile('دراسات سعر جاهزة',st0,'data-coh=\"sheet\" data-kind=\"studies\"'"));
