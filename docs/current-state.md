@@ -6,6 +6,17 @@ Updated 2026-11-14. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 14 November 2026 — SQL101: electricity and water on a property and on an owner offer (R52) — **published**
+
+- **Ahmed.** «أي عقار نستلمه لازم نعرف إذا الكهرباء موصلة», chose «الكهرباء والماء», then «نعم، طبق وادمج».
+- **SQL101** (`db/changes/101-property-utilities.*`, migration `20261114120000_property_utilities_20261114.sql`, applied 14 Nov from the file at `c1209b7`): `electricity_connected` and `water_connected` ('yes' / 'no' / NULL) on `properties` and `owner_leads`, checks, column grants, and both appended to the view `crm_properties_access` (guarded by the md5 of the SQL98 body). Only adds; no data changed. **Next free number: 102.**
+- **Front end** (`app-base-v15.html?v=20261114-util1`): «💡 الكهرباء» and «🚰 الماء» on the property form under the price field; saved, reopened, cleared for a new property; in the column lists and the export manifest.
+- **Agent** (`index.ts` + `brain.ts`): the property line says «الكهرباء: موصلة / غير موصلة» and «الماء: موصل / غير موصل» only when recorded (empty = not known = R41); the owner is asked once, next to the key question, «والكهرباء والماء موصلين ؟»; the answer is kept on the offer (`owner_offer.electricity` / `water`) and copied to his listed property where the office left it empty.
+- **Checked.** CI green on `c1209b7` (`tests/property-utilities.test.cjs`). The forward file ran first inside a rolled-back transaction on the live database: the staff account (Maram) still read 81 properties through the view with the two columns. After applying: 6 columns (2 + 2 + the view's 2), 81 properties, view grants unchanged. Inline dry run on the dry-run copy pinned to `c1209b7` with the new brain, 20 real messages (8 owner chats): all 200, replies as before; no chat was at the key-question step, so the new owner question was not seen in a run.
+- **Live.** `main` at `c1209b7`; `whatsapp-reply-agent` v69 → `c1209b7` (was `8f38701`); prompts synced; dry-run copy v30 → `c1209b7`.
+- **Not checked.** The two fields in a signed-in browser (form, save, reopen), a staff account saving them, the export. Every existing property is «غير معروف» until someone fills it.
+- **Rollback.** Pin `whatsapp-reply-agent` to `8f38701` first (its property query names the columns), revert the front end and the brain, re-sync, then `101-property-utilities.rollback.sql`.
+
 ## 14 November 2026 — Ahmed's decisions on the five written conflicts in the brain (R49 to R53) — **published**
 
 - **How.** The five tensions found by the inventory were put to Ahmed one by one (question cards); he answered three in his own words and chose the rest, then «نعم، ادمج». Recorded in `docs/agent-rules.md` as R49 to R53.
