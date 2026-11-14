@@ -6,6 +6,15 @@ Updated 2026-11-14. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 14 November 2026 — Ahmed's decisions on the five written conflicts in the brain (R49 to R53) — **published**
+
+- **How.** The five tensions found by the inventory were put to Ahmed one by one (question cards); he answered three in his own words and chose the rest, then «نعم، ادمج». Recorded in `docs/agent-rules.md` as R49 to R53.
+- **R49 thanks:** the «never answer thanks» line is gone; the agent reads why the client thanked, answers «العفو» only, no question, no offer, no pressure; a bare «شكرا» after our opinion question is a polite «it did not suit me». **R50 «حصلت»:** no «مبروك»; after «لين الحين تبحث ؟», «حصلت / لقيت / اشتريت» gets no reply, the client's active requests become `cancelled` with the reason «العميل قال إنه حصل عقار ووقف البحث (قفله العقل)» and Ahmed gets the CRM notification «وقف البحث» (code: `search_stopped`; «ما حصلت» is not that). **R51:** «المالك» and «صاحب العقار» are both allowed. **R52:** things outside the property (neighbours, the area, services) get «هذي الامور الافضل تطلع عليها بنفسك لما تزور المنطقة لانك انت اللي بتسكن هناك» + the visit question, no handoff; electricity and water are answered from the property's data (a night visit is advised to be by day); a fact of the property that is not recorded stays R41 (silence + «سؤال ما عندي جوابه:»). **R53:** the allowed promises are named («اول ما يتوفر بتواصل معك», «بنطلع على المنطقة والاسعار الحالية ونرجع لك», the R12 sentence).
+- **Checked.** CI green on `8f38701`. Inline dry run with the new brain (`brain_sha`), 21 real messages: all 200; 3 of 4 bare «شكرا» got «العفو» (one got no reply, context not reviewed). No real «حصلت» after the search question existed in the last 20 days and the «neighbours» samples were owners, so R50 and R52 are proven by the unit test and the wording only.
+- **Live.** `main` at `8f38701`; `whatsapp-reply-agent` v68 → `8f38701` (was `40a8a2a`); prompts synced from `main` (see the sha in `whatsapp_agent_prompts`); dry-run copy v29 → `8f38701`.
+- **Not built yet (Ahmed said yes).** Electricity and water on the property (two fields, the property form, the owner question next to the key question of R46, `propLine`). Until then an electricity question is R41.
+- **Rollback.** Pin `whatsapp-reply-agent` back to `40a8a2a`, revert `brain.ts` and re-sync the prompts. Requests closed by `search_stopped` are found by their `closed_reason`.
+
 ## 14 November 2026 — agent guards, batch 2: price talk before a visit, location before a time, meeting time, project figures — **published**
 
 - **Ahmed.** «نعم، كمل», then «نعم، ادمج» after the dry-run result.
