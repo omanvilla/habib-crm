@@ -46,7 +46,7 @@ test('1: arabicOnly cleans type codes in Arabic text and leaves links and Englis
 });
 
 test('1: the R9 redirect goes once per chat, keeps a silent R23 handoff and never leaves the client in a silent dead end',async()=>{
- const block=agent.slice(at('    const MUSCAT_AREAS = '),at('    // no English type codes reach the customer'))
+ const block=agent.slice(at('    const MUSCAT_AREAS = '),at('    // R48 (Ahmed 14 Nov 2026): a listed property'))
   .replace(/\(out as any\)/g,'out').replace(/\((\w+): (?:string|any)\)/g,'($1)');
  const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
  const redirect=new AsyncFunction('out','conv','history','analysis','msg','HARD_HANDOFF','mentionsProject','burstFrom',block+'\nreturn {out,analysis,redirectToMuscat};');
