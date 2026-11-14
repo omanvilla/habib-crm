@@ -350,6 +350,8 @@ const refusedPlace = (v: any) => v?.status === "done" && (String(v.rejection_rea
 const R64_OWNER = /\[contacts\]|(تواصل|نسق|تنسق|كلم)\s*(مع\s*)?(المالك|صاحب العقار|صاحب البيت)/;
 const R64_WHEN = /متي\s*يناسبك(م)?\s*(تزور|تشوف|تعاين|نزور)/;
 const R41_UNSURE = /ما\s*(عندي|عندنا|معي|معنا)\s*(تاكيد|معلومه|معلومات|تفاصيل|سبب|جواب|علم)|مو\s*متاكد|ما\s*ادري|ما\s*اعرف|غير\s*مؤكد|(ما\s*(هو|هي)|مو|مش|غير)\s*(موضح|مكتوب|مذكور|مسجل)/;
+// R41 in an English follow-up (R69; dry run of 14 Nov: «we do not have confirmation yet if WiFi is included»)
+const R41_UNSURE_EN = /\b(do|does|did)\s*n[o']?t\s+(have|know)\b|\bno\s+(confirmation|information|details)\b|\bnot\s+(sure|confirmed|mentioned|specified|stated|clear)\b|\bunsure\b/i;
 // After the one-question cut a text can be left as the name question alone («السلام عليكم اسمك الكريم ؟», seen 14 Nov on an
 // investor row that was also marked to go by itself). A follow-up that says nothing about the client's subject is not sent.
 const BARE_TEXT = /^(ممكن\s*)?(اسمك|الاسم)\s*(الكريم)?\s*؟?$/;
@@ -373,7 +375,7 @@ function notesGuard(out: any, group: boolean, clientSaid: string, officeSaid: st
   }
   // R41 in a follow-up (seen 14 Nov on the Muscat list: «ما عندي تأكيد إذا شامل أو لا», «ما عندنا سبب مؤكد»): an answer we
   // do not have is never written to the client. The row's own wording goes instead and it waits for the office.
-  if (!group && out.decision === "followup" && out.text && (R41_UNSURE.test(normAr(out.text)) || bareText(out.text))) {
+  if (!group && out.decision === "followup" && out.text && (R41_UNSURE.test(normAr(out.text)) || R41_UNSURE_EN.test(String(out.text)) || bareText(out.text))) {
     const bare = bareText(out.text);
     const base = String(fallback || "").replace(/\s+/g, " ").trim();
     if (base && !bareText(base)) out.text = base.startsWith("السلام عليكم") ? base : `السلام عليكم ${base}`;

@@ -184,7 +184,7 @@ test('R55: a rest house booked for a day gets no follow-up, and rent-or-buy is n
 // is asked whether he visited, not when he will. Held by code after the review answers.
 test('R60 / R63 / R64: refused area, valuation raise and owner contact are held by code',()=>{
  const pick=(start,end)=>{const a=fn.indexOf(start);assert(a>=0,start);return fn.slice(a,fn.indexOf(end,a)+end.length);};
- const src=[pick('const short =','\n'),pick('const normAr','\n'),pick('const R63_VALUATION','\n'),pick('const R60_GENERIC','\n'),pick('const areaWords','\n'),pick('const R60_PLACE','\n'),pick('const refusedPlace','\n'),pick('const R64_OWNER','\n'),pick('const R64_WHEN','\n'),pick('const R41_UNSURE','\n'),pick('const BARE_TEXT','\n'),pick('const bareText','\n'),pick('function notesGuard','\n}\n')].join('\n')
+ const src=[pick('const short =','\n'),pick('const normAr','\n'),pick('const R63_VALUATION','\n'),pick('const R60_GENERIC','\n'),pick('const areaWords','\n'),pick('const R60_PLACE','\n'),pick('const refusedPlace','\n'),pick('const R64_OWNER','\n'),pick('const R64_WHEN','\n'),pick('const R41_UNSURE','\n'),pick('const R41_UNSURE_EN','\n'),pick('const BARE_TEXT','\n'),pick('const bareText','\n'),pick('function notesGuard','\n}\n')].join('\n')
   .replace('(v: unknown, n = 500)','(v, n = 500)').replace('(out: any, group: boolean, clientSaid: string, officeSaid: string, refusedAreas: string[], offerLabel: string, fallback = "")','(out, group, clientSaid, officeSaid, refusedAreas, offerLabel, fallback = "")').replace(/\((\w+): (?:unknown|string|any)\)/g,'($1)');
  const {notesGuard,refusedPlace,areaWords}=new Function(src+';return {notesGuard,refusedPlace,areaWords};')();
  const o=(x)=>({decision:'followup',text:'السلام عليكم بخصوص طلبك لين الحين تبحث ؟',subject:null,reason:'',stage:'asked_no_visit',auto_ok:true,offer_no:null,...x});
@@ -238,6 +238,11 @@ test('R60 / R63 / R64: refused area, valuation raise and owner contact are held 
  // seen in the dry run of 14 Nov: «ما عندنا تفاصيل مكتوبة عن السبب ونقدر نوضح لك من المالك»
  r=notesGuard(o({text:'السلام عليكم بخصوص سؤالك عن سبب انخفاض الإيجار ما عندنا تفاصيل مكتوبة عن السبب متى يناسبك تزور البيت ؟'}),false,'','',[], '','بخصوص طلبك بيت الحيل الجنوبية لين الحين تبحث ؟');
  assert.equal(r.guard,'guard_unsure_answer');assert.equal(r.text,'السلام عليكم بخصوص طلبك بيت الحيل الجنوبية لين الحين تبحث ؟');
+ // R41 in English (R69; dry run of 14 Nov): the Arabic wording goes in, and languageGuard then puts the fixed English line
+ r=notesGuard(o({text:'Hello we do not have confirmation yet if WiFi is included in the rent When would you like to visit the apartment ?'}),false,'','',[], '','بخصوص طلبك شقة لين الحين تبحث ؟');
+ assert.equal(r.guard,'guard_unsure_answer');assert.equal(r.auto_ok,false);
+ for(const t of ['Hello I am not sure about the wifi when can you visit ?','Hello the wifi is not mentioned in the listing would you like to visit ?','Hello we dont know yet would you like to visit ?'])assert.equal(notesGuard(o({text:t}),false,'','',[], '','بخصوص طلبك شقة لين الحين تبحث ؟').guard,'guard_unsure_answer',t);
+ for(const t of ['Hello are you still looking for a property ?','Hello would you like to visit the apartment this week ?'])assert.equal(notesGuard(o({text:t}),false,'','',[], '','x').guard,undefined,t);
  assert(fn.includes('notesGuard(out, group, clientSaid, officeSaid, refusedAreas, offerLabel, kind === "request"'));
  assert(fn.includes('- الموقع ما ناسبه (R60')&&fn.includes('- رفع التثمين (R63')&&fn.includes('- رقم صاحب العقار (R64'));
 });
