@@ -23,7 +23,8 @@
   const httpsUrl=v=>{try{const u=new URL(String(v||''));return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch(_e){return '';}};
   const mayEdit=()=>typeof canEdit==='function'&&canEdit();
   const num=v=>Number(v).toLocaleString('en-US');
-  const day=d=>typeof fmtDate==='function'?fmtDate(d):String(d||'').slice(0,10);
+  // the page's fmtDate answers with markup around the digits: here the date is plain text
+  const day=d=>typeof fmtDate==='function'?String(fmtDate(d)).replace(/<[^>]+>/g,''):String(d||'').slice(0,10);
 
   // ---- the form section ----------------------------------------------------------------------------
   let state=null;      // what the database holds for the property in the form; null = not read, so nothing is written
