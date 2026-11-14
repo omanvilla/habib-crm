@@ -184,7 +184,7 @@ test('R55: a rest house booked for a day gets no follow-up, and rent-or-buy is n
 // is asked whether he visited, not when he will. Held by code after the review answers.
 test('R60 / R63 / R64: refused area, valuation raise and owner contact are held by code',()=>{
  const pick=(start,end)=>{const a=fn.indexOf(start);assert(a>=0,start);return fn.slice(a,fn.indexOf(end,a)+end.length);};
- const src=[pick('const short =','\n'),pick('const normAr','\n'),pick('const R63_VALUATION','\n'),pick('const R60_GENERIC','\n'),pick('const areaWords','\n'),pick('const R60_PLACE','\n'),pick('const refusedPlace','\n'),pick('const R64_OWNER','\n'),pick('const R64_WHEN','\n'),pick('const R41_UNSURE','\n'),pick('function notesGuard','\n}\n')].join('\n')
+ const src=[pick('const short =','\n'),pick('const normAr','\n'),pick('const R63_VALUATION','\n'),pick('const R60_GENERIC','\n'),pick('const areaWords','\n'),pick('const R60_PLACE','\n'),pick('const refusedPlace','\n'),pick('const R64_OWNER','\n'),pick('const R64_WHEN','\n'),pick('const R41_UNSURE','\n'),pick('const BARE_TEXT','\n'),pick('const bareText','\n'),pick('function notesGuard','\n}\n')].join('\n')
   .replace('(v: unknown, n = 500)','(v, n = 500)').replace('(out: any, group: boolean, clientSaid: string, officeSaid: string, refusedAreas: string[], offerLabel: string, fallback = "")','(out, group, clientSaid, officeSaid, refusedAreas, offerLabel, fallback = "")').replace(/\((\w+): (?:unknown|string|any)\)/g,'($1)');
  const {notesGuard,refusedPlace,areaWords}=new Function(src+';return {notesGuard,refusedPlace,areaWords};')();
  const o=(x)=>({decision:'followup',text:'السلام عليكم بخصوص طلبك لين الحين تبحث ؟',subject:null,reason:'',stage:'asked_no_visit',auto_ok:true,offer_no:null,...x});
@@ -227,6 +227,14 @@ test('R60 / R63 / R64: refused area, valuation raise and owner contact are held 
  assert.equal(r.text,'السلام عليكم بخصوص طلبك شقة في الخوير لين الحين تبحث ؟');assert.equal(r.auto_ok,false);assert.equal(r.guard,'guard_unsure_answer');assert(r.reason.startsWith('(R41)'));
  r=notesGuard(o({text:'السلام عليكم ما عندنا سبب مؤكد لانخفاض الايجار متى يناسبك تزور ؟'}),false,'','',[], '','');assert.equal(r.decision,'skip');assert.equal(r.text,null);
  r=notesGuard(o({text:'السلام عليكم عندنا شقة في الخوير تحب ارسلك تفاصيلها ؟'}),false,'','',[], '','x');assert.equal(r.guard,undefined);
+ // seen after the publish of 14 Nov: «ما هو موضح عندنا», and a text cut down to the name question that was marked to go by itself
+ r=notesGuard(o({text:'السلام عليكم بخصوص سؤالك عن الإنترنت ما هو موضح عندنا متى يناسبك تزور الشقة وتشوفها ؟'}),false,'','',[], '','بخصوص طلبك شقة مدينة السلطان قابوس لين الحين تبحث ؟');
+ assert.equal(r.guard,'guard_unsure_answer');assert.equal(r.text,'السلام عليكم بخصوص طلبك شقة مدينة السلطان قابوس لين الحين تبحث ؟');
+ for(const t of ['السلام عليكم الواي فاي مو مكتوب في الاعلان متى يناسبك تزور ؟','السلام عليكم هذا غير مذكور عندنا متى يناسبك تزور ؟'])assert.equal(notesGuard(o({text:t}),false,'','',[], '','بخصوص طلبك شقة لين الحين تبحث ؟').guard,'guard_unsure_answer',t);
+ r=notesGuard(o({text:'السلام عليكم اسمك الكريم ؟',auto_ok:true}),false,'','',[], '','بخصوص طلبك عرض مدينة السلطان هيثم لين الحين تبحث ؟');
+ assert.equal(r.guard,'guard_bare_text');assert.equal(r.auto_ok,false);assert.equal(r.text,'السلام عليكم بخصوص طلبك عرض مدينة السلطان هيثم لين الحين تبحث ؟');
+ r=notesGuard(o({text:'السلام عليكم',auto_ok:true}),false,'','',[], '','اسمك الكريم ؟');assert.equal(r.decision,'skip');assert.equal(r.text,null);assert.equal(r.auto_ok,false);
+ r=notesGuard(o({text:'السلام عليكم لين الحين تبحث عن غرفة وصالة ؟'}),false,'','',[], '','x');assert.equal(r.guard,undefined);
  // seen in the dry run of 14 Nov: «ما عندنا تفاصيل مكتوبة عن السبب ونقدر نوضح لك من المالك»
  r=notesGuard(o({text:'السلام عليكم بخصوص سؤالك عن سبب انخفاض الإيجار ما عندنا تفاصيل مكتوبة عن السبب متى يناسبك تزور البيت ؟'}),false,'','',[], '','بخصوص طلبك بيت الحيل الجنوبية لين الحين تبحث ؟');
  assert.equal(r.guard,'guard_unsure_answer');assert.equal(r.text,'السلام عليكم بخصوص طلبك بيت الحيل الجنوبية لين الحين تبحث ؟');

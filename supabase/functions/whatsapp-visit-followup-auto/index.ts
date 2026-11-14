@@ -326,7 +326,11 @@ const R60_PLACE = /موقع|بعيد|المنطقه|منطقه/;
 const refusedPlace = (v: any) => v?.status === "done" && (String(v.rejection_reason || "") === "location" || ((v.liked === false || String(v.client_feedback || "") === "disliked") && R60_PLACE.test(normAr(`${v.rejection_reason || ""} ${v.outcome_note || ""}`))));
 const R64_OWNER = /\[contacts\]|(تواصل|نسق|تنسق|كلم)\s*(مع\s*)?(المالك|صاحب العقار|صاحب البيت)/;
 const R64_WHEN = /متي\s*يناسبك(م)?\s*(تزور|تشوف|تعاين|نزور)/;
-const R41_UNSURE = /ما\s*(عندي|عندنا|معي|معنا)\s*(تاكيد|معلومه|معلومات|تفاصيل|سبب|جواب|علم)|مو\s*متاكد|ما\s*ادري|ما\s*اعرف|غير\s*مؤكد/;
+const R41_UNSURE = /ما\s*(عندي|عندنا|معي|معنا)\s*(تاكيد|معلومه|معلومات|تفاصيل|سبب|جواب|علم)|مو\s*متاكد|ما\s*ادري|ما\s*اعرف|غير\s*مؤكد|(ما\s*(هو|هي)|مو|مش|غير)\s*(موضح|مكتوب|مذكور|مسجل)/;
+// After the one-question cut a text can be left as the name question alone («السلام عليكم اسمك الكريم ؟», seen 14 Nov on an
+// investor row that was also marked to go by itself). A follow-up that says nothing about the client's subject is not sent.
+const BARE_TEXT = /^(ممكن\s*)?(اسمك|الاسم)\s*(الكريم)?\s*؟?$/;
+const bareText = (t: unknown) => { const s = normAr(t).replace(/^\s*السلام عليكم(\s*ورحمه الله(\s*وبركاته)?)?\s*/, "").trim(); return s.length < 12 || BARE_TEXT.test(s); };
 function notesGuard(out: any, group: boolean, clientSaid: string, officeSaid: string, refusedAreas: string[], offerLabel: string, fallback = "") {
   if (out.decision !== "skip" && R63_VALUATION.test(normAr(String(clientSaid || "").split("\n").slice(-12).join("\n")))) {
     out.reason = short(`(R63) موضوعه رفع التثمين عشان يغطي قرضه الشخصي وهذا ما عندنا، ما يحتاج متابعة. ${out.reason || ""}`, 300);
@@ -346,12 +350,13 @@ function notesGuard(out: any, group: boolean, clientSaid: string, officeSaid: st
   }
   // R41 in a follow-up (seen 14 Nov on the Muscat list: «ما عندي تأكيد إذا شامل أو لا», «ما عندنا سبب مؤكد»): an answer we
   // do not have is never written to the client. The row's own wording goes instead and it waits for the office.
-  if (!group && out.decision === "followup" && out.text && R41_UNSURE.test(normAr(out.text))) {
+  if (!group && out.decision === "followup" && out.text && (R41_UNSURE.test(normAr(out.text)) || bareText(out.text))) {
+    const bare = bareText(out.text);
     const base = String(fallback || "").replace(/\s+/g, " ").trim();
-    if (base) out.text = base.startsWith("السلام عليكم") ? base : `السلام عليكم ${base}`;
+    if (base && !bareText(base)) out.text = base.startsWith("السلام عليكم") ? base : `السلام عليكم ${base}`;
     else { out.decision = "skip"; out.text = null; }
-    out.auto_ok = false; out.guard = "guard_unsure_answer";
-    out.reason = short(`(R41) النص كان فيه «ما عندي تأكيد»، انشال: سؤاله يحتاج جوابك. ${out.reason || ""}`, 300);
+    out.auto_ok = false; out.guard = bare ? "guard_bare_text" : "guard_unsure_answer";
+    out.reason = short(`${bare ? "النص طلع سؤال الاسم بس بدون موضوع العميل، انبدل بالصيغة العادية." : "(R41) النص كان فيه «ما عندي تأكيد»، انشال: سؤاله يحتاج جوابك."} ${out.reason || ""}`, 300);
     return out;
   }
   if (!group && out.decision === "followup" && out.text && R64_OWNER.test(normAr(officeSaid)) && R64_WHEN.test(normAr(out.text))) {
