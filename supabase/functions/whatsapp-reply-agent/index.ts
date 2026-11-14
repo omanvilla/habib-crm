@@ -1073,7 +1073,8 @@ Deno.serve(async (req) => {
       const recent = await db.from("whatsapp_messages").select("body").eq("conversation_id", conv.id).eq("direction", "outbound")
         .gt("message_timestamp", new Date(Date.now() - 15 * 60 * 1000).toISOString()).limit(40);
       const norm = (t: unknown) => String(t || "").replace(/[\s؟?.!،,]+/g, " ").trim();
-      const seen = new Set((recent.data || []).map((r: any) => norm(r.body)).filter(Boolean));
+      // R54: one sent message now holds several lines, so each paragraph of it counts as a line already sent
+      const seen = new Set((recent.data || []).flatMap((r: any) => [r.body, ...String(r.body || "").split(/\n\s*\n/)]).map((b: any) => norm(b)).filter(Boolean));
       texts = texts.filter((t) => !seen.has(norm(t)));
     }
     // never tell a customer that a property is sold when the CRM still lists it as available
@@ -1570,7 +1571,14 @@ Deno.serve(async (req) => {
     // 1 (10 Nov): the send list is rebuilt from the FINAL reply, so the R9 redirect and the arabicOnly text are what really goes out
     // (9 Nov: the redirect was recorded in the draft but never sent). The location / lockbox / owner's number follow the text,
     // except after a redirect (that customer is not booked here).
-    const outgoing: any[] = [...out.reply_messages.map((t: string) => ({ type: "text", text: { preview_url: !ruleAuto && /https?:\/\//.test(t), body: t } })), ...(redirectToMuscat ? [] : actionMsgs)];
+    const outgoingParts: any[] = [...out.reply_messages.map((t: string) => ({ type: "text", text: { preview_url: !ruleAuto && /https?:\/\//.test(t), body: t } })), ...(redirectToMuscat ? [] : actionMsgs)];
+    // R54 (Ahmed 14 Nov 2026: «ادمج الفقاعات في رسالة وحدة»): Meta counts every bubble as one service message against the 1,000 free a
+    // month per number, so the whole reply goes as ONE text message: the reply lines, then the location link or the owner's number,
+    // each part on its own paragraph. Only an image (the lockbox photo) stays a message of its own.
+    const textParts = outgoingParts.filter((m: any) => m.type === "text");
+    const outgoing: any[] = [
+      ...(textParts.length ? [{ type: "text", text: { preview_url: textParts.some((m: any) => m.text.preview_url), body: textParts.map((m: any) => String(m.text.body)).join("\n\n") } }] : []),
+      ...outgoingParts.filter((m: any) => m.type !== "text")];
     const projectNamed = await mentionsProject(msg.company_id, out.reply_messages);
     if (projectNamed) analysis.project_named = true;
     // 9 Nov (Ahmed): investors are answered by the agent too (anything it does not know comes back to him as a handoff); only running deals wait
@@ -1591,7 +1599,8 @@ Deno.serve(async (req) => {
     // inline dry run: the answer and what would be sent come back here, nothing is written (the owner's number is masked).
     // forced_dry shows whether the dry-run copy recognised itself from its URL (true there, false on the live function)
     if (inline) {
-      const send_preview = outgoing.map((m: any) => m.type === "text" ? (/^\d{8,}$/.test(String(m.text.body)) ? "[رقم صاحب العقار]" : m.text.body) : "[صورة صندوق المفتاح]");
+      // R54: the owner's number is one paragraph of the single message now, and is masked there
+      const send_preview = outgoing.map((m: any) => m.type === "text" ? String(m.text.body).split("\n\n").map((p: string) => (/^\d{8,}$/.test(p) ? "[رقم صاحب العقار]" : p)).join("\n\n") : "[صورة صندوق المفتاح]");
       return json({ ok: true, inline: true, forced_dry: forcedDry, reply_messages: out.reply_messages, action: out.action, handoff_reason: out.handoff_reason ?? null, category: out.category,
         seriousness: out.seriousness ?? "unknown", seriousness_reason: out.seriousness_reason ?? "", meeting: out.meeting ?? null, mustahiq_waitlist: out.mustahiq_waitlist === true, crm_note: out.crm_note ?? "", send_preview, analysis });
     }

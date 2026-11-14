@@ -14,7 +14,7 @@ test('1: the send list is rebuilt from the final reply, after the R9 redirect an
  const redirect=at('if (redirectToMuscat) {');
  const arabic=at('out.reply_messages = (out.reply_messages || []).map((r: string) => arabicOnly(r));');
  const synced=at('Object.assign(analysis, { reply_messages: out.reply_messages, action: out.action, category: out.category });');
- const rebuild=at('const outgoing: any[] = [...out.reply_messages.map(');
+ const rebuild=at('const outgoingParts: any[] = [...out.reply_messages.map(');
  const send=at('const wamid = await metaSend(tokens, phoneId, to, outgoing[i]);');
  assert(redirect<arabic&&arabic<synced&&synced<rebuild&&rebuild<send,'redirect, then arabicOnly, then the draft record and the send list, then the send');
  // whatsapp-reply-send adds the location from analysis.action when a held draft is approved
@@ -276,6 +276,23 @@ test('14 Nov guards, batch 3: call request (R12), owner declines (R10 / R20), a 
  r=run('طيب',{out:{action:'handoff',handoff_reason:'يبي يعرف موعد التسليم'},texts:[]});assert.equal(r.out.soft_handoff_no_reply,true);
  // the pinned reply
  assert.match(agent,/if \(ruleAuto && \(out\.search_stopped \|\| Object\.keys\(out\)\.some\(\(k\) => k\.startsWith\("guard_"\)\)\)\) ruleAuto = false;/);
+});
+test('R54: the whole reply goes as one text message (every bubble counts against Meta\'s 1,000 free a month)',()=>{
+ const src=agent.slice(at('    const textParts = outgoingParts.filter('),at('    const projectNamed = await mentionsProject(msg.company_id, out.reply_messages);'))
+  .replace(/\((\w+): (?:string|any)\)/g,'($1)').replace('const outgoing: any[]','const outgoing');
+ const merge=(parts)=>new Function('outgoingParts',src+'\nreturn outgoing;')(parts);
+ const T=(body,preview=false)=>({type:'text',text:{preview_url:preview,body}});
+ let o=merge([T('وعليكم السلام ورحمة الله وبركاته'),T('السعر 59 الف'),T('متى يناسبك تزور ؟')]);
+ assert.equal(o.length,1);assert.equal(o[0].text.body,'وعليكم السلام ورحمة الله وبركاته\n\nالسعر 59 الف\n\nمتى يناسبك تزور ؟');assert.equal(o[0].text.preview_url,false);
+ // the location link joins the same message and keeps its preview; the lockbox photo stays a message of its own, after the text
+ o=merge([T('البيت مفتوح تقدر تشوفه'),T('https://maps.google.com/?q=1,2',true),{type:'image',image:{link:'x'}}]);
+ assert.equal(o.length,2);assert.equal(o[0].text.body,'البيت مفتوح تقدر تشوفه\n\nhttps://maps.google.com/?q=1,2');assert.equal(o[0].text.preview_url,true);assert.equal(o[1].type,'image');
+ assert.deepEqual(merge([]),[],'nothing to say stays nothing');
+ assert.equal(merge([T('العفو')])[0].text.body,'العفو');
+ // the owner's number is still hidden in a dry-run answer, and a line sent inside an earlier single message still counts as sent (R14)
+ assert(agent.includes('String(m.text.body).split("\\n\\n").map((p: string) => (/^\\d{8,}$/.test(p) ? "[رقم صاحب العقار]" : p)).join("\\n\\n")'));
+ assert(agent.includes('[r.body, ...String(r.body || "").split(/\\n\\s*\\n/)]'));
+ assert(agent.includes('...(redirectToMuscat ? [] : actionMsgs)];\n    // R54'),'the parts are still built from the final reply first');
 });
 test('R48: the visit watcher books no new visit from the other branch number, and book_viewing counts as serving',()=>{
  assert.match(agent,/select\("id,type,area,price,bedrooms,land_size,listing_purpose,branch_key"\)/);
