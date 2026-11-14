@@ -44,3 +44,11 @@ test('the home page draws the card after the first draw and escapes what it show
   assert.equal(draw([]),'');
   assert.match(read('index.html'),/crm-owner-home\.js\?v=20261114-use1/);
 });
+test('the agent does not read its own undelivered messages as said to the customer (14 Nov, 131042)',()=>{
+  const agent=read('supabase/functions/whatsapp-reply-agent/index.ts');
+  assert(agent.includes('message_timestamp,delivery_status,matched_property_id'),'the history query reads the delivery status');
+  assert(agent.includes('.reverse().filter((h: any) => !(h.direction === "outbound" && h.delivery_status === "failed"));'));
+  assert(agent.includes('.eq("direction", "outbound").neq("delivery_status", "failed")'),'the 15-minute repeat check ignores refused messages too');
+  const keep=(h)=>!(h.direction==='outbound'&&h.delivery_status==='failed');
+  assert.deepEqual([{direction:'inbound',delivery_status:null},{direction:'outbound',delivery_status:'failed'},{direction:'outbound',delivery_status:'read'}].filter(keep).length,2);
+});

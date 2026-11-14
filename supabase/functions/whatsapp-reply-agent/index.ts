@@ -636,14 +636,17 @@ Deno.serve(async (req) => {
     }
 
     const [histR, propsR, rulesR, priorR] = await Promise.all([
-      db.from("whatsapp_messages").select("id,direction,message_type,body,transcript,media_id,actor_type,message_timestamp,matched_property_id,property_link_key,property_image_analysis,referral:raw_payload->referral")
+      db.from("whatsapp_messages").select("id,direction,message_type,body,transcript,media_id,actor_type,message_timestamp,delivery_status,matched_property_id,property_link_key,property_image_analysis,referral:raw_payload->referral")
         .eq("conversation_id", conv.id).lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(60),
       db.from("properties").select("id,title,internal_name,type,area,wilayat,price,bedrooms,bathrooms,land_size,built_size,listing_purpose,public_details,description,map_url,visit_method,visit_instructions,lockbox_image_url,owner_id,branch_key,rental_terms,rented_units,price_negotiable,electricity_connected,water_connected")
         .eq("company_id", msg.company_id).eq("status", "available").eq("archived", false),
       db.from("whatsapp_reply_rules").select("id,situation,approved_reply,category,auto_send,auto_match_regex").eq("company_id", msg.company_id).eq("active", true).order("created_at", { ascending: false }).limit(40),
       db.from("whatsapp_reply_drafts").select("analysis,status").eq("conversation_id", conv.id).in("status", ["sent", "approved", "edited"]),
     ]);
-    const history = (histR.data || []).reverse();
+    // 14 Nov 2026: a message Meta refused (delivery_status failed, e.g. 131042 when the free tier ran out on the Barka number)
+    // never reached the customer, so it is not part of the chat the agent reads: otherwise the ad, the name question or the
+    // branch line count as already sent and the customer is left without them.
+    const history = (histR.data || []).reverse().filter((h: any) => !(h.direction === "outbound" && h.delivery_status === "failed"));
     const props = propsR.data || [];
     // R2: the customer's visits, so the agent knows whether a price talk can start (only after a visit).
     // Listed by a neutral label (type, area, price): the office title carries the owner's name (10 Nov)
@@ -1070,7 +1073,7 @@ Deno.serve(async (req) => {
     }
     // R14 (9 Nov): never send a line we already sent to this customer in the last 15 minutes (Amer Ali got "ارسل الكروكي" twice)
     if (!review && texts.length) {
-      const recent = await db.from("whatsapp_messages").select("body").eq("conversation_id", conv.id).eq("direction", "outbound")
+      const recent = await db.from("whatsapp_messages").select("body").eq("conversation_id", conv.id).eq("direction", "outbound").neq("delivery_status", "failed")
         .gt("message_timestamp", new Date(Date.now() - 15 * 60 * 1000).toISOString()).limit(40);
       const norm = (t: unknown) => String(t || "").replace(/[\s؟?.!،,]+/g, " ").trim();
       // R54: one sent message now holds several lines, so each paragraph of it counts as a line already sent
