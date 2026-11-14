@@ -186,7 +186,7 @@ test('14 Nov guards: rules that were words only are held by code (R16, R24, R34,
  r=await run(['في مدينة السلطان هيثم عرض بدون دفعة مقدمة'],{route:'muscat'});assert.equal(r.texts.length,1);
 });
 test('14 Nov guards, batch 2: price talk before a visit, location before a time, meeting time, project figures',async()=>{
- const block=agent.slice(at('    // ---- 14 Nov 2026, batch 2 ----'),at('    // the ad text goes once per conversation'))
+ const block=agent.slice(at('    // ---- 14 Nov 2026, batch 2 ----'),at('    // ---- 14 Nov 2026, batch 3 ----'))
   .replace(/\((\w+): (?:string|any|number)\)/g,'($1)').replace(/\((\w+): any, (\w+): number\)/g,'($1, $2)').replace('const bad: boolean[]','const bad');
  const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
  const guards=new AsyncFunction('out','texts','history','visitedIds','SAID_VISITED','SEE_FIRST','r16Seen','prop','visits','conv','msg','mentionsProject',block+'\nreturn {out,texts};');
