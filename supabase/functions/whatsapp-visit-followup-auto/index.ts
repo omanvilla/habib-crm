@@ -294,7 +294,7 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
     name = propertyName(pr);
     about = `متابعة بعد زيارة ${name || "عقار"} يوم ${v.data?.viewing_date || "غير معروف"}. ${v.data?.status === "done" ? "الزيارة تمت" : "ما نعرف هل زار"}.`;
     if (name) about += ` اسم العقار للعميل: ${name}. إذا سؤالك عن الزيارة اسأله عن رأيه في ${name} بالاسم، مثل "كيف شفت ${name} وايش انطباعك عنها ؟" ("عنه" للبيت والمبنى والمحل). ممنوع سؤال عام مثل "قدرت تشوف العقار ؟" أو "شفت العقار ؟" أو "بخصوص الزيارة"، وممنوع "كيف لقيت" (تنفهم «لقيتوا مكانها ؟»، R29).`;
-    if (x.after_visit) about += " هذي متابعة بعد موعد الزيارة بساعة ونص، وهذا أهم وقت للبيع. قرارك followup واسأله عن رأيه في العقار بالاسم، إلا إذا المحادثة تقول إنه ما زار أو موضوعه انتهى أو قال رأيه.";
+    if (x.after_visit) about += " هذي متابعة بعد موعد الزيارة بساعة ونص، وهذا أهم وقت للبيع (R47، أحمد 14 نوفمبر: بدون استثناء). قرارك followup واسأله عن رأيه في العقار بالاسم، حتى لو أحمد أو الموظفة كتبوا له أو كلمنا بعد الزيارة في شي ثاني. skip بس في ثلاث حالات: قال رأيه في العقار بنفسه بعد الزيارة، أو العقار انباع أو انسحب (R44)، أو في تفاوض أو صفقة شغالة مع أحمد. وإذا المحادثة تقول صراحة إنه ما زار (أجّل أو ألغى) اسأله هل قدر يزور بدل سؤال الرأي.";
   }
   const fixed = kind === "visit" ? String(x.body || "") : (x.messages || []).join(" ");
   // R39: a message prepared for everyone who asked about one property is read against each client's chat and file too.
@@ -1102,10 +1102,20 @@ async function sendOne(f: any, numbers: string[], freeOnly = false) {
   // the two company numbers never message each other
   if (!to || numbers.includes(to)) return stop("rejected", "company_number");
   if (!["barka", "muscat"].includes(conv.route_key) || conv.route_key !== f.route_key) return "route_blocked";
-  if (client.followup_suppressed || client.archived || conv.agent_muted || conv.human_handoff_required) return "held";
-  if (await chatHeld(conv.id)) return "held_owner_chat";
+  // R47 (Ahmed 14 Nov): the question after a visit goes to every client within 90 minutes; the only exceptions are a client who
+  // already said his opinion or a property that left the market (the review decides those), and a negotiation or running deal
+  // with Ahmed. An open handoff or Ahmed / staff typing in the chat no longer hold it back.
+  if (freeOnly) {
+    if (client.followup_suppressed || client.archived || conv.agent_muted) return "held";
+    if (await negotiationHold(conv.id)) return "held_negotiation";
+    if (conv.human_handoff_required && /^\s*(تفاوض|مشتري جاد)\s*:/.test(String(conv.handoff_reason || ""))) return "held_negotiation";
+  } else {
+    if (client.followup_suppressed || client.archived || conv.agent_muted || conv.human_handoff_required) return "held";
+    if (await chatHeld(conv.id)) return "held_owner_chat";
+  }
   const lastIn = lastInR.data?.message_timestamp ? new Date(lastInR.data.message_timestamp).getTime() : 0;
-  if (lastIn > new Date(f.created_at).getTime()) return stop("superseded", "client_wrote_after");
+  // R47: after a visit the review read the chat when it decided, so only a message after that decision supersedes the question
+  if (lastIn > new Date(freeOnly && f.reviewed_at ? f.reviewed_at : f.created_at).getTime()) return stop("superseded", "client_wrote_after");
   const service = lastIn > 0 && Date.now() - lastIn < WINDOW_MS;
   if (freeOnly && !service) return "window_closed";
   const tpl = tplR.data;

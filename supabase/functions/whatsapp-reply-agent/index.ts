@@ -14,7 +14,8 @@ const DEBOUNCE_MS = Number(Deno.env.get("REPLY_DEBOUNCE_MS") || 35000); // wait 
 // Only these handoffs keep the agent out of the chat until Ahmed answers (negotiation, serious buyer, owner price study).
 // Any other handoff ("send photos", "call me", "not sure") no longer silences the agent: the next message is answered
 // and the open item stays on Ahmed's list.
-const HARD_HANDOFF = /^\s*(تفاوض|مشتري جاد|دراسة سعر|سؤال ما عندي جوابه)\s*:/;
+// R45 (Ahmed 14 Nov): a meeting request («اجتماع:») silences the agent too; Ahmed answers the client himself
+const HARD_HANDOFF = /^\s*(تفاوض|مشتري جاد|دراسة سعر|سؤال ما عندي جوابه|اجتماع)\s*:/;
 // R41 (Ahmed 12 Nov): a question whose answer is not written in front of the agent gets no reply at all; the chat goes back to Ahmed
 const UNKNOWN_Q = /^\s*سؤال ما عندي جوابه\s*:/;
 // R40 (Ahmed 12 Nov): people the office never answers; the chat leaves «العقل موقوف عندهم» for the ignored list
@@ -249,8 +250,10 @@ const schema = {
         kind: { type: "string", enum: ["land", "villa", "house", "building", "apartment", "other"] },
         area: { type: ["string", "null"] }, wilayat: { type: ["string", "null"] },
         price: { type: ["number", "null"] }, land_size: { type: ["number", "null"] }, built_size: { type: ["number", "null"] },
+        // R46 (Ahmed 14 Nov): how we get in when Ahmed comes to inspect (open / key in a lockbox / the owner or someone opens)
+        visit_method: { type: ["string", "null"], enum: ["open", "lockbox", "office", null] }, visit_instructions: { type: ["string", "null"] },
       },
-      required: ["kind", "area", "wilayat", "price", "land_size", "built_size"],
+      required: ["kind", "area", "wilayat", "price", "land_size", "built_size", "visit_method", "visit_instructions"],
     }] },
     request: { anyOf: [{ type: "null" }, {
       type: "object", additionalProperties: false,
@@ -1008,32 +1011,22 @@ Deno.serve(async (req) => {
     // R33 (Ahmed 12 Nov): a project meeting is at that project's developer: Al Ahli Sabour in Al Udhaybah, Aida (Dar Global) at
     // their office by the Opera House; a project whose office Ahmed has not named yet (Al Yazan) waits for him to set the place
     const MEETING_PLACE: Record<string, string> = { office: "مكتب الموالح", online: "اونلاين", developer: "مكتب الأهلي صبور في العذيبة", dar_global: "مكتب دار جلوبال عند دار الأوبرا", project_tbd: "عند المطور (المكان يحدده أحمد)" };
-    // the meeting this chat already booked (an open «اجتماع:» handoff): booking the same one again («تمام» after it) alerts nobody
-    const openMeeting = !!conv.human_handoff_required && /^\s*اجتماع\s*:/.test(String(conv.handoff_reason || "")) ? String(conv.handoff_reason) : "";
-    if (out.action === "book_meeting" || (out.action === "handoff" && /^\s*اجتماع\s*:/.test(String(out.handoff_reason || "")))) {
+    // R45 (Ahmed 14 Nov, replaces the «تمام وصلت» of R19 / R30 and the «طلب موعد:» of R23): the moment a client asks for a meeting
+    // or an office visit, or accepts the agent's invitation, the agent says nothing, stops in that chat (hard handoff «اجتماع:»),
+    // Ahmed gets the WhatsApp alert and a task to confirm. Only Ahmed fixes the time and confirms it (button «أكّد الموعد»).
+    const MEETING_ASK = /^\s*(اجتماع|طلب اجتماع|طلب اجتماع بدون موعد|طلب موعد)\s*:/;
+    if (out.action === "book_meeting" || (out.action === "handoff" && MEETING_ASK.test(String(out.handoff_reason || "")))) {
       const mt = out.meeting || null;
-      // "16:00", "9:30" and "16:00:00" are the same kind of hour; it is kept as HH:MM
       const hm = String(mt?.time || "").trim().match(/^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/);
       if (mt && hm) mt.time = `${hm[1].padStart(2, "0")}:${hm[2]}`;
-      // R30: today is never offered (Ahmed needs time to fit it in); tomorrow or later only
-      const sameDay = !!mt && /^\d{4}-\d{2}-\d{2}$/.test(String(mt.date || "")) && String(mt.date) === dayM;
-      const dated = !!mt && !!hm && /^\d{4}-\d{2}-\d{2}$/.test(String(mt.date || "")) && String(mt.date) > dayM;
-      // the topic is what the model wrote after «اجتماع:» (else its intent); the fixed part comes first for Ahmed
-      const topic = String(out.handoff_reason || "").replace(/^\s*اجتماع\s*:\s*/, "").replace(/\s*\(ينتظر تأكيدك\)\s*$/, "").trim() || String(out.intent || out.crm_note || "");
-      if (sameDay) {
-        out.action = "none"; out.handoff_reason = null; out.meeting_waits = true;
-        out.reply_messages = ["اليوم صعب، بكره أو بعده يناسبك ؟"];
-      } else if (dated && MEETING_PLACE[mt.place]) {
-        out.action = "book_meeting";
-        const slot = `${MEETING_PLACE[mt.place]} ${mt.date} ${mt.time}`;
-        if (openMeeting.includes(slot)) { out.handoff_reason = openMeeting; out.meeting_already_booked = true; }
-        else out.handoff_reason = short(`اجتماع: ${client.name || conv.customer_name || "عميل"} ${slot} ${short(topic, 120)} (ينتظر تأكيدك)`, 300);
-        // R30: the agent never confirms the slot itself; Ahmed confirms it after checking his day
-        const CONFIRMS = /نشوفك|نتشرف\s*فيك|تم\s*(الحجز|التأكيد|تأكيد)|موعدك\s*(تأكد|محجوز|ثابت)|أكدنا|اكدنا|حجزنا\s*لك|بانتظارك|ننتظرك/;
-        const kept = (out.reply_messages || []).map(String).filter((t) => !CONFIRMS.test(t));
-        out.reply_messages = kept.length ? kept : ["تمام وصلت"];
-      } else if (out.action === "book_meeting") { out.action = "none"; out.handoff_reason = null; out.meeting_waits = true; }
-      else out.handoff_reason = openMeeting || short(`طلب اجتماع بدون موعد: ${topic}`, 300);
+      const dated = !!mt && /^\d{4}-\d{2}-\d{2}$/.test(String(mt.date || "")) && String(mt.date) >= dayM;
+      if (mt && !dated) mt.date = null;
+      if (mt && !hm) mt.time = null;
+      const topic = String(out.handoff_reason || "").replace(MEETING_ASK, "").replace(/\s*\(ينتظر تأكيدك\)\s*$/, "").trim() || String(out.intent || out.crm_note || "");
+      const slot = [MEETING_PLACE[mt?.place] || "", mt?.date || "", mt?.time || ""].filter(Boolean).join(" ") || "بدون موعد";
+      out.action = "book_meeting";
+      out.handoff_reason = short(`اجتماع: ${client.name || conv.customer_name || "عميل"} ${slot} ${short(topic, 120)} (ينتظر تأكيدك)`, 300);
+      out.reply_messages = [];
     }
 
     // the agent may only touch properties that are really available
@@ -1063,7 +1056,7 @@ Deno.serve(async (req) => {
       if (!BOUGHT_RE.test(saidSince)) {
         texts = texts.filter((t) => !CONGRATS_RE.test(t));
         const lastOutBody = lastOutIdx >= 0 ? String(history[lastOutIdx]?.body || "") : "";
-        if (!texts.length && AFTER_VISIT_Q.test(lastOutBody) && !NOT_A_VISIT_Q.test(lastOutBody)) texts = ["حياك الله، وايش انطباعك بعد الزيارة ؟"];
+        if (!texts.length && out.action !== "book_meeting" && AFTER_VISIT_Q.test(lastOutBody) && !NOT_A_VISIT_Q.test(lastOutBody)) texts = ["حياك الله، وايش انطباعك بعد الزيارة ؟"];
       }
     }
     // R14 (9 Nov): never send a line we already sent to this customer in the last 15 minutes (Amer Ali got "ارسل الكروكي" twice)
@@ -1252,10 +1245,22 @@ Deno.serve(async (req) => {
       try {
         const ex = await db.from("owner_leads").select("id").eq("conversation_id", conv.id).limit(1);
         const o = out.owner_offer;
-        const row = { kind: o.kind, area: o.area, wilayat: o.wilayat, price: o.price, land_size: o.land_size, built_size: o.built_size, notes: short(out.crm_note, 1000), updated_at: new Date().toISOString() };
+        const row: any = { kind: o.kind, area: o.area, wilayat: o.wilayat, price: o.price, land_size: o.land_size, built_size: o.built_size, notes: short(out.crm_note, 1000), updated_at: new Date().toISOString() };
+        // R46: the owner's answer to «المفتاح وين يكون ؟» is kept on the offer (SQL100 columns) and never wiped by a later empty answer
+        if (o.visit_method && ["open", "lockbox", "office"].includes(o.visit_method)) row.visit_method = o.visit_method;
+        if (String(o.visit_instructions || "").trim()) row.visit_instructions = short(o.visit_instructions, 300);
         if ((ex.data || []).length) await db.from("owner_leads").update(row).eq("id", ex.data![0].id);
         else await db.from("owner_leads").insert({ ...row, company_id: msg.company_id, client_id: client.id, conversation_id: conv.id });
         await db.rpc("crm_match_owner_leads");
+        // R46: a property of this owner already in the CRM without a way in gets the same answer (never over what the office wrote)
+        if (row.visit_method || row.visit_instructions) {
+          const ow = await db.from("owners").select("id,phone").eq("company_id", msg.company_id).limit(2000);
+          const ids = (ow.data || []).filter((x: any) => digits(x.phone).slice(-8) && digits(x.phone).slice(-8) === to.slice(-8)).map((x: any) => x.id);
+          if (ids.length) {
+            const pr = await db.from("properties").select("id,visit_method,visit_instructions").in("owner_id", ids).eq("archived", false).is("visit_method", null).limit(5);
+            for (const p of pr.data || []) await db.from("properties").update({ visit_method: row.visit_method || null, visit_instructions: p.visit_instructions || row.visit_instructions || null }).eq("id", p.id).is("visit_method", null);
+          }
+        }
       } catch (e) { console.error("[reply-agent] owner lead", String((e as any)?.message || e)); }
     }
     // an owner sent everything (kroki or house details, and the price): a price study goes on Ahmed's task list
@@ -1439,7 +1444,7 @@ Deno.serve(async (req) => {
     }
     // keep the CRM up to date
     const convPatch: any = { ai_summary: short(out.crm_note, 1500), last_automation_action: { scenario: "reply_agent_v1", action: out.action, at: now, category: out.category, source: out.source }, updated_at: now };
-    // R19: a booked meeting is a soft handoff «اجتماع: …» (Ahmed is alerted, the agent keeps answering simple questions)
+    // R45: a meeting request is a hard handoff «اجتماع: …» (Ahmed is alerted and answers; the agent stays out of the chat)
     const meetingBooked = out.action === "book_meeting" && /^\s*اجتماع\s*:/.test(String(out.handoff_reason || ""));
     if (out.action === "handoff" || meetingBooked) Object.assign(convPatch, { human_handoff_required: true, handoff_reason: short(out.handoff_reason || out.intent, 500), handoff_updated_at: now });
     if (ignored) Object.assign(convPatch, { agent_muted: true, agent_muted_reason: `متجاهل: ${IGNORE_LABEL[out.ignore_kind]}`, ignored_at: now, ignore_kind: out.ignore_kind,
@@ -1458,7 +1463,7 @@ Deno.serve(async (req) => {
       try {
         const o = await db.from("profiles").select("id").eq("company_id", msg.company_id).eq("role", "owner").eq("is_active", true).limit(1).maybeSingle();
         // R30: the task is to confirm the slot, so it is due today (the meeting day is in its title)
-        const open = await db.from("tasks").select("id").eq("client_id", client.id).ilike("title", "اجتماع%").eq("done", false).ilike("title", `%${out.meeting.date}%`).limit(1);
+        const open = await db.from("tasks").select("id").eq("client_id", client.id).ilike("title", "اجتماع%").eq("done", false).limit(1);
         if (!(open.data || []).length) await db.from("tasks").insert({ company_id: msg.company_id, user_id: o.data?.id || null, client_id: client.id, title: short(out.handoff_reason, 200), notes: short(`أكد الموعد مع العميل أو اقترح وقت ثاني. ${out.crm_note || ""}`, 1000), due_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date()), priority: "high", done: false });
       } catch (e) { console.error("[reply-agent] meeting task", String((e as any)?.message || e)); }
     }

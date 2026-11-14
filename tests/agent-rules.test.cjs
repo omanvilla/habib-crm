@@ -117,7 +117,10 @@ test('R19: the agent invites an interested lead itself and books the meeting wit
  // R19 covers an interested investor or project buyer on the Muscat number; anyone else asking to come by gets a reply and a
  // handoff with the time (R23), never a booking or a confirmation Ahmed did not give
  assert(brain.includes('على رقم مسقط بس: مستثمر أو مشتري مهتم بمشروع'));
- assert(brain.includes('handoff_reason يبدأ بـ "طلب موعد:"'));
+ // R45 (14 Nov): anyone asking for a meeting or an office visit gets no reply, a silent «اجتماع:» handoff, alert and task
+ assert(brain.includes('طلب اجتماع (R45، أحمد 14 نوفمبر'));
+ assert(!brain.includes('handoff_reason يبدأ بـ "طلب موعد:"'),'R45 replaced «طلب موعد:» by the silent «اجتماع:»');
+ assert(rules.includes('| R45 |'));
  assert(!brain.includes('ولما يحدد نفس الشي (book_meeting)'),'a visitor or a Barka client is not booked at Mawaleh');
  assert(!brain.includes('book_meeting (place=office)'),'an owner is not booked: his old silent rule became R23, not R19');
  // the WhatsApp meeting alert is only claimed once whatsapp-owner-hot-alert accepts «اجتماع:» (it answers skipped:not_hot today)

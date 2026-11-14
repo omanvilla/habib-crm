@@ -206,29 +206,25 @@ test('5: memory and seriousness are saved on live runs only, and an empty note n
  assert(at("// the agent's own memory (contract C")>at('status: "rewritten"'),'a rewrite never saves memory');
 });
 
-test('5: book_meeting is booked only with a day and an hour, as a soft «اجتماع:» handoff, with one alert and one task per slot',()=>{
+test('5 + R45: any meeting request is a silent «اجتماع:» handoff with whatever day and hour the client said, one alert and one task',()=>{
  const block=agent.slice(at('const MEETING_PLACE'),at('    // the agent may only touch properties that are really available')).replace(': Record<string, string>','');
  const run=(o,conv={})=>new Function('out','conv','client','dayM','short',block+'\nreturn out;')(o,conv,{name:'أبو سالم'},'2026-11-10',short);
- let o=run({action:'book_meeting',meeting:{place:'office',date:'2026-11-12',time:'9:30'},handoff_reason:'اجتماع: يبي جدول الدفع في مدينة السلطان هيثم',intent:'x'});
+ let o=run({action:'book_meeting',meeting:{place:'office',date:'2026-11-12',time:'9:30'},handoff_reason:'اجتماع: يبي جدول الدفع في مدينة السلطان هيثم',intent:'x',reply_messages:['تمام وصلت']});
  assert.equal(o.action,'book_meeting');
  assert.equal(o.meeting.time,'09:30');
  assert.equal(o.handoff_reason,'اجتماع: أبو سالم مكتب الموالح 2026-11-12 09:30 يبي جدول الدفع في مدينة السلطان هيثم (ينتظر تأكيدك)');
- assert.deepEqual(o.reply_messages,['تمام وصلت'],'R30: the agent never confirms the slot itself');
+ assert.deepEqual(o.reply_messages,[],'R45: the agent says nothing, Ahmed answers');
  o=run({action:'book_meeting',meeting:{place:'developer',date:'2026-11-10',time:'17:00'},handoff_reason:'اجتماع: x',intent:'x',reply_messages:['تمام نشوفك اليوم']});
- assert.equal(o.action,'none');assert.deepEqual(o.reply_messages,['اليوم صعب، بكره أو بعده يناسبك ؟'],'R30: never the same day');
+ assert.equal(o.action,'book_meeting');assert.deepEqual(o.reply_messages,[]);assert(o.handoff_reason.includes('2026-11-10 17:00'),'today too: Ahmed decides');
  o=run({action:'book_meeting',meeting:{place:'online',date:'2026-11-12',time:null},handoff_reason:'اجتماع: x',intent:'x'});
- assert.equal(o.action,'none');assert.equal(o.handoff_reason,null);assert.equal(o.meeting_waits,true);
+ assert.equal(o.action,'book_meeting');assert.equal(o.handoff_reason,'اجتماع: أبو سالم اونلاين 2026-11-12 x (ينتظر تأكيدك)');
  o=run({action:'book_meeting',meeting:{place:'office',date:'2026-11-09',time:'10:00'},handoff_reason:null,intent:'x'});
- assert.equal(o.action,'none','a day already gone is not booked');
- o=run({action:'handoff',meeting:null,handoff_reason:'اجتماع: مستثمر مهتم',intent:'x'});
- assert.equal(o.action,'handoff');assert.equal(o.handoff_reason,'طلب اجتماع بدون موعد: مستثمر مهتم','no meeting alert without a day and an hour');
- const booked='اجتماع: أبو سالم مكتب الموالح 2026-11-12 09:30 جدول الدفع';
- o=run({action:'book_meeting',meeting:{place:'office',date:'2026-11-12',time:'09:30:00'},handoff_reason:'اجتماع: تأكيد',intent:'x'},{human_handoff_required:true,handoff_reason:booked});
- assert.equal(o.handoff_reason,booked);assert.equal(o.meeting_already_booked,true,'the same slot again is not a new booking');
- o=run({action:'handoff',meeting:null,handoff_reason:'اجتماع: تمام',intent:'x'},{human_handoff_required:true,handoff_reason:booked});
- assert.equal(o.handoff_reason,booked,'the booked meeting stays as it is');
- o=run({action:'book_meeting',meeting:{place:'developer',date:'2026-11-13',time:'16:00'},handoff_reason:'اجتماع: موعد جديد',intent:'x'},{human_handoff_required:true,handoff_reason:booked});
- assert(o.handoff_reason.startsWith('اجتماع: أبو سالم مكتب الأهلي صبور في العذيبة 2026-11-13 16:00')&&!o.meeting_already_booked,'a changed slot is a new booking (R30: the developer office is Al Udhaybah)');
+ assert.equal(o.meeting.date,null,'a day already gone is dropped');assert(o.handoff_reason.startsWith('اجتماع: أبو سالم مكتب الموالح 10:00'));
+ o=run({action:'handoff',meeting:null,handoff_reason:'اجتماع: مستثمر مهتم',intent:'x',reply_messages:['متى يناسبك ؟']});
+ assert.equal(o.action,'book_meeting');assert.equal(o.handoff_reason,'اجتماع: أبو سالم بدون موعد مستثمر مهتم (ينتظر تأكيدك)');assert.deepEqual(o.reply_messages,[]);
+ o=run({action:'handoff',meeting:null,handoff_reason:'طلب موعد: بكره الساعة 10 يبي يمر المكتب',intent:'x',reply_messages:['تمام وصلت']});
+ assert.equal(o.handoff_reason,'اجتماع: أبو سالم بدون موعد بكره الساعة 10 يبي يمر المكتب (ينتظر تأكيدك)','an office visit request is the same silent meeting handoff');
+ assert(re('HARD_HANDOFF').test(o.handoff_reason),'R45: a meeting request silences the agent');
  // after the send: soft handoff, Ahmed alerted once with a task on the meeting day
  assert(agent.includes('const meetingBooked = out.action === "book_meeting" && /^\\s*اجتماع\\s*:/.test(String(out.handoff_reason || ""));'));
  assert(agent.includes('if (out.action === "handoff" || meetingBooked) Object.assign(convPatch, { human_handoff_required: true'));
@@ -238,7 +234,6 @@ test('5: book_meeting is booked only with a day and an hour, as a soft «اجت�
  assert(mt.includes('due_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date()), priority: "high"')&&mt.includes('أكد الموعد مع العميل أو اقترح وقت ثاني'));
  assert(at('if (meetingBooked && !out.meeting_already_booked) {')>at('const wamid = await metaSend'),'the meeting is handed over after the reply went out');
  assert(agent.includes('/^اجتماع/.test(reason) ? "📅 اجتماع"'));
- assert(!re('HARD_HANDOFF').test(booked),'a meeting is a soft handoff: the agent keeps answering');
 });
 
 test('5: handoff alerts reach an active account: the assignee while active, else the owner; a booked meeting always the owner',async()=>{
@@ -372,15 +367,17 @@ test('R29: a congratulation needs the customer to say they bought, reserved or p
  assert(brain.includes('قاعدة ثابتة (R29، أحمد 11 نوفمبر)')&&brain.includes('ممنوع "مبروك" أو "الله يبارك لك"'));
 });
 // R30 (Ahmed 11 Nov): project meetings at the developer's office in Al Udhaybah; the agent never confirms a slot; never today
-test('R30: meeting at Al Udhaybah, Ahmed confirms the time, never the same day',()=>{
+test('R30 + R45: meeting at Al Udhaybah, the agent never sets or confirms a time, Ahmed confirms with the button',()=>{
  assert(agent.includes('developer: "مكتب الأهلي صبور في العذيبة"'));
- assert(agent.includes('String(mt.date) > dayM')&&agent.includes('out.reply_messages = ["اليوم صعب، بكره أو بعده يناسبك ؟"]'));
- assert(agent.includes('(ينتظر تأكيدك)')&&agent.includes('out.reply_messages = kept.length ? kept : ["تمام وصلت"]'));
+ assert(agent.includes('(ينتظر تأكيدك)')&&agent.includes('out.reply_messages = [];'));
  const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
- assert(brain.includes('مع المطور الأهلي صبور في مكتبهم بالعذيبة')&&brain.includes('انت ما تأكد الموعد أبداً'));
+ assert(brain.includes('مع المطور الأهلي صبور في مكتبهم بالعذيبة')&&brain.includes('انت ما تحدد ولا تقترح ولا تسأل عن يوم أو وقت أبداً'));
+ assert(!brain.includes('"أي يوم يناسبك ؟"'),'R45: the invitation asks no day');
  assert(!brain.includes('تمام ان شاء الله نشوفك الاحد الساعة 5 في المكتب'));
  const hot=fs.readFileSync('supabase/functions/whatsapp-owner-hot-alert/index.ts','utf8');
  assert(hot.includes('📅 طلب اجتماع ينتظر تأكيدك'));
+ const ui=fs.readFileSync('crm-calls-meetings.js','utf8');
+ assert(ui.includes('أكّد الموعد وارسله للعميل')&&ui.includes('crmSendWhatsApp({client_id:task.client_id'));
 });
 // R31 (Ahmed 11 Nov): «المستحقين» stopped; askers go on a waiting list
 test('R31: المستحقين stopped, askers join the waiting list',()=>{

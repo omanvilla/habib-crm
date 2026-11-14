@@ -28,7 +28,7 @@ test('R40: the ignored chats leave the paused list, have their own list and can 
   assert(home.includes("data-coh=\"pignore\"")&&home.includes("data-coh=\"punignore\"")&&home.includes("supa.rpc('crm_set_chat_ignored'"));
 });
 test('R41: a question with no written answer gets no reply and a hard handoff with its own tab',()=>{
-  assert(agent.includes('const HARD_HANDOFF = /^\\s*(تفاوض|مشتري جاد|دراسة سعر|سؤال ما عندي جوابه)\\s*:/;'));
+  assert(agent.includes('const HARD_HANDOFF = /^\\s*(تفاوض|مشتري جاد|دراسة سعر|سؤال ما عندي جوابه|اجتماع)\\s*:/;'));
   assert(agent.includes('if (out.action === "handoff" && UNKNOWN_Q.test(String(out.handoff_reason || ""))) out.reply_messages = [];'));
   assert(brain.includes('handoff_reason يبدأ بـ "سؤال ما عندي جوابه:"'));
   assert(!brain.includes('"السموحة ما عندي معلومة مؤكدة عن [الشي]"'));

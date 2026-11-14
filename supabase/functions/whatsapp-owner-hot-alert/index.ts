@@ -11,7 +11,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const META_APP_SECRET = Deno.env.get("META_APP_SECRET") ?? "";
 const WHATSAPP_ACCESS_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN") ?? "";
 const GRAPH = Deno.env.get("META_GRAPH_VERSION") || "v25.0";
-// R19 (10 Nov): a meeting the agent booked («اجتماع:») also reaches Ahmed; it is a soft handoff, the agent keeps answering.
+// R19 (10 Nov) / R45 (14 Nov): a meeting request («اجتماع:») reaches Ahmed; since R45 it is a hard handoff, the agent stays out.
 const HOT = /^\s*(مشتري جاد|تفاوض|اجتماع)\s*:/;
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -348,8 +348,8 @@ Deno.serve(async (req) => {
     `الرقم: ${phone}`,
     reason ? `${meeting ? "الموعد اللي طلبه" : "الموضوع"}: ${short(reason, 300)}` : "",
     `افتح المحادثة: https://wa.me/${phone}`,
-    // R30 (Ahmed 11 Nov): the agent only took the requested slot; Ahmed confirms it or offers another time
-    meeting ? "العقل قال له «تمام وصلت» بس. أكد له الموعد أو اقترح وقت ثاني" : "العقل ساكن في محادثته لين ترد عليه",
+    // R45 (Ahmed 14 Nov): the agent said nothing and stays out of the chat; Ahmed answers and confirms with «أكّد الموعد»
+    meeting ? "العقل ما رد عليه وواقف في المحادثة. رد عليه انت، والتأكيد من زر «أكّد الموعد» في مهمة الاجتماع" : "العقل ساكن في محادثته لين ترد عليه",
   ].filter(Boolean).join("\n");
 
   const r = await metaText(await routeTokens(conv.company_id, conv.route_key), phoneId, to, text);
