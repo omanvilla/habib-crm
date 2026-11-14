@@ -1361,6 +1361,37 @@ Deno.serve(async (req) => {
       if (redirectSent) analysis.redirect_already_sent = true;
       if (keepHandoff) analysis.redirect_kept_handoff = true;
     }
+    // R48 (Ahmed 14 Nov 2026): a listed property is followed on its own branch number. The brain says so («العميل اللي كلم الرقم
+    // الثاني»), but on 12-14 Nov the model served four chats about Barka properties on the Muscat number (the ad, the video, a pinned
+    // «برسلك الموقع», the location and a visit). The code holds it now: no ad, link, location or visit question for a property of the
+    // other branch; the customer gets the branch line, once per chat. A short answer keeps going with the line after it, the
+    // «اذا تقبل» offer of R22 and a strong handoff (R23) stay as they are.
+    const branchOf = (k: any) => k === "barka" ? { name: "بركاء", number: "92344273" } : k === "muscat" ? { name: "مسقط", number: "71770030" } : null;
+    const propBranch = branchOf(prop?.branch_key);
+    if (!redirectToMuscat && propBranch && branchOf(conv.route_key) && prop.branch_key !== conv.route_key) {
+      const bLine = `هذا العقار تتابعه معنا على رقم ${propBranch.name} ${propBranch.number} واتساب`;
+      const bOut = history.filter((h: any) => h.direction === "outbound" && String(h.body || "").includes(propBranch.number));
+      const bSent = bOut.length > 0;
+      const bRecent = bOut.some((h: any) => Date.now() - new Date(h.message_timestamp).getTime() < 15 * 60 * 1000);
+      const said = (out.reply_messages || []).map((t: any) => String(t));
+      const bWhy = String(out.handoff_reason || "");
+      const bKeep = out.action === "handoff" && (HARD_HANDOFF.test(bWhy) || /^\s*طلب اتصال/.test(bWhy));
+      const serving = ["send_location", "send_lockbox", "send_owner_number"].includes(out.action)
+        || said.some((t: string) => /https?:\/\//.test(t) || t.length > 220 || /(تزور|تزورون|تزورين|اللوكيشن|الموقع)/.test(t));
+      const offer = said.some((t: string) => /[اإ]ذا\s*(تقبل|يناسبك)|تحب\s*[اأ]رسل/.test(t));
+      const hasLine = said.some((t: string) => t.includes(propBranch.number));
+      if (!bKeep && serving) {
+        const salam = said.map((t: string) => t.trim().split("\n")[0]).find((t: string) => /^وعليكم السلام/.test(t));
+        out.reply_messages = !bSent ? [...(salam ? [salam] : []), bLine] : bRecent ? [] : [bLine];
+        out.action = "none"; out.viewing_date = null; out.viewing_time = null;
+        actionMsgs.length = 0;
+        analysis.branch_redirect = prop.branch_key; analysis.viewing_date = null; analysis.viewing_time = null;
+        if (bSent) analysis.branch_line_already_sent = true;
+      } else if (!bKeep && said.length && !hasLine && !bSent && !offer) {
+        out.reply_messages = [...said.slice(0, 2), bLine];
+        analysis.branch_redirect = prop.branch_key;
+      }
+    }
     // no English type codes reach the customer (links are left as they are)
     out.reply_messages = (out.reply_messages || []).map((r: string) => arabicOnly(r));
     // the draft records the final reply, action and category: whatsapp-reply-send adds the location / owner number from

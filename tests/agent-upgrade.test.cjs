@@ -96,6 +96,53 @@ test('1: the R9 redirect goes once per chat, keeps a silent R23 handoff and neve
  assert.equal(r.redirectToMuscat,false);assert.deepEqual(r.out.reply_messages,['متوفره']);
 });
 
+test('R48: a property of the other branch is not served on this number, the customer gets the branch line once',()=>{
+ const block=agent.slice(at('    const branchOf = '),at('    // no English type codes reach the customer')).replace(/\((\w+): (?:string|any)\)/g,'($1)');
+ const guard=new Function('out','conv','history','analysis','prop','HARD_HANDOFF','redirectToMuscat','actionMsgs',block+'\nreturn {out,analysis,actionMsgs};');
+ const BARKA='هذا العقار تتابعه معنا على رقم بركاء 92344273 واتساب',MUSCAT='هذا العقار تتابعه معنا على رقم مسقط 71770030 واتساب';
+ const hoursAgo=(h)=>new Date(Date.now()-h*3600*1000).toISOString();
+ const sent=(body,ts=hoursAgo(3))=>({direction:'outbound',body,message_timestamp:ts});
+ const run=(o,{route='muscat',branch='barka',hist=[],redirect=false,msgs=[]}={})=>
+  guard({action:'none',handoff_reason:null,viewing_date:null,viewing_time:null,reply_messages:[],...o},{route_key:route},[...hist,{direction:'inbound',body:'x',message_timestamp:hoursAgo(0)}],{},branch===null?null:{id:'p',branch_key:branch},re('HARD_HANDOFF'),redirect,msgs);
+ // the chat of 12 Nov (42b53d11): a pinned «برسلك الموقع» on the Muscat number for the Somhan villa, then the location and a visit
+ let r=run({reply_messages:['ان شاء الله برسلك الموقع','متى يناسبك تزور ؟','اسمك الكريم ؟']});
+ assert.deepEqual(r.out.reply_messages,[BARKA]);assert.equal(r.out.action,'none');assert.equal(r.analysis.branch_redirect,'barka');
+ r=run({reply_messages:['البيت مفتوح تقدر تشوفه'],action:'send_location',viewing_date:'2026-11-13',viewing_time:'09:00'},{msgs:[{type:'text'}]});
+ assert.deepEqual(r.out.reply_messages,[BARKA]);assert.equal(r.out.action,'none');assert.equal(r.out.viewing_date,null);assert.equal(r.actionMsgs.length,0,'no location after the line');
+ // the ad (with the greeting on its first line) and the video are not sent here
+ r=run({reply_messages:['وعليكم السلام ورحمة الله وبركاته\nللبيع توين فيلا في الرميس بركاء\n'+'تفاصيل '.repeat(60),'متى يناسبك تزور ؟']});
+ assert.deepEqual(r.out.reply_messages,['وعليكم السلام ورحمة الله وبركاته',BARKA]);
+ r=run({reply_messages:['وعليكم السلام ورحمة الله وبركاته','https://www.instagram.com/reel/abc/','اسمك الكريم ؟']});
+ assert.deepEqual(r.out.reply_messages,['وعليكم السلام ورحمة الله وبركاته',BARKA]);
+ // the other way round: a Muscat property on the Barka number
+ r=run({reply_messages:['متى يناسبك تزور ؟']},{route:'barka',branch:'muscat'});
+ assert.deepEqual(r.out.reply_messages,[MUSCAT]);
+ // a short answer stays and the line follows it; what the brain already wrote with the number is left alone
+ r=run({reply_messages:['لا الفيلا وسطية مو كورنر']});
+ assert.deepEqual(r.out.reply_messages,['لا الفيلا وسطية مو كورنر',BARKA]);
+ r=run({reply_messages:['لا الفيلا وسطية مو كورنر',BARKA]});
+ assert.deepEqual(r.out.reply_messages,['لا الفيلا وسطية مو كورنر',BARKA]);assert.equal(r.analysis.branch_redirect,undefined);
+ // once per chat: after the line a short answer goes alone, serving gets the line again, never twice within 15 minutes, «تمام» gets nothing
+ r=run({reply_messages:['المساحة 400 متر']},{hist:[sent(BARKA)]});
+ assert.deepEqual(r.out.reply_messages,['المساحة 400 متر']);
+ r=run({reply_messages:['متى يناسبك تزور ؟']},{hist:[sent(BARKA)]});
+ assert.deepEqual(r.out.reply_messages,[BARKA]);assert.equal(r.analysis.branch_line_already_sent,true);
+ r=run({reply_messages:['متى يناسبك تزور ؟']},{hist:[sent(BARKA,hoursAgo(0.05))]});
+ assert.deepEqual(r.out.reply_messages,[]);
+ r=run({},{hist:[sent(BARKA)]});
+ assert.deepEqual(r.out.reply_messages,[]);
+ // R22: the offer of a property of the other branch is a question and stays; R23: a strong handoff stays
+ r=run({reply_messages:['اذا تقبل بركاء عندنا فيلا في الرميس بـ 59 الف','تحب ارسلك تفاصيلها ؟']});
+ assert.deepEqual(r.out.reply_messages,['اذا تقبل بركاء عندنا فيلا في الرميس بـ 59 الف','تحب ارسلك تفاصيلها ؟']);
+ r=run({reply_messages:['اللوكيشن اللي ارسلناه للفيلا المتوفرة'],action:'handoff',handoff_reason:'سؤال ما عندي جوابه: أي فيلا'});
+ assert.equal(r.out.action,'handoff');assert.deepEqual(r.out.reply_messages,['اللوكيشن اللي ارسلناه للفيلا المتوفرة']);
+ // the same branch, no property, a property with no branch, and a chat the R9 redirect already took: untouched
+ for(const o of [{branch:'muscat'},{branch:null},{branch:'investment'},{redirect:true}]){
+  r=run({reply_messages:['متى يناسبك تزور ؟'],action:'send_location'},{...o,msgs:[{type:'text'}]});
+  assert.deepEqual(r.out.reply_messages,['متى يناسبك تزور ؟']);assert.equal(r.out.action,'send_location');assert.equal(r.actionMsgs.length,1);
+ }
+});
+
 test('2: the R2 guard honours R16 (after-visit question, passed visit time, location or owner number sent)',()=>{
  const AFTER=re('AFTER_VISIT_Q'),NOT=re('NOT_A_VISIT_Q');
  for(const t of ['السلام عليكم كيف لقيت فيلا الرميس ؟','السلام عليكم بخصوص فيلا الرميس قدرت تشوفها ؟','السلام عليكم بخصوص زيارة المنزل في الحيل الجنوبية قدرتي تشوفينه ؟','بخصوص الزيارة قدرت تشوف العقار ؟ كيف لقيته ؟','السلام عليكم شفت فيلا الرميس بعد الصلاة وكيف لقيتها ؟'])
