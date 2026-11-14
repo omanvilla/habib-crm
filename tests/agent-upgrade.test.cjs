@@ -230,7 +230,7 @@ test('14 Nov decisions: «حصلت» after «لين الحين تبحث ؟» clo
  const block=agent.slice(at('    let lastOutBody = "";'),at('    // the ad text goes once per conversation'));
  const run=(said,last='بخصوص طلبك فيلا في الرميس\nلين الحين تبحث ؟',o={})=>{
   const out={action:'none',...o};
-  const r=new Function('out','texts','history','burstSaid',block+'\nreturn {out,texts};')(out,['مبروك الله يبارك لك 🌷'],[{direction:'outbound',body:last},{direction:'inbound',body:said}],said);
+  const r=new Function('out','texts','history','burstSaid','closedAfterBooking',block+'\nreturn {out,texts};')(out,['مبروك الله يبارك لك 🌷'],[{direction:'outbound',body:last},{direction:'inbound',body:said}],said,()=>false);
   return r;
  };
  for(const said of ['حصلت','خلاص حصلت بيت','اشتريت الحمدلله','لقيت واحد','حصل']){const r=run(said);assert.deepEqual(r.texts,[],said);assert.equal(r.out.search_stopped,true,said);}
