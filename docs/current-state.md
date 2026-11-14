@@ -6,6 +6,15 @@ Updated 2026-11-14. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 14 November 2026 — agent guards, batch 3 (the inventory is finished) — **published**
+
+- **Ahmed.** «كمل باقي الجرد», then «نعم، ادمج».
+- **The change** (`whatsapp-reply-agent/index.ts` only; no rule text changed, `brain.ts` untouched, no prompt sync): R12 (`guard_call_request`: a clear call request gets no reply and «طلب اتصال:» whatever the model wrote; «حاولت اتصل وما رديت» stays with the brain's allowed sentence; a strong handoff is not touched), R10 / R20 (`guard_owner_decline`: an owner who says in his own clear words heirs, mortgaged or lived in, and was not declined, gets the two fixed lines and R37 closes the offer; a negation never counts, a chat an office person wrote in is left alone), the pinned reply (an auto-sent pinned wording no longer replaces a reply a guard corrected or a stopped search), R23 (not held by code, because «دراسة سعر:» has a written reply; `soft_handoff_no_reply` only marks a soft handoff that leaves the client with nothing).
+- **Checked.** CI green on `ca92e08` (test «14 Nov guards, batch 3»). Inline dry run on the dry-run copy pinned to `ca92e08`, 27 real messages (14 owner chats, one call message, 12 latest chats): all 200, no guard fired, so no false decline on the owner chats and no real case of the new guards in the run.
+- **Live.** `main` at `ca92e08`; `whatsapp-reply-agent` v70 → `ca92e08` (was `c1209b7`); dry-run copy v31 → `ca92e08`.
+- **The inventory is finished.** Every absolute rule is held by code with a test. Left to the model by nature: R4, R15, R19, R22, R40 and R23. **To do in a few days:** count `analysis.guard_*` and `soft_handoff_no_reply` in `whatsapp_reply_drafts` to see which guards fire and how often.
+- **Rollback.** Pin `whatsapp-reply-agent` back to `c1209b7`.
+
 ## 14 November 2026 — SQL101: electricity and water on a property and on an owner offer (R52) — **published**
 
 - **Ahmed.** «أي عقار نستلمه لازم نعرف إذا الكهرباء موصلة», chose «الكهرباء والماء», then «نعم، طبق وادمج».
