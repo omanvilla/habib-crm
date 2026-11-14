@@ -1236,6 +1236,15 @@ Deno.serve(async (req) => {
         out.guard_project_figure = true;
       }
     }
+    // Ahmed 14 Nov: «حصلت» / «اشتريت» after our «لين الحين تبحث ؟» means the search is over. No reply and no «مبروك»; the
+    // client's active requests are closed further down and Ahmed gets a note in the CRM. «ما حصلت» is not that.
+    let lastOutBody = "";
+    for (const h of history) if (h.direction === "outbound") lastOutBody = String(h.body || "");
+    const FOUND_RE = /(^|\s)(حصل|حصلت|حصلنا|لقيت|لقينا|اشتريت|اشترينا|شريت|شرينا|وقفت\s*البحث)(\s|$|[.!،,])/;
+    const NOT_FOUND_RE = /(^|\s)(ما|مب|مو|لسا|لسه|بعدني|بعدنا|لا)\s+(حصل|لقي)/;
+    if (/لين الحين تبحث/.test(lastOutBody) && FOUND_RE.test(burstSaid) && !NOT_FOUND_RE.test(burstSaid) && !/[؟?]/.test(burstSaid) && out.action !== "handoff") {
+      texts = []; out.action = "none"; out.search_stopped = true;
+    }
     // the ad text goes once per conversation: if a long office message about this property already went out, drop it
     if (prop) {
       const priceKey = prop.price ? String(Math.round(Number(prop.price) / 1000)) : "";
@@ -1627,10 +1636,21 @@ Deno.serve(async (req) => {
       if (out.area) flags.preferred_area = short(out.area, 200);
       if (Object.keys(flags).length) await db.from("clients").update(flags).eq("id", client.id);
     } catch (_) { /* optional */ }
+    // Ahmed 14 Nov: the client found a property and stopped searching: his active requests are closed and Ahmed is told
+    if (out.search_stopped && !review) {
+      try {
+        const c = await db.from("client_requests").update({ status: "cancelled", closed_reason: "العميل قال إنه حصل عقار ووقف البحث (قفله العقل)", closed_at: now, updated_at: now })
+          .eq("client_id", client.id).eq("company_id", msg.company_id).eq("status", "active").select("id");
+        if (c.error) console.error("[reply-agent] search stopped", c.error.message);
+        const o = await db.from("profiles").select("id").eq("company_id", msg.company_id).eq("role", "owner").eq("is_active", true).limit(1).maybeSingle();
+        if (o.data?.id) await db.from("notifications").insert({ user_id: o.data.id, type: "whatsapp_handoff", is_read: false, client_id: client.id, link: "whatsapp",
+          title: `وقف البحث: ${client.name || conv.customer_name || client.phone || "عميل"}`, body: `العميل قال إنه حصل عقار. انقفل ${(c.data || []).length} طلب له بدون رد. إذا تبي تكمل معه افتح المحادثة.` });
+      } catch (e) { console.error("[reply-agent] search stopped", String((e as any)?.message || e)); }
+    }
     // keep what the client is looking for in their open request, so a matching listing can be sent later
     try {
       const rq = out.request;
-      if (rq && (rq.areas?.length || rq.property_types?.length || rq.budget_max || rq.bedrooms_min)) {
+      if (!out.search_stopped && rq && (rq.areas?.length || rq.property_types?.length || rq.budget_max || rq.bedrooms_min)) {
         const patch: any = { request_type: rq.request_type, updated_at: now, last_contact_at: now };
         if (rq.areas?.length) { patch.preferred_areas = rq.areas.slice(0, 6); patch.preferred_area = rq.areas[0]; }
         if (rq.property_types?.length) { patch.property_types = rq.property_types.slice(0, 4); patch.property_type = rq.property_types[0]; }

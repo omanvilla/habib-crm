@@ -226,6 +226,25 @@ test('14 Nov guards, batch 2: price talk before a visit, location before a time,
  r=await run(['عندنا شقة في الخوض بـ 45 الف'],{route:'muscat'});assert.deepEqual(r.texts,['عندنا شقة في الخوض بـ 45 الف'],'a listed property is not a project');
  r=await run(['فيلا في المعبيلة قريب من مدينة السلطان هيثم بـ 85 الف'],{route:'muscat'});assert.equal(r.texts[0].includes('85'),true);
 });
+test('14 Nov decisions: «حصلت» after «لين الحين تبحث ؟» closes the request with no reply; thanks, «المالك» and the allowed promises are written once',()=>{
+ const block=agent.slice(at('    let lastOutBody = "";'),at('    // the ad text goes once per conversation'));
+ const run=(said,last='بخصوص طلبك فيلا في الرميس\nلين الحين تبحث ؟',o={})=>{
+  const out={action:'none',...o};
+  const r=new Function('out','texts','history','burstSaid',block+'\nreturn {out,texts};')(out,['مبروك الله يبارك لك 🌷'],[{direction:'outbound',body:last},{direction:'inbound',body:said}],said);
+  return r;
+ };
+ for(const said of ['حصلت','خلاص حصلت بيت','اشتريت الحمدلله','لقيت واحد','حصل']){const r=run(said);assert.deepEqual(r.texts,[],said);assert.equal(r.out.search_stopped,true,said);}
+ for(const said of ['ما حصلت شي','لسا ما لقيت','اي ابحث','حصلت شي جديد ؟']){const r=run(said);assert.equal(r.out.search_stopped,undefined,said);assert.equal(r.texts.length,1,said);}
+ assert.equal(run('حصلت','متى يناسبك تزور ؟').out.search_stopped,undefined,'only after our search question');
+ assert.match(agent,/status: "cancelled", closed_reason: "العميل قال إنه حصل عقار ووقف البحث \(قفله العقل\)"/);
+ assert.match(agent,/if \(!out\.search_stopped && rq && \(/);
+ const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
+ assert(!brain.includes('إذا قال حصل: "مبروك'));
+ assert(!brain.includes('كلام الختام والشكر ما نرد عليه أبداً'));assert(brain.includes('الرد "العفو" بس، بدون سؤال جديد ولا عرض ولا ضغط'));
+ assert(!brain.includes('لا تكتب "المالكة" ولا "المالك"'));assert(brain.includes('الكلمتين مسموحات'));
+ assert(brain.includes('هذي الامور الافضل تطلع عليها بنفسك لما تزور المنطقة'));
+ assert(brain.includes('المسموح بس (أحمد 14 نوفمبر) جملتين ثابتات'));
+});
 test('R48: the visit watcher books no new visit from the other branch number, and book_viewing counts as serving',()=>{
  assert.match(agent,/select\("id,type,area,price,bedrooms,land_size,listing_purpose,branch_key"\)/);
  assert.match(agent,/cv\.data!\.route_key !== prop\.branch_key\) return \{ \.\.\.out, applied: false, why: "other_branch" \}/);
