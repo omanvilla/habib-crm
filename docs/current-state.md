@@ -6,6 +6,14 @@ Updated 2026-11-14. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 14 November 2026 — why no system reply reaches customers on the Barka number (131042): Meta's free tier, not the code
+
+- **What Ahmed saw.** Every automatic reply in a Barka chat marked «⚠ لم تصل للعميل» (the label added the same morning); he answered that client by hand from the app.
+- **Found (read only).** From 13 Nov 14:56 Muscat time no system message on the Barka number was delivered: 50 messages in 19 chats by 14 Nov 10:45, error 131042 «currency is not configured» on each; 18 of those chats had no answer at all. Messages typed in the WhatsApp Business app go. The Muscat number delivers.
+- **Why.** Meta's pricing page (read 14 Nov): since 1 Oct 2026 service (free-form) messages are charged again after **1,000 free per business phone number per month**, and an account without a payment method gets nothing delivered past the free tier. Counted in the CRM for November: Barka 930 delivered system messages before the stop (the CRM does not record every send to Ahmed's own number), Muscat 611 so far, so Muscat reaches the limit around 22 to 23 Nov at this pace. In Meta's billing page (Ahmed's Chrome) the Barka account has no payment method and an empty currency. The Barka phone being off from 13 Nov afternoon to 14 Nov morning is a coincidence: sends still failed with the phone on (10:27, 10:45).
+- **Not changed.** Nothing in the code, nothing in Meta. Only Ahmed can add the currency and a payment method. Every bubble the agent sends counts as one message.
+- **Ideas, not built.** A CRM alert when a number starts returning 131042; a monthly counter per number; fewer bubbles per reply.
+
 ## 14 November 2026 — agent guards, batch 3 (the inventory is finished) — **published**
 
 - **Ahmed.** «كمل باقي الجرد», then «نعم، ادمج».

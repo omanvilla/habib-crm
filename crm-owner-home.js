@@ -68,7 +68,7 @@
     box=document.createElement('div');box.id='crmOwnerHome';box.className='coh';box.hidden=true;
     box.innerHTML='<section class="coh-hello" id="cohHello"></section>'
       +'<section class="coh-now" aria-labelledby="cohNowTitle"><h2 class="coh-h" id="cohNowTitle">المطلوب منك الآن</h2><div id="cohTiles" class="coh-tiles"></div></section>'
-      +'<section class="coh-quick" id="cohQuick"><div id="cohAuto"></div><div id="cohTwins"></div><div id="cohIg"></div></section>'
+      +'<section class="coh-quick" id="cohQuick"><div id="cohAuto"></div><div id="cohTwins"></div><div id="cohIg"></div><div id="cohUsage"></div></section>'
       +'<section class="card coh-sec" id="cohSummary"></section>'
       +'<button type="button" class="btn-secondary coh-full" data-coh="full" aria-expanded="false">قائمة العمل الكاملة</button>';
     const header=page.querySelector('.page-header');if(header)header.after(box);else page.prepend(box);
@@ -223,6 +223,26 @@
   /* System updates (10 Nov 2026): deals the system closed because a property was sold, withdrawn or archived
    * (SQL77, type deal_auto_closed) and listing contracts that ended (SQL76, type property_archive). Nothing else in
    * the CRM shows these notifications. «تم» marks one read (the owner's own notifications, RLS). */
+  // SQL102 (14 Nov 2026): the system's WhatsApp replies this month per branch number, against Meta's 1,000 free service messages.
+  // An estimate (the CRM's own count); shown to the owner and to staff, read after the first draw so the home never waits for it.
+  let usage=[];
+  function drawUsage(){
+    const slot=byId('cohUsage');if(!slot)return;
+    const rows=(Array.isArray(usage)?usage:[]).filter(u=>u&&(u.route_key==='barka'||u.route_key==='muscat'));
+    if(!rows.length){slot.innerHTML='';return;}
+    const name={barka:'بركاء',muscat:'مسقط'};
+    slot.innerHTML='<div class="card coh-sec"><div class="coh-subhead"><h3>ردود النظام على واتساب هذا الشهر</h3></div>'
+      +rows.map(u=>{
+        const used=Number(u.used||0),lim=Number(u.free_limit||1000),pct=Math.max(0,Math.min(100,Math.round(used/lim*100)));
+        const state=u.blocked?'stop':used>=lim?'stop':pct>=80?'warn':'ok';
+        const color=state==='stop'?'#B91C1C':state==='warn'?'#B45309':'#15803D';
+        const note=u.blocked?'واقف: ردود النظام ما توصل. رد من تطبيق واتساب بزنس':used>=lim?'خلص المجاني':pct>=80?'قرّب يخلص المجاني':'';
+        return '<div style="margin:8px 0"><div style="display:flex;justify-content:space-between;gap:8px;font-size:13px"><strong>رقم '+esc(name[u.route_key])+'</strong><span dir="ltr">'+num(used)+' / '+num(lim)+'</span></div>'
+          +'<div style="height:8px;border-radius:6px;background:#E5E7EB;overflow:hidden;margin-top:4px" role="img" aria-label="'+esc(num(used)+' من '+num(lim))+'"><div style="height:100%;width:'+pct+'%;background:'+color+'"></div></div>'
+          +(note?'<small style="color:'+color+';font-weight:600">'+esc(note)+'</small>':'')+'</div>';
+      }).join('')
+      +'<small style="color:#6B7280">عدد تقريبي من النظام. ميتا تعطي كل رقم 1000 رد مجاني في الشهر، والرد بيدك من التطبيق ما ينحسب.</small></div>';
+  }
   let autoNotes=[];
   const AUTO_TYPES=['deal_auto_closed','property_archive'];
   function readAutoNotes(){
@@ -269,6 +289,7 @@
       if(seq!==sequence)return;
       // a staff session never keeps the owner's lists from an earlier session in the same tab
       if(!owner){paused={items:[],total:0};autoNotes=[];}
+      usage=[];
       if(pz&&!pz.error&&pz.data)paused=pz.data;
       if(home.error||!home.data){if(!last){box.hidden=true;page.classList.remove('coh-on');}return;}
       last={data:home.data,pending:pending||0,twins:twinGroups&&!twinGroups.error?twinGroups.data:[]};
@@ -276,6 +297,7 @@
       box.hidden=false;page.classList.add('coh-on');
       // after the first draw, so the home never waits for it
       readAutoNotes().then(list=>{if(seq!==sequence||list==null)return;autoNotes=list;drawAuto();});
+      supa.rpc('crm_whatsapp_usage').then(r=>{if(seq!==sequence||!r||r.error)return;usage=r.data||[];drawUsage();});
     }finally{if(seq===sequence)releaseGate();}
   }
   function render(){
