@@ -6,6 +6,17 @@ Updated 2026-11-14. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 14 November 2026 — R48: a property of the other branch is not served on this number (code guard) — **published**
+
+- **What Ahmed said.** A customer wrote to the Muscat number about a Barka property (the Somhan villa, chat `42b53d11`) and the agent answered him there with the location and a visit; it should have sent him to the Barka number. «شوف ايش الخلل أو التعارض وصلحه».
+- **Found.** No conflicting rule: the brain already says it (section «العميل اللي كلم الرقم الثاني»). Nothing in the code held it (only R9 was enforced). In ten days the agent answered 8 chats on the Muscat number about Barka properties; in 4 of them (12 to 14 Nov) it sent the ad, the video, the pinned reply «ان شاء الله برسلك الموقع», the location or booked a visit. In `42b53d11` the pinned reply `3a34c635` (location request) won over the branch rule.
+- **The change** (`whatsapp-reply-agent/index.ts` only, after the R9 redirect; `brain.ts` untouched, no prompt sync): when the property the agent chose has a branch other than the chat's number, no ad, link, location, owner number or visit question goes out and no visit is recorded; the customer gets «هذا العقار تتابعه معنا على رقم بركاء 92344273 واتساب» (or the Muscat line) once per chat, again if the agent serves him later, never twice in 15 minutes. A short answer stays with the line after it; the «اذا تقبل» offer of R22 and a strong handoff stay. `analysis.branch_redirect` marks it. Recorded as **R48** in `docs/agent-rules.md` with five scenarios.
+- **Checked.** CI green on `65ceec7` (new test in `tests/agent-upgrade.test.cjs`). Inline dry run on the dry-run copy pinned to `ded8b4e`, 31 real messages, nothing written or sent: the 11 messages of the four chats got the Barka line or silence (the guard itself fired on 3, the model wrote the line on the others), and the latest message of the last 20 chats was untouched (ads, the reel and visit questions on the Barka number for Barka properties went as before).
+- **Live.** `main` at `65ceec7`; `whatsapp-reply-agent` v65 → `65ceec7` (was `e106d81`); the dry-run copy v26 → `ded8b4e`.
+- **Not done.** The chats already served on the wrong number were not touched (the visit of `42b53d11` stays recorded; it is with Ahmed). The pinned reply `3a34c635` itself is unchanged. `whatsapp-reply-send` (approved held drafts) has no such guard: the agent runs in direct mode.
+- **Ahmed, same day.** The Meta billing error 131042 is parked: «لا تشغل بالك فيه». He asked why the agent repeats mistakes; proposed to him: list R1 to R48 as held by code or words only, hold the absolute ones in code, and an automatic conflict check before a new rule. Waiting for his answer.
+- **Rollback.** Pin `whatsapp-reply-agent` back to `e106d81`.
+
 ## 14 November 2026 — voice notes recorded in the CRM chat never reached the customer (131053): now Ogg/Opus
 
 - **What Ahmed asked.** «ليش ما تنرسل الرسالة من النظام؟» with a screenshot of a voice note marked ⚠, then «نعم، أصلحها».
