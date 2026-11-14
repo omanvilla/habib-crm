@@ -413,6 +413,8 @@
     try{
       const r=await supa.functions.invoke('whatsapp-reply-agent',{body:{draft_id:id,instruction}});
       const data=r.data||{};if(r.error||data.ok!==true){let detail=data;try{if(r.error&&r.error.context)detail=await r.error.context.json();}catch(_){}throw detail&&detail.error?detail:(r.error||data);}
+      // 14 Nov (Ahmed): an order not to answer closes the draft; it leaves the list and teaches nothing
+      if(data.status==='closed'){toast('انشال الرد، ما في رد لهالعميل','success');refresh();updateBadge();return;}
       const d=state.drafts.find(x=>x.id===id);
       if(d){d.reply_messages=data.reply_messages||[];d.analysis=data.analysis||d.analysis;card.outerHTML=draftCard(d);}
       // the same instruction teaches the agent for the next replies (crm_owner_notes → lessons in the brain)

@@ -287,6 +287,7 @@ async function review(item: any, companyId: string, available: string, fixed: st
   out.english = english;
   // R68: the visit confirmation of an earlier day that the client never answered
   out.confirm_unanswered = confirmUnanswered(chat, today);
+  out.booked_closed = bookedClosed(chat);
   // an unread voice note near the end means nobody knows what was said; he decides, never the automatic send
   if (chat.split("\n").slice(-6).some((l: string) => l.includes("[رسالة صوتية قديمة ما انقرت]"))) out.auto_ok = false;
   // R55: the client's own lines, for the code guard in judge() (removed there, never stored)
@@ -419,8 +420,31 @@ const R66_OFFER = /(تقبل|يناسبك|تناسبك)\s*(في\s*)?بركاء|�
 const R18_PROJECT = /السلطان هيثم|وادي زها|ايكونيك|عايده|اليزن|صبور|المستحقين|المطور|مشروع|مقدم/;
 const R18_ALLOWED = ["57", "57000", "30", "2026", "50", "50000", "200", "200000", "2", "10", "0"];
 const figuresOf = (t: unknown) => (r55Norm(t).match(/\d[\d,٬]*/g) || []).map((n) => n.replace(/[,٬]/g, ""));
-// o: { group, route, clientSaid, confirmUnanswered, visitedDone, offerBranch, barkaAreas, fallback }
+// R71 (Ahmed 14 Nov 2026, notes on chat 53bffb7d): the office's last words congratulate a client who said she booked or bought,
+// and she answered only with closing words (or nothing): she gets no follow-up, alone or in a message for everyone.
+const R71_CONGRATS = /مبروك|مبارك\s*عليك|يبارك\s*لك/;
+const R71_BOOKED = /(اشترينا|اشتريت|شرينا|شريت|حجزنا|حجزت|دفعنا|دفعت|عربون|استلمنا|وقعنا|وقعت|تم\s*البيع|تم\s*الحجز)/;
+const R71_CLOSING = /(الله\s*)?(يبارك|بارك)(\s*الله)?(\s*(فيك|فيكي|فيكم|فيج|بك|بكم))?|شكرا|شكراً|جزيلا|جزيلاً|مشكور(ين|ه|ة)?|تسلم(ون|ين)?|(الله\s*)?يسلمك|يعطيك\s*العافي[هة]|جزاك(م)?\s*الله\s*خير(ا|اً)?|[اآ]مين|(الله\s*)?يحفظك|ما\s*قصرت(وا)?|الحمد\s*لله|ولله\s*الحمد|خلاص|تمام|اوكي|ok|thanks|thank\s*you|وياك(م)?|حياك(م)?(\s*الله)?|ان\s*شاء\s*الله|الله\s*يسعدك|يعطيك\s*الصح[هة]/gi;
+function bookedClosed(chat: unknown) {
+  const turns: { who: string; text: string }[] = [];
+  for (const l of String(chat ?? "").split("\n")) {
+    const m = l.match(/^\[[^\]]*\] (العميل|المكتب): (.*)$/);
+    if (m) turns.push({ who: m[1], text: m[2] }); else if (turns.length) turns[turns.length - 1].text += `\n${l}`;
+  }
+  let last = -1; turns.forEach((t, i) => { if (t.who === "المكتب") last = i; });
+  if (last < 0 || !R71_CONGRATS.test(turns[last].text)) return false;
+  let prev = -1; for (let i = last - 1; i >= 0; i--) if (turns[i].who === "المكتب") { prev = i; break; }
+  const before = turns.slice(prev + 1, last).map((t) => t.text).join(" ");
+  const after = turns.slice(last + 1).map((t) => t.text);
+  return R71_BOOKED.test(before) && after.every((s) => !/[؟?]/.test(s) && !s.replace(R71_CLOSING, " ").replace(/[^ء-يA-Za-z]+/g, ""));
+}
+// o: { group, route, clientSaid, confirmUnanswered, visitedDone, offerBranch, barkaAreas, fallback, bookedClosed }
 function eveningGuard(out: any, o: any) {
+  if (o.bookedClosed && out.decision !== "skip") {
+    out.reason = short(`(R71) قال إنه حجز أو اشترى وانبارك له وختم الكلام: ما يتابع. ${out.reason || ""}`, 300);
+    out.decision = "skip"; out.text = null; out.auto_ok = false; out.offer_no = null; out.guard = "guard_booked_closed";
+    return out;
+  }
   if (o.group || out.decision === "skip") return out;
   const stage = String(out.stage || "");
   if (o.confirmUnanswered && !o.visitedDone && !["visited_liked", "visited_no_fit", "negotiating"].includes(stage)) {
@@ -563,10 +587,10 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
     const fallback = kind === "request" && subj && subj.length <= 60 && !/[A-Za-z]/.test(subj) ? `بخصوص طلبك ${subj} لين الحين تبحث ؟` : fixed;
     notesGuard(out, group, clientSaid, officeSaid, refusedAreas, offerLabel, kind === "request" && subj && subj.length <= 60 && !/[A-Za-z]/.test(subj) ? `بخصوص طلبك ${subj} لين الحين تبحث ؟` : fixed);
     // R66, R67, R68 and R18 in a follow-up (the notes of the evening of 14 Nov)
-    eveningGuard(out, { group, route: String(x.route_key || ""), clientSaid, confirmUnanswered: !!out.confirm_unanswered, visitedDone, offerBranch, barkaAreas: l.barkaAreas, fallback });
+    eveningGuard(out, { group, route: String(x.route_key || ""), clientSaid, confirmUnanswered: !!out.confirm_unanswered, visitedDone, offerBranch, barkaAreas: l.barkaAreas, fallback, bookedClosed: !!out.booked_closed });
   }
   const english = !!out.english;
-  delete out.english; delete out.confirm_unanswered;
+  delete out.english; delete out.confirm_unanswered; delete out.booked_closed;
   if (kind === "visit" && !english) out.text = namedVisitQuestion(out.text, name);
   // R39: a client who already gave his opinion is never asked the step-1 opinion question again by the fixed template
   if (kind === "visit" && Number(x.step) === 1 && ["visited_liked", "visited_no_fit"].includes(String(out.stage))) out.auto_ok = false;
@@ -1152,7 +1176,22 @@ async function judgeResult(v: any, today: string, opinionOnly = false) {
   });
   const p = await ai.json().catch(() => ({}));
   if (!ai.ok) throw new Error(p?.error?.message || `openai_${ai.status}`);
-  return JSON.parse(p.output_text || p.output?.flatMap((x: any) => x?.content || []).find((x: any) => x?.type === "output_text")?.text || "{}");
+  const res = JSON.parse(p.output_text || p.output?.flatMap((x: any) => x?.content || []).find((x: any) => x?.type === "output_text")?.text || "{}");
+  return { ...res, client_said: saidBy(chat, "العميل") };
+}
+
+// R72 (Ahmed 14 Nov 2026, note 13382d75: «انتظر أول شي مال وزارة الدفاع، وبعدها… أقل عن 65، فما ينفعنا هذا»): «🔥 مشتري جاد»
+// never goes up for a client whose opinion of this property is not liked / negotiate, who says he waits for a procedure (a
+// ministry, the bank, a loan, financing), or whose stated budget is below this property's price.
+const R72_WAIT = /(انتظر|ننتظر|ينتظر|منتظر|انتظار|بانتظار)[^\n]{0,30}(اجراء|موافق|قرض|تمويل|راتب|وزار|بنك|اسكان|الدفاع|معامل)|(اجراءات|معامله|موافقه)[^\n]{0,20}(وزار|بنك|الدفاع|اسكان|قرض|تمويل)/;
+const R72_BUDGET = /(ميزاني|مزاني|بحدود|حدود|اقصي|اقصى|budget)[^\d\n]{0,15}(\d+(?:[.,]\d+)?)/gi;
+function seriousBlocked(r: any, clientSaid: unknown, price: unknown, requestBudget: unknown) {
+  if (!["liked", "negotiate"].includes(String(r?.opinion || ""))) return "opinion";
+  const said = r55Norm(String(clientSaid ?? "").split("\n").slice(-15).join("\n"));
+  if (R72_WAIT.test(said) || R72_WAIT.test(normAr(r?.note))) return "waiting";
+  let budget = Number(requestBudget) || 0;
+  for (const m of said.matchAll(R72_BUDGET)) { const n = Number(m[2].replace(",", ".")); if (n > 0) budget = n < 1000 ? n * 1000 : n; }
+  return budget > 0 && Number(price) > 0 && budget < Number(price) ? "budget" : "";
 }
 
 async function alertSerious(companyId: string, clientId: string, name: string, body: string) {
@@ -1205,7 +1244,7 @@ async function opinionBlocked(v: any) {
 async function visitResults(companyId: string, out: Record<string, number>) {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
   const from = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString().slice(0, 10);
-  const vs = await db.from("viewings").select("id,company_id,client_id,property_id,viewing_date,viewing_time,status,notes,ai_checked_at,row_version,properties(type,area,status,archived),clients(name)")
+  const vs = await db.from("viewings").select("id,company_id,client_id,property_id,viewing_date,viewing_time,status,notes,ai_checked_at,row_version,properties(type,area,status,archived,price),clients(name)")
     .eq("company_id", companyId).eq("archived", false).in("status", ["scheduled", "confirmed", "postponed"]).lt("viewing_date", today).gte("viewing_date", from)
     .order("viewing_date", { ascending: false }).limit(80);
   // the done-visit pass waits for SQL77 and its 77b cleanup (point 5): 77b leaves merged cards and nothing removes them
@@ -1213,7 +1252,7 @@ async function visitResults(companyId: string, out: Record<string, number>) {
   const opinionPass = !merged.error && (merged.data || []).length > 0;
   if (!opinionPass) out.visit_opinion_waits_sql77b = 1;
   const ds: any = opinionPass
-    ? await db.from("viewings").select("id,company_id,client_id,property_id,viewing_date,viewing_time,status,notes,ai_checked_at,row_version,properties(type,area,status,archived),clients(name)")
+    ? await db.from("viewings").select("id,company_id,client_id,property_id,viewing_date,viewing_time,status,notes,ai_checked_at,row_version,properties(type,area,status,archived,price),clients(name)")
       .eq("company_id", companyId).eq("archived", false).eq("status", "done").is("client_feedback", null).is("pipeline_outcome", null).lte("viewing_date", today).gte("viewing_date", opinionSince())
       .order("viewing_date", { ascending: false }).limit(60)
     : { data: [] };
@@ -1293,7 +1332,13 @@ async function visitResults(companyId: string, out: Record<string, number>) {
             else if (r.result === "cancelled") patch = { status: "cancelled", notes };
             else if (r.result === "postponed") patch = /^\d{4}-\d{2}-\d{2}$/.test(r.new_date || "") && r.new_date >= today ? { status: "scheduled", viewing_date: r.new_date, notes } : { status: "postponed", notes };
           }
-          if (r.serious && r.confidence >= 0.6 && !again) { await alertSerious(companyId, v.client_id, (v as any).clients?.name, `${typeAr(pr.type)} في ${pr.area || ""}: ${r.note}`); out.serious_alert = (out.serious_alert || 0) + 1; }
+          let blocked = "";
+          if (r.serious && r.confidence >= 0.6 && !again) {
+            const rq = await db.from("client_requests").select("budget_max").eq("client_id", v.client_id).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle();
+            blocked = seriousBlocked(r, r.client_said, pr.price, rq.data?.budget_max);
+            if (blocked) out[`serious_blocked_${blocked}`] = (out[`serious_blocked_${blocked}`] || 0) + 1;
+          }
+          if (r.serious && r.confidence >= 0.6 && !again && !blocked) { await alertSerious(companyId, v.client_id, (v as any).clients?.name, `${typeAr(pr.type)} في ${pr.area || ""}: ${r.note}`); out.serious_alert = (out.serious_alert || 0) + 1; }
           if (done) { const k = patch ? `visit_opinion_${r.opinion}` : gates.get(key) ? `visit_opinion_left_${gates.get(key)}` : "visit_opinion_unclear"; out[k] = (out[k] || 0) + 1; }
           else if (patch) out[`visit_result_${r.result}`] = (out[`visit_result_${r.result}`] || 0) + 1; else out.visit_result_unclear = (out.visit_result_unclear || 0) + 1;
         }

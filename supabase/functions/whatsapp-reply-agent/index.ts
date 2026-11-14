@@ -64,6 +64,31 @@ const AFTER_VISIT_Q = /كيف\s*لقي|كيف\s*شفت|قدرت[يوا]*\s*تش�
 // after-visit question means they found the place, not that they bought (Umm Mawadda got «مبروك الله يبارك لك 🌷»).
 const CONGRATS_RE = /مبروك|مبارك\s*عليك|يبارك\s*لك/;
 const BOUGHT_RE = /(اشتري|اشترينا|اشتريت|شرينا|شريت|حجزنا|حجزت|دفعنا|دفعت|عربون|تم\s*البيع|استلمنا|وقعنا|وقعت|سجلنا|تزوج|عرس|مولود|نجح|تخرج|توظف)/;
+// R71 (Ahmed 14 Nov 2026, notes 6793c909 / 7c28d6ca / 41e2db0a: «دام إنه الشخص حجز عقاره وباركنا له… فما يحتاج إن نرد عليه»):
+// a client told us she booked or bought, we congratulated her, and her answer is only closing words («الله يبارك فيك», «شكراً»,
+// 🌷): no reply and no draft (this changes R49 here only), her active requests close (search_stopped) and nothing follows her.
+const BOOKED_RE = /(اشترينا|اشتريت|شرينا|شريت|حجزنا|حجزت|دفعنا|دفعت|عربون|استلمنا|وقعنا|وقعت|تم\s*البيع|تم\s*الحجز)/;
+const CLOSING_WORDS = /(الله\s*)?(يبارك|بارك)(\s*الله)?(\s*(فيك|فيكي|فيكم|فيج|بك|بكم))?|شكرا|شكراً|جزيلا|جزيلاً|مشكور(ين|ه|ة)?|تسلم(ون|ين)?|(الله\s*)?يسلمك|يعطيك\s*العافي[هة]|جزاك(م)?\s*الله\s*خير(ا|اً)?|[اآ]مين|(الله\s*)?يحفظك|ما\s*قصرت(وا)?|الحمد\s*لله|ولله\s*الحمد|خلاص|تمام|اوكي|ok|thanks|thank\s*you|وياك(م)?|حياك(م)?(\s*الله)?|ان\s*شاء\s*الله|الله\s*يسعدك|يعطيك\s*الصح[هة]/gi;
+function closingOnly(h: any) {
+  if (["reaction", "sticker"].includes(String(h.message_type || ""))) return true;
+  const s = `${h.body || ""} ${h.transcript || ""}`;
+  if (/[؟?]/.test(s)) return false;
+  return !s.replace(CLOSING_WORDS, " ").replace(/[^ء-يA-Za-z]+/g, "");
+}
+function closedAfterBooking(history: any[]) {
+  const said = history.filter((h: any) => !["edit", "revoke", "system", "unsupported"].includes(String(h.message_type || "")));
+  let lastOut = -1; said.forEach((h: any, i: number) => { if (h.direction === "outbound") lastOut = i; });
+  if (lastOut < 0 || !CONGRATS_RE.test(String(said[lastOut].body || ""))) return false;
+  const burst = said.slice(lastOut + 1).filter((h: any) => h.direction === "inbound");
+  let prevOut = -1; for (let i = lastOut - 1; i >= 0; i--) if (said[i].direction === "outbound") { prevOut = i; break; }
+  const before = said.slice(prevOut + 1, lastOut).filter((h: any) => h.direction === "inbound").map((h: any) => `${h.body || ""} ${h.transcript || ""}`).join(" ");
+  return burst.length > 0 && BOOKED_RE.test(before) && burst.every(closingOnly);
+}
+// Ahmed 14 Nov 2026 (same notes): «أمر للذكاء الاصطناعي» that says not to answer («ما يحتاج نرد», «ما في أي رد», «لا ترد»,
+// «الغي المتابعة», «خوزه من هنا») closes the draft at once instead of asking the model again; an order that also says what to send does not.
+const NO_REPLY_ORDER = /ما\s*(في|فيه|فيها)\s*(أي|اي|اى)?\s*رد|ما\s*(يحتاج|نحتاج|تحتاج|له\s*داعي|لها\s*داعي)\s*(ا|إ)?(ن)?\s*(ن|ت)?رد|(^|\s)(لا|ما)\s*(ت|ن)رد(ون)?(\s*(عليه|عليها|عليهم|بشي|بشيء))?\s*($|[.!،,]|خلاص)|بدون\s*(أي|اي)?\s*رد|(ا|إ)?لغ(ي|ى|يه|يها)\s*(ال)?(رد|متابع[هة])|لغ(يه|يها)\s*من\s*هنا|(خوز|شيل)(ه|ها|ة)?\s*من\s*هنا/;
+const ORDER_DO = /(^|\s)(ارسل|أرسل|رسل|ارسله|ارسلها|قل|قول|قوله|قولها|اكتب|اسأل|اسال|اسأله|اساله|عطه|عطيه|خبره|خبرها|بلغه|بلغها|اعرض|وضح)(\s|$)/;
+const noReplyOrder = (t: string) => NO_REPLY_ORDER.test(t) && !ORDER_DO.test(t);
 const NOT_A_VISIT_Q = /فيديو|الصور|صور البيت|صور الفيلا|الرابط|الريل|الاعلان|الإعلان/;
 // R10 / R20 (8 and 10 Nov): an owner is declined politely (heirs, occupied, mortgaged); this reply always goes out.
 // A bare «نعتذر منك» (sorry for the delay) is not a decline.
@@ -90,6 +115,14 @@ function outsideArea(area: unknown, wilayat: unknown) {
 const ALLOWED_ORIGINS = ["https://omanvilla.github.io"]; // the approval screen asks for a rewrite from here
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+// the owner's order not to answer: the waiting draft leaves «ردود تنتظر موافقتك» as rejected, with his words kept
+async function closeDraft(draftId: string, analysis: any, instruction: string, by: string | null) {
+  const u = await db.from("whatsapp_reply_drafts").update({ status: "rejected", decided_at: new Date().toISOString(), decided_by: by, reply_messages: [],
+    approver_note: `أمر المدير: ${instruction}`.slice(0, 500), analysis: { ...(analysis || {}), reply_messages: [], owner_instruction: instruction, closed_by_order: true } })
+    .eq("id", draftId).eq("status", "pending").select("id");
+  if (!(u.data || []).length) return { ok: false, error: "draft_not_pending" };
+  return { ok: true, status: "closed", reply_messages: [] };
+}
 const enc = new TextEncoder();
 const digits = (v: unknown) => String(v ?? "").replace(/\D/g, "");
 const short = (v: unknown, n = 1500) => { const s = String(v ?? "").trim(); return s.length > n ? s.slice(0, n) + "…" : s; };
@@ -522,7 +555,7 @@ Deno.serve(async (req) => {
   let dry = body?.dry_run === true || body?.inline === true || forcedDry;
   // redo: the owner, from the approval screen, asks for a waiting draft to be rewritten following
   // their instruction ("ارسل له تفاصيل العقار"). The new reply replaces the draft and still waits for approval.
-  let redo: { draftId: string; instruction: string } | null = null;
+  let redo: { draftId: string; instruction: string; by: string } | null = null;
   // resume (11 Nov, Ahmed): «كمّل يا عقل» on a paused chat. The agent reads the whole chat again and answers the customer's
   // last message now, if nobody answered it; when it still cannot, the chat comes back to Ahmed with the reason.
   let resume = false;
@@ -559,7 +592,9 @@ Deno.serve(async (req) => {
     const d = await db.from("whatsapp_reply_drafts").select("id,message_id,status,analysis").eq("id", String(body.draft_id)).eq("company_id", prof.data.company_id).maybeSingle();
     if (!d.data) return json({ ok: false, error: "draft_not_found" }, 404);
     if (d.data.status !== "pending") return json({ ok: false, error: "draft_not_pending" }, 409);
-    redo = { draftId: d.data.id, instruction };
+    // 14 Nov (Ahmed, three times on one draft): an order not to answer closes the draft at once, with no new reply
+    if (noReplyOrder(instruction)) return json(await closeDraft(d.data.id, d.data.analysis, instruction, prof.data.id));
+    redo = { draftId: d.data.id, instruction, by: prof.data.id };
     message_id = d.data.message_id;
     dry = forcedDry || d.data.analysis?.dry_run === true;
     }
@@ -1327,6 +1362,8 @@ Deno.serve(async (req) => {
     if (/لين الحين تبحث/.test(lastOutBody) && FOUND_RE.test(burstSaid) && !NOT_FOUND_RE.test(burstSaid) && !/[؟?]/.test(burstSaid) && out.action !== "handoff") {
       texts = []; out.action = "none"; out.search_stopped = true;
     }
+    // R71 (Ahmed 14 Nov 2026): she booked or bought, we congratulated, and she only closes the talk: no reply, no draft, the search ends
+    if (closedAfterBooking(history)) { texts = []; out.action = "none"; out.handoff_reason = null; out.search_stopped = true; out.guard_closed_after_booking = true; }
     // the ad text goes once per conversation: if a long office message about this property already went out, drop it
     if (prop) {
       const priceKey = prop.price ? String(Math.round(Number(prop.price) / 1000)) : "";
@@ -1524,6 +1561,8 @@ Deno.serve(async (req) => {
       } catch (e) { console.error("[reply-agent] task", String((e as any)?.message || e)); }
     }
     if (redo) {
+      // a rewrite that leaves nothing to send is closed too (Ahmed 14 Nov): an empty reply never waits for approval
+      if (!out.reply_messages.length) return json(await closeDraft(draftId, analysis, redo.instruction, redo.by));
       // only while it still waits: if it was sent or rejected meanwhile, nothing changes
       const u = await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages }).eq("id", draftId).eq("status", "pending").select("id");
       if (!(u.data || []).length) return json({ ok: false, error: "draft_not_pending" }, 409);
