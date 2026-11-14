@@ -1599,7 +1599,6 @@ Deno.serve(async (req) => {
     // inline dry run: the answer and what would be sent come back here, nothing is written (the owner's number is masked).
     // forced_dry shows whether the dry-run copy recognised itself from its URL (true there, false on the live function)
     if (inline) {
-      // R54: the owner's number is one paragraph of the single message now, and is masked there
       const send_preview = outgoing.map((m: any) => m.type === "text" ? String(m.text.body).split("\n\n").map((p: string) => (/^\d{8,}$/.test(p) ? "[رقم صاحب العقار]" : p)).join("\n\n") : "[صورة صندوق المفتاح]");
       return json({ ok: true, inline: true, forced_dry: forcedDry, reply_messages: out.reply_messages, action: out.action, handoff_reason: out.handoff_reason ?? null, category: out.category,
         seriousness: out.seriousness ?? "unknown", seriousness_reason: out.seriousness_reason ?? "", meeting: out.meeting ?? null, mustahiq_waitlist: out.mustahiq_waitlist === true, crm_note: out.crm_note ?? "", send_preview, analysis });
