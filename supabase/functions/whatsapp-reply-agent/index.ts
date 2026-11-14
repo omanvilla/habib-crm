@@ -42,7 +42,7 @@ const RESIDENCY_WORK_RE = /حق\s*العمل|الشغل|وزارة\s*العمل|
 const promisesResidency = (t: string) => RESIDENCY_WORD_RE.test(t) && RESIDENCY_PROMISE_RE.test(t) && !RESIDENCY_WORK_RE.test(t);
 // R17: a residency answer that opens with a denial («ما في عقار يضمن إقامة», «ما في إقامة», «ما في قيمة عقار تضمن...»)
 const NEG_RESIDENCY_RE = /^\s*(ما\s*(في|فيه)\s*(عقار|قيمة|شي)[^\n]{0,30}(يضمن|تضمن|يعطي|تعطي)[^\n]{0,20}(إقامة|اقامة)|ما\s*(في|فيه)\s*(إقامة|اقامة)|(لا\s*يوجد|ما\s*عندنا)\s*(عقار)?[^\n]{0,20}(يضمن|تضمن)[^\n]{0,20}(إقامة|اقامة))/;
-const SAID_VISITED = /(زرت|زرنا|زرناه|زرناها|عاينت|عاينا|شفت البيت|شفت الفيلا|شفنا البيت|شفنا الفيلا|شفناه|شفناها|رحت شفت|رحنا شفنا|دخلت البيت|دخلنا)/;
+const SAID_VISITED = /(مشيت شفت|مريت عليه|مريت عليها|زرت|زرنا|زرناه|زرناها|عاينت|عاينا|شفت البيت|شفت الفيلا|شفنا البيت|شفنا الفيلا|شفناه|شفناها|رحت شفت|رحنا شفنا|دخلت البيت|دخلنا)/;
 // R16 (9 Nov): our after-visit question («كيف لقيت…» / «قدرت تشوفه ؟» / «قدرتي تشوفينه ؟»), not a question about a video or photos
 const AFTER_VISIT_Q = /كيف\s*لقي|كيف\s*شفت|قدرت[يوا]*\s*تشوف/;
 // R29 (Ahmed 11 Nov): «مبروك» only when the customer says they bought, reserved or paid. «ايوه لقيناها الفيلا» after our
@@ -404,7 +404,7 @@ async function watchVisit(msg: any, dry = false) {
   const lastIn = rows.filter((h: any) => h.direction === "inbound").slice(-3).map((h: any) => h.transcript || h.body || "").join(" ");
   if (!VISIT_HINT.test(lastIn)) return { event: "none", skipped: "no_hint" };
   const [propsR, openR] = await Promise.all([
-    db.from("properties").select("id,type,area,price,bedrooms,land_size,listing_purpose").eq("company_id", msg.company_id).in("status", ["available", "reserved"]).eq("archived", false),
+    db.from("properties").select("id,type,area,price,bedrooms,land_size,listing_purpose,branch_key").eq("company_id", msg.company_id).in("status", ["available", "reserved"]).eq("archived", false),
     db.from("viewings").select("id,property_id,viewing_date,viewing_time,status,created_via,notes").eq("client_id", msg.client_id).eq("archived", false).in("status", ["scheduled", "confirmed", "postponed"]),
   ]);
   const props = propsR.data || [];
@@ -441,6 +441,11 @@ async function watchVisit(msg: any, dry = false) {
       if (open.status !== "postponed" && open.viewing_date === date && (!time || open.viewing_time?.slice(0, 5) === time)) return { ...out, applied: false, why: "already_recorded" };
       w = await db.from("viewings").update({ viewing_date: date, viewing_time: time || open.viewing_time, status: "scheduled", notes: addNote() }).eq("id", open.id);
     } else {
+      // R48: no new visit is booked from a chat on the other branch's number (the customer is sent to that number instead)
+      if (["muscat", "barka"].includes(String(prop.branch_key))) {
+        const cv = await db.from("whatsapp_conversations").select("route_key").eq("id", msg.conversation_id).maybeSingle();
+        if (["muscat", "barka"].includes(String(cv.data?.route_key)) && cv.data!.route_key !== prop.branch_key) return { ...out, applied: false, why: "other_branch" };
+      }
       w = await db.from("viewings").insert({ company_id: msg.company_id, client_id: msg.client_id, property_id: prop.id, viewing_date: date, viewing_time: time || "16:00", duration_minutes: 30, status: "scheduled", notes: short(out.note, 1000), ...provenance });
     }
   } else if (out.event === "done") {
@@ -1123,6 +1128,54 @@ Deno.serve(async (req) => {
         out.action = "none"; out.handoff_reason = null; out.visit_first = true;
       } else if (r16) out.r16_seen = r16;
     }
+    // ---- 14 Nov 2026 (Ahmed: «ما على كل مرة نعدل نفس الاشياء»): rules that were only words in the brain are held here. ----
+    // R16 the other way round: a client who has seen the property is never told «شوف العقار أول». The line (and the visit
+    // question with it) is dropped; a price question that would be left with no handoff reaches Ahmed as «مشتري جاد:».
+    const SEE_FIRST = /شوف[يوا]{0,2}\s*(العقار|البيت|الفيلا|الشقة|المكان)\s*(أول|اول)/;
+    if (!out.visit_first && texts.some((t) => SEE_FIRST.test(t))) {
+      const visitedThis = out.property_id ? visitedIds.has(out.property_id) : visitedIds.size > 0;
+      const saidVisited = history.some((h: any) => h.direction === "inbound" && SAID_VISITED.test(String(h.transcript || h.body || "")));
+      const seen = visitedThis ? "زيارته مسجلة" : saidVisited ? "قال إنه زار" : await r16Seen(out.property_id || null);
+      if (seen) {
+        texts = texts.filter((t) => !SEE_FIRST.test(t) && !(t.length < 90 && /(تزور|تزورون|تزورين)\s*؟/.test(t)));
+        out.r16_seen = seen; out.guard_see_first = true;
+        if (out.action === "none" && (prop?.price_negotiable !== "fixed" || !texts.length)) {
+          out.action = "handoff"; out.handoff_reason = short(`مشتري جاد: زار العقار ويسأل عن السعر. ${out.intent || ""}`, 300);
+        }
+      }
+    }
+    // R24: a property that left the market without being sold (withdrawn, contract ended, rented) is «ما متوفره حالياً», never «انباع»
+    const goneNotSold = new Set<string>(goneRows.filter((g: any) => !/^sold_/.test(String(g.archive_reason || ""))).map((g: any) => g.id));
+    const linkedGone = history.some((h: any) => goneNotSold.has(h.matched_property_id))
+      || Object.values(reels).some((r: any) => goneNotSold.has(r.property_id) || (r.propertyIds || []).some((id: string) => goneNotSold.has(id)));
+    if (linkedGone && !linkedSold && !linkedAvailable && !groupTalk && texts.some((t) => SOLD_RE.test(t))) {
+      texts = texts.map((t) => (SOLD_RE.test(t) ? "حالياً ما متوفره" : t)).filter((t, i, a) => a.indexOf(t) === i);
+      out.guard_gone_not_sold = true;
+    }
+    // R34: we have no photos, only the video. A promise or an offer of photos is taken out; a reply left empty says so.
+    const PHOTO_PROMISE = /(برسل|بارسل|بأرسل|بنرسل|نرسل|برسلك|بارسلك)\s*(لك|لج|لكم)?\s*(ال)?صور|(ارسل|أرسل|ارسلك|أرسلك)\s*(لك|لج|لكم)\s*(ال)?صور|(ارسلك|أرسلك)\s*(ال)?صور/;
+    if (texts.some((t) => PHOTO_PROMISE.test(t))) {
+      texts = texts.filter((t) => !PHOTO_PROMISE.test(t));
+      if (!texts.length && out.action === "none") texts = ["السموحة ما عندنا صور", "عندنا الفيديو بس"];
+      out.guard_photo_promise = true;
+    }
+    // R44: the two questions Ahmed banned on 12 Nov, and the old area name is never explained to the customer
+    const BANNED_R44 = /البيت\s*لك\s*ولا\s*تعرضه|تشتري(ها|ه)\s*ولا\s*تعرض(ها|ه)/;
+    if (texts.some((t) => BANNED_R44.test(t))) { texts = texts.filter((t) => !BANNED_R44.test(t)); out.guard_r44 = true; }
+    if (texts.some((t) => /حي\s*(ال)?عاصم/.test(t))) { texts = texts.map((t) => t.replace(/حي\s*(ال)?عاصم/g, "الرميس")); out.guard_r44 = true; }
+    // R9 / R22: no project and no developer unit is named on the Barka number, whatever category the model chose (until now this
+    // was only flagged as project_named). The line is taken out; a reply left empty goes to Ahmed instead of silence.
+    if (conv.route_key === "barka" && out.category !== "investor" && texts.length) {
+      // not the office ad (long text from the CRM) and not a distance line: Barka ads say «قريب من مدينة السلطان هيثم», which is a
+      // place there, not an offer of the project
+      const named: boolean[] = [];
+      for (const t of texts) named.push(t.length <= 250 && !/قريب|قرب|تبعد|دقيقة|دقايق|دقائق/.test(t) && await mentionsProject(msg.company_id, [t]));
+      if (named.some(Boolean)) {
+        texts = texts.filter((_t, i) => !named[i]);
+        out.guard_barka_project = true;
+        if (!texts.length && out.action === "none") { out.action = "handoff"; out.handoff_reason = "العقل كان بيذكر مشروع على رقم بركاء (R9)، راجع المحادثة"; }
+      }
+    }
     // the ad text goes once per conversation: if a long office message about this property already went out, drop it
     if (prop) {
       const priceKey = prop.price ? String(Math.round(Number(prop.price) / 1000)) : "";
@@ -1376,7 +1429,7 @@ Deno.serve(async (req) => {
       const said = (out.reply_messages || []).map((t: any) => String(t));
       const bWhy = String(out.handoff_reason || "");
       const bKeep = out.action === "handoff" && (HARD_HANDOFF.test(bWhy) || /^\s*طلب اتصال/.test(bWhy));
-      const serving = ["send_location", "send_lockbox", "send_owner_number"].includes(out.action)
+      const serving = ["send_location", "send_lockbox", "send_owner_number", "book_viewing"].includes(out.action)
         || said.some((t: string) => /https?:\/\//.test(t) || t.length > 220 || /(تزور|تزورون|تزورين|اللوكيشن|الموقع)/.test(t));
       const offer = said.some((t: string) => /[اإ]ذا\s*(تقبل|يناسبك)|تحب\s*[اأ]رسل/.test(t));
       const hasLine = said.some((t: string) => t.includes(propBranch.number));

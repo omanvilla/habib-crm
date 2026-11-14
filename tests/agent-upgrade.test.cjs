@@ -143,6 +143,54 @@ test('R48: a property of the other branch is not served on this number, the cust
  }
 });
 
+test('14 Nov guards: rules that were words only are held by code (R16, R24, R34, R44, R9 on the Barka number)',async()=>{
+ const block=agent.slice(at('    const SEE_FIRST = '),at('    // the ad text goes once per conversation'))
+  .replace(/\((\w+): (?:string|any)\)/g,'($1)').replace(/new Set<string>/g,'new Set').replace('const named: boolean[]','const named');
+ const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
+ const guards=new AsyncFunction('out','texts','history','visitedIds','SAID_VISITED','r16Seen','prop','short','goneRows','reels','linkedSold','linkedAvailable','groupTalk','SOLD_RE','conv','msg','mentionsProject',block+'\nreturn {out,texts};');
+ const PROJECT=/مدينة السلطان هيثم|عايدة|اليزن/;
+ const run=(texts,o={})=>guards({action:'none',handoff_reason:null,category:'buyer',property_id:null,intent:'x',...(o.out||{})},texts,
+  o.history||[{direction:'inbound',body:o.said||'كم آخر سعر'}],new Set(o.visited||[]),re('SAID_VISITED'),async()=>o.r16||null,o.prop||null,(s)=>String(s),
+  o.gone||[],{},!!o.linkedSold,!!o.linkedAvailable,false,/ابتاع|انباع|انحجز|تم البيع|مباع/,{route_key:o.route||'barka'},{company_id:'c'},async(_c,t)=>PROJECT.test(t.join(' ')));
+ const SEE=['شوف العقار أول واذا ناسبك نتكلم في السعر','متى يناسبك تزور ؟'];
+ // R16: said he saw it (R44's «مشيت شفته» too), a recorded visit, or the location went out: never «شوف العقار أول»
+ let r=await run([...SEE],{said:'أنا مشيت شفته كم آخر سعر'});
+ assert.deepEqual(r.texts,[]);assert.equal(r.out.action,'handoff');assert.match(r.out.handoff_reason,/^مشتري جاد:/);
+ r=await run([...SEE],{out:{property_id:'p1'},visited:['p1']});
+ assert.deepEqual(r.texts,[]);assert.match(r.out.handoff_reason,/^مشتري جاد:/);
+ r=await run(['السعر 59 الف',...SEE],{r16:'انرسل له اللوكيشن',prop:{price_negotiable:'fixed'}});
+ assert.deepEqual(r.texts,['السعر 59 الف']);assert.equal(r.out.action,'none','a fixed price keeps the answer and is not handed over');
+ // before a visit the line stays, and so does the pair the R2 code itself wrote
+ r=await run([...SEE]);assert.deepEqual(r.texts,SEE);assert.equal(r.out.action,'none');
+ r=await run([...SEE],{out:{visit_first:true},said:'زرت البيت'});assert.deepEqual(r.texts,SEE);
+ // R24: withdrawn is «ما متوفره», a property the owner sold is still «انباع»
+ const hist=[{direction:'inbound',body:'متوفره ؟',matched_property_id:'g1'}];
+ r=await run(['للاسف انباع'],{history:hist,gone:[{id:'g1',archive_reason:'owner_withdrew'}]});
+ assert.deepEqual(r.texts,['حالياً ما متوفره']);
+ r=await run(['للاسف انباع'],{history:hist,gone:[{id:'g1',archive_reason:'sold_by_owner'}]});
+ assert.deepEqual(r.texts,['للاسف انباع']);
+ // R34: no photo promise or offer; asking the customer for a picture of the ad is not one
+ r=await run(['تمام برسل لك الصور']);assert.deepEqual(r.texts,['السموحة ما عندنا صور','عندنا الفيديو بس']);
+ r=await run(['البيت 4 غرف','أرسل لك الصور ؟']);assert.deepEqual(r.texts,['البيت 4 غرف']);
+ r=await run(['ارسل صورة الإعلان اذا ما عليك امر']);assert.deepEqual(r.texts,['ارسل صورة الإعلان اذا ما عليك امر']);
+ // R44
+ r=await run(['البيت لك ولا تعرضه ؟','ارسل الكروكي']);assert.deepEqual(r.texts,['ارسل الكروكي']);
+ r=await run(['عندنا في حي عاصم فيلا بـ 59 الف']);assert.deepEqual(r.texts,['عندنا في الرميس فيلا بـ 59 الف']);
+ // R9: no project on the Barka number; the ad's «قريب من مدينة السلطان هيثم» is a place, and the Muscat number is free
+ r=await run(['بـ 30 الف ما عندنا شي جاهز','بس في مدينة السلطان هيثم عرض بدون دفعة مقدمة']);
+ assert.deepEqual(r.texts,['بـ 30 الف ما عندنا شي جاهز']);
+ r=await run(['في مدينة السلطان هيثم عرض بدون دفعة مقدمة']);
+ assert.deepEqual(r.texts,[]);assert.equal(r.out.action,'handoff');assert.match(r.out.handoff_reason,/R9/);
+ r=await run(['توين فيلا في الشخاخيط في موقع قريب من مسقط ومدينة السلطان هيثم']);
+ assert.equal(r.texts.length,1);
+ r=await run(['في مدينة السلطان هيثم عرض بدون دفعة مقدمة'],{route:'muscat'});assert.equal(r.texts.length,1);
+});
+test('R48: the visit watcher books no new visit from the other branch number, and book_viewing counts as serving',()=>{
+ assert.match(agent,/select\("id,type,area,price,bedrooms,land_size,listing_purpose,branch_key"\)/);
+ assert.match(agent,/cv\.data!\.route_key !== prop\.branch_key\) return \{ \.\.\.out, applied: false, why: "other_branch" \}/);
+ assert.match(agent,/\["send_location", "send_lockbox", "send_owner_number", "book_viewing"\]\.includes\(out\.action\)/);
+});
+
 test('2: the R2 guard honours R16 (after-visit question, passed visit time, location or owner number sent)',()=>{
  const AFTER=re('AFTER_VISIT_Q'),NOT=re('NOT_A_VISIT_Q');
  for(const t of ['السلام عليكم كيف لقيت فيلا الرميس ؟','السلام عليكم بخصوص فيلا الرميس قدرت تشوفها ؟','السلام عليكم بخصوص زيارة المنزل في الحيل الجنوبية قدرتي تشوفينه ؟','بخصوص الزيارة قدرت تشوف العقار ؟ كيف لقيته ؟','السلام عليكم شفت فيلا الرميس بعد الصلاة وكيف لقيتها ؟'])
