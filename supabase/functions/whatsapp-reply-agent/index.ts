@@ -274,7 +274,7 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     // (a property the office already named in this chat is the topic, not a new offer: R48 answers that)
     const raised = c.history.some((h: any) => h.direction === "outbound" && keys.some((k: string) => areaKey(body(h)).includes(k)));
     if (texts.some(offers) && !raised && !nearBarka(inbound.map(body).join(" "), barka.map((p: any) => p.area))) {
-      texts = texts.filter((t) => !offers(t) && !(t.length <= 250 && (R66_DETAILS_ASK.test(t) || /تقدر(ين|ون)?\s*تزيد/.test(t))) && !VISIT_Q.test(t));
+      texts = texts.filter((t) => !offers(t) && !(t.length <= 250 && (R66_DETAILS_ASK.test(t) || /تزيد/.test(t))) && !VISIT_Q.test(t));
       const line = (out.request?.areas || []).length ? "اول ما يتوفر بتواصل معك" : "في اي منطقة تبحث ؟";
       if (!texts.includes(line)) texts.push(line);
       out.guard_barka_offer = true; out.property_id = null;

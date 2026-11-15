@@ -124,6 +124,7 @@ test('R77: a client who names the day for a house the owner lives in gets the ow
  r=decide(['اسمك الكريم ؟','اذا حاب تزور البيت الحين خبرني باليوم والوقت المناسب'],chat,day,{prop});
  assert.equal(r.out.action,'send_owner_number');assert.deepEqual(r.texts,[LINE,'اسمك الكريم ؟']);
  r=decide(['كم الساعة تقريباً يوم السبت ؟'],[IN('السبت ان شاء الله')],day,{prop});assert.equal(r.out.action,'send_owner_number');assert.deepEqual(r.texts,[LINE]);
+ r=decide(['ممكن بكره بس','اسمك الكريم ؟'],chat,day,{prop});assert.equal(r.out.action,'send_owner_number');assert.deepEqual(r.texts,[LINE,'اسمك الكريم ؟'],'third run of the same message');
  // left alone: no day named, the model read no visit, another sentence left, the number already went, an open house
  r=decide(['كم الساعة تقريباً ؟','اسمك الكريم ؟'],[IN('متى ممكن الزيارة؟')],day,{prop});assert.equal(r.out.action,'none');assert.deepEqual(r.texts,['اسمك الكريم ؟']);
  r=decide(['اسمك الكريم ؟'],[IN('بكره بسأل البنك')],{},{prop});assert.equal(r.out.action,'none');
@@ -180,4 +181,18 @@ test('R86: a stranger opener from a number outside Oman is ignored for good',()=
  assert(agent.includes('if (STRANGER_OPENER.test(asked) && !/^968/.test(to) && !out.property_id && !history.some((h: any) => h.matched_property_id) && ["general", "unclear", "ignore"].includes(out.category)'));
  assert(agent.includes('out.category = "ignore"; out.ignore_kind = "stranger"; out.guard_stranger = true;'));
  assert(agent.includes('stranger: "رسالة مشبوهة من رقم غريب"'));
+});
+test('R84 with no location going out, and the last orphan after R66',()=>{
+ const prop={id:'P1',visit_method:'open'};
+ // the location went earlier in the chat; «بكره» still got an hour of ours
+ let r=decide(['تمام ان شاء الله البيت مفتوح تقدرون تشوفونه بكره الساعة 4'],[IN('ممكن الموقع'),OUT('https://maps.app.goo.gl/TEST'),IN('بكره')],{action:'none',viewing_time:'16:00'},{prop});
+ assert.deepEqual(r.texts,['تمام ان شاء الله البيت مفتوح تقدرون تشوفونه بكره','كم الساعة تقريباً ؟']);assert.equal(r.out.viewing_time,null);
+ // he said an hour earlier in the chat, the line is about yesterday, the line is not about seeing the house: untouched
+ const line=['البيت مفتوح تقدر تشوفه بكره الساعة 5'];
+ r=decide(line,[IN('بجي الساعة 5'),OUT('تمام'),IN('خلها بكره'),IN('نفس الوقت'),IN('اوكي'),IN('تمام')],{action:'none'},{prop});assert.deepEqual(r.texts,line);
+ r=decide(['الزيارة كانت مسجلة أمس الساعة 4','اذا حاب تزور اليوم خبرني'],[IN('ما رحت')],{action:'none'},{prop});assert.equal(r.texts.length,2);assert.equal(r.out.guard_hour_asked,undefined);
+ r=decide(['الدوام من الساعة 8 الصبح'],[IN('متى تداومون')],{action:'none'},{prop});assert.deepEqual(r.texts,['الدوام من الساعة 8 الصبح']);
+ // fourth run of chat 5b58c79e: «اذا يناسبك تزيدها نرتب لك زيارة» stayed after the Barka offer was taken out
+ const c={route:'muscat',available:[{id:'B1',branch_key:'barka',area:'الصومحان الجنوبية'}],prop:{id:'B1',branch_key:'barka'}};
+ r=decide(['اقرب شي عندنا فيلا في الصومحان بـ 69 الف','اذا يناسبك تزيدها نرتب لك زيارة'],[IN('65')],{request:{areas:['مسقط']}},c);assert.deepEqual(r.texts,['اول ما يتوفر بتواصل معك']);
 });
