@@ -158,9 +158,17 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     out.guard_owner_time = true;
     // dry run of 16 Nov (rows 513 to 552): «متى ممكن الزيارة؟ بكرة ممكن؟» was left with «اسمك الكريم ؟» alone. He named the
     // day, the hour is the owner's: the owner's number goes with the fixed line, as on the chats where the model sends it itself.
-    if (out.action === "none" && ["buyer", "tenant"].includes(out.category) && /بكر|باكر|السبت|ال[اأ]حد|ال[اإ]ثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمع[ةه]/.test(String(c.burstSaid || ""))
-      && !texts.some((t) => !/^\s*و?اسمك\s*الكريم\s*؟\s*$/.test(t))) {
-      out.action = "send_owner_number"; texts = [OWNER_TIME_LINE, ...texts]; out.guard_owner_number_day = true;
+  }
+  // dry run of 16 Nov (rows 513 to 552): «متى ممكن الزيارة؟ بكرة ممكن؟» for a house the owner lives in came back as «اسمك الكريم ؟»
+  // alone, and on a second run as «خبرني باليوم والوقت المناسب». He named the day and the hour is the owner's (R77, R11): the
+  // owner's number goes with the fixed line, as on the chats where the model sends it itself. Only when the model itself read a
+  // visit day, the client's words name one, and what is left of the reply is the name question or a question about the time.
+  if (c.prop?.visit_method === "owner_lives" && out.action === "none" && ["buyer", "tenant"].includes(out.category) && out.viewing_date
+    && /بكر|باكر|السبت|ال[اأ]حد|ال[اإ]ثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمع[ةه]/.test(String(c.burstSaid || ""))
+    && !c.history.some((h: any) => h.direction === "outbound" && /تواصل\s*مع\s*(صاحب\s*العقار|المالك)/.test(String(h.body || "")))) {
+    const NAME_Q = /^\s*و?اسمك\s*الكريم\s*؟\s*$/, TIME_Q = /خبرني\s*ب?(ال)?(يوم|وقت)|(ال)?يوم\s*و(ال)?وقت|متى\s*يناسبك|[اأ]ي\s*(يوم|وقت|ساع[ةه])/;
+    if (!texts.some((t) => !NAME_Q.test(t) && !(t.length <= 200 && (TIME_Q.test(t) || VISIT_Q.test(t))))) {
+      out.action = "send_owner_number"; texts = [OWNER_TIME_LINE, ...texts.filter((t) => NAME_Q.test(t))]; out.guard_owner_number_day = true;
     }
   }
   // R41, same batch: «… يحتاج رد أحمد» with no handoff leaves the client waiting for nobody. It becomes the silent handoff
@@ -243,8 +251,10 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     && !inbound.some((h: any) => /instagram\.com|facebook\.com|fb\.watch/.test(body(h)) || ["image", "video"].includes(String(h.message_type || "")))) {
     const barka = (c.available || []).filter((p: any) => p.branch_key === "barka");
     const keys = barka.map((p: any) => areaKey(String(p.area || "").replace(/^\s*(ولاية\s+)?بركاء\s+/, "")).split(" ")[0]).filter((k: string) => k.length > 2 && !R66_GENERIC.includes(k));
-    const offers = (t: string) => t.length <= 250 && /عندنا|[اأ]قرب|متوفر/.test(t) && keys.some((k: string) => areaKey(t).includes(k));
-    if (texts.some(offers) && !nearBarka(inbound.map(body).join(" "), barka.map((p: any) => p.area))) {
+    const offers = (t: string) => t.length <= 250 && /عندنا|[اأ]قرب|متوفر|[0-9٠-٩]\s*[اأ]لف|تزيد/.test(t) && keys.some((k: string) => areaKey(t).includes(k));
+    // (a property the office already named in this chat is the topic, not a new offer: R48 answers that)
+    const raised = c.history.some((h: any) => h.direction === "outbound" && keys.some((k: string) => areaKey(body(h)).includes(k)));
+    if (texts.some(offers) && !raised && !nearBarka(inbound.map(body).join(" "), barka.map((p: any) => p.area))) {
       texts = texts.filter((t) => !offers(t) && !(t.length <= 250 && (R66_DETAILS_ASK.test(t) || /تقدر(ين|ون)?\s*تزيد/.test(t))) && !VISIT_Q.test(t));
       const line = (out.request?.areas || []).length ? "اول ما يتوفر بتواصل معك" : "في اي منطقة تبحث ؟";
       if (!texts.includes(line)) texts.push(line);
@@ -1946,7 +1956,7 @@ Deno.serve(async (req) => {
         actionMsgs.length = 0;
         analysis.branch_redirect = prop.branch_key; analysis.viewing_date = null; analysis.viewing_time = null;
         if (bSent) analysis.branch_line_already_sent = true;
-      } else if (!bKeep && said.length && !hasLine && !bSent && !offer && !out.guard_thanks_only) {
+      } else if (!bKeep && said.length && !hasLine && !bSent && !offer && !(said.length === 1 && /^(العفو|You're welcome)\s*$/.test(said[0]))) {
         out.reply_messages = [...said.slice(0, 2), bLine];
         analysis.branch_redirect = prop.branch_key;
       }
