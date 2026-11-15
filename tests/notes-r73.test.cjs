@@ -98,7 +98,7 @@ test('R49 by code: thanks alone get «العفو» alone',()=>{
  for(const s of ['تم جزاك الله خير','شكرا','بارك الله فيك','وعليكم السلام ورحمة الله وبركاته أخي شكرا جزيلا لك','تسلم الغالي','يعطيك العافية اخوي','مشكور ما قصرت'])assert.equal(thanksOnly(s),true,s);
  for(const s of ['شكرا كم السعر ؟','لا شكرًا ما اريد في بركاء','تمام','ان شاء الله','شكرا بس ابي الموقع','طيب','بكون شاكر لك وربي يبارك لك يا اخي الكريم في رزقك'])assert.equal(thanksOnly(s),false,s);
  const last='المالك ساكن في البيت وما عندنا صور من الداخل عشان الخصوصية';
- // the real case: the photo lines were written a second time
+ // a reply that repeats our last lines to a client who only thanked becomes «العفو»
  let r=answer('تم جزاك الله خير',last,['بحكم إن المالك ساكن في البيت ما صورنا البيت من الداخل عشان الخصوصية','بس نقدر نرتب لك زيارة وتشوف البيت من الداخل على راحتك']);
  assert.deepEqual(r.texts,['العفو']);assert.equal(r.out.guard_thanks_only,true);
  r=answer('شكرا',last,['العفو']);assert.equal(r.out.guard_thanks_only,undefined);

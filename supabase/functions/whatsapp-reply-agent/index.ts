@@ -1381,8 +1381,8 @@ Deno.serve(async (req) => {
     }
     // R71 (Ahmed 14 Nov 2026): she booked or bought, we congratulated, and she only closes the talk: no reply, no draft, the search ends
     if (closedAfterBooking(history)) { texts = []; out.action = "none"; out.handoff_reason = null; out.search_stopped = true; out.guard_closed_after_booking = true; }
-    // R49 held by code (dry run of 15 Nov: «تم جزاك الله خير» got the photo lines a second time): the client's last words are
-    // thanks only, so the reply is «العفو» alone, with no question, offer or repeated line. Only over a plain reply: not when
+    // R49 held by code (15 Nov 2026; an absolute rule that was words only, no failure of it was seen in the dry run): the client's
+    // last words are thanks only, so the reply is «العفو» alone, with no question, offer or repeated line. Only over a plain reply: not when
     // the model chose to say nothing, not with a handoff or a location going out, and R71 above already took its case.
     if (texts.length && out.action === "none" && !out.search_stopped && thanksOnly(burstSaid) && !(texts.length === 1 && String(texts[0]).trim() === "العفو")) {
       texts = ["العفو"]; out.guard_thanks_only = true;
