@@ -1,0 +1,66 @@
+'use strict';
+// R74 to R79: Ahmed's six decisions of 15 Nov 2026 after the dry run on 124 chats, held by code (ownerDecisions in the reply agent).
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
+const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8').replace(/\r\n/g,'\n');
+const pickA=(start,end)=>{const a=agent.indexOf(start);assert(a>=0,'missing: '+start);const b=agent.indexOf(end,a);assert(b>a,'no end: '+start);return agent.slice(a,b+end.length);};
+const dsrc=['const UNKNOWN_Q','const LOCATION_ASK','const AREA_REASON','const locationForArea','const LOCATION_HELD','const AREA_LINES','const INSIDE_VIDEO_ASK','const LAYOUT_ASK','const LAYOUT_LINES','const OUR_HOUR','const OWNER_TIME_LINE','const DEPOSIT_SAID','const REASON_Q','const VISIT_Q']
+ .map((s)=>pickA(s,'\n')).join('')+pickA('function ownerDecisions','\n}\n');
+const D=new Function(dsrc.replace(/(\w+): (?:string|any)(?:\[\])?(?=[,)])/g,'$1')+';return {ownerDecisions,locationForArea,INSIDE_VIDEO_ASK,LAYOUT_ASK,LAYOUT_LINES,AREA_LINES,OWNER_TIME_LINE,DEPOSIT_SAID};')();
+const IN=(b)=>({direction:'inbound',body:b}),OUT=(b)=>({direction:'outbound',body:b});
+const MAP='https://maps.app.goo.gl/TEST',MAIN='https://www.instagram.com/reel/TESTMAIN/',INSIDE='https://www.instagram.com/reel/TESTINSIDE/';
+const decide=(texts,history,out,c)=>{const o={action:'none',category:'buyer',...(out||{})};const burst=[];for(const h of history){if(h.direction==='outbound')burst.length=0;else burst.push(h.body);}
+ const t=D.ownerDecisions(o,texts,{history,burstSaid:burst.join(' '),prop:{id:'TEST_PROP',map_url:MAP,videoInside:INSIDE},visitedProp:false,visitedAny:false,saidVisited:false,handoffOpen:false,hardHandoff:false,...(c||{})});return {out:o,texts:t};};
+
+test('R74: the location goes to a client who needs it to judge the area, once, and no visit is recorded from it',()=>{
+ for(const s of ['ي صديقي اريد اشوف الموقع هل مناسب لي او لا مو لازم للزياره','اذا ممكن الموقع عشان اعرف هل يناسبني او لا','اذا نظامك ما ممكن ترسل الموقع خلاص ما ممكن أزور الموقع لاني قلتلك انه زيارة الفيلا تعتمد ع الموقع','إذا ممكن اشوف الموقع اشوفه إذا يناسب او لا'])assert.equal(D.locationForArea(s),true,s);
+ for(const s of ['ممكن الموقع','طيب هات الموقع','رسل الموقع','اعرف اذا السعر مناسب','ممكن لوكيشن والصوره الله يخليك'])assert.equal(D.locationForArea(s),false,s);
+ const chat=[IN('الموقع'),OUT('اللوكيشن نرسله قبل الزيارة عشان نتأكد إن العقار لسا متاح وما تتعنى على الفاضي'),IN('ي صديقي اريد اشوف الموقع هل مناسب لي او لا'),IN('مو لازم للزياره')];
+ let r=decide(['الموقع نرسله قبل الزيارة فقط اخوي عشان نتأكد العقار متوفر وقتها'],chat);
+ assert.equal(r.out.action,'send_location');assert.equal(r.out.location_for_area,true);assert.deepEqual(r.texts,D.AREA_LINES);
+ r=decide(['ان شاء الله برسلك الموقع','متى يناسبك تزور ؟'],chat);assert.deepEqual(r.texts,D.AREA_LINES);
+ // not twice, not without the reason, not for an owner, not without a map
+ r=decide(['تمام'],[...chat,OUT(MAP),IN('اشوف الموقع يناسبني او لا')]);assert.equal(r.out.action,'none');
+ r=decide(['ان شاء الله برسلك الموقع','متى يناسبك تزور ؟'],[IN('ممكن الموقع')]);assert.equal(r.out.action,'none');assert.equal(r.texts.length,2);
+ r=decide(['x'],chat,{category:'seller'});assert.equal(r.out.action,'none');
+ r=decide(['x'],chat,{},{prop:{id:'TEST_PROP',map_url:null}});assert.equal(r.out.action,'none');
+ assert(agent.includes('if (sentIds.length && prop && !review && !out.location_for_area && ["send_location", "send_owner_number", "send_lockbox"].includes(out.action)) {'));
+});
+test('R75: a request for the inside video gets the reel marked «من الداخل», and nothing of ours is said about a video',()=>{
+ for(const s of ['ممكن ترسلي فيديو من داخل البيت','شي مقطع فيديو من داخل !','اقصد من الداخل الفيديو','ف الفيديو ذاكر تواصلو معي ف الواتساب وبرسلكم الفيديو للفه من داخل ع طول'])assert(D.INSIDE_VIDEO_ASK.test(s),s);
+ for(const s of ['هل متوفر فيديو للفله','ممكن الصور','ابي ادخل البيت'])assert(!D.INSIDE_VIDEO_ASK.test(s),s);
+ let r=decide(['اي نعم الفيديو فيه تصوير من داخل الفيلا'],[OUT(MAIN),IN('ف الفيديو مذكور انه في فيديو للبيت من الداخل')]);
+ assert.deepEqual(r.texts,['هذا الفيديو من الداخل',INSIDE,'متى يناسبك تزور ؟']);assert.equal(r.out.guard_inside_video,true);
+ r=decide([MAIN,'متى يناسبك تزور ؟'],[IN('ممكن فيديو من داخل البيت')]);assert.deepEqual(r.texts,['هذا الفيديو من الداخل',INSIDE,'متى يناسبك تزور ؟']);
+ r=decide(['ما عندنا تصوير ثاني للداخل'],[OUT(INSIDE),IN('ابي فيديو من الداخل')]);assert.deepEqual(r.texts,['الفيديو من الداخل ارسلته لك فوق','متى يناسبك تزور ؟']);
+ r=decide(['ما عندنا تصوير ثاني للداخل'],[IN('ابي فيديو من الداخل')],{},{prop:{id:'TEST_PROP',videoInside:null}});assert.deepEqual(r.texts,['ما عندنا تصوير ثاني للداخل'],'a property with no inside reel is left alone');
+ assert(agent.includes('.ilike("notes", "%من الداخل%")'));
+});
+test('R76: a layout question handed over as unknown gets «الخرائط تختلف عن الواقع» and the visit question',()=>{
+ for(const s of ['ممكن مساحات و تقسيمات الفلا قبل ازور الموقع','توزيع الغرف كيف','عندكم مخطط البيت','سؤال ما عندي جوابه: مساحات كل غرفة في الاستراحة'])assert(D.LAYOUT_ASK.test(s),s);
+ assert(!D.LAYOUT_ASK.test('كم مساحة الارض'));
+ let r=decide([],[IN('ممكن تفاصيل الغرف والمساحات قبل ما نقرر الزيارة')],{action:'handoff',handoff_reason:'سؤال ما عندي جوابه: مساحات كل غرفة في استراحة VVIP بالرميس'});
+ assert.equal(r.out.action,'none');assert.equal(r.out.handoff_reason,null);assert.deepEqual(r.texts,D.LAYOUT_LINES);assert.match(D.LAYOUT_LINES[0],/الخرائط تختلف عن الواقع/);
+ r=decide([],[IN('كم عمولة الاسكان')],{action:'handoff',handoff_reason:'سؤال ما عندي جوابه: كم عمولة الاسكان'});assert.equal(r.out.action,'handoff','another unknown question still goes to Ahmed');
+ r=decide([],[IN('ممكن التقسيم')],{action:'handoff',handoff_reason:'سؤال ما عندي جوابه: تقسيم الفيلا'},{visitedProp:true});assert.equal(r.out.action,'handoff');
+});
+test('R77 / R78: no hour of ours when the owner arranges the visit; the reason is asked once',()=>{
+ let r=decide(['الساعة 4 العصر مناسب ان شاء الله','تواصل مع صاحب العقار على الرقم المرسل ونسق معه الزيارة'],[IN('ان شاء الله بكره، الساعة كم مناسب لك؟')],{action:'send_owner_number'});
+ assert.deepEqual(r.texts,[D.OWNER_TIME_LINE]);assert.equal(r.out.guard_owner_time,true);
+ r=decide(['تشرفنا محمد','تواصل مع صاحب العقار مباشرة ونسق معه الزيارة'],[IN('بكره')],{action:'send_owner_number'});assert.equal(r.texts.length,2);assert.equal(r.out.guard_owner_time,undefined);
+ r=decide(['البيت مفتوح تقدر تشوفه بكره الساعة 4 العصر'],[IN('بكره')],{action:'send_location'});assert.equal(r.texts.length,1,'our own visits keep their hour');
+ const ask='اذا ما عليك امر ممكن تذكر لي الاسباب ليش ما ناسبتك الفيلا ؟';
+ r=decide([ask],[OUT('كيف شفت الفيلا ؟'),IN('ما ناسبتني')]);assert.deepEqual(r.texts,[ask]);
+ r=decide(['تمام',ask],[OUT(ask),IN('خلاص ما ناسبتني')]);assert.deepEqual(r.texts,['تمام']);assert.equal(r.out.guard_reason_once,true);
+});
+test('R79: a visited client who asks about a deposit is «مشتري جاد:» so the WhatsApp alert goes',()=>{
+ for(const s of ['هل يصير ادفع عربون لحجز الفلا','ابي احجز الفيلا','كم العربون'])assert(D.DEPOSIT_SAID.test(s),s);
+ for(const s of ['شي حجز تاريخ 2026/11/26','احجز موعد زيارة'])assert(!D.DEPOSIT_SAID.test(s),s);
+ const chat=[IN('شفت الفيلا و عجبتني هل يصير ادفع عربون لحجز الفلا و بعدها انهي اجراءاتي في شهر ٥ ؟'),OUT('اسمك الكريم ؟'),IN('حسناء')];
+ const ho={action:'handoff',category:'active_deal',handoff_reason:'صفقة شغالة: حسناء زارت فيلا الرميس وتسأل عن دفع عربون',soft_handoff_no_reply:true};
+ let r=decide([],chat,{...ho},{saidVisited:true});
+ assert.equal(r.out.handoff_reason,'مشتري جاد: حسناء زارت فيلا الرميس وتسأل عن دفع عربون');assert.equal(r.out.guard_deposit_serious,true);assert.equal(r.out.soft_handoff_no_reply,undefined);
+ for(const c of [{},{saidVisited:true,handoffOpen:true},{saidVisited:true,hardHandoff:true}]){r=decide([],chat,{...ho},c);assert.equal(r.out.guard_deposit_serious,undefined);}
+ r=decide([],chat,{...ho,handoff_reason:'طلب اتصال: يبي أحمد يتصل'},{saidVisited:true});assert.equal(r.out.guard_deposit_serious,undefined);
+ assert(agent.includes('texts = ownerDecisions(out, texts, { history, burstSaid, prop,'));
+ assert(agent.indexOf('texts = ownerDecisions(')<agent.indexOf('analysis.branch_redirect = prop.branch_key;'),'the branch rule (R48) still runs after it');
+});
