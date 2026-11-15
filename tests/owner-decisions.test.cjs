@@ -3,9 +3,9 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8').replace(/\r\n/g,'\n');
 const pickA=(start,end)=>{const a=agent.indexOf(start);assert(a>=0,'missing: '+start);const b=agent.indexOf(end,a);assert(b>a,'no end: '+start);return agent.slice(a,b+end.length);};
-const dsrc=['const ASK_HOUR','const NEEDS_AHMED','const VIDEO_PROMISE','const FAREWELL','const FIXED_PRICE_LINE','const IG_CODE','const UNKNOWN_Q','const LOCATION_ASK','const AREA_REASON','const locationForArea','const LOCATION_HELD','const AREA_LINES','const INSIDE_VIDEO_ASK','const LAYOUT_ASK','const LAYOUT_LINES','const OUR_HOUR','const OWNER_TIME_LINE','const DEPOSIT_SAID','const REASON_Q','const VISIT_Q']
+const dsrc=['const COMMISSION_ASK','const COMMISSION_BUYER_LINES','const COMMISSION_OWNER_LINES','const ASK_LINK','const areaKey','const BOOKING_ASK','const BOOKING_NOT','const ASK_HOUR','const NEEDS_AHMED','const VIDEO_PROMISE','const FAREWELL','const FIXED_PRICE_LINE','const IG_CODE','const UNKNOWN_Q','const LOCATION_ASK','const AREA_REASON','const locationForArea','const LOCATION_HELD','const AREA_LINES','const INSIDE_VIDEO_ASK','const LAYOUT_ASK','const LAYOUT_LINES','const OUR_HOUR','const OWNER_TIME_LINE','const DEPOSIT_SAID','const REASON_Q','const VISIT_Q']
  .map((s)=>pickA(s,'\n')).join('')+pickA('function ownerDecisions','\n}\n');
-const D=new Function(dsrc.replace(/(\w+): (?:string|any)(?:\[\])?(?=[,)])/g,'$1')+';return {ownerDecisions,locationForArea,INSIDE_VIDEO_ASK,LAYOUT_ASK,LAYOUT_LINES,AREA_LINES,OWNER_TIME_LINE,DEPOSIT_SAID};')();
+const D=new Function(dsrc.replace(/(\w+): (?:string|any|unknown)(?:\[\])?(?=[,)])/g,'$1')+';return {ownerDecisions,COMMISSION_BUYER_LINES,COMMISSION_OWNER_LINES,locationForArea,INSIDE_VIDEO_ASK,LAYOUT_ASK,LAYOUT_LINES,AREA_LINES,OWNER_TIME_LINE,DEPOSIT_SAID};')();
 const IN=(b)=>({direction:'inbound',body:b}),OUT=(b)=>({direction:'outbound',body:b});
 const MAP='https://maps.app.goo.gl/TEST',MAIN='https://www.instagram.com/reel/TESTMAIN/',INSIDE='https://www.instagram.com/reel/TESTINSIDE/';
 const decide=(texts,history,out,c)=>{const o={action:'none',category:'buyer',...(out||{})};const burst=[];for(const h of history){if(h.direction==='outbound')burst.length=0;else burst.push(h.body);}
@@ -85,6 +85,36 @@ test('fifth dry-run batch: no hour asked where the owner lives; «يحتاج ر�
  r=decide(['موضوع إلغاء الشقق وتعديل المخطط يحتاج رد أحمد','اسمك الكريم ؟'],[IN('واذا بغيت اكنسل الشقق شي مخطط يكون بيت واحد ؟')]);
  assert.deepEqual(r.texts,[]);assert.equal(r.out.action,'handoff');assert.match(r.out.handoff_reason,/^سؤال ما عندي جوابه: واذا بغيت اكنسل الشقق/);
  r=decide(['تمام وصلت','الموضوع يحتاج رد أحمد'],[IN('x')],{action:'handoff',handoff_reason:'صفقة شغالة: x'});assert.equal(r.texts.length,2,'an existing handoff is left alone');
+});
+test('R80: who pays the commission, for a buyer and for an owner, never a figure',()=>{
+ const ours={id:'TEST_PROP',owner_id:'TEST_OWNER',listing_purpose:'sale'};
+ let r=decide([],[IN('العموله المكتب على من؟؟؟')],{action:'handoff',handoff_reason:'سؤال ما عندي جوابه: العمولة المكتب على من؟ عن فيلا الرميس'},{prop:ours,hardHandoff:true});
+ assert.deepEqual(r.texts,D.COMMISSION_BUYER_LINES);assert.equal(r.out.action,'none');assert.equal(r.out.handoff_reason,null);
+ r=decide(['تفاصيل العرض والعمولة يوضحها أحمد','ارسل الملكية والكروكي اذا ما عليك امر'],[IN('الملكيه والكروكي ايش رايك لم نتفق على تفاصيل العرض ومقدار عمولتك ؟')],{category:'seller',action:'handoff',handoff_reason:'سؤال عن العمولة'},{prop:null});
+ assert.deepEqual(r.texts,['ارسل الملكية والكروكي اذا ما عليك امر',...D.COMMISSION_OWNER_LINES]);assert.equal(r.out.action,'none');
+ assert(!D.COMMISSION_BUYER_LINES.concat(D.COMMISSION_OWNER_LINES).some((t)=>/[0-9٠-٩%٪]/.test(t)),'no figure');
+ // left alone: a broker, a tenant, a buyer on no known property, a negotiation
+ for(const [o,c] of [[{category:'broker'},{prop:ours}],[{category:'tenant'},{prop:ours}],[{},{prop:null}],[{action:'handoff',handoff_reason:'تفاوض: x'},{prop:ours,hardHandoff:true}]]){r=decide(['x'],[IN('كم العمولة')],o,c);assert.equal(r.out.guard_commission,undefined);}
+});
+test('R81: a buyer who asks about booking goes to Ahmed as «مشتري جاد:» with no reply, visited or not',()=>{
+ let r=decide(['تمام الله يسهل'],[IN('اذا حجزت معاكم كم مدة الانتظار')]);
+ assert.deepEqual(r.texts,[]);assert.equal(r.out.action,'handoff');assert.match(r.out.handoff_reason,/^مشتري جاد: يسأل عن الحجز: اذا حجزت معاكم/);
+ r=decide([],[IN('ابي احجز الفيلا كيف الطريقة')],{action:'handoff',handoff_reason:'سؤال ما عندي جوابه: طريقة الحجز'},{hardHandoff:true});assert.match(r.out.handoff_reason,/^مشتري جاد:/);
+ for(const s of ['ابي احجز موعد زيارة بكره','شي حجز تاريخ 2026/11/26 استراحة','ابي احجز الاستراحة ليلة الخميس','كم السعر'])
+  {r=decide(['x'],[IN(s)]);assert.equal(r.out.guard_booking_serious,undefined,s);}
+ r=decide(['x'],[IN('كم العربون')],{category:'investor'});assert.equal(r.out.guard_booking_serious,undefined,'a project buyer follows the meeting rules');
+ r=decide([],[IN('كم العربون')],{action:'handoff',handoff_reason:'تفاوض: x'},{hardHandoff:true});assert.equal(r.out.handoff_reason,'تفاوض: x');
+});
+test('R82: a property named by its area that we no longer have gets «ما متوفره حالياً» and the nearest one, not a request for a link',()=>{
+ const gone=[{id:'G1',type:'twin_villa',area:'الشخاخيط',price:69000,listing_purpose:'sale'}];
+ const available=[{id:'A1',type:'villa',area:'الصومحان الجنوبية',price:69000,listing_purpose:'sale',branch_key:'barka'},{id:'A2',type:'villa',area:'الخوض',price:70000,listing_purpose:'sale',branch_key:'muscat'},{id:'A3',type:'land',area:'الرميس',price:68000,listing_purpose:'sale',branch_key:'barka'}];
+ const c={prop:null,gone,available,route:'barka',typeLabel:(t)=>(/villa/.test(t)?'فيلا':'عقار')};
+ let r=decide(['ارسل لي رابط الفيديو او صورة منه عشان ارسلك التفاصيل والسعر بالضبط','اسمك الكريم ؟'],[IN('فيلا الشخاخيط اريد موقعها الي مكونه م ٦ غرفه')],{},c);
+ assert.deepEqual(r.texts,['فيلا الشخاخيط اللي سألت عنها ما متوفره حالياً','بس عندنا فيلا في الصومحان الجنوبية بـ 69 الف','تحب ارسلك تفاصيلها ؟']);
+ r=decide(['اي فيلا بالضبط ؟'],[IN('فيلا الشخاخيط')],{},{...c,available:[available[1]]});assert.deepEqual(r.texts,['فيلا الشخاخيط اللي سألت عنها ما متوفره حالياً','اول ما يتوفر بتواصل معك']);
+ // left alone: we still have one there, or no area of ours is named
+ r=decide(['اي فيلا بالضبط ؟'],[IN('فيلا الشخاخيط')],{},{...c,available:[...available,{id:'A4',type:'villa',area:'الشخاخيط',price:75000,listing_purpose:'sale',branch_key:'barka'}]});assert.equal(r.out.guard_named_gone,undefined);
+ r=decide(['اي فيلا بالضبط ؟'],[IN('تفاصيل الفله لو سمحت')],{},c);assert.equal(r.out.guard_named_gone,undefined);
 });
 test('R79: a visited client who asks about a deposit is «مشتري جاد:» so the WhatsApp alert goes',()=>{
  for(const s of ['هل يصير ادفع عربون لحجز الفلا','ابي احجز الفيلا','كم العربون'])assert(D.DEPOSIT_SAID.test(s),s);

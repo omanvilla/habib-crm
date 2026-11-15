@@ -42,6 +42,13 @@ const AREA_LINES = ["تفضل هذا الموقع", "شوف اذا المنطق�
 const INSIDE_VIDEO_ASK = /(فيديو|فديو|مقطع|تصوير)[^\n]{0,60}داخل|داخل[^\n]{0,30}(فيديو|فديو|مقطع)/;
 const VIDEO_PROMISE = /(برسل|بنرسل|ارسل|نرسل)(ك|كم)?\s*(لك|لكم)?\s*(ال)?(فيديو|فديو)/;
 const FAREWELL = /الله\s*(يوفقك|يسعدك|يحفظك)|بالتوفيق/;
+const COMMISSION_ASK = /عمول[ةه]|عمولت|كومشن|commission/i;
+const COMMISSION_BUYER_LINES = ["ما عليك عمولة للمكتب", "العمولة على الطرف المفوض وهو المالك"];
+const COMMISSION_OWNER_LINES = ["بخصوص العمولة نحتاج اول شي نزور الموقع بعد ما ترسل لنا المستندات ونطلع على العقار", "وبعدها نتفق ان شاء الله على كل شي"];
+const ASK_LINK = /رابط\s*(ال)?(فيديو|اعلان|إعلان)|صور[ةه]\s*منه|[اأ]ي\s*(فيلا|بيت|عقار|شق[ةه]|[اأ]رض)\s*(بالضبط|تقصد|قصدك)/;
+const areaKey = (s: unknown) => String(s ?? "").replace(/[ً-ْـ]/g, "").replace(/[أإآ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/(^|\s)ال/g, "$1").replace(/\s+/g, " ").trim();
+const BOOKING_ASK = /عربون|(اذا|إذا|لو)\s*حجز(ت|نا)|([اأ]بي|[اأ]بغى|[اأ]با|[اأ]ريد|نبي|نبغى|بغيت|حاب|ودي)\s*[اأن]حجز|(كيف|طريق[ةه])\s*(ال)?حجز|[اأن]حجز\s*(ال)?(فيلا|فل[ةه]|بيت|شق[ةه]|منزل|عقار|[اأ]رض)|لحجز\s*(ال)?(فيلا|فل[ةه]|بيت|شق[ةه]|منزل|عقار|[اأ]رض)/;
+const BOOKING_NOT = /موعد|زيار|معاين|استراح|شاليه|مزرع|يومي|ليل[ةه]|تاريخ|[0-9٠-٩]{1,2}\s*[\/\-]\s*[0-9٠-٩]/;
 const ASK_HOUR = /كم\s*الساع[ةه]/;
 const NEEDS_AHMED = /(يحتاج|تحتاج|ينتظر|تنتظر)\s*رد\s*(من\s*)?(الاستاذ\s*|الأستاذ\s*)?[اأ]حمد/;
 const FIXED_PRICE_LINE ="الاسعار تختلف حسب الوحدة والمساحة والمرحلة";
@@ -132,6 +139,41 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   if (out.action === "none" && texts.some((t) => t.length <= 200 && NEEDS_AHMED.test(t))) {
     texts = []; out.action = "handoff"; out.guard_needs_ahmed = true;
     out.handoff_reason = `سؤال ما عندي جوابه: ${String(c.burstSaid || "").replace(/\s+/g, " ").trim().slice(0, 200)}`;
+  }
+  // R80 (Ahmed 15 Nov 2026 evening): who pays the commission. A buyer on a property we list for its owner is told he pays the
+  // office nothing: the party who mandated us (the owner) does. An owner who asks our commission is told we visit first and
+  // agree after. No figure ever (the brain's line stays). A broker is still not answered (brain, 9 Nov).
+  if (COMMISSION_ASK.test(c.burstSaid) && (out.action === "none" || (out.action === "handoff" && !c.hardHandoff) || UNKNOWN_Q.test(String(out.handoff_reason || "")))) {
+    const lines = out.category === "seller" ? COMMISSION_OWNER_LINES : out.category === "buyer" && c.prop?.owner_id && c.prop?.listing_purpose !== "rent" ? COMMISSION_BUYER_LINES : null;
+    if (lines) {
+      texts = [...texts.filter((t) => !(t.length <= 250 && /عمول|[اأ]حمد/.test(t))).slice(0, 1), ...lines];
+      if (out.action === "handoff") { out.action = "none"; out.handoff_reason = null; delete out.soft_handoff_no_reply; }
+      out.guard_commission = true;
+    }
+  }
+  // R82 (Ahmed, same evening: «كان محدد أي عقار بالضبط ومعانا هذا العقار كان، بس الحين ما معانا… يحول حال أقرب عقار»): the
+  // client names a property by its area, we no longer have it, and the model asked for a link: he is told it is not available
+  // and offered the nearest one we have (same number, same kind, price within 10,000), as R24 / R6 say.
+  if (out.action === "none" && !c.prop && ["buyer", "tenant"].includes(out.category) && texts.some((t) => t.length <= 200 && ASK_LINK.test(t))) {
+    const said = areaKey(c.burstSaid), named = (rows: any[]) => (rows || []).filter((p: any) => areaKey(p.area).length > 2 && said.includes(areaKey(p.area)));
+    const gone = named(c.gone)[0];
+    if (gone && !named(c.available).length) {
+      const group = (t: unknown) => (/villa|house|twin/i.test(String(t || "")) ? "home" : String(t || ""));
+      const alt = (c.available || []).filter((p: any) => p.branch_key === c.route && (p.listing_purpose || "sale") === (gone.listing_purpose || "sale") && group(p.type) === group(gone.type)
+        && Math.abs(Number(p.price || 0) - Number(gone.price || 0)) <= 10000).sort((a: any, b: any) => Math.abs(Number(a.price) - Number(gone.price)) - Math.abs(Number(b.price) - Number(gone.price)))[0];
+      const label = (p: any) => `${c.typeLabel ? c.typeLabel(p.type) : "عقار"} ${String(p.area || "").trim()}`;
+      texts = [`${label(gone)} اللي سألت عنها ما متوفره حالياً`,
+        ...(alt ? [`بس عندنا ${c.typeLabel ? c.typeLabel(alt.type) : "عقار"} في ${String(alt.area || "").trim()} بـ ${Math.round(Number(alt.price || 0) / 1000)} الف`, "تحب ارسلك تفاصيلها ؟"] : ["اول ما يتوفر بتواصل معك"])];
+      out.guard_named_gone = true;
+    }
+  }
+  // R81 (Ahmed, same evening: «دام إنه وصل موضوع حجز مفروض يتحول عندي… مشتري جاد… ما يرد عليه بشيء»; widens R79): a buyer who
+  // asks about booking a property or a deposit, visited or not, gets no reply: the chat goes to Ahmed as «مشتري جاد:» with
+  // the WhatsApp alert. Not a visit appointment, not a short rent of a rest house, not over another hard handoff or a call request.
+  if (["buyer", "active_deal"].includes(out.category) && (!c.hardHandoff || UNKNOWN_Q.test(String(out.handoff_reason || ""))) && !/^\s*طلب اتصال/.test(String(out.handoff_reason || ""))
+    && BOOKING_ASK.test(c.burstSaid) && !BOOKING_NOT.test(c.burstSaid)) {
+    texts = []; out.action = "handoff"; out.guard_booking_serious = true; delete out.soft_handoff_no_reply;
+    out.handoff_reason = `مشتري جاد: يسأل عن الحجز: ${String(c.burstSaid || "").replace(/\s+/g, " ").trim().slice(0, 160)}`;
   }
   // R79 (Ahmed: «افضل على واتسابي»): a client who visited and asks about a deposit or booking is «مشتري جاد:», so the
   // WhatsApp alert of R7 reaches Ahmed. Once, when the chat is not already with him; never over a hard handoff or a call request.
@@ -1576,7 +1618,8 @@ Deno.serve(async (req) => {
     // R74 to R79: Ahmed's decisions of 15 Nov 2026 (ownerDecisions above). The branch rule (R48) still runs after this.
     texts = ownerDecisions(out, texts, { history, burstSaid, prop, visitedProp: !!prop && visitedIds.has(prop.id), visitedAny: !out.property_id && visitedIds.size > 0,
       saidVisited: history.some((h: any) => h.direction === "inbound" && SAID_VISITED.test(String(h.transcript || h.body || ""))),
-      handoffOpen: !!conv.human_handoff_required, hardHandoff: HARD_HANDOFF.test(String(out.handoff_reason || "")) });
+      handoffOpen: !!conv.human_handoff_required, hardHandoff: HARD_HANDOFF.test(String(out.handoff_reason || "")),
+      gone: goneRows, available: props, route: String(conv.route_key || ""), typeLabel: typeAr });
     let askedOnce = false;
     texts = texts.filter((t) => { const q = t.length < 90 && /(تزور|تزورون|تزورين)\s*؟/.test(t); if (!q) return true; if (askedOnce) return false; askedOnce = true; return true; });
     // keep the question even when there are two ads
