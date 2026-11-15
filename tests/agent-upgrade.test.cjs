@@ -412,7 +412,7 @@ test('5: memory and seriousness are saved on live runs only, and an empty note n
 
 test('5 + R45: any meeting request is a silent «اجتماع:» handoff with whatever day and hour the client said, one alert and one task',()=>{
  const block=agent.slice(at('const MEETING_PLACE'),at('    // the agent may only touch properties that are really available')).replace(': Record<string, string>','');
- const run=(o,conv={})=>new Function('out','conv','client','dayM','short',block+'\nreturn out;')(o,conv,{name:'أبو سالم'},'2026-11-10',short);
+ const run=(o,conv={})=>new Function('out','conv','client','dayM','short','history','THEIR_OFFICE',block+'\nreturn out;')(o,conv,{name:'أبو سالم'},'2026-11-10',short,[],/x^/);
  let o=run({action:'book_meeting',meeting:{place:'office',date:'2026-11-12',time:'9:30'},handoff_reason:'اجتماع: يبي جدول الدفع في مدينة السلطان هيثم',intent:'x',reply_messages:['تمام وصلت']});
  assert.equal(o.action,'book_meeting');
  assert.equal(o.meeting.time,'09:30');
@@ -598,7 +598,7 @@ test('R31: المستحقين stopped, askers join the waiting list',()=>{
 test('R33: each project meeting is at its developer (Aida at Dar Global by the Opera House), never Mawaleh (12 Nov)',()=>{
  const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
  const block=agent.slice(at('const MEETING_PLACE'),at('    // the agent may only touch properties that are really available')).replace(': Record<string, string>','');
- const run=(o,conv={})=>new Function('out','conv','client','dayM','short',block+'\nreturn out;')(o,conv,{name:'أبو سالم'},'2026-11-10',short);
+ const run=(o,conv={})=>new Function('out','conv','client','dayM','short','history','THEIR_OFFICE',block+'\nreturn out;')(o,conv,{name:'أبو سالم'},'2026-11-10',short,[],/x^/);
  let o=run({action:'book_meeting',meeting:{place:'dar_global',date:'2026-11-12',time:'10:00'},handoff_reason:'اجتماع: عايدة',intent:'x',reply_messages:['تمام وصلت']});
  assert.equal(o.handoff_reason,'اجتماع: أبو سالم مكتب دار جلوبال عند دار الأوبرا 2026-11-12 10:00 عايدة (ينتظر تأكيدك)');
  o=run({action:'book_meeting',meeting:{place:'project_tbd',date:'2026-11-12',time:'10:00'},handoff_reason:'اجتماع: اليزن',intent:'x',reply_messages:['تمام وصلت']});
