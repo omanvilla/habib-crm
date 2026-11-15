@@ -72,7 +72,7 @@ test('R77 / R78: no hour of ours when the owner arranges the visit; the reason i
  let r=decide(['الساعة 4 العصر مناسب ان شاء الله','تواصل مع صاحب العقار على الرقم المرسل ونسق معه الزيارة'],[IN('ان شاء الله بكره، الساعة كم مناسب لك؟')],{action:'send_owner_number'});
  assert.deepEqual(r.texts,[D.OWNER_TIME_LINE]);assert.equal(r.out.guard_owner_time,true);
  r=decide(['تشرفنا محمد','تواصل مع صاحب العقار مباشرة ونسق معه الزيارة'],[IN('بكره')],{action:'send_owner_number'});assert.equal(r.texts.length,2);assert.equal(r.out.guard_owner_time,undefined);
- r=decide(['البيت مفتوح تقدر تشوفه بكره الساعة 4 العصر'],[IN('بكره')],{action:'send_location'});assert.equal(r.texts.length,1,'our own visits keep their hour');
+ r=decide(['البيت مفتوح تقدر تشوفه بكره الساعة 4 العصر'],[IN('بكره')],{action:'send_location'});assert.deepEqual(r.texts,['البيت مفتوح تقدر تشوفه بكره','كم الساعة تقريباً ؟'],'R84 (Ahmed 16 Nov): the hour of our own visits is asked, not named');
  const ask='اذا ما عليك امر ممكن تذكر لي الاسباب ليش ما ناسبتك الفيلا ؟';
  r=decide([ask],[OUT('كيف شفت الفيلا ؟'),IN('ما ناسبتني')]);assert.deepEqual(r.texts,[ask]);
  r=decide(['تمام',ask],[OUT(ask),IN('خلاص ما ناسبتني')]);assert.deepEqual(r.texts,['تمام']);assert.equal(r.out.guard_reason_once,true);
