@@ -6,7 +6,9 @@ Updated 2026-11-14. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
-## 15 November 2026 — the chat send question, R73, the silent handoff, and a dry run on 124 chats — **NOT published** (branch `claude/send-guard-review-20261115`, waits for Ahmed's «ادمج»)
+## 15 November 2026 — the chat send question, R73 to R79, the silent handoff, and a dry run on 226 chats — **published** (`e9d9f9e`)
+
+- **Published 15 Nov about 15:50 after Ahmed's «نعم، ادمج».** `main` = `e9d9f9e` (fast-forward). whatsapp-reply-agent v77, whatsapp-visit-followup-auto v36 and the dry-run copy v45 are pinned to it; `brain.ts` did not change, so no prompt sync. Checked live: an inline call to the live agent on Hasna's message answers «مشتري جاد:» (R79) and writes nothing; GitHub Pages serves `crm-v18-request-integrity-patch.js?v=20261115-send1`; no live draft failed. Note `5b7d5e71` is closed (`done`). The lines below that say «not published» or «waits» describe the state before the merge.
 
 - **Ahmed asked four things in one session.** (1) Why the chat said «اختر الطلب الذي يخص هذا الرد أولاً حتى نرسل من رقم المكتب الصحيح» for a client who writes on the right branch. (2) His open note `5b7d5e71` (chat `20318506`): the follow-up asked a question the client had just answered. (3) Why a card with no reply waited on «ردود تنتظر موافقتك» (chat `4850e47a`). (4) «راجع كل محادثات العقل… وحط قواعد صارمه» and «جرب على اكثر من 100 محادثه وليس 20».
 - **(1) Chat send.** The client had two open requests, both on Muscat (the second is a duplicate the AI opened on 9 Nov; not merged, history is kept). `crm-v18-request-integrity-patch.js` stopped every send when a client had more than one request of any status and none was chosen. Now it asks only when the open requests do not all belong to the branch of the open chat; closed requests do not count. The server (`whatsapp-send`) was already safe: without a request it sends from the chat's own number. `?v=20261115-send1`. Test `tests/send-request-choice.test.cjs`.
