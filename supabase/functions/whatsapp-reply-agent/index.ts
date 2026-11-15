@@ -168,8 +168,9 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   if (c.prop?.visit_method === "owner_lives" && out.action === "none" && ["buyer", "tenant"].includes(out.category) && out.viewing_date
     && /بكر|باكر|السبت|ال[اأ]حد|ال[اإ]ثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمع[ةه]/.test(String(c.burstSaid || ""))
     && !c.history.some((h: any) => h.direction === "outbound" && /تواصل\s*مع\s*(صاحب\s*العقار|المالك)/.test(String(h.body || "")))) {
-    const NAME_Q = /^\s*و?اسمك\s*الكريم\s*؟\s*$/, TIME_Q = /خبرني\s*ب?(ال)?(يوم|وقت)|(ال)?يوم\s*و(ال)?وقت|متى\s*يناسبك|[اأ]ي\s*(يوم|وقت|ساع[ةه])/;
-    if (!texts.some((t) => !NAME_Q.test(t) && !(t.length <= 200 && (TIME_Q.test(t) || VISIT_Q.test(t))))) {
+    // (third run of the same message: «ممكن بكره بس». Any short reply goes, unless it says the day does not work.)
+    const NAME_Q = /^\s*و?اسمك\s*الكريم\s*؟\s*$/, DAY_NO = /قبل\s*ب?يوم|يوم\s*ثاني|صعب|ما\s*(ينفع|يصير|يمدي)/;
+    if (!texts.some((t) => t.length > 200 || DAY_NO.test(t))) {
       out.action = "send_owner_number"; texts = [OWNER_TIME_LINE, ...texts.filter((t) => NAME_Q.test(t))]; out.guard_owner_number_day = true;
     }
   }
@@ -242,10 +243,14 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   // agent wrote «تقدر تشوفه بكره الساعة 4 العصر» (the 16:00 a visit with no hour is saved at). The hour is his to say: ours is
   // taken out of the line and he is asked «كم الساعة تقريباً ؟». The location still goes (R11 is about the day or the hour).
   // Not for a visit arranged with the owner (R77) and not for the location sent to judge the area (R74).
-  if (["send_location", "send_lockbox"].includes(out.action) && !out.location_for_area && c.prop?.visit_method !== "owner_lives"
-    && !HOUR_SAID.test(inbound.slice(-3).map(body).join(" \n ")) && texts.some((t) => t.length <= 200 && OUR_HOUR.test(t))) {
+  // The same line with no location going out (it went earlier in the chat): only a line about seeing the open house, and only
+  // when the client never said an hour anywhere in the chat.
+  const sendingPlace = ["send_location", "send_lockbox"].includes(out.action);
+  const ourHour = (t: string) => t.length <= 200 && OUR_HOUR.test(t) && (sendingPlace || (/مفتوح|تشوف/.test(t) && !/[اأ]مس|كانت/.test(t)));
+  if ((sendingPlace || (out.action === "none" && ["buyer", "tenant"].includes(out.category))) && !out.location_for_area && c.prop?.visit_method !== "owner_lives"
+    && !HOUR_SAID.test((sendingPlace ? inbound.slice(-3) : inbound).map(body).join(" \n ")) && texts.some(ourHour)) {
     const PART = "(العصر|الصبح|الصباح|المغرب|المسا|المساء|الظهر|الليل)";
-    texts = texts.map((t) => (t.length <= 200 && OUR_HOUR.test(t)
+    texts = texts.map((t) => (ourHour(t)
       ? t.replace(new RegExp(`\\s*(على\\s*)?الساع[ةه]\\s*[0-9٠-٩]+(\\s*ونص)?(\\s*${PART})?`, "g"), "").replace(new RegExp(`\\s*[0-9٠-٩]+(\\s*ونص)?\\s*${PART}`, "g"), "").replace(/\s+/g, " ").trim() : t)).filter(Boolean);
     if (!texts.some((t) => ASK_HOUR.test(t))) texts.push("كم الساعة تقريباً ؟");
     out.viewing_time = null; out.guard_hour_asked = true;
