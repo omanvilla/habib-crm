@@ -3,7 +3,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8').replace(/\r\n/g,'\n');
 const pickA=(start,end)=>{const a=agent.indexOf(start);assert(a>=0,'missing: '+start);const b=agent.indexOf(end,a);assert(b>a,'no end: '+start);return agent.slice(a,b+end.length);};
-const dsrc=['const COMMISSION_ASK','const COMMISSION_BUYER_LINES','const COMMISSION_OWNER_LINES','const ASK_LINK','const areaKey','const BOOKING_ASK','const BOOKING_NOT','const ASK_HOUR','const NEEDS_AHMED','const VIDEO_PROMISE','const FAREWELL','const FIXED_PRICE_LINE','const IG_CODE','const UNKNOWN_Q','const LOCATION_ASK','const AREA_REASON','const locationForArea','const LOCATION_HELD','const AREA_LINES','const INSIDE_VIDEO_ASK','const LAYOUT_ASK','const LAYOUT_LINES','const OUR_HOUR','const OWNER_TIME_LINE','const DEPOSIT_SAID','const REASON_Q','const VISIT_Q']
+const dsrc=['const SILENT_TYPES','const COMMISSION_ASK','const COMMISSION_BUYER_LINES','const COMMISSION_OWNER_LINES','const ASK_LINK','const areaKey','const BOOKING_ASK','const BOOKING_NOT','const ASK_HOUR','const NEEDS_AHMED','const VIDEO_PROMISE','const FAREWELL','const FIXED_PRICE_LINE','const IG_CODE','const UNKNOWN_Q','const LOCATION_ASK','const AREA_REASON','const locationForArea','const LOCATION_HELD','const AREA_LINES','const INSIDE_VIDEO_ASK','const LAYOUT_ASK','const LAYOUT_LINES','const OUR_HOUR','const OWNER_TIME_LINE','const DEPOSIT_SAID','const REASON_Q','const VISIT_Q']
  .map((s)=>pickA(s,'\n')).join('')+pickA('function ownerDecisions','\n}\n');
 const D=new Function(dsrc.replace(/(\w+): (?:string|any|unknown)(?:\[\])?(?=[,)])/g,'$1')+';return {ownerDecisions,COMMISSION_BUYER_LINES,COMMISSION_OWNER_LINES,locationForArea,INSIDE_VIDEO_ASK,LAYOUT_ASK,LAYOUT_LINES,AREA_LINES,OWNER_TIME_LINE,DEPOSIT_SAID};')();
 const IN=(b)=>({direction:'inbound',body:b}),OUT=(b)=>({direction:'outbound',body:b});
@@ -138,4 +138,14 @@ test('eighth dry-run batch: no claim about what the ordinary reel shows; the nam
  r=decide(['مدينة السلطان هيثم بالسيب من المطور الأهلي صبور والتملك حر لأي جنسية واسمك الكريم ؟'],[IN('هل عندك عقار')],{category:'investor'});
  assert.deepEqual(r.texts,['مدينة السلطان هيثم بالسيب من المطور الأهلي صبور والتملك حر لأي جنسية']);
  r=decide(['هذا الفيديو من الداخل',INSIDE],[OUT(MAIN),IN('ابي فيديو من الداخل')]);assert.equal(r.texts[0],'هذا الفيديو من الداخل','the marked reel keeps its line');
+});
+test('ninth dry-run batch: an ad that mentions a commission is not a question; deleted messages get no answer',()=>{
+ let r=decide(['اسمك الكريم ؟'],[IN('*متبقي فيلا فقط للحجز المسبق* الحضيّب السوادي بركاء السعر 75 الف شامل العمولة للتواصل')],{category:'seller'});
+ assert.equal(r.out.guard_commission,undefined);
+ for(const s of ['العموله المكتب على من؟؟؟','كم عمولتكم','من يدفع العمولة','ومقدار عمولتك ؟'])
+  {r=decide(['x'],[IN(s)],{category:'seller'});assert.equal(r.out.guard_commission,true,s);}
+ const del=(t)=>({direction:'inbound',body:null,message_type:t});
+ r=decide(['اسمك الكريم ؟','ارسل الملكية اذا ما عليك امر'],[del('revoke'),del('revoke'),del('reaction')]);assert.deepEqual(r.texts,[]);assert.equal(r.out.guard_nothing_said,true);
+ r=decide(['مرحبتين تفضل'],[del('revoke'),{direction:'inbound',body:'مرحبا',message_type:'text'}]);assert.equal(r.texts.length,1);
+ r=decide(['ان شاء الله برسلك الموقع','متى يناسبك تزور ؟ واسمك الكريم ؟'],[IN('ممكن الموقع')]);assert.deepEqual(r.texts,['ان شاء الله برسلك الموقع','متى يناسبك تزور ؟']);
 });

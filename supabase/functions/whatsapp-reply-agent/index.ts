@@ -42,7 +42,9 @@ const AREA_LINES = ["تفضل هذا الموقع", "شوف اذا المنطق�
 const INSIDE_VIDEO_ASK = /(فيديو|فديو|مقطع|تصوير)[^\n]{0,60}داخل|داخل[^\n]{0,30}(فيديو|فديو|مقطع)/;
 const VIDEO_PROMISE = /(برسل|بنرسل|ارسل|نرسل)(ك|كم)?\s*(لك|لكم)?\s*(ال)?(فيديو|فديو)/;
 const FAREWELL = /الله\s*(يوفقك|يسعدك|يحفظك)|بالتوفيق/;
-const COMMISSION_ASK = /عمول[ةه]|عمولت|كومشن|commission/i;
+// a question about the commission, not an advertisement that mentions one (ninth dry-run batch: a broker's ad got the owner's lines)
+const COMMISSION_ASK = /(كم|على\s*من|من\s*(اللي\s*)?يدفع|مين|نسب[ةه]|مقدار)[^\n]{0,30}عمول|عمول[^\n]{0,30}(كم|على\s*من|على\s*مين|من\s*(اللي\s*)?يدفع|[؟?])/;
+const SILENT_TYPES = ["revoke", "reaction", "system", "edit", "unsupported"];
 const COMMISSION_BUYER_LINES = ["ما عليك عمولة للمكتب", "العمولة على الطرف المفوض وهو المالك"];
 const COMMISSION_OWNER_LINES = ["بخصوص العمولة نحتاج اول شي نزور الموقع بعد ما ترسل لنا المستندات ونطلع على العقار", "وبعدها نتفق ان شاء الله على كل شي"];
 const ASK_LINK = /رابط\s*(ال)?(فيديو|اعلان|إعلان)|صور[ةه]\s*منه|[اأ]ي\s*(فيلا|بيت|عقار|شق[ةه]|[اأ]رض)\s*(بالضبط|تقصد|قصدك)/;
@@ -66,6 +68,13 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   const inbound = c.history.filter((h: any) => h.direction === "inbound");
   const recentIn = inbound.slice(-6).map(body).join(" ");
   const sentBefore = (s: string) => c.history.some((h: any) => h.direction === "outbound" && String(h.body || "").includes(s));
+  // ninth dry-run batch: the client's last messages are only deleted ones, reactions or edits (no word of his): nothing is
+  // answered («اسمك الكريم ؟ ارسل الملكية…» went to three deleted messages)
+  let lastOut = -1; c.history.forEach((h: any, i: number) => { if (h.direction === "outbound") lastOut = i; });
+  const tail = c.history.slice(lastOut + 1).filter((h: any) => h.direction === "inbound");
+  if (out.action === "none" && texts.length && tail.length && tail.every((h: any) => SILENT_TYPES.includes(String(h.message_type || "")))) {
+    out.guard_nothing_said = true; return [];
+  }
   // R78 (Ahmed: «يسأل مره اخيره عن السبب واذا ما جاوب ما يضغط عليه»): why the property did not suit is asked once in a chat
   if (texts.some((t) => REASON_Q.test(t)) && c.history.some((h: any) => h.direction === "outbound" && REASON_Q.test(String(h.body || "")))) {
     texts = texts.filter((t) => !REASON_Q.test(t)); out.guard_reason_once = true;
@@ -119,7 +128,7 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   // for the reel marked «من الداخل» (above); elsewhere the claim is taken out of the line.
   if (!out.guard_inside_video) texts = texts.map((t) => (t.length <= 200 && /فيديو|فديو/.test(t) ? t.replace(/\s*من\s*(ال)?(داخل|خارج|برع)(\s*و\s*(من\s*)?(ال)?(داخل|خارج|برع))?/g, "") : t));
   // «… والتملك حر لأي جنسية واسمك الكريم ؟»: the name question is not glued to the end of a sentence about something else
-  texts = texts.map((t) => (t.length > 60 && !/^https?:/.test(t) ? t.replace(/\s*و\s*اسمك\s*الكريم\s*؟/g, "").trim() : t)).filter(Boolean);
+  texts = texts.map((t) => ((t.length > 60 || VISIT_Q.test(t)) && !/^https?:/.test(t) ? t.replace(/\s*و\s*اسمك\s*الكريم\s*؟/g, "").trim() : t)).filter(Boolean);
   // the fixed project line is said once («… ⏎ العرض الحالي … والاسعار تختلف حسب الوحدة والمساحة والمرحلة»)
   if (texts.includes(FIXED_PRICE_LINE)) texts = texts.map((t) => (t === FIXED_PRICE_LINE ? t : t.replace(new RegExp(`\\s*و?${FIXED_PRICE_LINE}`), "").trim())).filter(Boolean);
   // R76 (Ahmed: «اللي يسأل عن التقسيم يفضل يزور الموقع لان الخرائط تختلف عن الواقع»; changes R41 for this question only)
