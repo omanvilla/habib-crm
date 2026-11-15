@@ -35,7 +35,7 @@ const YOUTUBE_LINES = ["الافضل تشوف العقار على الطبيعة
 const UNKNOWN_Q = /^\s*سؤال ما عندي جوابه\s*:/;
 // R74 to R79: Ahmed's six decisions of 15 Nov 2026 after the dry run on 124 chats, held by code (brain.ts has no room left)
 const LOCATION_ASK = /موقع|لوكيشن|لوكشن|location|الخريط/i;
-const AREA_REASON = /(اعرف|أعرف|اشوف|أشوف|نشوف|اتاكد|أتأكد|اتأكد)[^\n]{0,40}(يناسب|مناسب|قريب|بعيد)|(يناسب|مناسب)(ني|نا|ه)?\s*(لي\s*)?(او|أو|ولا|والا)\s*(لا|ما)|مو\s*لازم\s*(لل)?زيار|الزيار[ةه]\s*تعتمد|تعتمد\s*(على|ع)\s*(ال)?موقع/;
+const AREA_REASON = /(اعرف|أعرف|اشوف|أشوف|نشوف|اتاكد|أتأكد|اتأكد)[^\n]{0,40}(يناسب(ني|نا)|مناسب\s*(لي|لنا)|قريب|بعيد)|(يناسب|مناسب)(ني|نا|ه)?\s*(لي\s*)?(او|أو|ولا|والا)\s*(لا|ما)|مو\s*لازم\s*(لل)?زيار|الزيار[ةه]\s*تعتمد|تعتمد\s*(على|ع)\s*(ال)?موقع/;
 const locationForArea = (said: string) => LOCATION_ASK.test(said) && AREA_REASON.test(said);
 const LOCATION_HELD = /(موقع|لوكيشن)[^\n]{0,40}(قبل|مع|وقت|بعد)\s*(تحديد|الزيار|موعد)|برسلك\s*الموقع|نرسله/;
 const AREA_LINES = ["تفضل هذا الموقع", "شوف اذا المنطقة تناسبك وخبرني متى يناسبك تزور"];
@@ -99,6 +99,12 @@ function ownerDecisions(out: any, lines: string[], c: any) {
       texts = [...texts.filter((t) => !VISIT_Q.test(t)).slice(0, 1), String(c.prop.video), ...q.slice(0, 1)];
       out.guard_photo_video = true;
     }
+  }
+  // fourth dry-run batch: «الفيلا اللي سألت عنها ما متوفره حالياً» + «متى يناسبك تزور ؟» with nothing offered in its place.
+  // The visit question goes only with a property to visit.
+  if (texts.some((t) => t.length <= 200 && /ما\s*متوفر[هة]?\s*حالي|انباع/.test(t)) && !texts.some((t) => /عندنا|متوفر[هة]?\s*(الحين|حالياً\s*و)|المتبقي/.test(t.replace(/ما\s*متوفر[هة]?\s*حالي\S*/g, ""))) && out.action === "none") {
+    const kept = texts.filter((t) => !VISIT_Q.test(t));
+    if (kept.length !== texts.length) { texts = kept; out.guard_visit_nothing = true; }
   }
   // the fixed project line is said once («… ⏎ العرض الحالي … والاسعار تختلف حسب الوحدة والمساحة والمرحلة»)
   if (texts.includes(FIXED_PRICE_LINE)) texts = texts.map((t) => (t === FIXED_PRICE_LINE ? t : t.replace(new RegExp(`\\s*و?${FIXED_PRICE_LINE}`), "").trim())).filter(Boolean);

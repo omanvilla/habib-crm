@@ -50,6 +50,10 @@ test('the video is never promised: the reel goes now, or the promise is taken ou
  r=decide(['ما عندنا صور للفيلا حالياً','متى يناسبك تزور ؟'],[IN('ممكن صور الفيلا')],{},{prop});
  assert.deepEqual(r.texts,['ما عندنا صور للفيلا حالياً',MAIN,'متى يناسبك تزور ؟']);assert.equal(r.out.guard_photo_video,true);
  r=decide(['ما عندنا صور للفيلا حالياً','متى يناسبك تزور ؟'],[OUT(MAIN),IN('ممكن صور الفيلا')],{},{prop});assert.equal(r.texts.length,2);
+ // no visit question when the property is not available and nothing is offered in its place
+ r=decide(['تشرفنا هلال','الفيلا اللي سألت عنها في الشخاخيط ما متوفره حالياً','متى يناسبك تزور ؟'],[IN('هلال عزان')]);assert.deepEqual(r.texts,['تشرفنا هلال','الفيلا اللي سألت عنها في الشخاخيط ما متوفره حالياً']);
+ r=decide(['الفيلا اللي سألت عنها ما متوفره حالياً بس عندنا فيلا في الصومحان بـ 69 الف','متى يناسبك تزور ؟'],[IN('متوفره ؟')]);assert.equal(r.texts.length,2);
+ assert.equal(D.locationForArea('ممكن الموقع اشوف اهل إذا يناسبهم اليوم عصر راح افيدك'),false,'the family\'s time is not the area');
  // the fixed project line once
  const F='الاسعار تختلف حسب الوحدة والمساحة والمرحلة';
  r=decide([F,'العرض الحالي بدون دفعة مقدمة وساري لين 30 نوفمبر 2026 والاسعار تختلف حسب الوحدة والمساحة والمرحلة','يناسبك ؟'],[IN('ابا تفاصيل عنهم كلهم')],{category:'investor'});
