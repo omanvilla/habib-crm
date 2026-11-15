@@ -163,10 +163,17 @@ test('tenth dry-run batch: a named area with one available property gets its det
  assert.deepEqual(r.texts,[AD,'متى يناسبك تزور ؟']);assert.equal(r.out.property_id,'H1');
  r=decide(['اسمك الكريم ؟','ارسل تفاصيل البيت كاملة والمستندات والسعر اللي في بالك اذا ما عليك امر'],[IN('عارضين بيت للبيع ف الحيل الجنوبية')],{category:'seller'},c);
  assert.deepEqual(r.texts,[AD,'متى يناسبك تزور ؟']);assert.equal(r.out.category,'buyer');
+});
+test('tenth batch B: left alone',()=>{
+ const AD='للبيع | منزل + شقتين مؤجرة مسقط الحيل الجنوبية السعر: 130,000 ريال مساحة الأرض: 692 م² مساحة البناء: 430 م²';
+ const c={prop:null,route:'muscat',available:[{id:'H1',area:'الحيل الجنوبية',branch_key:'muscat',marketing:AD},{id:'R1',area:'الرميس',branch_key:'barka',marketing:'x'},{id:'R2',area:'الرميس',branch_key:'barka',marketing:'y'}]};
+ let r;
  // left alone: his own property, two properties in the area, the ad already sent
  r=decide(['ارسل تفاصيل البيت'],[IN('عندي بيت عارضه للبيع في الحيل الجنوبية')],{category:'seller'},c);assert.equal(r.out.guard_named_available,undefined);
  r=decide(['تقصد تفاصيل الفيلا اللي في الرميس ؟'],[IN('فيلا الرميس')],{},{...c,route:'barka'});assert.equal(r.out.guard_named_available,undefined);
  r=decide(['قصدك البيت المعروض في الحيل الجنوبية ؟'],[OUT(AD),IN('البيت المعروض في الحيل الجنوبية')],{},c);assert.equal(r.out.guard_named_available,undefined);
+});
+test('tenth batch C: the client office wording',()=>{
  for(const s of ['متي بتيجي معنا المكتب','تشرفونا في مكتبنا بالخوير','متى تزورنا'])assert(D.THEIR_OFFICE.test(s),s);
  for(const s of ['ابي امر المكتب','متى اجي المكتب','اجتماع اونلاين'])assert(!D.THEIR_OFFICE.test(s),s);
  assert(agent.includes('theirOffice && mt?.place !== "online" ? "مكتب العميل" : MEETING_PLACE[mt?.place] || ""'));
