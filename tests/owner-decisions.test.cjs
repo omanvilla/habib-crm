@@ -158,7 +158,7 @@ test('tenth dry-run batch: a named area with one available property gets its det
  const AD='للبيع | منزل + شقتين مؤجرة مسقط الحيل الجنوبية السعر: 130,000 ريال مساحة الأرض: 692 م² مساحة البناء: 430 م²';
  const c={prop:null,route:'muscat',available:[{id:'H1',area:'الحيل الجنوبية',branch_key:'muscat',marketing:AD},{id:'R1',area:'الرميس',branch_key:'barka',marketing:'x'},{id:'R2',area:'الرميس',branch_key:'barka',marketing:'y'}]};
  let r=decide(['قصدك البيت المعروض في الحيل الجنوبية ؟','اسمك الكريم ؟'],[IN('صباح الخير شفت بيت معروض فحيل الجنوبية الله يخليكم عطوني تفاصيل')],{},c);
- assert.equal(r.out.guard_named_available,undefined,'«فحيل» is not the area as written: left to the model');
+ assert.deepEqual(r.texts,[AD,'متى يناسبك تزور ؟'],'«فحيل الجنوبية» is read as the area too');
  r=decide(['قصدك البيت المعروض في الحيل الجنوبية ؟','اسمك الكريم ؟'],[IN('شفت بيت معروض في الحيل الجنوبية عطوني تفاصيل')],{},c);
  assert.deepEqual(r.texts,[AD,'متى يناسبك تزور ؟']);assert.equal(r.out.property_id,'H1');
  r=decide(['اسمك الكريم ؟','ارسل تفاصيل البيت كاملة والمستندات والسعر اللي في بالك اذا ما عليك امر'],[IN('عارضين بيت للبيع ف الحيل الجنوبية')],{category:'seller'},c);
