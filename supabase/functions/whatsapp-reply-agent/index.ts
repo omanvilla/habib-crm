@@ -115,6 +115,11 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     const kept = texts.filter((t) => !VISIT_Q.test(t));
     if (kept.length !== texts.length) { texts = kept; out.guard_visit_nothing = true; }
   }
+  // R75, eighth dry-run batch: «هذا فيديو الفيلا من الداخل والخارج» with the ordinary reel. What a video shows is said only
+  // for the reel marked «من الداخل» (above); elsewhere the claim is taken out of the line.
+  if (!out.guard_inside_video) texts = texts.map((t) => (t.length <= 200 && /فيديو|فديو/.test(t) ? t.replace(/\s*من\s*(ال)?(داخل|خارج|برع)(\s*و\s*(من\s*)?(ال)?(داخل|خارج|برع))?/g, "") : t));
+  // «… والتملك حر لأي جنسية واسمك الكريم ؟»: the name question is not glued to the end of a sentence about something else
+  texts = texts.map((t) => (t.length > 60 && !/^https?:/.test(t) ? t.replace(/\s*و\s*اسمك\s*الكريم\s*؟/g, "").trim() : t)).filter(Boolean);
   // the fixed project line is said once («… ⏎ العرض الحالي … والاسعار تختلف حسب الوحدة والمساحة والمرحلة»)
   if (texts.includes(FIXED_PRICE_LINE)) texts = texts.map((t) => (t === FIXED_PRICE_LINE ? t : t.replace(new RegExp(`\\s*و?${FIXED_PRICE_LINE}`), "").trim())).filter(Boolean);
   // R76 (Ahmed: «اللي يسأل عن التقسيم يفضل يزور الموقع لان الخرائط تختلف عن الواقع»; changes R41 for this question only)

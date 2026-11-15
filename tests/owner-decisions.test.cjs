@@ -132,3 +132,10 @@ test('a unit with no reel uses the reel of its sibling unit',()=>{
  assert(agent.includes('const sib = (props as any[]).find((q: any) => q.video && q.id !== p.id && q.owner_id && q.owner_id === p.owner_id && q.area === p.area && q.type === p.type'));
  assert(agent.indexOf('if (sib) p.video = sib.video;')>agent.indexOf('p.video = vids[0]?.permalink || null;'));
 });
+test('eighth dry-run batch: no claim about what the ordinary reel shows; the name question is not glued to another sentence',()=>{
+ let r=decide(['هذا فيديو الفيلا من الداخل والخارج https://www.instagram.com/reel/TESTMAIN/','اسمك الكريم ؟'],[IN('ممكن تراويني الصور')],{},{prop:{id:'TEST_PROP',video:MAIN,videoInside:null}});
+ assert.equal(r.texts[0],'هذا فيديو الفيلا https://www.instagram.com/reel/TESTMAIN/');assert.equal(r.texts[1],'اسمك الكريم ؟');
+ r=decide(['مدينة السلطان هيثم بالسيب من المطور الأهلي صبور والتملك حر لأي جنسية واسمك الكريم ؟'],[IN('هل عندك عقار')],{category:'investor'});
+ assert.deepEqual(r.texts,['مدينة السلطان هيثم بالسيب من المطور الأهلي صبور والتملك حر لأي جنسية']);
+ r=decide(['هذا الفيديو من الداخل',INSIDE],[OUT(MAIN),IN('ابي فيديو من الداخل')]);assert.equal(r.texts[0],'هذا الفيديو من الداخل','the marked reel keeps its line');
+});
