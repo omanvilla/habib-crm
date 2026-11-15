@@ -1477,6 +1477,7 @@ async function visitResults(companyId: string, out: Record<string, number>) {
   }
 }
 
+const HOUR_UNKNOWN = /الساعة ما تحددت/;
 // "اليوم الساعة 4 العصر"; with no saved time only the day
 function visitWhen(date: string, time: string | null) {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
@@ -1495,7 +1496,9 @@ async function confirmBeforeVisit(companyId: string, numbers: string[], out: Rec
   for (const v of (c.data || []).filter((x: any) => x.company_id === companyId).slice(0, AFTER_VISIT_PER_RUN)) {
     const to = digits(v.phone);
     if (!to || numbers.includes(to)) continue;
-    const body = `السلام عليكم نأكد موعد زيارة العقار في ${v.area || "الموقع"} ${visitWhen(v.viewing_date, v.viewing_time)} ؟`;
+    // R84 (Ahmed 16 Nov 2026): a visit saved with no hour said (its note carries «الساعة ما تحددت») is confirmed by its day only
+    const vn = await db.from("viewings").select("notes").eq("id", v.viewing_id).maybeSingle();
+    const body = `السلام عليكم نأكد موعد زيارة العقار في ${v.area || "الموقع"} ${visitWhen(v.viewing_date, HOUR_UNKNOWN.test(String(vn.data?.notes || "")) ? null : v.viewing_time)} ؟`;
     const now = new Date().toISOString();
     try {
       const wamid = await metaSend(await routeTokens(companyId, v.route_key), digits(v.meta_phone_number_id), to, { type: "text", text: { preview_url: false, body } });

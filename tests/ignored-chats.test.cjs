@@ -12,7 +12,7 @@ test('R40: the agent marks jobs, broker sign-ups, foreign brokers, banks and ser
   assert(agent.includes('"unclear", "ignore"]'));
   assert(agent.includes('ignore_kind: { type: ["string", "null"], enum: ["job", "broker_signup", "foreign_broker", "bank", "service", "contest", null] }'));
   // R61 (note of 14 Nov 2026): a question about a contest is ignored too, held by code, and kept in the list as «other»
-  assert(agent.includes('contest: "يسأل عن مسابقة"')&&agent.includes('ignore_kind: out.ignore_kind === "contest" ? "other" : out.ignore_kind,'));
+  assert(agent.includes('contest: "يسأل عن مسابقة"')&&agent.includes('ignore_kind: ["contest", "stranger"].includes(out.ignore_kind) ? "other" : out.ignore_kind,'));
   assert(agent.includes('out.category = "ignore"; out.ignore_kind = "contest"; out.guard_contest = true;'));
   const CONTEST=new RegExp(agent.match(/const CONTEST_ASK = \/(.+)\/;/)[1]);
   assert(CONTEST.test('متى تبدأ المسابقة؟')&&CONTEST.test('في مسابقه عندكم')&&!CONTEST.test('ابي فيلا في الرميس'));

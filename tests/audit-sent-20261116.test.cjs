@@ -9,7 +9,7 @@ const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','
 const fu=fs.readFileSync('supabase/functions/whatsapp-visit-followup-auto/index.ts','utf8').replace(/\r\n/g,'\n');
 const pickFrom=(src)=>(start,end)=>{const a=src.indexOf(start);assert(a>=0,'missing: '+start);const b=src.indexOf(end,a);assert(b>a,'no end: '+start);return src.slice(a,b+end.length);};
 const pickA=pickFrom(agent),pick=pickFrom(fu);
-const dsrc=['const THEIR_OFFICE','const ASK_CONFIRM','const WE_SHOW','const MY_OWN','const SILENT_TYPES','const COMMISSION_ASK','const COMMISSION_BUYER_LINES','const COMMISSION_OWNER_LINES','const ASK_LINK','const areaKey','const BOOKING_ASK','const BOOKING_NOT','const ASK_HOUR','const NEEDS_AHMED','const VIDEO_PROMISE','const FAREWELL','const FIXED_PRICE_LINE','const IG_CODE','const UNKNOWN_Q','const LOCATION_ASK','const AREA_REASON','const OUTSIDE_LOOK','const locationForArea','const LOCATION_HELD','const AREA_LINES','const INSIDE_VIDEO_ASK','const LAYOUT_ASK','const LAYOUT_LINES','const OUR_HOUR','const OWNER_TIME_LINE','const DEPOSIT_SAID','const REASON_Q','const VISIT_Q','const R66_DETAILS_ASK','const R66_GENERIC']
+const dsrc=['const THEIR_OFFICE','const ASK_CONFIRM','const WE_SHOW','const MY_OWN','const SILENT_TYPES','const COMMISSION_ASK','const COMMISSION_BUYER_LINES','const COMMISSION_OWNER_LINES','const ASK_LINK','const areaKey','const BOOKING_ASK','const BOOKING_NOT','const ASK_HOUR','const NEEDS_AHMED','const VIDEO_PROMISE','const FAREWELL','const FIXED_PRICE_LINE','const IG_CODE','const UNKNOWN_Q','const LOCATION_ASK','const AREA_REASON','const OUTSIDE_LOOK','const locationForArea','const LOCATION_HELD','const AREA_LINES','const INSIDE_VIDEO_ASK','const LAYOUT_ASK','const LAYOUT_LINES','const OUR_HOUR','const HOUR_SAID','const OWNER_TIME_LINE','const DEPOSIT_SAID','const REASON_Q','const VISIT_Q','const R66_DETAILS_ASK','const R66_GENERIC']
  .map((s)=>pickA(s,'\n')).join('')+pickA('function nearBarka','\n}\n')+pickA('function ownerDecisions','\n}\n');
 const D=new Function(dsrc.replace(/(\w+): (?:string|any|unknown|number)(?:\[\])?(?=[,)])/g,'$1')+';return {ownerDecisions};')();
 const IN=(b,type)=>({direction:'inbound',body:b,message_type:type||'text'}),OUT=(b)=>({direction:'outbound',body:b});
@@ -143,4 +143,41 @@ test('the name question is not glued inside the visit question; R66 leaves no «
  r=decide(['لا الصومحان في بركاء مو مسقط'],[IN('65')],{},c);assert.deepEqual(r.texts,['لا الصومحان في بركاء مو مسقط'],'a plain answer about the place is not an offer');
  // chat 90f3bf27 (Barka number, a Muscat house): «شكرا» came back as «العفو» with the branch line after it
  assert(agent.includes("} else if (!bKeep && said.length && !hasLine && !bSent && !offer && !(said.length === 1 && /^(العفو|You're welcome)\\s*$/.test(said[0]))) {"));
+});
+
+// ---- Ahmed's answers of 16 Nov 2026: R84 (the hour is asked, not named), R85 / SQL106 (confirmation one hour before), R86 (strangers) ----
+test('R84: a day with no hour gets «كم الساعة تقريباً ؟», not an hour of ours; the location still goes',()=>{
+ const prop={id:'P1',visit_method:'open'},loc={action:'send_location',viewing_time:'16:00'};
+ // chats 765fe454 and 42ce77f2 (14 Nov): «بكره» / «بكره الاحد» got «… بكره الساعة 4 العصر»
+ let r=decide(['البيت مفتوح تقدرون تشوفونه بكره الساعة 4 العصر'],[OUT('متى يناسبكم تزورون ؟'),IN('بكره')],loc,{prop});
+ assert.deepEqual(r.texts,['البيت مفتوح تقدرون تشوفونه بكره','كم الساعة تقريباً ؟']);assert.equal(r.out.action,'send_location');assert.equal(r.out.viewing_time,null);assert.equal(r.out.guard_hour_asked,true);
+ r=decide(['تمام بكره 4 العصر البيت مفتوح تقدر تشوفه'],[IN('بكره الاحد')],loc,{prop});assert.deepEqual(r.texts,['تمام بكره البيت مفتوح تقدر تشوفه','كم الساعة تقريباً ؟']);
+ // he said the hour or the part of the day himself, he is on his way, the owner arranges it, the location is for the area: untouched
+ const keep=['البيت مفتوح تقدر تشوفه بكره الساعة 4 العصر'];
+ for(const said of ['بكرة العصر','بكره الساعة 5','باكر العصر، أن شاء الله على ساعة ٥ مناسب','بروح الحين','انا في الطريق']){r=decide(keep,[IN(said)],loc,{prop});assert.deepEqual(r.texts,keep,said);}
+ r=decide(keep,[IN('بكره')],{...loc,location_for_area:true},{prop});assert.deepEqual(r.texts,keep);
+ r=decide(keep,[IN('بكره')],loc,{prop:{id:'H1',visit_method:'owner_lives'}});assert.deepEqual(r.texts,keep);
+ r=decide(keep,[IN('بكره')],{action:'none'},{prop});assert.deepEqual(r.texts,keep);
+ // the visit saved with no hour is marked, and its confirmation names the day only
+ assert(agent.includes('${time ? "" : " (الساعة ما تحددت)"}'));
+ assert(fu.includes('visitWhen(v.viewing_date, HOUR_UNKNOWN.test(String(vn.data?.notes || "")) ? null : v.viewing_time)'));
+});
+test('R85 / SQL106: the visit confirmation goes one hour before the visit, guarded and mirrored',()=>{
+ const f=fs.readFileSync('db/changes/106-visit-confirm-hour-before.forward.sql','utf8').replace(/\r\n/g,'\n'),rb=fs.readFileSync('db/changes/106-visit-confirm-hour-before.rollback.sql','utf8').replace(/\r\n/g,'\n');
+ assert.equal(f,fs.readFileSync('supabase/migrations/20261116090000_visit_confirm_hour_before_20261116.sql','utf8').replace(/\r\n/g,'\n'));
+ assert(f.includes("<> '2a4692f084801b40138100555fa08aba'"),'refuses a body that changed since SQL70');
+ assert(f.includes("now() >= v.visit_at - interval '60 minutes' AND now() < v.visit_at - interval '15 minutes'"));
+ assert(f.includes("v.created_at < now() - interval '60 minutes' AND li.last_in < now() - interval '30 minutes'"));
+ assert(f.includes("OR (li.last_in + interval '24 hours' < v.visit_at - interval '60 minutes'"),'the window closing earlier keeps the SQL70 moment');
+ assert(f.includes("li.last_in + interval '24 hours' > now() + interval '10 minutes'")&&f.includes("m.raw_payload->>'source' = 'visit_confirm'")&&f.includes("m.actor_type = 'human'"));
+ assert(f.includes('REVOKE ALL ON FUNCTION public.crm_visit_confirm_candidates() FROM PUBLIC, anon, authenticated;'));
+ assert(!rb.includes("interval '60 minutes'")&&rb.includes("li.last_in + interval '24 hours' < v.visit_at + interval '90 minutes'"));
+});
+test('R86: a stranger opener from a number outside Oman is ignored for good',()=>{
+ const S=new Function(pickA('const STRANGER_OPENER','\n')+';return STRANGER_OPENER;')();
+ for(const s of ['سيدي الرئيس، هل هذا أنت حقاً؟','هل هذا أنت؟','هل سبق لك أن زرت الصين؟ أعتقد أنني رأيتك من قبل في غوانزو.','Is this really you?'])assert(S.test(s),s);
+ for(const s of ['هل هذا البيت متوفر ؟','هل هذا انت اللي عارض البيت في الرميس','السلام عليكم','من معاي تكرما؟'])assert(!S.test(s),s);
+ assert(agent.includes('if (STRANGER_OPENER.test(asked) && !/^968/.test(to) && !out.property_id && !history.some((h: any) => h.matched_property_id) && ["general", "unclear", "ignore"].includes(out.category)'));
+ assert(agent.includes('out.category = "ignore"; out.ignore_kind = "stranger"; out.guard_stranger = true;'));
+ assert(agent.includes('stranger: "رسالة مشبوهة من رقم غريب"'));
 });

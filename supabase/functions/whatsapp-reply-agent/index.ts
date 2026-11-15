@@ -18,6 +18,7 @@ const DEBOUNCE_MS = Number(Deno.env.get("REPLY_DEBOUNCE_MS") || 35000); // wait 
 const HARD_HANDOFF = /^\s*(تفاوض|مشتري جاد|دراسة سعر|سؤال ما عندي جوابه|اجتماع)\s*:/;
 // R61: a question about a contest (we run none). R62: a question about a YouTube channel or video of the property.
 const CONTEST_ASK = /مسابق[ةه]|المسابقات/;
+const STRANGER_OPENER = /سيدي\s*الرئيس|هل\s*هذا\s*[اأ]نت(\s*حق[اًا]*)?\s*[؟?]|هل\s*سبق\s*لك\s*[اأ]ن\s*زرت|is\s*this\s*(really\s*)?you\s*[?؟]/i;
 // R66 (Ahmed 14 Nov 2026, changes R22): a Barka property is offered on the Muscat number only to a client who said he looks
 // in المعبيلة or near Barka (the word بركاء, or the area of a listed Barka property, in his own messages)
 const R66_BARKA_OFFER = /(تقبل|تقبلين|يناسبك|تناسبك)\s*(في\s*)?بركاء/;
@@ -65,7 +66,8 @@ const IG_CODE = /instagram\.com\/(?:reels?|p|tv)\/([A-Za-z0-9_-]+)/i;
 const LAYOUT_ASK = /تقسيم|توزيع\s*(ال)?غرف|مساح(ة|ه|ات)\s*(كل\s*)?(ال)?غرف|مخطط|خرا[ئي]ط/;
 const LAYOUT_LINES = ["بخصوص التقسيم الافضل تزور الموقع وتشوفه على الطبيعة لان الخرائط تختلف عن الواقع", "متى يناسبك تزور ؟"];
 const OUR_HOUR = /الساع[ةه]\s*[0-9٠-٩]|[0-9٠-٩]\s*(العصر|الصبح|الصباح|المغرب|المسا|المساء|الظهر|الليل)/;
-const OWNER_TIME_LINE = "تواصل مع صاحب العقار مباشرة ونسق معه وقت الزيارة";
+const HOUR_SAID = /(الساع[ةه]|على)\s*[0-9٠-٩]|[0-9٠-٩]\s*(ونص|العصر|الصبح|الصباح|المغرب|المسا|الظهر|الليل|م(\s|$)|ص(\s|$)|pm|am)|(^|\n)\s*[0-9٠-٩]{1,2}([:.][0-9٠-٩]{2})?\s*(\n|$)|العصر|الصبح|الصباح|الفجر|الضحى|المغرب|العشا|الظهر|الليل|المسا|الحين|ال[اآ]ن|ذلحين|هالحين|(^|\s)تو(\s|$)|طالع|في\s*الطريق|جاي/;
+const OWNER_TIME_LINE ="تواصل مع صاحب العقار مباشرة ونسق معه وقت الزيارة";
 const REASON_Q = /الاسباب|ليش\s*ما\s*ناسب/;
 const VISIT_Q = /(تزور|تزورون|تزورين)\s*؟/;
 // c: { history, burstSaid, prop, visitedProp, visitedAny, saidVisited, handoffOpen, hardHandoff }. Returns the reply lines; marks out.
@@ -236,6 +238,18 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     out.handoff_reason = `مشتري جاد: ${String(out.handoff_reason || out.intent || "زار ويسأل عن العربون والحجز").replace(/^[^:\n]{0,30}:\s*/, "")}`;
     out.guard_deposit_serious = true; delete out.soft_handoff_no_reply;
   }
+  // R84 (Ahmed 16 Nov 2026: «أفضل يسأله يعني الساعة كم بدل لا هو يحدد»): the client named a day and no hour («بكره»), and the
+  // agent wrote «تقدر تشوفه بكره الساعة 4 العصر» (the 16:00 a visit with no hour is saved at). The hour is his to say: ours is
+  // taken out of the line and he is asked «كم الساعة تقريباً ؟». The location still goes (R11 is about the day or the hour).
+  // Not for a visit arranged with the owner (R77) and not for the location sent to judge the area (R74).
+  if (["send_location", "send_lockbox"].includes(out.action) && !out.location_for_area && c.prop?.visit_method !== "owner_lives"
+    && !HOUR_SAID.test(inbound.slice(-3).map(body).join(" \n ")) && texts.some((t) => t.length <= 200 && OUR_HOUR.test(t))) {
+    const PART = "(العصر|الصبح|الصباح|المغرب|المسا|المساء|الظهر|الليل)";
+    texts = texts.map((t) => (t.length <= 200 && OUR_HOUR.test(t)
+      ? t.replace(new RegExp(`\\s*(على\\s*)?الساع[ةه]\\s*[0-9٠-٩]+(\\s*ونص)?(\\s*${PART})?`, "g"), "").replace(new RegExp(`\\s*[0-9٠-٩]+(\\s*ونص)?\\s*${PART}`, "g"), "").replace(/\s+/g, " ").trim() : t)).filter(Boolean);
+    if (!texts.some((t) => ASK_HOUR.test(t))) texts.push("كم الساعة تقريباً ؟");
+    out.viewing_time = null; out.guard_hour_asked = true;
+  }
   // Audit of the replies really sent (11 to 15 Nov 2026), three wordings the code itself produced or let through:
   // R44: «حي عاصم» becomes «الرميس», which left «الرميس ولا الرميس ؟» and «… قريب الشارع العام او الرميس» in two sent replies.
   // The second mention in the same line is taken out.
@@ -265,7 +279,7 @@ function ownerDecisions(out: any, lines: string[], c: any) {
 }
 const DEPOSIT_SAID = /عربون|مقدم\s*حجز|(ا|أ|ن)حجز\s*(ال)?(فيلا|فل[ةه]|بيت|شق[ةه]|منزل|عقار|[اأ]رض)|لحجز\s*(ال)?(فيلا|فل[ةه]|بيت|شق[ةه]|منزل|عقار|[اأ]رض)/;
 // R40 (Ahmed 12 Nov): people the office never answers; the chat leaves «العقل موقوف عندهم» for the ignored list
-const IGNORE_LABEL: Record<string, string> = { job: "طالب وظيفة", broker_signup: "يبي يتسجل وسيط عندنا", foreign_broker: "وسيط أو شركة من برا عمان", bank: "موظف بنك يعرض تعاون", service: "يعرض خدمة", contest: "يسأل عن مسابقة" };
+const IGNORE_LABEL: Record<string, string> = { job: "طالب وظيفة", broker_signup: "يبي يتسجل وسيط عندنا", foreign_broker: "وسيط أو شركة من برا عمان", bank: "موظف بنك يعرض تعاون", service: "يعرض خدمة", contest: "يسأل عن مسابقة", stranger: "رسالة مشبوهة من رقم غريب" };
 // Ahmed's strict rule (6 Nov): never promise the customer a reply ("بشوف وارد عليك"). Silence is better than a promise nobody keeps.
 // R12 (9 Nov, in code 10 Nov): first-person call promises too ("بتصل عليك", "بكلمك"). The one allowed sentence is R12's third-person
 // "اول ما يفضى يتصل فيك", which none of these match; "اول ما يتوفر بتواصل معك" is not a call promise and stays.
@@ -732,7 +746,8 @@ async function watchVisit(msg: any, dry = false) {
   const only = (openR.data || []).length === 1 ? openR.data![0] : null;
   const open = (openR.data || []).find((v: any) => v.property_id === out.property_id) || (!props.some((x: any) => x.id === out.property_id) ? only : null);
   const prop = props.find((x: any) => x.id === (out.property_id || open?.property_id)) || props.find((x: any) => x.id === open?.property_id);
-  const addNote = () => [open?.notes, short(out.note, 500)].filter(Boolean).join("\n").slice(0, 1000);
+  // R84: a visit saved with no hour said carries «(الساعة ما تحددت)» in its note until the client says one (the confirmation then names no hour)
+  const addNote = () => [time ? String(open?.notes || "").replace(/ ?\(الساعة ما تحددت\)/g, "") : open?.notes, short(out.note, 500)].filter(Boolean).join("\n").slice(0, 1000);
   const date = /^\d{4}-\d{2}-\d{2}$/.test(out.date || "") ? out.date : (open?.viewing_date || null);
   // "الحين" / "طالع" / "بروح الحين" (8 Nov, Ahmed): the visit is now, so it is recorded at the current Muscat time, not a guessed 16:00
   const immediate = /(الحين|الان|الآن|طالع|وصلت|وصلنا)/.test(lastIn) && !/بكر|باكر|العصر|الصبح|المغرب|الظهر/.test(lastIn);
@@ -752,7 +767,7 @@ async function watchVisit(msg: any, dry = false) {
         const cv = await db.from("whatsapp_conversations").select("route_key").eq("id", msg.conversation_id).maybeSingle();
         if (["muscat", "barka"].includes(String(cv.data?.route_key)) && cv.data!.route_key !== prop.branch_key) return { ...out, applied: false, why: "other_branch" };
       }
-      w = await db.from("viewings").insert({ company_id: msg.company_id, client_id: msg.client_id, property_id: prop.id, viewing_date: date, viewing_time: time || "16:00", duration_minutes: 30, status: "scheduled", notes: short(out.note, 1000), ...provenance });
+      w = await db.from("viewings").insert({ company_id: msg.company_id, client_id: msg.client_id, property_id: prop.id, viewing_date: date, viewing_time: time || "16:00", duration_minutes: 30, status: "scheduled", notes: short(`${out.note || ""}${time ? "" : " (الساعة ما تحددت)"}`, 1000), ...provenance });
     }
   } else if (out.event === "done") {
     if (open) w = await db.from("viewings").update({ status: "done" }).eq("id", open.id);
@@ -1334,6 +1349,11 @@ Deno.serve(async (req) => {
       const asked = history.slice(from).filter((h: any) => h.direction === "inbound").map((h: any) => String(h.transcript || h.body || "")).join(" ");
       if (CONTEST_ASK.test(asked) && !out.property_id && !history.some((h: any) => h.matched_property_id) && ["general", "unclear", "ignore"].includes(out.category) && !IGNORE_LABEL[String(out.ignore_kind || "")]) {
         out.category = "ignore"; out.ignore_kind = "contest"; out.guard_contest = true;
+      }
+      // R86 (Ahmed 16 Nov 2026: «ايوه تجاهل هذيله … رقمه من الصين … مشكوك في امره»): a stranger's opener from a number outside
+      // Oman («سيدي الرئيس، هل هذا أنت حقاً؟», «هل سبق لك أن زرت الصين؟») with no property in the chat is ignored for good, like R40.
+      if (STRANGER_OPENER.test(asked) && !/^968/.test(to) && !out.property_id && !history.some((h: any) => h.matched_property_id) && ["general", "unclear", "ignore"].includes(out.category) && !IGNORE_LABEL[String(out.ignore_kind || "")]) {
+        out.category = "ignore"; out.ignore_kind = "stranger"; out.guard_stranger = true;
       }
     }
     const ignored = out.category === "ignore" && !!IGNORE_LABEL[String(out.ignore_kind || "")];
@@ -2052,7 +2072,7 @@ Deno.serve(async (req) => {
         if (!open.data) {
           const vd = /^\d{4}-\d{2}-\d{2}$/.test(out.viewing_date || "") && out.viewing_date >= todayM ? out.viewing_date : todayM;
           const vt = /^([01]\d|2[0-3]):[0-5]\d$/.test(out.viewing_time || "") ? out.viewing_time : (vd === todayM ? nowM : "16:00");
-          const w = await db.from("viewings").insert({ company_id: msg.company_id, client_id: client.id, property_id: prop.id, viewing_date: vd, viewing_time: vt, duration_minutes: 30, status: "scheduled", notes: "انرسل للعميل اللوكيشن، الوقت تقريبي", created_via: "whatsapp_ai", source_whatsapp_message_id: msg.id });
+          const w = await db.from("viewings").insert({ company_id: msg.company_id, client_id: client.id, property_id: prop.id, viewing_date: vd, viewing_time: vt, duration_minutes: 30, status: "scheduled", notes: `انرسل للعميل اللوكيشن، الوقت تقريبي${/^([01]d|2[0-3]):[0-5]d$/.test(out.viewing_time || "") || vd === todayM ? "" : " (الساعة ما تحددت)"}`, created_via: "whatsapp_ai", source_whatsapp_message_id: msg.id });
           if (w.error) console.error("[reply-agent] location visit", w.error.message);
         }
       } catch (e) { console.error("[reply-agent] location visit", String((e as any)?.message || e)); }
@@ -2062,7 +2082,7 @@ Deno.serve(async (req) => {
     // R45: a meeting request is a hard handoff «اجتماع: …» (Ahmed is alerted and answers; the agent stays out of the chat)
     const meetingBooked = out.action === "book_meeting" && /^\s*اجتماع\s*:/.test(String(out.handoff_reason || ""));
     if (out.action === "handoff" || meetingBooked) Object.assign(convPatch, { human_handoff_required: true, handoff_reason: short(out.handoff_reason || out.intent, 500), handoff_updated_at: now });
-    if (ignored) Object.assign(convPatch, { agent_muted: true, agent_muted_reason: `متجاهل: ${IGNORE_LABEL[out.ignore_kind]}`, ignored_at: now, ignore_kind: out.ignore_kind === "contest" ? "other" : out.ignore_kind,
+    if (ignored) Object.assign(convPatch, { agent_muted: true, agent_muted_reason: `متجاهل: ${IGNORE_LABEL[out.ignore_kind]}`, ignored_at: now, ignore_kind: ["contest", "stranger"].includes(out.ignore_kind) ? "other" : out.ignore_kind,
       human_handoff_required: false, handoff_reason: null, handoff_updated_at: now });
     // a handoff that only said "which property ?" is closed by the agent itself once it answers normally (8 Nov, Ahmed: it must not wait for him)
     if (out.action !== "handoff" && !meetingBooked && sentIds.length && out.reply_messages.length && conv.human_handoff_required && /مو واضح|ما عرفنا|أي عقار|اي عقار|العقار.*(واضح|محدد)/.test(String(conv.handoff_reason || "")) && !HARD_HANDOFF.test(String(conv.handoff_reason || ""))) {
