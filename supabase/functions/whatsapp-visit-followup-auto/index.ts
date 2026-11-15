@@ -115,6 +115,7 @@ const REVIEW_RULES = `أنت تراجع متابعة عميل لمكتب عقا�
 - ما رد على تأكيد الموعد (R68، أحمد 14 نوفمبر، يعدّل R39): عميل أرسلنا له "نأكد موعد زيارة ..." وما رد بعدها بأي شي وما في زيارة مسجلة تمت: ما زار وما هو مهتم. skip، لا "كيف شفت" ولا "تحب نحدد موعد ثاني".
 - لغة العميل (R69، أحمد 14 نوفمبر): إذا مكتوب تحت "العميل يكتب بالإنجليزي" اكتب text كله بالإنجليزي البسيط، يبدأ بـ "Hello" وبدون "السلام عليكم"، سطر أو سطرين وسؤال واحد ينتهي بـ "?". reason و subject يبقون بالعربي.
 - جاوب سؤاله (R70، ملاحظة 14 نوفمبر): عميل سأل سؤال وما وصله جواب، وجوابه مكتوب قدامك (تفاصيل العقار، أو "معرفة المشاريع" إذا موجودة تحت: أرقامها بس، R18): text يجاوب سؤاله أول وبعدها سؤال واحد يكمل. المتابعة ما تسأل "اسمك الكريم ؟" أبداً.
+- اقرأ المحادثة قبل السؤال (R73، ملاحظة أحمد 15 نوفمبر): لا تسأل العميل سؤال هو جاوبه، ولا سؤال المكتب سأله إياه وجاوب عليه. اللي قال إنه ما زار (انشغل، أجّل، ما قدر) ما ينسأل "قدرت تزور ؟" ولا "كيف شفت": سؤاله "تحب نحدد لك موعد ثاني ؟" و auto_ok=false.
 
 وضع العميل (R39، أحمد 12 نوفمبر): قبل القرار اقرأ "ملف العميل من النظام" (زياراته وصفقاته وطلباته) مع المحادثة كاملة، وحدد في stage وين وصل. كل عميل ياخذ رسالة على حسب وضعه، مو نفس الرسالة للكل، واللي جاوب على سؤال ما ينعاد عليه:
 - asked_no_visit: سأل وما زار. (القواعد فوق: "متى يناسبك تزور ؟" إذا ما سألناه، وسكوته بعد التفاصيل جواب.)
@@ -294,6 +295,8 @@ async function review(item: any, companyId: string, available: string, fixed: st
   out.client_said = clientLines;
   // R64: the office's own lines, for notesGuard in judge() (removed there, never stored)
   out.office_said = saidBy(chat, "المكتب");
+  // R73: the chat as the review read it and today's date, for answeredGuard in judge() (removed there, never stored)
+  out.chat_read = chat; out.today_read = today;
   return out;
 }
 
@@ -485,6 +488,63 @@ function eveningGuard(out: any, o: any) {
   }
   return out;
 }
+// R73 (Ahmed's note of 15 Nov 2026 on chat 20318506: «العقل يقرا المحادثه قبل لان راح سأل نفس السؤال … خليها قاعده ثابته»):
+// a follow-up never asks a question the client already answered. Ahmed asked «كيف شفت فيلا بركاء الرميس …» by hand, the client
+// answered that he got busy and would try these days, and 12 minutes later the automatic «هل قدرت تزور فيلا بركاء الرميس ؟»
+// went out (the after-visit prompt told the review to ask it when the client had not visited). Held by code on the chat the
+// review read, after it answers:
+// (1) the client himself said, on or after the day of the visit, that he did not go (busy, postponed, could not): no visit
+//     question is asked. The row becomes R39's question for a missed visit («تحب نحدد لك موعد ثاني ؟»), waits for the office
+//     and never goes by itself, also on the after-visit path (R47).
+// (2) the office already asked the visit question (the opinion or «قدرت تزور») on or after that day and the client answered:
+//     the same question is not asked again (skip).
+// (3) any follow-up whose question the office asked in the last three days and the client answered waits for the office.
+// Never over an instruction given on that follow-up, never on a message prepared for everyone.
+const R73_DID_VISIT_Q = /(قدرت(ي)?|هل)\s*(تزور(ين|ي)?|زرت(ي)?|تشوف(ين|ي)?|شفت(ي)?|تعاين(ين|ي)?|عاينت(ي)?|تمر(ين|ي)?|مريت(ي)?)|(^|\s)زرت(ي)?\s*(ال)?(عقار|بيت|فيلا|شقه|ارض|مكان|موقع)/;
+const R73_OPINION_Q = /كيف\s*شفت|انطباعك|كيف\s*لقيت|عجبتك\s*ولا/;
+const R73_NOT_VISITED = /(^|\s)(ما|لم|مو|مب)\s*(قدرت|زرت|رحت|سرت|مريت|جيت|تمكنت|لحقت|امداني|مداني|(حصلت|لقيت|صار|حصل)\s*(لي\s*)?(وقت|نصيب|فرصه))|ماقدرت|ا?نشغل(ت|نا)|(^|\s)(مشغول|منشغل)(ين|ه)?(\s|$)|تاجل|اجلنا|اجلت|(^|\s)(لسا|لسه|بعدني|للحين|لين\s*الحين)\s*ما\s*(زرت|رحت|مريت|شفت|جيت)|(^|\s)(ب|ا|بن|ن)?حاول\s*(هذه|هذي|ه)?\s*(ال)?(ايام|يومين|اسبوع)/;
+const R73_GREET = /^\s*(السلام عليكم(\s*ورحمه الله(\s*وبركاته)?)?|هلا|مرحبا|اهلا)\s*/;
+function chatTurns(chat: unknown) {
+  const turns: { day: string; who: string; text: string }[] = [];
+  for (const l of String(chat ?? "").split("\n")) {
+    const m = l.match(/^\[(\d{4}-\d{2}-\d{2})\] (العميل|المكتب): (.*)$/);
+    if (m) turns.push({ day: m[1], who: m[2], text: m[3] }); else if (turns.length) turns[turns.length - 1].text += `\n${l}`;
+  }
+  return turns;
+}
+const questionsOf = (t: unknown) => normAr(t).split(/[؟?]/).slice(0, -1).map((q) => String(q.split("\n").pop() || "").replace(R73_GREET, "").replace(/[^ء-يA-Za-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim()).filter((q) => q.length >= 8);
+const sameQuestion = (a: string, b: string) => a === b || (a.length >= 12 && b.includes(a)) || (b.length >= 12 && a.includes(b));
+function repeatsAnswered(turns: any[], text: unknown, today: string) {
+  const mine = questionsOf(text);
+  if (!mine.length || !today) return false;
+  const from = new Date(Date.parse(`${today}T00:00:00Z`) - 3 * 86400000).toISOString().slice(0, 10);
+  return turns.some((x: any, i: number) => x.who === "المكتب" && x.day >= from && turns.slice(i + 1).some((n: any) => n.who === "العميل") && questionsOf(x.text).some((q) => mine.some((m) => sameQuestion(q, m))));
+}
+// o: { group, kind, chat, visitDay, visitDone, today, name }
+function answeredGuard(out: any, o: any) {
+  if (o.group || out.decision !== "followup" || !out.text) return out;
+  const turns = chatTurns(o.chat), t = normAr(out.text);
+  if (o.kind === "visit" && o.visitDay && (R73_OPINION_Q.test(t) || R73_DID_VISIT_Q.test(t))) {
+    const since = turns.filter((x) => x.day >= o.visitDay);
+    if (!o.visitDone && since.some((x) => x.who === "العميل" && R73_NOT_VISITED.test(normAr(x.text)))) {
+      const she = /(قدرتي|شفتي|تزورين|تشوفين)/.test(out.text), name = String(o.name || "").trim();
+      out.text = `السلام عليكم ${name ? `بخصوص ${name} ` : ""}${she ? "تحبين" : "تحب"} نحدد لك موعد ثاني ؟`;
+      out.auto_ok = false; out.stage = "booked_no_show"; out.guard = "guard_answered_not_visited";
+      out.reason = short(`(R73) قال بنفسه إنه ما زار، فما ينسأل عن الزيارة مرة ثانية: السؤال موعد ثاني وينتظر المكتب. ${out.reason || ""}`, 300);
+      return out;
+    }
+    if (since.some((x, i) => x.who === "المكتب" && (R73_OPINION_Q.test(normAr(x.text)) || R73_DID_VISIT_Q.test(normAr(x.text))) && since.slice(i + 1).some((n) => n.who === "العميل"))) {
+      out.reason = short(`(R73) انسأل عن الزيارة بعد موعدها وجاوب، ما ينعاد عليه نفس السؤال. ${out.reason || ""}`, 300);
+      out.decision = "skip"; out.text = null; out.auto_ok = false; out.offer_no = null; out.guard = "guard_question_answered";
+      return out;
+    }
+  }
+  if (repeatsAnswered(turns, out.text, String(o.today || ""))) {
+    out.auto_ok = false; out.guard = out.guard || "guard_repeated_question";
+    out.reason = short(`(R73) نفس السؤال انسأل له في آخر ثلاث أيام وجاوب عليه: راجعها قبل الإرسال. ${out.reason || ""}`, 300);
+  }
+  return out;
+}
 // R69 (Ahmed 14 Nov 2026): a client who writes to us in English only gets his follow-up in English. Meta's templates are Arabic,
 // so nothing goes to him by itself past the 24 hours (auto_ok=false): the office sends from the phone. If the text still came
 // out Arabic (the model, or a guard's Arabic wording) a fixed English line goes instead.
@@ -545,14 +605,15 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
     if ((pending.data || []).length) throw new Error("voice_note_pending");
   }
   let about = "متابعة طلب: هل لين الحين يبحث";
-  let name = "";
+  let name = "", visitDay = "", visitDone = false;
   if (kind === "visit") {
     const v = await db.from("viewings").select("viewing_date,status,properties(type,area)").eq("id", x.viewing_id).maybeSingle();
     const pr: any = (v.data as any)?.properties;
     name = propertyName(pr);
+    visitDay = String(v.data?.viewing_date || "").slice(0, 10); visitDone = v.data?.status === "done";
     about = `متابعة بعد زيارة ${name || "عقار"} يوم ${v.data?.viewing_date || "غير معروف"}. ${v.data?.status === "done" ? "الزيارة تمت" : "ما نعرف هل زار"}.`;
     if (name) about += ` اسم العقار للعميل: ${name}. إذا سؤالك عن الزيارة اسأله عن رأيه في ${name} بالاسم، مثل "كيف شفت ${name} وايش انطباعك عنها ؟" ("عنه" للبيت والمبنى والمحل). ممنوع سؤال عام مثل "قدرت تشوف العقار ؟" أو "شفت العقار ؟" أو "بخصوص الزيارة"، وممنوع "كيف لقيت" (تنفهم «لقيتوا مكانها ؟»، R29).`;
-    if (x.after_visit) about += " هذي متابعة بعد موعد الزيارة بساعة ونص، وهذا أهم وقت للبيع (R47، أحمد 14 نوفمبر: بدون استثناء). قرارك followup واسأله عن رأيه في العقار بالاسم، حتى لو أحمد أو الموظفة كتبوا له أو كلمنا بعد الزيارة في شي ثاني. skip بس في ثلاث حالات: قال رأيه في العقار بنفسه بعد الزيارة، أو العقار انباع أو انسحب (R44)، أو في تفاوض أو صفقة شغالة مع أحمد. وإذا المحادثة تقول صراحة إنه ما زار (أجّل أو ألغى) اسأله هل قدر يزور بدل سؤال الرأي.";
+    if (x.after_visit) about += " هذي متابعة بعد موعد الزيارة بساعة ونص، وهذا أهم وقت للبيع (R47، أحمد 14 نوفمبر: بدون استثناء). قرارك followup واسأله عن رأيه في العقار بالاسم، حتى لو أحمد أو الموظفة كتبوا له أو كلمنا بعد الزيارة في شي ثاني. skip بس في ثلاث حالات: قال رأيه في العقار بنفسه بعد الزيارة، أو العقار انباع أو انسحب (R44)، أو في تفاوض أو صفقة شغالة مع أحمد. اقرأ المحادثة أول (R73، أحمد 15 نوفمبر): إذا العميل قال بنفسه بعد الموعد إنه ما زار (انشغل، أجّل، ألغى، ما قدر) لا تسأله هل قدر يزور ولا عن رأيه، هو جاوب: اكتب \"تحب نحدد لك موعد ثاني ؟\" بالاسم و auto_ok=false. وإذا المكتب سأله عن رأيه أو عن الزيارة بعد الموعد وجاوب: skip، لا تعيد نفس السؤال.";
   }
   const fixed = kind === "visit" ? String(x.body || "") : (x.messages || []).join(" ");
   // R39: a message prepared for everyone who asked about one property is read against each client's chat and file too.
@@ -571,6 +632,8 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
   // R60 / R63 / R64: the notes guard (a message prepared for everyone is read for R60 too; never over an instruction)
   const officeSaid = String(out.office_said || "");
   delete out.office_said;
+  const chatRead = String(out.chat_read || ""), todayRead = String(out.today_read || "");
+  delete out.chat_read; delete out.today_read;
   if (!instruction) {
     const group = kind === "request" && ["property_sold", "new_listing"].includes(String(x.kind));
     let refusedAreas: string[] = [], visitedDone = false;
@@ -588,6 +651,8 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
     notesGuard(out, group, clientSaid, officeSaid, refusedAreas, offerLabel, kind === "request" && subj && subj.length <= 60 && !/[A-Za-z]/.test(subj) ? `بخصوص طلبك ${subj} لين الحين تبحث ؟` : fixed);
     // R66, R67, R68 and R18 in a follow-up (the notes of the evening of 14 Nov)
     eveningGuard(out, { group, route: String(x.route_key || ""), clientSaid, confirmUnanswered: !!out.confirm_unanswered, visitedDone, offerBranch, barkaAreas: l.barkaAreas, fallback, bookedClosed: !!out.booked_closed });
+    // R73: a question the client already answered is not asked again (the note of 15 Nov)
+    answeredGuard(out, { group, kind, chat: chatRead, visitDay, visitDone, today: todayRead, name });
   }
   const english = !!out.english;
   delete out.english; delete out.confirm_unanswered; delete out.booked_closed;
@@ -837,6 +902,8 @@ async function afterVisit(companyId: string, numbers: string[], out: Record<stri
       const k = `after_visit_${r}`; out[k] = (out[k] || 0) + 1;
       if (r !== "kept") continue;
       const f = await db.from("whatsapp_visit_followups").select("*").eq("id", id).single();
+      // R73: the client already answered about this visit, so the row waits for the office and nothing goes by itself
+      if (/\(R73\)/.test(String(f.data?.review_reason || ""))) { out.after_visit_held_answered = (out.after_visit_held_answered || 0) + 1; continue; }
       const s = await sendOne(f.data, numbers, true);
       const k2 = `after_visit_${s}`; out[k2] = (out[k2] || 0) + 1;
     } catch (e) { out.after_visit_failed = (out.after_visit_failed || 0) + 1; console.error("[followup-auto] after visit", String((e as any)?.message || e)); }

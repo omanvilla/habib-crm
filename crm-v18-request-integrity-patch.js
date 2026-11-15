@@ -77,12 +77,31 @@
   // Never let staff accidentally send from the physical WhatsApp thread when a client has
   // multiple active requests. They must select the exact request so the server can choose
   // the correct Muscat/Barka route.
+  // 15 Nov 2026 (Ahmed: «ليش يصير كذا مع انها تتواصل على الفرع الصحيح»): the choice is asked
+  // only when it can change the number. Closed requests do not count, and when every open
+  // request belongs to the branch of the chat that is open, the reply leaves from this chat's
+  // own number whichever request is meant, so the send goes through.
+  function requestRoute(r){
+    if(!r)return '';
+    if(r.route_key==='investment'||r.branch_key==='investment')return 'investment';
+    return String(r.branch_key||r.route_key||'');
+  }
+  function sendNeedsRequestChoice(requests,selectedId,conversation){
+    if(!Array.isArray(requests)||selectedId)return false;
+    var open=requests.filter(function(r){return r&&(r.status==='active'||r.status==='paused')});
+    if(open.length<2)return false;
+    var chatRoute=String(conversation&&conversation.route_key||'');
+    if(!chatRoute)return true;
+    return open.some(function(r){var route=requestRoute(r);return !!route&&route!==chatRoute});
+  }
+  window.crmSendNeedsRequestChoice=sendNeedsRequestChoice;
   var oldSend=window.sendWhatsAppInboxMessage;
   if(typeof oldSend==='function'){
     window.sendWhatsAppInboxMessage=async function(){
       try{
-        if(typeof waInboxRequests!=='undefined'&&Array.isArray(waInboxRequests)&&waInboxRequests.length>1&&
-           (typeof waInboxSelectedRequestId==='undefined'||!waInboxSelectedRequestId)){
+        if(typeof waInboxRequests!=='undefined'&&sendNeedsRequestChoice(waInboxRequests,
+             typeof waInboxSelectedRequestId==='undefined'?null:waInboxSelectedRequestId,
+             typeof waInboxActiveConversation==='undefined'?null:waInboxActiveConversation)){
           if(typeof showToast==='function')showToast('اختر الطلب الذي يخص هذا الرد أولاً حتى نرسل من رقم المكتب الصحيح','warning');
           return;
         }

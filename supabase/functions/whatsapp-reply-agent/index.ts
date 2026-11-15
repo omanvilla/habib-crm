@@ -1723,11 +1723,19 @@ Deno.serve(async (req) => {
       return json({ ok: true, inline: true, forced_dry: forcedDry, reply_messages: out.reply_messages, action: out.action, handoff_reason: out.handoff_reason ?? null, category: out.category,
         seriousness: out.seriousness ?? "unknown", seriousness_reason: out.seriousness_reason ?? "", meeting: out.meeting ?? null, mustahiq_waitlist: out.mustahiq_waitlist === true, crm_note: out.crm_note ?? "", send_preview, analysis });
     }
+    // 15 Nov 2026 (Ahmed, on the card of a visited client asking about a deposit: «ليش كاتب ينتظر موافقتي ومع انه خلاص متفقين
+    // على هذا النوع من المحادثات»): a handoff with no reply has nothing to approve. It never waits on «ردود تنتظر موافقتك»
+    // («المحرك يقترح عدم الرد»): the chat goes to Ahmed at once with its alert, like every silent handoff of R23. Before this a
+    // running deal (active_deal) with an empty reply sat on the approval screen and the chat was not marked for him.
+    const silentHandoff = !dry && !review && !out.reply_messages.length && out.action === "handoff";
     if (dry || holdForOwner || (rt.reply_agent_mode === "approval" && !autoSend)) {
-      // nothing to say (closing words, the other branch handles it): no empty card in the approval screen
-      const nothing = !dry && !out.reply_messages.length && out.action === "none";
-      await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages, status: nothing ? "skipped" : "pending", error: nothing ? "no_reply_needed" : null }).eq("id", draftId);
-      return json({ ok: true, status: "awaiting_approval" });
+      if (silentHandoff) analysis.silent_handoff_direct = true;
+      else {
+        // nothing to say (closing words, the other branch handles it): no empty card in the approval screen
+        const nothing = !dry && !out.reply_messages.length && out.action === "none";
+        await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages, status: nothing ? "skipped" : "pending", error: nothing ? "no_reply_needed" : null }).eq("id", draftId);
+        return json({ ok: true, status: "awaiting_approval" });
+      }
     }
 
     // the customer wrote again while this reply was being prepared: the newer message's run answers everything
