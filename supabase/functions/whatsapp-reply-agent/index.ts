@@ -78,7 +78,7 @@ function closingOnly(h: any) {
 // R49 by code (15 Nov 2026): the client's words are thanks and nothing else (greeting and filler words aside)
 const THANKS_WORD = /شكر|مشكور|تسلم|يسلمو|يعطيك\s*العافي|جزاك|جزيت|بارك\s*الله|يبارك|ما\s*قصرت|ما\s*تقصر|thank/i;
 const THANKS_FILLER = /(^|\s)(تم|طيب|اخي|اخوي|أخي|أخوي|الغالي|عزيزي|حبيبي|يا|والله|خير|خيرا|خيراً|كثير|كثيرا|جدا|لك|لكم|وعليكم السلام|ورحمة الله|ورحمه الله|وبركاته|استاذ|أستاذ)(?=\s|$)/g;
-const thanksOnly = (s: string) => !/[؟?]/.test(s) && THANKS_WORD.test(s) && !s.replace(CLOSING_WORDS, " ").replace(THANKS_FILLER, " ").replace(/[^ء-يA-Za-z]+/g, "");
+const thanksOnly = (s: string) => !/[؟?]/.test(s) && THANKS_WORD.test(s) && !s.replace(/[ً-ْ]/g, "").replace(CLOSING_WORDS, " ").replace(THANKS_FILLER, " ").replace(/[^ء-يA-Za-z]+/g, "");
 function closedAfterBooking(history: any[]) {
   const said = history.filter((h: any) => !["edit", "revoke", "system", "unsupported"].includes(String(h.message_type || "")));
   let lastOut = -1; said.forEach((h: any, i: number) => { if (h.direction === "outbound") lastOut = i; });
