@@ -75,6 +75,10 @@ function closingOnly(h: any) {
   if (/[؟?]/.test(s)) return false;
   return !s.replace(CLOSING_WORDS, " ").replace(/[^ء-يA-Za-z]+/g, "");
 }
+// R49 by code (15 Nov 2026): the client's words are thanks and nothing else (greeting and filler words aside)
+const THANKS_WORD = /شكر|مشكور|تسلم|يسلمو|يعطيك\s*العافي|جزاك|جزيت|بارك\s*الله|يبارك|ما\s*قصرت|ما\s*تقصر|thank/i;
+const THANKS_FILLER = /(^|\s)(تم|طيب|اخي|اخوي|أخي|أخوي|الغالي|عزيزي|حبيبي|يا|والله|خير|خيرا|خيراً|كثير|كثيرا|جدا|لك|لكم|وعليكم السلام|ورحمة الله|ورحمه الله|وبركاته|استاذ|أستاذ)(?=\s|$)/g;
+const thanksOnly = (s: string) => !/[؟?]/.test(s) && THANKS_WORD.test(s) && !s.replace(CLOSING_WORDS, " ").replace(THANKS_FILLER, " ").replace(/[^ء-يA-Za-z]+/g, "");
 function closedAfterBooking(history: any[]) {
   const said = history.filter((h: any) => !["edit", "revoke", "system", "unsupported"].includes(String(h.message_type || "")));
   let lastOut = -1; said.forEach((h: any, i: number) => { if (h.direction === "outbound") lastOut = i; });
@@ -1322,6 +1326,12 @@ Deno.serve(async (req) => {
         texts = texts.map((t, i) => (bad[i] ? fixedLine : t)).filter((t, i, a) => a.indexOf(t) === i);
         out.guard_project_figure = true;
       }
+      // nothing is glued to the fixed line («… وما عندي سعر محدد لغرفتين وصالة», dry run of 15 Nov: R41 never says «ما عندي»)
+      const glued = (t: string) => t.length <= 200 && t.includes(fixedLine) && t.trim() !== fixedLine && /ما\s*(عندي|عندنا|معي)/.test(t);
+      if (texts.some(glued)) {
+        texts = texts.map((t) => (glued(t) ? fixedLine : t)).filter((t, i, a) => a.indexOf(t) === i);
+        out.guard_fixed_line = true;
+      }
     }
     // ---- 14 Nov 2026, batch 3 ----
     // R12: a clear call request is never answered with words: no reply, and Ahmed gets «طلب اتصال:». The one exception stays with
@@ -1359,11 +1369,24 @@ Deno.serve(async (req) => {
     for (const h of history) if (h.direction === "outbound") lastOutBody = String(h.body || "");
     const FOUND_RE = /(^|\s)(حصل|حصلت|حصلنا|لقيت|لقينا|اشتريت|اشترينا|شريت|شرينا|وقفت\s*البحث)(\s|$|[.!،,])/;
     const NOT_FOUND_RE = /(^|\s)(ما|مب|مو|لسا|لسه|بعدني|بعدنا|لا)\s+(حصل|لقي)/;
-    if (/لين الحين تبحث/.test(lastOutBody) && FOUND_RE.test(burstSaid) && !NOT_FOUND_RE.test(burstSaid) && !/[؟?]/.test(burstSaid) && out.action !== "handoff") {
+    // 15 Nov 2026 (dry run on 124 chats: «وجدت خيار مناسب», «اخذت بيت في سيب», «حصلنا فيلا بقيمه أقل», «حاليا متوقف عن
+    // الشراء» came as answers to our other follow-ups, «انحجزت وحدة منها…» and «ما متوفره حالياً بس عندنا…», and the requests
+    // stayed open): the same R50 after any follow-up of ours, but only when the client names what he found (a property word)
+    // or says he stopped buying, so «حصلت رقمكم» after an offer is not read as the end of the search.
+    const FOLLOWUP_SAID = /لين الحين (تبحث|تدور)|خيارات ثاني[ةه]|انحجزت وحد[ةه]|ما متوفر[ةه] حالياً|[اأ]رسلك تفاصيل|عندنا (فيلا|بيت|شق[ةه]|[اأ]رض|منزل)/;
+    const FOUND_THING_RE = /(^|\s)((حصل(ت|نا)?|لقي(ت|نا)|اشتري(ت|نا)|شري(ت|نا)|وجد(ت|نا)|[اأ]خذ(ت|نا)|خذي(ت|نا))\s*(لي\s*|لنا\s*)?(خيار|بيت|فيلا|فل[ةه]|شق[ةه]|[اأ]رض|منزل|عقار)|(متوقف(ين)?|وقف(ت|نا))\s*(عن\s*)?(ال)?(شراء|بحث))/;
+    if (!NOT_FOUND_RE.test(burstSaid) && !/[؟?]/.test(burstSaid) && out.action !== "handoff"
+      && ((/لين الحين تبحث/.test(lastOutBody) && FOUND_RE.test(burstSaid)) || (FOLLOWUP_SAID.test(lastOutBody) && FOUND_THING_RE.test(burstSaid)))) {
       texts = []; out.action = "none"; out.search_stopped = true;
     }
     // R71 (Ahmed 14 Nov 2026): she booked or bought, we congratulated, and she only closes the talk: no reply, no draft, the search ends
     if (closedAfterBooking(history)) { texts = []; out.action = "none"; out.handoff_reason = null; out.search_stopped = true; out.guard_closed_after_booking = true; }
+    // R49 held by code (dry run of 15 Nov: «تم جزاك الله خير» got the photo lines a second time): the client's last words are
+    // thanks only, so the reply is «العفو» alone, with no question, offer or repeated line. Only over a plain reply: not when
+    // the model chose to say nothing, not with a handoff or a location going out, and R71 above already took its case.
+    if (texts.length && out.action === "none" && !out.search_stopped && thanksOnly(burstSaid) && !(texts.length === 1 && String(texts[0]).trim() === "العفو")) {
+      texts = ["العفو"]; out.guard_thanks_only = true;
+    }
     // the ad text goes once per conversation: if a long office message about this property already went out, drop it
     if (prop) {
       const priceKey = prop.price ? String(Math.round(Number(prop.price) / 1000)) : "";
@@ -1420,9 +1443,12 @@ Deno.serve(async (req) => {
       && !history.some((h: any) => h.direction === "outbound" && h.actor_type === "human")) {
       const place = outsideArea(out.owner_offer?.area, out.owner_offer?.wilayat);
       if (place) {
+        // 15 Nov (dry run): the apology already went out in this chat (the owner only reacted to it): it is not sent twice
+        const told = history.some((h: any) => h.direction === "outbound" && OUT_OF_AREA_SAID.test(String(h.body || "")));
         const salam = texts.find((t) => /^وعليكم السلام/.test(String(t).trim()));
-        texts = [...(salam ? [salam] : []), ...OUT_OF_AREA_LINES, ...(salam ? [] : ["الله يسعدك 🌷"])];
+        texts = told ? [] : [...(salam ? [salam] : []), ...OUT_OF_AREA_LINES, ...(salam ? [] : ["الله يسعدك 🌷"])];
         out.action = "none"; out.handoff_reason = null; out.guard_owner_area = place;
+        if (told) out.guard_owner_area_repeat = true;
       }
     }
     // the visit question is its own message, never glued to the end of an ad (7 Nov, Ahmed)

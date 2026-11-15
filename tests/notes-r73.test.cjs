@@ -76,3 +76,43 @@ test('a handoff with no reply never waits for approval: the chat goes to Ahmed a
  assert(block.includes('if (silentHandoff) analysis.silent_handoff_direct = true;\n      else {'),'only a draft with something to approve is kept pending');
  assert(block.includes('status: nothing ? "skipped" : "pending"'));
 });
+
+// ---- the dry run of 15 Nov 2026 on the last 124 chats: four mistakes held by code ----
+const pickA=(start,end)=>{const a=agent.indexOf(start);assert(a>=0,'missing: '+start);const b=agent.indexOf(end,a);assert(b>a,'no end: '+start);return agent.slice(a,b+end.length);};
+const {thanksOnly}=new Function([pickA('const CLOSING_WORDS','\n'),pickA('const THANKS_WORD','\n'),pickA('const THANKS_FILLER','\n'),pickA('const thanksOnly','\n')].join('\n').replace(/\(s: string\)/,'(s)')+';return {thanksOnly};')();
+const r50=agent.slice(agent.indexOf('    let lastOutBody = "";'),agent.indexOf('    // the ad text goes once per conversation'));
+const answer=(said,last,texts,o)=>{const out={action:'none',...(o||{})};
+ return new Function('out','texts','history','burstSaid','closedAfterBooking','thanksOnly',r50+'\nreturn {out,texts};')(out,texts||['تحب تشوف خيارات ثانية ؟'],[{direction:'outbound',body:last},{direction:'inbound',body:said}],said,()=>false,thanksOnly);};
+
+test('R50 after any follow-up of ours: a client who names what he found, or stopped buying, gets no reply and his search ends',()=>{
+ const booked='السلام عليكم بخصوص فيلا الصومحان الجنوبية اللي سألت عنها انحجزت وحدة منها والمتبقي الثانية والثالثة تحب تشوفها ؟';
+ const gone='السلام عليكم بخصوص فيلا الشخاخيط اللي سألتي عنها ما متوفره حالياً بس عندنا فيلا في الصومحان الجنوبية بـ 69 الف';
+ for(const [said,last] of [['شكرًا وجدت خيار مناسب أكثر لي',booked],['وعليكم السلام بس خلاص جزاك الله خير اخذت بيت في سيب',booked],['وعليكم السلام.. خلاص اخوي حصلنا فيلا بقيمه أقل اشكرك',gone],['لا عزيزي حاليا متوقف عن الشراء',booked]]){
+  const r=answer(said,last);assert.deepEqual(r.texts,[],said);assert.equal(r.out.search_stopped,true,said);}
+ // not the end of a search: no property named, a question, a denial, or not after a follow-up of ours
+ for(const [said,last] of [['حصلت رقمكم من صديق ارسل التفاصيل',gone],['حصلتوا شي ثاني ؟',gone],['لسا ما حصلت بيت',booked],['اخذت بيت في سيب','متى يناسبك تزور ؟'],['تمام ارسل التفاصيل',booked]]){
+  const r=answer(said,last);assert.equal(r.out.search_stopped,undefined,said);assert.equal(r.texts.length,1,said);}
+ assert.equal(answer('اخذت بيت في سيب',booked,['تمام'],{action:'handoff'}).out.search_stopped,undefined,'a handoff is left alone');
+});
+test('R49 by code: thanks alone get «العفو» alone',()=>{
+ for(const s of ['تم جزاك الله خير','شكرا','بارك الله فيك','وعليكم السلام ورحمة الله وبركاته أخي شكرا جزيلا لك','تسلم الغالي','يعطيك العافية اخوي','مشكور ما قصرت'])assert.equal(thanksOnly(s),true,s);
+ for(const s of ['شكرا كم السعر ؟','لا شكرًا ما اريد في بركاء','تمام','ان شاء الله','شكرا بس ابي الموقع','طيب','بكون شاكر لك وربي يبارك لك يا اخي الكريم في رزقك'])assert.equal(thanksOnly(s),false,s);
+ const last='المالك ساكن في البيت وما عندنا صور من الداخل عشان الخصوصية';
+ // the real case: the photo lines were written a second time
+ let r=answer('تم جزاك الله خير',last,['بحكم إن المالك ساكن في البيت ما صورنا البيت من الداخل عشان الخصوصية','بس نقدر نرتب لك زيارة وتشوف البيت من الداخل على راحتك']);
+ assert.deepEqual(r.texts,['العفو']);assert.equal(r.out.guard_thanks_only,true);
+ r=answer('شكرا',last,['العفو']);assert.equal(r.out.guard_thanks_only,undefined);
+ r=answer('شكرا',last,[]);assert.deepEqual(r.texts,[],'the model chose to say nothing');
+ r=answer('شكرا',last,['البيت مفتوح تقدر تشوفه'],{action:'send_location'});assert.equal(r.texts[0],'البيت مفتوح تقدر تشوفه','a location going out is left alone');
+ r=answer('شكرا كم السعر ؟',last,['السعر 59 الف']);assert.deepEqual(r.texts,['السعر 59 الف']);
+});
+test('R56 apology is not sent twice, and nothing is glued to the fixed project line',()=>{
+ assert(agent.includes('const told = history.some((h: any) => h.direction === "outbound" && OUT_OF_AREA_SAID.test(String(h.body || "")));'));
+ assert(agent.includes('texts = told ? [] : [...(salam ? [salam] : []), ...OUT_OF_AREA_LINES, ...(salam ? [] : ["الله يسعدك 🌷"])];'));
+ assert(agent.includes('if (told) out.guard_owner_area_repeat = true;'));
+ const glued=new Function('fixedLine','return '+pickA('(t: string) => t.length <= 200 && t.includes(fixedLine)',';').replace('(t: string)','(t)').replace(/;$/,''))('الاسعار تختلف حسب الوحدة والمساحة والمرحلة');
+ assert.equal(glued('الاسعار تختلف حسب الوحدة والمساحة والمرحلة وما عندي سعر محدد لغرفتين وصالة قبل اختيار الوحدة'),true);
+ assert.equal(glued('الاسعار تختلف حسب الوحدة والمساحة والمرحلة'),false);
+ assert.equal(glued('الاسعار تختلف حسب الوحدة والمساحة والمرحلة والافضل نرتب لك اجتماع مع المطور'),false);
+ assert(agent.includes('texts = texts.map((t) => (glued(t) ? fixedLine : t)).filter((t, i, a) => a.indexOf(t) === i);'));
+});
