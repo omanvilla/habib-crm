@@ -128,3 +128,7 @@ test('R79: a visited client who asks about a deposit is «مشتري جاد:» s
  assert(agent.includes('texts = ownerDecisions(out, texts, { history, burstSaid, prop,'));
  assert(agent.indexOf('texts = ownerDecisions(')<agent.indexOf('analysis.branch_redirect = prop.branch_key;'),'the branch rule (R48) still runs after it');
 });
+test('a unit with no reel uses the reel of its sibling unit',()=>{
+ assert(agent.includes('const sib = (props as any[]).find((q: any) => q.video && q.id !== p.id && q.owner_id && q.owner_id === p.owner_id && q.area === p.area && q.type === p.type'));
+ assert(agent.indexOf('if (sib) p.video = sib.video;')>agent.indexOf('p.video = vids[0]?.permalink || null;'));
+});

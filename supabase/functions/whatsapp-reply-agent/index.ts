@@ -901,6 +901,15 @@ Deno.serve(async (req) => {
       const caps = ((capR as any).data || []).filter((c: any) => c.property_id === p.id).map((c: any) => publicText(c.caption)).sort((a: string, b: string) => b.length - a.length);
       p.marketing = [publicText(p.public_details), publicText(p.description), caps[0] || ""].sort((a: string, b: string) => b.length - a.length)[0] || ""; // the fullest ad text wins
     }
+    // 15 Nov 2026 (dry run, three chats): the reel of a group of similar units is saved on one unit, so a photo request about
+    // another unit ended as a handoff «ما عندنا رابط فيديو». A unit with no reel uses the reel of its sibling: same owner,
+    // area and type, price within 10%.
+    for (const p of props as any[]) {
+      if (p.video) continue;
+      const sib = (props as any[]).find((q: any) => q.video && q.id !== p.id && q.owner_id && q.owner_id === p.owner_id && q.area === p.area && q.type === p.type
+        && Math.abs(Number(q.price || 0) - Number(p.price || 0)) <= 0.1 * Number(p.price || 0));
+      if (sib) p.video = sib.video;
+    }
     // A/B/C test: each pinned reply shows the model one wording, picked at random among the active ones
     const ruleIds = (rulesR.data || []).map((r: any) => r.id);
     const varR = ruleIds.length ? await db.from("whatsapp_reply_variants").select("rule_id,label,reply,status").in("rule_id", ruleIds).eq("active", true) : { data: [] };
