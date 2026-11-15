@@ -72,7 +72,9 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   // answered («اسمك الكريم ؟ ارسل الملكية…» went to three deleted messages)
   let lastOut = -1; c.history.forEach((h: any, i: number) => { if (h.direction === "outbound") lastOut = i; });
   const tail = c.history.slice(lastOut + 1).filter((h: any) => h.direction === "inbound");
-  if (out.action === "none" && texts.length && tail.length && tail.every((h: any) => SILENT_TYPES.includes(String(h.message_type || "")))) {
+  // (on the real chat the deleted messages were not in the history at all: the message being answered is checked too)
+  const silentMsg = SILENT_TYPES.includes(String(c.msgType || "")) && !String(c.burstSaid || "").trim();
+  if (out.action === "none" && texts.length && (silentMsg || (tail.length && tail.every((h: any) => SILENT_TYPES.includes(String(h.message_type || "")))))) {
     out.guard_nothing_said = true; return [];
   }
   // R78 (Ahmed: «يسأل مره اخيره عن السبب واذا ما جاوب ما يضغط عليه»): why the property did not suit is asked once in a chat
@@ -1642,7 +1644,7 @@ Deno.serve(async (req) => {
     texts = ownerDecisions(out, texts, { history, burstSaid, prop, visitedProp: !!prop && visitedIds.has(prop.id), visitedAny: !out.property_id && visitedIds.size > 0,
       saidVisited: history.some((h: any) => h.direction === "inbound" && SAID_VISITED.test(String(h.transcript || h.body || ""))),
       handoffOpen: !!conv.human_handoff_required, hardHandoff: HARD_HANDOFF.test(String(out.handoff_reason || "")),
-      gone: goneRows, available: props, route: String(conv.route_key || ""), typeLabel: typeAr });
+      gone: goneRows, available: props, route: String(conv.route_key || ""), typeLabel: typeAr, msgType: msg.message_type });
     let askedOnce = false;
     texts = texts.filter((t) => { const q = t.length < 90 && /(تزور|تزورون|تزورين)\s*؟/.test(t); if (!q) return true; if (askedOnce) return false; askedOnce = true; return true; });
     // keep the question even when there are two ads

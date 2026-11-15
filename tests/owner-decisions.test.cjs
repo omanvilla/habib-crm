@@ -149,3 +149,8 @@ test('ninth dry-run batch: an ad that mentions a commission is not a question; d
  r=decide(['مرحبتين تفضل'],[del('revoke'),{direction:'inbound',body:'مرحبا',message_type:'text'}]);assert.equal(r.texts.length,1);
  r=decide(['ان شاء الله برسلك الموقع','متى يناسبك تزور ؟ واسمك الكريم ؟'],[IN('ممكن الموقع')]);assert.deepEqual(r.texts,['ان شاء الله برسلك الموقع','متى يناسبك تزور ؟']);
 });
+test('a deleted message that is not in the history gets no answer either',()=>{
+ let r=decide(['اسمك الكريم ؟','ارسل الملكية اذا ما عليك امر'],[OUT('اسمك الكريم ؟')],{},{msgType:'revoke'});assert.deepEqual(r.texts,[]);assert.equal(r.out.guard_nothing_said,true);
+ r=decide(['مرحبتين تفضل'],[IN('مرحبا')],{},{msgType:'text'});assert.equal(r.texts.length,1);
+ assert(agent.includes('typeLabel: typeAr, msgType: msg.message_type });'));
+});
