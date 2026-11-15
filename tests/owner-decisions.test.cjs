@@ -3,7 +3,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8').replace(/\r\n/g,'\n');
 const pickA=(start,end)=>{const a=agent.indexOf(start);assert(a>=0,'missing: '+start);const b=agent.indexOf(end,a);assert(b>a,'no end: '+start);return agent.slice(a,b+end.length);};
-const dsrc=['const VIDEO_PROMISE','const FAREWELL','const IG_CODE','const UNKNOWN_Q','const LOCATION_ASK','const AREA_REASON','const locationForArea','const LOCATION_HELD','const AREA_LINES','const INSIDE_VIDEO_ASK','const LAYOUT_ASK','const LAYOUT_LINES','const OUR_HOUR','const OWNER_TIME_LINE','const DEPOSIT_SAID','const REASON_Q','const VISIT_Q']
+const dsrc=['const VIDEO_PROMISE','const FAREWELL','const FIXED_PRICE_LINE','const IG_CODE','const UNKNOWN_Q','const LOCATION_ASK','const AREA_REASON','const locationForArea','const LOCATION_HELD','const AREA_LINES','const INSIDE_VIDEO_ASK','const LAYOUT_ASK','const LAYOUT_LINES','const OUR_HOUR','const OWNER_TIME_LINE','const DEPOSIT_SAID','const REASON_Q','const VISIT_Q']
  .map((s)=>pickA(s,'\n')).join('')+pickA('function ownerDecisions','\n}\n');
 const D=new Function(dsrc.replace(/(\w+): (?:string|any)(?:\[\])?(?=[,)])/g,'$1')+';return {ownerDecisions,locationForArea,INSIDE_VIDEO_ASK,LAYOUT_ASK,LAYOUT_LINES,AREA_LINES,OWNER_TIME_LINE,DEPOSIT_SAID};')();
 const IN=(b)=>({direction:'inbound',body:b}),OUT=(b)=>({direction:'outbound',body:b});
@@ -45,7 +45,15 @@ test('the video is never promised: the reel goes now, or the promise is taken ou
  r=decide(['ما عندنا صور','تمام برسلك الفيديو'],[IN('فيه صور للمكان')],{action:'handoff',handoff_reason:'طلب فيديو وما عندنا رابط الفيديو'},{prop:{id:'TEST_PROP',video:null}});
  assert.deepEqual(r.texts,['ما عندنا صور']);assert.equal(r.out.action,'handoff','no reel: Ahmed still gets it, without the promise');
  r=decide(['الله يوفقك اخوي'],[IN('اذا ممكن الموقع عشان اعرف هل يناسبني او لا')]);assert.deepEqual(r.texts,D.AREA_LINES);
- assert(agent.includes('texts = [/[ء-ي]/.test(burstSaid) ? "العفو" : "You\'re welcome"];'));
+ assert(agent.includes('const welcome = /[ء-ي]/.test(burstSaid) ? "العفو" : "You\'re welcome";'));
+ // a photo request gets the property's reel with «ما عندنا صور», once
+ r=decide(['ما عندنا صور للفيلا حالياً','متى يناسبك تزور ؟'],[IN('ممكن صور الفيلا')],{},{prop});
+ assert.deepEqual(r.texts,['ما عندنا صور للفيلا حالياً',MAIN,'متى يناسبك تزور ؟']);assert.equal(r.out.guard_photo_video,true);
+ r=decide(['ما عندنا صور للفيلا حالياً','متى يناسبك تزور ؟'],[OUT(MAIN),IN('ممكن صور الفيلا')],{},{prop});assert.equal(r.texts.length,2);
+ // the fixed project line once
+ const F='الاسعار تختلف حسب الوحدة والمساحة والمرحلة';
+ r=decide([F,'العرض الحالي بدون دفعة مقدمة وساري لين 30 نوفمبر 2026 والاسعار تختلف حسب الوحدة والمساحة والمرحلة','يناسبك ؟'],[IN('ابا تفاصيل عنهم كلهم')],{category:'investor'});
+ assert.deepEqual(r.texts,[F,'العرض الحالي بدون دفعة مقدمة وساري لين 30 نوفمبر 2026','يناسبك ؟']);
 });
 test('R76: a layout question handed over as unknown gets «الخرائط تختلف عن الواقع» and the visit question',()=>{
  for(const s of ['ممكن مساحات و تقسيمات الفلا قبل ازور الموقع','توزيع الغرف كيف','عندكم مخطط البيت','سؤال ما عندي جوابه: مساحات كل غرفة في الاستراحة'])assert(D.LAYOUT_ASK.test(s),s);

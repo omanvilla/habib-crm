@@ -42,6 +42,7 @@ const AREA_LINES = ["تفضل هذا الموقع", "شوف اذا المنطق�
 const INSIDE_VIDEO_ASK = /(فيديو|فديو|مقطع|تصوير)[^\n]{0,60}داخل|داخل[^\n]{0,30}(فيديو|فديو|مقطع)/;
 const VIDEO_PROMISE = /(برسل|بنرسل|ارسل|نرسل)(ك|كم)?\s*(لك|لكم)?\s*(ال)?(فيديو|فديو)/;
 const FAREWELL = /الله\s*(يوفقك|يسعدك|يحفظك)|بالتوفيق/;
+const FIXED_PRICE_LINE = "الاسعار تختلف حسب الوحدة والمساحة والمرحلة";
 const IG_CODE = /instagram\.com\/(?:reels?|p|tv)\/([A-Za-z0-9_-]+)/i;
 const LAYOUT_ASK = /تقسيم|توزيع\s*(ال)?غرف|مساح(ة|ه|ات)\s*(كل\s*)?(ال)?غرف|مخطط|خرا[ئي]ط/;
 const LAYOUT_LINES = ["بخصوص التقسيم الافضل تزور الموقع وتشوفه على الطبيعة لان الخرائط تختلف عن الواقع", "متى يناسبك تزور ؟"];
@@ -89,6 +90,18 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     }
     out.guard_video_promise = true;
   }
+  // R34 (third dry-run batch: «ممكن صور الفيلا» got «ما عندنا صور» and the visit question, without the video): a photo
+  // request about a property that has a reel gets the reel with it, when it was not sent in this chat
+  if (/صور/.test(c.burstSaid) && out.action === "none" && texts.length && c.prop?.video && !texts.some((t) => /instagram\.com/.test(t)) && texts.some((t) => /صور/.test(t))) {
+    const pcode = (String(c.prop.video).match(IG_CODE) || [])[1] || String(c.prop.video);
+    if (!sentBefore(pcode)) {
+      const q = texts.filter((t) => VISIT_Q.test(t));
+      texts = [...texts.filter((t) => !VISIT_Q.test(t)).slice(0, 1), String(c.prop.video), ...q.slice(0, 1)];
+      out.guard_photo_video = true;
+    }
+  }
+  // the fixed project line is said once («… ⏎ العرض الحالي … والاسعار تختلف حسب الوحدة والمساحة والمرحلة»)
+  if (texts.includes(FIXED_PRICE_LINE)) texts = texts.map((t) => (t === FIXED_PRICE_LINE ? t : t.replace(new RegExp(`\\s*و?${FIXED_PRICE_LINE}`), "").trim())).filter(Boolean);
   // R76 (Ahmed: «اللي يسأل عن التقسيم يفضل يزور الموقع لان الخرائط تختلف عن الواقع»; changes R41 for this question only)
   if (out.action === "handoff" && UNKNOWN_Q.test(String(out.handoff_reason || "")) && LAYOUT_ASK.test(`${c.burstSaid} ${out.handoff_reason}`)
     && ["buyer", "tenant"].includes(out.category) && !c.visitedProp) {
@@ -1464,8 +1477,9 @@ Deno.serve(async (req) => {
     // R49 held by code (15 Nov 2026; an absolute rule that was words only, no failure of it was seen in the dry run): the client's
     // last words are thanks only, so the reply is «العفو» alone, with no question, offer or repeated line. Only over a plain reply: not when
     // the model chose to say nothing, not with a handoff or a location going out, and R71 above already took its case.
-    if (texts.length && out.action === "none" && !out.search_stopped && thanksOnly(burstSaid) && !(texts.length === 1 && String(texts[0]).trim() === "العفو")) {
-      texts = [/[ء-ي]/.test(burstSaid) ? "العفو" : "You're welcome"]; out.guard_thanks_only = true; // R69: an English-writing client is answered in English
+    const welcome = /[ء-ي]/.test(burstSaid) ? "العفو" : "You're welcome"; // R69: an English-writing client is answered in English
+    if (texts.length && out.action === "none" && !out.search_stopped && thanksOnly(burstSaid) && !(texts.length === 1 && String(texts[0]).trim() === welcome)) {
+      texts = [welcome]; out.guard_thanks_only = true;
     }
     // the ad text goes once per conversation: if a long office message about this property already went out, drop it
     if (prop) {
