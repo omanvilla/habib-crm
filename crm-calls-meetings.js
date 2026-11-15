@@ -23,7 +23,7 @@
   let callsToday=null,callKey=null;
   async function loadCalls(){
     if(!staff())return;
-    try{const r=await supa.rpc('crm_calls_today');if(!r.error&&r.data){callsToday=r.data;paintCallBtn();}}catch(_){}
+    try{const r=await supa.rpc('crm_calls_today');if(!r.error&&r.data){callsToday=r.data;paintCallBtn();paintHomeCall();}}catch(_){}
   }
   function paintCallBtn(){
     const page=byId('page-clientDetail');if(!page||!staff())return;
@@ -36,13 +36,29 @@
   function chips(name,list){
     return '<div class="ccm-chips" role="radiogroup">'+list.map(([v,l])=>'<label class="ccm-chip"><input type="radio" name="'+name+'" value="'+esc(v)+'"><span>'+esc(l)+'</span></label>').join('')+'</div>';
   }
-  function openCall(){
-    if(typeof viewingClient==='undefined'||!viewingClient){toast('افتح العميل أول','error');return;}
+  /* 16 Nov 2026 (R87, SQL107): the same button on the home page, by the number itself, also for a person who is not a client
+     yet. A number called as an owner or an advertiser is left to the office by the reply agent when he writes on WhatsApp. */
+  function paintHomeCall(){
+    if(!staff())return;
+    const host=document.querySelector('#crmOwnerHome .coh-now');if(!host||!host.parentNode)return;
+    let w=byId('crmCallHome');
+    if(!w){w=document.createElement('div');w.id='crmCallHome';w.className='ccm-home';
+      w.innerHTML='<button type="button" class="btn-primary" id="crmCallHomeBtn" data-ccm="open-number"></button>'
+        +'<small class="ccm-note">سجّل كل اتصال برقم صاحبه حتى لو مو مسجل عندنا. اللي تتصل عليه كمالك أو معلن، العقل ما يرد عليه إذا أرسل واتساب، والمحادثة تجي عندك</small>';}
+    if(w.nextElementSibling!==host)host.parentNode.insertBefore(w,host);
+    const n=callsToday?Number(callsToday.mine||0):null,t=callsToday?Number(callsToday.target||20):20;
+    byId('crmCallHomeBtn').innerHTML='📞 سجّل اتصال'+(n==null?'':' <small dir="ltr">'+n+'/'+t+'</small>');
+  }
+  function openCall(byNumber){
+    byNumber=byNumber===true;
+    if(!byNumber&&(typeof viewingClient==='undefined'||!viewingClient)){toast('افتح العميل أول','error');return;}
     let d=byId('crmCallDlg');
     if(!d){d=document.createElement('dialog');d.id='crmCallDlg';d.className='ccm-dlg';document.body.appendChild(d);
       d.addEventListener('click',e=>{if(e.target===d)d.close();});}
-    callKey=uuid();
-    d.innerHTML='<form method="dialog" class="ccm-form"><h3>📞 سجّل اتصال <small>'+esc(viewingClient.name||'')+'</small></h3>'
+    callKey=uuid();d.dataset.mode=byNumber?'number':'client';
+    d.innerHTML='<form method="dialog" class="ccm-form"><h3>📞 سجّل اتصال <small>'+esc(byNumber?'':viewingClient.name||'')+'</small></h3>'
+      +(byNumber?'<label class="ccm-q" for="ccmPhone">رقم الجوال</label><input id="ccmPhone" class="fi" type="tel" inputmode="tel" dir="ltr" maxlength="20" autocomplete="off" placeholder="9XXXXXXX">'
+        +'<label class="ccm-q" for="ccmName">الاسم (اختياري)</label><input id="ccmName" class="fi" maxlength="80" dir="auto" autocomplete="off">':'')
       +'<div class="ccm-q">اتصلت على</div>'+chips('ccmKind',KINDS)
       +'<div class="ccm-q">النتيجة</div>'+chips('ccmResult',RESULTS)
       +'<div class="ccm-q">الخطوة الجاية</div>'+chips('ccmNext',NEXT.map(x=>[x,x]))
@@ -56,11 +72,15 @@
     const val=n=>{const x=d.querySelector('input[name="'+n+'"]:checked');return x?x.value:'';};
     const kind=val('ccmKind'),result=val('ccmResult'),next=val('ccmNext');
     if(!kind||!result){err.textContent='اختر مين اتصلت عليه والنتيجة';return;}
+    const byNumber=d.dataset.mode==='number',phone=byNumber?String(byId('ccmPhone').value||'').replace(/[٠-٩]/g,c=>'٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(/\D/g,''):'';
+    if(byNumber&&(phone.length<8||phone.length>15)){err.textContent='اكتب رقم الجوال صح';return;}
     btn.disabled=true;err.textContent='';
     try{
-      const r=await supa.rpc('crm_log_call',{p_client:viewingClient.id,p_kind:kind,p_result:result,p_next:next==='ما في خطوة'?'':next,p_note:byId('ccmNote').value||'',p_key:callKey});
+      const common={p_kind:kind,p_result:result,p_next:next==='ما في خطوة'?'':next,p_note:byId('ccmNote').value||'',p_key:callKey};
+      const r=byNumber?await supa.rpc('crm_log_call_number',{p_phone:phone,p_name:byId('ccmName').value||'',...common})
+        :await supa.rpc('crm_log_call',{p_client:viewingClient.id,...common});
       if(r.error)throw r.error;
-      d.close();toast('انسجل الاتصال','success');await loadCalls();
+      d.close();toast(byNumber&&['owner','advertiser'].includes(kind)?'انسجل الاتصال. إذا أرسل على الواتساب العقل ما يرد عليه والمحادثة تجي عندك':'انسجل الاتصال','success');await loadCalls();
       if(typeof loadClientActivities==='function')try{loadClientActivities();}catch(_){}
     }catch(e){err.textContent='ما انحفظ: '+(e.message||e);btn.disabled=false;}
   }
@@ -138,12 +158,13 @@
   document.addEventListener('click',e=>{
     const b=e.target.closest('[data-ccm]');if(!b)return;
     if(b.dataset.ccm==='save')saveCall(b);
+    else if(b.dataset.ccm==='open-number')openCall(true);
     else if(b.dataset.ccm==='close')byId('crmCallDlg').close();
     else if(b.dataset.ccm==='toggle-unasked'){unaskedOpen=!unaskedOpen;drawUnasked();}
   });
   const vc=window.viewClient;
   if(typeof vc==='function')window.viewClient=async function(){const r=await vc.apply(this,arguments);paintCallBtn();loadCalls();return r;};
   const ld=window.loadDashboard;
-  if(typeof ld==='function')window.loadDashboard=function(){const r=ld.apply(this,arguments);setTimeout(loadUnasked,1500);return r;};
-  setTimeout(()=>{loadUnasked();loadCalls();},2500);
+  if(typeof ld==='function')window.loadDashboard=function(){const r=ld.apply(this,arguments);setTimeout(()=>{loadUnasked();paintHomeCall();},1500);return r;};
+  setTimeout(()=>{loadUnasked();loadCalls();paintHomeCall();},2500);
 })();

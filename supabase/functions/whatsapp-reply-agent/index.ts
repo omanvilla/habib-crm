@@ -951,6 +951,23 @@ Deno.serve(async (req) => {
       if (hold.data === "negotiation") { await watch(); return fail("human_handoff_open"); }
       if (hold.data === "muted") { await watch(); return fail("agent_muted"); }
     }
+    // R87 (Ahmed 16 Nov 2026): the staff phoned this number as an owner or an advertiser («سجّل اتصال») and he now writes on
+    // WhatsApp, usually to send what she asked for. The agent stays out and the chat goes to the office with the reason, until
+    // someone hands it back (a handoff changed after the call) or presses «كمّل يا عقل». Fails open: with no answer from the
+    // lookup the agent works as before. An inline dry run writes nothing.
+    if (!review && !resume) {
+      const called = await db.rpc("crm_staff_called", { p_company: msg.company_id, p_phone: to });
+      const call = called.error ? null : called.data;
+      const mine = /^\s*اتصال المكتب\s*:/.test(String(conv.handoff_reason || ""));
+      if (call?.at && ((conv.human_handoff_required && mine) || new Date(call.at).getTime() > new Date(conv.handoff_updated_at || 0).getTime())) {
+        if (!inline && !(conv.human_handoff_required && mine)) {
+          const nowC = new Date().toISOString();
+          await db.from("whatsapp_conversations").update({ human_handoff_required: true, handoff_updated_at: nowC, updated_at: nowC,
+            handoff_reason: `اتصال المكتب: ${call.by || "الموظف"} اتصل على هذا الرقم (${call.kind === "owner" ? "مالك" : "معلن"}${call.name ? `، ${call.name}` : ""}) وهو الحين يرسل على الواتساب. الرد عندكم.` }).eq("id", conv.id);
+        }
+        await watch(); return fail("staff_called");
+      }
+    }
     await watch();
     // the owner of a property we list writes to us: Ahmed answers owners himself
     if (!review) {

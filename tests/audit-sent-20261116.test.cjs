@@ -207,3 +207,30 @@ test('last runs of 16 Nov: the Barka branch line as an offer, and «قبل بي�
  r=decide(['الزيارة تحتاج تنسيق مع المالك قبل بيوم'],chat,{viewing_date:'2020-01-01'},{prop});assert.equal(r.out.action,'none','a day that is not ahead still waits');
  r=decide(['بكره صعب، يوم ثاني يناسبك ؟'],chat,{viewing_date:'2099-01-01'},{prop});assert.equal(r.out.action,'none');
 });
+
+// ---- R87 / SQL107 (Ahmed 16 Nov 2026): a call is logged by the number, from the home page; the agent leaves that number to the office ----
+test('R87 / SQL107: the call by number, the agent stays out of a number the staff called, the button is on the home page',()=>{
+ const f=fs.readFileSync('db/changes/107-call-by-number.forward.sql','utf8').replace(/\r\n/g,'\n'),rb=fs.readFileSync('db/changes/107-call-by-number.rollback.sql','utf8');
+ assert.equal(f,fs.readFileSync('supabase/migrations/20261116100000_call_by_number_20261116.sql','utf8').replace(/\r\n/g,'\n'));
+ assert(f.includes("coalesce(public.my_role(), '') NOT IN ('owner', 'manager', 'agent')"),'staff only');
+ assert(f.includes("IF length(d) < 8 OR length(d) > 15 THEN RAISE EXCEPTION 'call_phone_required'"));
+ assert(f.includes('crm_repair_private.can_access_client(c, k.id)'),'a client of another branch is not attached');
+ assert(f.includes("'call_phone', d, 'call_name', nm, 'source', 'crm_log_call_number'"));
+ assert(f.includes('REVOKE ALL ON FUNCTION public.crm_log_call_number(text, text, text, text, text, text, uuid) FROM PUBLIC, anon;'));
+ assert(f.includes("a.after_data ->> 'call_kind' IN ('owner', 'advertiser')")&&f.includes("a.occurred_at > now() - interval '14 days'"));
+ assert(f.includes('REVOKE ALL ON FUNCTION public.crm_staff_called(uuid, text) FROM PUBLIC, anon, authenticated;'),'the lookup is the agent\'s only');
+ assert(rb.includes('DROP FUNCTION IF EXISTS public.crm_staff_called(uuid, text);')&&rb.includes('DROP FUNCTION IF EXISTS public.crm_log_call_number('));
+ // the agent: before the model, never on «كمّل يا عقل», nothing written by an inline dry run, handed back when the handoff changed after the call
+ const a=agent.indexOf('const called = await db.rpc("crm_staff_called", { p_company: msg.company_id, p_phone: to });');
+ assert(a>0&&a<agent.indexOf('// the owner of a property we list writes to us: Ahmed answers owners himself'));
+ assert(agent.includes('if (!review && !resume) {\n      const called = await db.rpc("crm_staff_called"'));
+ assert(agent.includes('new Date(call.at).getTime() > new Date(conv.handoff_updated_at || 0).getTime()'));
+ assert(agent.includes('if (!inline && !(conv.human_handoff_required && mine)) {'));
+ assert(agent.includes('await watch(); return fail("staff_called");'));
+ // the screen
+ const ui=fs.readFileSync('crm-calls-meetings.js','utf8'),index=fs.readFileSync('index.html','utf8');
+ assert(ui.includes("document.querySelector('#crmOwnerHome .coh-now')")&&ui.includes('data-ccm="open-number"'));
+ assert(ui.includes("supa.rpc('crm_log_call_number',{p_phone:phone,p_name:byId('ccmName').value||'',...common})"));
+ assert(ui.includes("supa.rpc('crm_log_call',{p_client:viewingClient.id,...common})"),'the client page keeps its own call');
+ assert(index.includes('crm-calls-meetings.js?v=20261116-ccm2')&&index.includes('crm-calls-meetings.css?v=20261116-ccm2'));
+});
