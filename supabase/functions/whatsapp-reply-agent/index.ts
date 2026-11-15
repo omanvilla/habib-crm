@@ -1324,7 +1324,7 @@ Deno.serve(async (req) => {
       const topic = String(out.handoff_reason || "").replace(MEETING_ASK, "").replace(/\s*\(ينتظر تأكيدك\)\s*$/, "").trim() || String(out.intent || out.crm_note || "");
       // 15 Nov 2026 (Ahmed on the chat of a developer who asked «متي بتيجي معنا المكتب»: the alert read «مكتب الموالح» and then
       // «مكتب الأهلي صبور في العذيبة»): when the client invites us to his own office, the place is his office.
-      const theirOffice = THEIR_OFFICE.test(history.filter((h: any) => h.direction === "inbound").slice(-10).map((h: any) => String(h.transcript || h.body || "")).join(" "));
+      const theirOffice = THEIR_OFFICE.test(history.filter((h) => h.direction === "inbound").slice(-10).map((h) => String(h.transcript || h.body || "")).join(" "));
       const slot = [theirOffice && mt?.place !== "online" ? "مكتب العميل" : MEETING_PLACE[mt?.place] || "", mt?.date || "", mt?.time || ""].filter(Boolean).join(" ") || "بدون موعد";
       out.action = "book_meeting";
       out.handoff_reason = short(`اجتماع: ${client.name || conv.customer_name || "عميل"} ${slot} ${short(topic, 120)} (ينتظر تأكيدك)`, 300);
