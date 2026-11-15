@@ -82,7 +82,7 @@ const pickA=(start,end)=>{const a=agent.indexOf(start);assert(a>=0,'missing: '+s
 const {thanksOnly}=new Function([pickA('const CLOSING_WORDS','\n'),pickA('const THANKS_WORD','\n'),pickA('const THANKS_FILLER','\n'),pickA('const thanksOnly','\n')].join('\n').replace(/\(s: string\)/,'(s)')+';return {thanksOnly};')();
 const r50=agent.slice(agent.indexOf('    let lastOutBody = "";'),agent.indexOf('    // the ad text goes once per conversation'));
 const answer=(said,last,texts,o)=>{const out={action:'none',...(o||{})};
- return new Function('out','texts','history','burstSaid','closedAfterBooking','thanksOnly',r50+'\nreturn {out,texts};')(out,texts||['تحب تشوف خيارات ثانية ؟'],[{direction:'outbound',body:last},{direction:'inbound',body:said}],said,()=>false,thanksOnly);};
+ return new Function('out','texts','history','burstSaid','closedAfterBooking','thanksOnly','REASON_Q',r50+'\nreturn {out,texts};')(out,texts||['تحب تشوف خيارات ثانية ؟'],(o&&o.history)||[{direction:'outbound',body:last},{direction:'inbound',body:said}],said,()=>false,thanksOnly,/الاسباب|ليش\s*ما\s*ناسب/);};
 
 test('R50 after any follow-up of ours: a client who names what he found, or stopped buying, gets no reply and his search ends',()=>{
  const booked='السلام عليكم بخصوص فيلا الصومحان الجنوبية اللي سألت عنها انحجزت وحدة منها والمتبقي الثانية والثالثة تحب تشوفها ؟';
@@ -115,4 +115,45 @@ test('R56 apology is not sent twice, and nothing is glued to the fixed project l
  assert.equal(glued('الاسعار تختلف حسب الوحدة والمساحة والمرحلة'),false);
  assert.equal(glued('الاسعار تختلف حسب الوحدة والمساحة والمرحلة والافضل نرتب لك اجتماع مع المطور'),false);
  assert(agent.includes('texts = texts.map((t) => (glued(t) ? fixedLine : t)).filter((t, i, a) => a.indexOf(t) === i);'));
+});
+
+// ---- R74 to R79: Ahmed's six decisions of 15 Nov 2026 after the dry run ----
+const D=new Function(['const LOCATION_ASK','const AREA_REASON','const locationForArea','const LOCATION_HELD','const AREA_LINES','const INSIDE_VIDEO_ASK','const LAYOUT_ASK','const LAYOUT_LINES','const OUR_HOUR','const OWNER_TIME_LINE','const REASON_Q','const DEPOSIT_SAID']
+ .map((s)=>pickA(s,'\n')).join('').replace(/\(said: string\)/,'(said)')+';return {locationForArea,LOCATION_HELD,AREA_LINES,INSIDE_VIDEO_ASK,LAYOUT_ASK,LAYOUT_LINES,OUR_HOUR,OWNER_TIME_LINE,REASON_Q,DEPOSIT_SAID};')();
+
+test('R74: the location goes to a client who needs it to judge the area, and no visit is recorded from it',()=>{
+ for(const s of ['ي صديقي اريد اشوف الموقع هل مناسب لي او لا مو لازم للزياره','اذا ممكن الموقع عشان اعرف هل يناسبني او لا','اذا نظامك ما ممكن ترسل الموقع خلاص ما ممكن أزور الموقع لاني قلتلك انه زيارة الفيلا تعتمد ع الموقع','إذا ممكن اشوف الموقع اشوفه إذا يناسب او لا'])assert.equal(D.locationForArea(s),true,s);
+ for(const s of ['ممكن الموقع','طيب هات الموقع','رسل الموقع','اعرف اذا السعر مناسب','ممكن لوكيشن والصوره الله يخليك'])assert.equal(D.locationForArea(s),false,s);
+ assert(D.LOCATION_HELD.test('اللوكيشن نرسله قبل الزيارة عشان نتأكد إن العقار لسا متاح')&&D.LOCATION_HELD.test('ان شاء الله برسلك الموقع'));
+ assert(agent.includes('&& out.action === "send_location" && areaAsk) out.location_for_area = true;'));
+ assert(agent.includes('if (areaAsk && out.action === "none" && prop?.map_url && ["buyer", "tenant"].includes(out.category)'));
+ assert(agent.includes('String(h.body || "").includes(String(prop.map_url))'),'once per chat');
+ assert(agent.includes('if (sentIds.length && prop && !review && !out.location_for_area && ["send_location", "send_owner_number", "send_lockbox"].includes(out.action)) {'));
+ assert.equal(D.AREA_LINES.length,2);
+});
+test('R75: a request for the inside video gets the reel marked «من الداخل», and the agent says nothing of its own about a video',()=>{
+ for(const s of ['ممكن ترسلي فيديو من داخل البيت','شي مقطع فيديو من داخل !','اقصد من الداخل الفيديو','في الفيديو ذاكر تواصلو معي ف الواتساب وبرسلكم الفيديو للفه من داخل ع طول'])assert(D.INSIDE_VIDEO_ASK.test(s),s);
+ for(const s of ['هل متوفر فيديو للفله','ممكن الصور','ابي ادخل البيت'])assert(!D.INSIDE_VIDEO_ASK.test(s),s);
+ assert(agent.includes('.ilike("notes", "%من الداخل%")'));
+ assert(agent.includes('if (INSIDE_VIDEO_ASK.test(burstSaid) && prop?.videoInside && out.action !== "handoff") {'));
+ assert(agent.includes('!(t.length <= 200 && /فيديو|فديو|تصوير|مصور|الصور|التقسيم/.test(t)) && !/instagram\.com/.test(t)'));
+});
+test('R76 / R77 / R78 / R79: layout, the owner\'s hour, the reason once, the deposit alert',()=>{
+ for(const s of ['ممكن مساحات و تقسيمات الفلا قبل ازور الموقع','ممكن تفاصيل الغرف والمساحات سؤال ما عندي جوابه: مساحات كل غرفة','توزيع الغرف كيف','عندكم مخطط البيت'])assert(D.LAYOUT_ASK.test(s),s);
+ assert(!D.LAYOUT_ASK.test('كم مساحة الارض'));
+ assert.match(D.LAYOUT_LINES[0],/الخرائط تختلف عن الواقع/);
+ assert(agent.includes('if (out.action === "handoff" && UNKNOWN_Q.test(String(out.handoff_reason || "")) && LAYOUT_ASK.test(`${burstSaid} ${out.handoff_reason}`)'));
+ assert(D.OUR_HOUR.test('الساعة 4 العصر مناسب ان شاء الله')&&D.OUR_HOUR.test('تمام 5 المغرب')&&!D.OUR_HOUR.test('تواصل مع صاحب العقار ونسق معه الزيارة'));
+ assert(agent.includes('if (out.action === "send_owner_number" && texts.some((t) => t.length <= 200 && OUR_HOUR.test(t))) {'));
+ assert.match(D.OWNER_TIME_LINE,/نسق معه وقت الزيارة/);
+ // the reason is asked once
+ const ask='اذا ما عليك امر ممكن تذكر لي الاسباب ليش ما ناسبتك الفيلا ؟';
+ let r=answer('ما ناسبتني','كيف شفت الفيلا ؟',[ask]);assert.deepEqual(r.texts,[ask]);
+ r=answer('خلاص ما ناسبتني','x',['تمام',ask],{history:[{direction:'outbound',body:ask},{direction:'inbound',body:'خلاص ما ناسبتني'}]});
+ assert.deepEqual(r.texts,['تمام']);assert.equal(r.out.guard_reason_once,true);
+ // the deposit
+ for(const s of ['هل يصير ادفع عربون لحجز الفلا','ابي احجز الفيلا','كم العربون'])assert(D.DEPOSIT_SAID.test(s),s);
+ for(const s of ['شي حجز تاريخ 2026/11/26','احجز موعد زيارة'])assert(!D.DEPOSIT_SAID.test(s),s);
+ assert(agent.includes('out.handoff_reason = `مشتري جاد: ${String(out.handoff_reason || out.intent || "زار ويسأل عن العربون والحجز").replace(/^[^:\n]{0,30}:\s*/, "")}`;'));
+ assert(agent.includes('if (out.action === "handoff" && !conv.human_handoff_required && !HARD_HANDOFF.test(String(out.handoff_reason || ""))'));
 });

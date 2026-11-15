@@ -33,6 +33,19 @@ const YOUTUBE_ASK = /يوتيوب|يوتوب|youtube/i;
 const YOUTUBE_LINES = ["الافضل تشوف العقار على الطبيعة احسن من الفيديو والصور", "متى يناسبك تزور ؟"];
 // R41 (Ahmed 12 Nov): a question whose answer is not written in front of the agent gets no reply at all; the chat goes back to Ahmed
 const UNKNOWN_Q = /^\s*سؤال ما عندي جوابه\s*:/;
+// R74 to R79: Ahmed's six decisions of 15 Nov 2026 after the dry run on 124 chats, held by code (brain.ts has no room left)
+const LOCATION_ASK = /موقع|لوكيشن|لوكشن|location|الخريط/i;
+const AREA_REASON = /(اعرف|أعرف|اشوف|أشوف|نشوف|اتاكد|أتأكد|اتأكد)[^\n]{0,40}(يناسب|مناسب|قريب|بعيد)|(يناسب|مناسب)(ني|نا|ه)?\s*(لي\s*)?(او|أو|ولا|والا)\s*(لا|ما)|مو\s*لازم\s*(لل)?زيار|الزيار[ةه]\s*تعتمد|تعتمد\s*(على|ع)\s*(ال)?موقع/;
+const locationForArea = (said: string) => LOCATION_ASK.test(said) && AREA_REASON.test(said);
+const LOCATION_HELD = /(موقع|لوكيشن)[^\n]{0,40}(قبل|مع|وقت|بعد)\s*(تحديد|الزيار|موعد)|برسلك\s*الموقع|نرسله/;
+const AREA_LINES = ["تفضل هذا الموقع", "شوف اذا المنطقة تناسبك وخبرني متى يناسبك تزور"];
+const INSIDE_VIDEO_ASK = /(فيديو|فديو|مقطع|تصوير)[^\n]{0,30}داخل|داخل[^\n]{0,30}(فيديو|فديو|مقطع)/;
+const LAYOUT_ASK = /تقسيم|توزيع\s*(ال)?غرف|مساح(ة|ه|ات)\s*(كل\s*)?(ال)?غرف|مخطط|خرا[ئي]ط/;
+const LAYOUT_LINES = ["بخصوص التقسيم الافضل تزور الموقع وتشوفه على الطبيعة لان الخرائط تختلف عن الواقع", "متى يناسبك تزور ؟"];
+const OUR_HOUR = /الساع[ةه]\s*[0-9٠-٩]|[0-9٠-٩]\s*(العصر|الصبح|الصباح|المغرب|المسا|المساء|الظهر|الليل)/;
+const OWNER_TIME_LINE = "تواصل مع صاحب العقار مباشرة ونسق معه وقت الزيارة";
+const REASON_Q = /الاسباب|ليش\s*ما\s*ناسب/;
+const DEPOSIT_SAID = /عربون|مقدم\s*حجز|(ا|أ|ن)حجز\s*(ال)?(فيلا|فل[ةه]|بيت|شق[ةه]|منزل|عقار|[اأ]رض)|لحجز\s*(ال)?(فيلا|فل[ةه]|بيت|شق[ةه]|منزل|عقار|[اأ]رض)/;
 // R40 (Ahmed 12 Nov): people the office never answers; the chat leaves «العقل موقوف عندهم» for the ignored list
 const IGNORE_LABEL: Record<string, string> = { job: "طالب وظيفة", broker_signup: "يبي يتسجل وسيط عندنا", foreign_broker: "وسيط أو شركة من برا عمان", bank: "موظف بنك يعرض تعاون", service: "يعرض خدمة", contest: "يسأل عن مسابقة" };
 // Ahmed's strict rule (6 Nov): never promise the customer a reply ("بشوف وارد عليك"). Silence is better than a promise nobody keeps.
@@ -738,7 +751,10 @@ Deno.serve(async (req) => {
       && (v.viewing_date < dayM || (v.viewing_date === dayM && !!v.viewing_time && String(v.viewing_time).slice(0, 5) <= hmM));
     // the ad text for each property: its description, or else the longest caption of a reel about it
     const capR = props.length ? await db.from("instagram_media_catalog").select("property_id,caption,permalink,likes,comments").in("property_id", props.map((p: any) => p.id)) : { data: [] };
+    // R75: a reel whose note in the marketing journal says «من الداخل» is the property's video of the inside
+    const insideR = props.length ? await db.from("property_marketing_events").select("property_id,url").in("property_id", props.map((p: any) => p.id)).ilike("notes", "%من الداخل%").order("published_at", { ascending: false }) : { data: [] };
     for (const p of props as any[]) {
+      p.videoInside = (((insideR as any).data || []).find((e: any) => e.property_id === p.id && /^https:\/\/(www\.)?instagram\.com\//.test(String(e.url || ""))) || {}).url || null;
       // the video to send when someone asks for it: the reel of this property that did best
       const vids = ((capR as any).data || []).filter((c: any) => c.property_id === p.id && /^https:\/\/(www\.)?instagram\.com\//.test(String(c.permalink || "")))
         .sort((a: any, b: any) => (Number(b.likes || 0) + Number(b.comments || 0)) - (Number(a.likes || 0) + Number(a.comments || 0)));
@@ -1290,16 +1306,56 @@ Deno.serve(async (req) => {
         out.guard_price_before_visit = true;
       }
     }
+    // R74 (Ahmed 15 Nov 2026, «نعم نرسل الموقع في هذه الحاله»; changes R11 in this case only): a client who asks for the
+    // location and says it is to see whether the place suits him, before he chooses a time, gets it. No visit is recorded
+    // from it (location_for_area). Seen in the dry run: one client refused twice, another left («اذا نظامك ما ممكن ترسل الموقع»).
+    const recentIn = history.filter((h: any) => h.direction === "inbound").slice(-6).map((h: any) => String(h.transcript || h.body || "")).join(" ");
+    const areaAsk = locationForArea(recentIn);
     // R11: the location, the lockbox or the owner's number never goes out before the client said when he is coming
     if (["send_location", "send_owner_number", "send_lockbox"].includes(out.action)) {
       const TIME_SAID = /اليوم|الحين|الان|الآن|بكر|باكر|بعد|العصر|الصبح|الصباح|المغرب|الظهر|الليل|المسا|الساع|طالع|جاي|في الطريق|وصلت|وصلنا|السبت|ال[اأ]حد|ال[اإ]ثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمعة|[0-9٠-٩]/;
-      const recentIn = history.filter((h: any) => h.direction === "inbound").slice(-6).map((h: any) => String(h.transcript || h.body || "")).join(" ");
       const booked = visits.some((v: any) => (!prop || v.property_id === prop.id) && ["scheduled", "confirmed", "postponed"].includes(v.status));
-      if (!out.viewing_date && !out.viewing_time && !booked && !TIME_SAID.test(recentIn)) {
+      if (!out.viewing_date && !out.viewing_time && !booked && !TIME_SAID.test(recentIn) && out.action === "send_location" && areaAsk) out.location_for_area = true;
+      else if (!out.viewing_date && !out.viewing_time && !booked && !TIME_SAID.test(recentIn)) {
         out.action = "none"; out.guard_location_before_time = true;
         texts = texts.filter((t) => !/تقدر\s*تشوف|مفتوح|المفتاح|الرمز/.test(t));
         if (!texts.some((t) => /(تزور|تزورون|تزورين)\s*؟/.test(t))) texts = [...texts.slice(0, 1), "ان شاء الله برسلك الموقع", "متى يناسبك تزور ؟"];
       }
+    }
+    // R74: the model refused or only promised the location; it goes now (once per chat, a buyer or tenant, a property with a map)
+    if (areaAsk && out.action === "none" && prop?.map_url && ["buyer", "tenant"].includes(out.category)
+      && !history.some((h: any) => h.direction === "outbound" && String(h.body || "").includes(String(prop.map_url)))) {
+      out.action = "send_location"; out.location_for_area = true;
+    }
+    if (out.location_for_area) {
+      texts = texts.filter((t) => !(t.length <= 200 && LOCATION_HELD.test(t)) && !/تقدر\s*تشوف|مفتوح|المفتاح|الرمز/.test(t)).slice(0, 1);
+      texts = texts.filter((t) => !/(تزور|تزورون|تزورين)\s*؟/.test(t));
+      texts.push(...AREA_LINES);
+      out.guard_location_for_area = true;
+    }
+    // R75 (Ahmed 15 Nov 2026, he gave the reel): a client who asks for a video of the inside gets the reel marked «من الداخل»
+    // in the property's marketing journal, once. The agent says nothing of its own about what a video shows (in the dry run it
+    // answered three ways: «خارجي فقط», «فيه تصوير من داخل», «ما عندنا تصوير ثاني»).
+    if (INSIDE_VIDEO_ASK.test(burstSaid) && prop?.videoInside && out.action !== "handoff") {
+      const code = (String(prop.videoInside).match(IG_RE) || [])[1] || String(prop.videoInside);
+      const sent = history.some((h: any) => h.direction === "outbound" && String(h.body || "").includes(code));
+      texts = texts.filter((t) => !(t.length <= 200 && /فيديو|فديو|تصوير|مصور|الصور|التقسيم/.test(t)) && !/instagram\.com/.test(t));
+      texts = [...(sent ? ["الفيديو من الداخل ارسلته لك فوق"] : ["هذا الفيديو من الداخل", String(prop.videoInside)]), ...texts];
+      if (out.action === "none" && !visitedIds.has(prop.id) && !texts.some((t) => /(تزور|تزورون|تزورين)\s*؟/.test(t))) texts.push("متى يناسبك تزور ؟");
+      out.guard_inside_video = true;
+    }
+    // R76 (Ahmed 15 Nov 2026, «اللي يسأل عن التقسيم يفضل يزور الموقع لان الخرائط تختلف عن الواقع»; changes R41 for this
+    // question only): a question about the layout or the rooms' sizes that the model handed over as unknown gets the fixed pair.
+    if (out.action === "handoff" && UNKNOWN_Q.test(String(out.handoff_reason || "")) && LAYOUT_ASK.test(`${burstSaid} ${out.handoff_reason}`)
+      && ["buyer", "tenant"].includes(out.category) && !(prop && visitedIds.has(prop.id))) {
+      out.action = "none"; out.handoff_reason = null;
+      texts = [...texts.filter((t) => !/(تزور|تزورون|تزورين)\s*؟/.test(t)).slice(0, 1), ...LAYOUT_LINES];
+      out.guard_layout = true;
+    }
+    // R77 (Ahmed 15 Nov 2026, «ما يحدد الوقت لازم ينسق مع المالك»): a visit arranged with the owner carries no hour of ours
+    if (out.action === "send_owner_number" && texts.some((t) => t.length <= 200 && OUR_HOUR.test(t))) {
+      texts = [...texts.filter((t) => !(t.length <= 200 && OUR_HOUR.test(t)) && !/نسق|تنسق/.test(t)), OWNER_TIME_LINE];
+      out.guard_owner_time = true;
     }
     // R45: the agent never asks for or proposes a day or an hour for a meeting, and never confirms one; the invitation ends with «يناسبك ؟»
     const MEETING_WORD = /اجتماع|نجتمع|المطور|تمر\s*(علينا\s*)?المكتب|في\s*المكتب|مكتبهم|اونلاين|أونلاين/;
@@ -1361,6 +1417,16 @@ Deno.serve(async (req) => {
         out.action = "none"; out.guard_owner_decline = heirs ? "heirs" : "mortgaged_or_occupied";
       }
     }
+    // R79 (Ahmed 15 Nov 2026, «افضل على واتسابي»): a client who visited and asks about a deposit or booking the property is a
+    // serious buyer: the handoff reads «مشتري جاد:», so the WhatsApp alert of R7 reaches Ahmed. Once, when the chat is not
+    // already with him; never over another hard handoff or a call request.
+    if (out.action === "handoff" && !conv.human_handoff_required && !HARD_HANDOFF.test(String(out.handoff_reason || "")) && !/^\s*طلب اتصال/.test(String(out.handoff_reason || ""))
+      && ["buyer", "active_deal"].includes(out.category)
+      && DEPOSIT_SAID.test(history.filter((h: any) => h.direction === "inbound").slice(-6).map((h: any) => String(h.transcript || h.body || "")).join(" "))
+      && ((out.property_id ? visitedIds.has(out.property_id) : visitedIds.size > 0) || history.some((h: any) => h.direction === "inbound" && SAID_VISITED.test(String(h.transcript || h.body || ""))))) {
+      out.handoff_reason = `مشتري جاد: ${String(out.handoff_reason || out.intent || "زار ويسأل عن العربون والحجز").replace(/^[^:\n]{0,30}:\s*/, "")}`;
+      out.guard_deposit_serious = true;
+    }
     // R23, measured only: a soft handoff that leaves the customer with no reply is marked, so it can be counted
     if (out.action === "handoff" && !texts.length && !HARD_HANDOFF.test(String(out.handoff_reason || "")) && !/^\s*طلب اتصال/.test(String(out.handoff_reason || ""))) out.soft_handoff_no_reply = true;
     // Ahmed 14 Nov: «حصلت» / «اشتريت» after our «لين الحين تبحث ؟» means the search is over. No reply and no «مبروك»; the
@@ -1381,6 +1447,11 @@ Deno.serve(async (req) => {
     }
     // R71 (Ahmed 14 Nov 2026): she booked or bought, we congratulated, and she only closes the talk: no reply, no draft, the search ends
     if (closedAfterBooking(history)) { texts = []; out.action = "none"; out.handoff_reason = null; out.search_stopped = true; out.guard_closed_after_booking = true; }
+    // R78 (Ahmed 15 Nov 2026, «يسأل مره اخيره عن السبب واذا ما جاوب ما يضغط عليه»): the question about why the property did
+    // not suit is asked once in a chat; a second one is taken out.
+    if (texts.some((t) => REASON_Q.test(t)) && history.some((h: any) => h.direction === "outbound" && REASON_Q.test(String(h.body || "")))) {
+      texts = texts.filter((t) => !REASON_Q.test(t)); out.guard_reason_once = true;
+    }
     // R49 held by code (15 Nov 2026; an absolute rule that was words only, no failure of it was seen in the dry run): the client's
     // last words are thanks only, so the reply is «العفو» alone, with no question, offer or repeated line. Only over a plain reply: not when
     // the model chose to say nothing, not with a handoff or a location going out, and R71 above already took its case.
@@ -1792,7 +1863,7 @@ Deno.serve(async (req) => {
 
     // a location (or the owner's number) went out: the client is going to see the property, so the visit is recorded even when
     // his time was vague ("الحين", "العصر") and the question after 1.5 h can follow (8 Nov, Ahmed)
-    if (sentIds.length && prop && !review && ["send_location", "send_owner_number", "send_lockbox"].includes(out.action)) {
+    if (sentIds.length && prop && !review && !out.location_for_area && ["send_location", "send_owner_number", "send_lockbox"].includes(out.action)) {
       try {
         const todayM = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
         const nowM = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Muscat", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
