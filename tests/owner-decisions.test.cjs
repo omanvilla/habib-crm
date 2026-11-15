@@ -3,7 +3,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8').replace(/\r\n/g,'\n');
 const pickA=(start,end)=>{const a=agent.indexOf(start);assert(a>=0,'missing: '+start);const b=agent.indexOf(end,a);assert(b>a,'no end: '+start);return agent.slice(a,b+end.length);};
-const dsrc=['const VIDEO_PROMISE','const FAREWELL','const FIXED_PRICE_LINE','const IG_CODE','const UNKNOWN_Q','const LOCATION_ASK','const AREA_REASON','const locationForArea','const LOCATION_HELD','const AREA_LINES','const INSIDE_VIDEO_ASK','const LAYOUT_ASK','const LAYOUT_LINES','const OUR_HOUR','const OWNER_TIME_LINE','const DEPOSIT_SAID','const REASON_Q','const VISIT_Q']
+const dsrc=['const ASK_HOUR','const NEEDS_AHMED','const VIDEO_PROMISE','const FAREWELL','const FIXED_PRICE_LINE','const IG_CODE','const UNKNOWN_Q','const LOCATION_ASK','const AREA_REASON','const locationForArea','const LOCATION_HELD','const AREA_LINES','const INSIDE_VIDEO_ASK','const LAYOUT_ASK','const LAYOUT_LINES','const OUR_HOUR','const OWNER_TIME_LINE','const DEPOSIT_SAID','const REASON_Q','const VISIT_Q']
  .map((s)=>pickA(s,'\n')).join('')+pickA('function ownerDecisions','\n}\n');
 const D=new Function(dsrc.replace(/(\w+): (?:string|any)(?:\[\])?(?=[,)])/g,'$1')+';return {ownerDecisions,locationForArea,INSIDE_VIDEO_ASK,LAYOUT_ASK,LAYOUT_LINES,AREA_LINES,OWNER_TIME_LINE,DEPOSIT_SAID};')();
 const IN=(b)=>({direction:'inbound',body:b}),OUT=(b)=>({direction:'outbound',body:b});
@@ -75,6 +75,15 @@ test('R77 / R78: no hour of ours when the owner arranges the visit; the reason i
  const ask='اذا ما عليك امر ممكن تذكر لي الاسباب ليش ما ناسبتك الفيلا ؟';
  r=decide([ask],[OUT('كيف شفت الفيلا ؟'),IN('ما ناسبتني')]);assert.deepEqual(r.texts,[ask]);
  r=decide(['تمام',ask],[OUT(ask),IN('خلاص ما ناسبتني')]);assert.deepEqual(r.texts,['تمام']);assert.equal(r.out.guard_reason_once,true);
+});
+test('fifth dry-run batch: no hour asked where the owner lives; «يحتاج رد أحمد» becomes the silent handoff',()=>{
+ const owner={id:'TEST_PROP',visit_method:'owner_lives'};
+ let r=decide(['الزيارة تحتاج تنسيق مع المالك قبل يوم على الأقل','اسمك الكريم ؟ وكم الساعة تقريباً اليوم ؟'],[IN('اليوم العصر ممكن ؟')],{},{prop:owner});
+ assert.deepEqual(r.texts,['الزيارة تحتاج تنسيق مع المالك قبل يوم على الأقل','اسمك الكريم ؟']);assert.equal(r.out.guard_owner_time,true);
+ r=decide(['كم الساعة تقريباً بكره ؟'],[IN('بكره')],{},{prop:{id:'TEST_PROP',visit_method:'open'}});assert.equal(r.texts.length,1,'our own visits still ask the hour');
+ r=decide(['موضوع إلغاء الشقق وتعديل المخطط يحتاج رد أحمد','اسمك الكريم ؟'],[IN('واذا بغيت اكنسل الشقق شي مخطط يكون بيت واحد ؟')]);
+ assert.deepEqual(r.texts,[]);assert.equal(r.out.action,'handoff');assert.match(r.out.handoff_reason,/^سؤال ما عندي جوابه: واذا بغيت اكنسل الشقق/);
+ r=decide(['تمام وصلت','الموضوع يحتاج رد أحمد'],[IN('x')],{action:'handoff',handoff_reason:'صفقة شغالة: x'});assert.equal(r.texts.length,2,'an existing handoff is left alone');
 });
 test('R79: a visited client who asks about a deposit is «مشتري جاد:» so the WhatsApp alert goes',()=>{
  for(const s of ['هل يصير ادفع عربون لحجز الفلا','ابي احجز الفيلا','كم العربون'])assert(D.DEPOSIT_SAID.test(s),s);

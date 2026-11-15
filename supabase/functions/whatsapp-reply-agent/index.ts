@@ -42,7 +42,9 @@ const AREA_LINES = ["تفضل هذا الموقع", "شوف اذا المنطق�
 const INSIDE_VIDEO_ASK = /(فيديو|فديو|مقطع|تصوير)[^\n]{0,60}داخل|داخل[^\n]{0,30}(فيديو|فديو|مقطع)/;
 const VIDEO_PROMISE = /(برسل|بنرسل|ارسل|نرسل)(ك|كم)?\s*(لك|لكم)?\s*(ال)?(فيديو|فديو)/;
 const FAREWELL = /الله\s*(يوفقك|يسعدك|يحفظك)|بالتوفيق/;
-const FIXED_PRICE_LINE = "الاسعار تختلف حسب الوحدة والمساحة والمرحلة";
+const ASK_HOUR = /كم\s*الساع[ةه]/;
+const NEEDS_AHMED = /(يحتاج|تحتاج|ينتظر|تنتظر)\s*رد\s*(من\s*)?(الاستاذ\s*|الأستاذ\s*)?[اأ]حمد/;
+const FIXED_PRICE_LINE ="الاسعار تختلف حسب الوحدة والمساحة والمرحلة";
 const IG_CODE = /instagram\.com\/(?:reels?|p|tv)\/([A-Za-z0-9_-]+)/i;
 const LAYOUT_ASK = /تقسيم|توزيع\s*(ال)?غرف|مساح(ة|ه|ات)\s*(كل\s*)?(ال)?غرف|مخطط|خرا[ئي]ط/;
 const LAYOUT_LINES = ["بخصوص التقسيم الافضل تزور الموقع وتشوفه على الطبيعة لان الخرائط تختلف عن الواقع", "متى يناسبك تزور ؟"];
@@ -118,6 +120,18 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   if (out.action === "send_owner_number" && texts.some((t) => t.length <= 200 && OUR_HOUR.test(t))) {
     texts = [...texts.filter((t) => !(t.length <= 200 && OUR_HOUR.test(t)) && !/نسق|تنسق/.test(t)), OWNER_TIME_LINE];
     out.guard_owner_time = true;
+  }
+  // R77, fifth dry-run batch: on a property whose owner lives in it the agent wrote «الزيارة تحتاج تنسيق مع المالك قبل يوم»
+  // and then «كم الساعة تقريباً اليوم ؟». The hour is the owner's: the question about it is taken out.
+  if (c.prop?.visit_method === "owner_lives" && texts.some((t) => t.length <= 200 && ASK_HOUR.test(t))) {
+    texts = texts.map((t) => (t.length <= 200 && ASK_HOUR.test(t) ? t.replace(/\s*و?\s*كم\s*الساع[ةه][^؟?\n]*[؟?]?/g, "").trim() : t)).filter(Boolean);
+    out.guard_owner_time = true;
+  }
+  // R41, same batch: «… يحتاج رد أحمد» with no handoff leaves the client waiting for nobody. It becomes the silent handoff
+  // «سؤال ما عندي جوابه:» (R41), unless a handoff or a location is already going out.
+  if (out.action === "none" && texts.some((t) => t.length <= 200 && NEEDS_AHMED.test(t))) {
+    texts = []; out.action = "handoff"; out.guard_needs_ahmed = true;
+    out.handoff_reason = `سؤال ما عندي جوابه: ${String(c.burstSaid || "").replace(/\s+/g, " ").trim().slice(0, 200)}`;
   }
   // R79 (Ahmed: «افضل على واتسابي»): a client who visited and asks about a deposit or booking is «مشتري جاد:», so the
   // WhatsApp alert of R7 reaches Ahmed. Once, when the chat is not already with him; never over a hard handoff or a call request.
