@@ -44,7 +44,12 @@ const VIDEO_PROMISE = /(برسل|بنرسل|ارسل|نرسل)(ك|كم)?\s*(لك
 const FAREWELL = /الله\s*(يوفقك|يسعدك|يحفظك)|بالتوفيق/;
 // a question about the commission, not an advertisement that mentions one (ninth dry-run batch: a broker's ad got the owner's lines)
 const COMMISSION_ASK = /(كم|على\s*من|من\s*(اللي\s*)?يدفع|مين|نسب[ةه]|مقدار)[^\n]{0,30}عمول|عمول[^\n]{0,30}(كم|على\s*من|على\s*مين|من\s*(اللي\s*)?يدفع|[؟?])/;
-const SILENT_TYPES = ["revoke", "reaction", "system", "edit", "unsupported"];
+const THEIR_OFFICE = /(معنا|عندنا|معانا)\s*(في\s*)?(ال)?مكتب|مكتبنا|(بتجي|بتيجي|تجي|تيجي|تجون|تجينا|تزورنا|تزورونا|تمر(ون)?\s*علينا|تشرفنا|تشرفونا)(\s|$)/;
+// a question that only repeats what the client said («قصدك البيت المعروض في الحيل الجنوبية ؟»)
+const ASK_CONFIRM = /^(قصدك|تقصد(ين)?)\s[^\n]{0,90}؟\s*$/;
+const WE_SHOW = /(^|\s)عارض(ين|ه|ة)?\s+(لل?بيع\s+)?(فل[ةه]|فيلا|بيت|منزل|شق[ةه]|[اأ]رض)|(فل[ةه]|فيلا|بيت|منزل)\s*(ال)?معروض|معروض\s*عندكم/;
+const MY_OWN = /عندي|بيتي|فلتي|ارضي|أرضي|ملكي|[اأ](بي|بغى|با|ريد)\s*[اأ]عرض|نعرض|عقاري/;
+const SILENT_TYPES =["revoke", "reaction", "system", "edit", "unsupported"];
 const COMMISSION_BUYER_LINES = ["ما عليك عمولة للمكتب", "العمولة على الطرف المفوض وهو المالك"];
 const COMMISSION_OWNER_LINES = ["بخصوص العمولة نحتاج اول شي نزور الموقع بعد ما ترسل لنا المستندات ونطلع على العقار", "وبعدها نتفق ان شاء الله على كل شي"];
 const ASK_LINK = /رابط\s*(ال)?(فيديو|اعلان|إعلان)|صور[ةه]\s*منه|[اأ]ي\s*(فيلا|بيت|عقار|شق[ةه]|[اأ]رض)\s*(بالضبط|تقصد|قصدك)/;
@@ -181,6 +186,23 @@ function ownerDecisions(out: any, lines: string[], c: any) {
       texts = [`${label(gone)} اللي سألت عنها ما متوفره حالياً`,
         ...(alt ? [`بس عندنا ${c.typeLabel ? c.typeLabel(alt.type) : "عقار"} في ${String(alt.area || "").trim()} بـ ${Math.round(Number(alt.price || 0) / 1000)} الف`, "تحب ارسلك تفاصيلها ؟"] : ["اول ما يتوفر بتواصل معك"])];
       out.guard_named_gone = true;
+    }
+  }
+  // R44 / R32, tenth dry-run batch: «شفت بيت معروض فحيل الجنوبية عطوني تفاصيل» got «قصدك البيت المعروض في الحيل الجنوبية ؟»,
+  // and «عارضين بيت للبيع ف الحيل الجنوبية» was answered as an owner («ارسل تفاصيل البيت والمستندات»). The client names an
+  // area where this number has exactly one available property and no word says the property is his: he gets its details.
+  {
+    const echo = out.action === "none" && texts.some((t) => ASK_CONFIRM.test(t.trim()));
+    const asOwner = out.action === "none" && out.category === "seller" && WE_SHOW.test(c.burstSaid) && !MY_OWN.test(recentIn);
+    if (echo || asOwner) {
+      const said = areaKey(c.burstSaid);
+      const here = (c.available || []).filter((p: any) => p.branch_key === c.route && areaKey(p.area).length > 2 && said.includes(areaKey(p.area)));
+      const p = here.length === 1 ? here[0] : null;
+      if (p && p.marketing && !sentBefore(String(p.marketing).slice(0, 40))) {
+        texts = [String(p.marketing), "متى يناسبك تزور ؟"];
+        out.property_id = p.id; if (asOwner) out.category = "buyer";
+        out.guard_named_available = true;
+      }
     }
   }
   // R81 (Ahmed, same evening: «دام إنه وصل موضوع حجز مفروض يتحول عندي… مشتري جاد… ما يرد عليه بشيء»; widens R79): a buyer who
@@ -1298,7 +1320,10 @@ Deno.serve(async (req) => {
       if (mt && !dated) mt.date = null;
       if (mt && !hm) mt.time = null;
       const topic = String(out.handoff_reason || "").replace(MEETING_ASK, "").replace(/\s*\(ينتظر تأكيدك\)\s*$/, "").trim() || String(out.intent || out.crm_note || "");
-      const slot = [MEETING_PLACE[mt?.place] || "", mt?.date || "", mt?.time || ""].filter(Boolean).join(" ") || "بدون موعد";
+      // 15 Nov 2026 (Ahmed on the chat of a developer who asked «متي بتيجي معنا المكتب»: the alert read «مكتب الموالح» and then
+      // «مكتب الأهلي صبور في العذيبة»): when the client invites us to his own office, the place is his office.
+      const theirOffice = THEIR_OFFICE.test(history.filter((h: any) => h.direction === "inbound").slice(-10).map((h: any) => String(h.transcript || h.body || "")).join(" "));
+      const slot = [theirOffice && mt?.place !== "online" ? "مكتب العميل" : MEETING_PLACE[mt?.place] || "", mt?.date || "", mt?.time || ""].filter(Boolean).join(" ") || "بدون موعد";
       out.action = "book_meeting";
       out.handoff_reason = short(`اجتماع: ${client.name || conv.customer_name || "عميل"} ${slot} ${short(topic, 120)} (ينتظر تأكيدك)`, 300);
       out.reply_messages = [];
