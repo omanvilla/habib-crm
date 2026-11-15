@@ -158,7 +158,7 @@ test('R84: a day with no hour gets «كم الساعة تقريباً ؟», not 
  for(const said of ['بكرة العصر','بكره الساعة 5','باكر العصر، أن شاء الله على ساعة ٥ مناسب','بروح الحين','انا في الطريق']){r=decide(keep,[IN(said)],loc,{prop});assert.deepEqual(r.texts,keep,said);}
  r=decide(keep,[IN('بكره')],{...loc,location_for_area:true},{prop});assert.deepEqual(r.texts,keep);
  r=decide(keep,[IN('بكره')],loc,{prop:{id:'H1',visit_method:'owner_lives'}});assert.deepEqual(r.texts,keep);
- r=decide(keep,[IN('بكره')],{action:'none'},{prop});assert.deepEqual(r.texts,keep);
+ r=decide(keep,[IN('بكره')],{action:'none',category:'seller'},{prop});assert.deepEqual(r.texts,keep);
  // the visit saved with no hour is marked, and its confirmation names the day only
  assert(agent.includes('${time ? "" : " (الساعة ما تحددت)"}'));
  assert(fu.includes('visitWhen(v.viewing_date, HOUR_UNKNOWN.test(String(vn.data?.notes || "")) ? null : v.viewing_time)'));
@@ -195,4 +195,15 @@ test('R84 with no location going out, and the last orphan after R66',()=>{
  // fourth run of chat 5b58c79e: «اذا يناسبك تزيدها نرتب لك زيارة» stayed after the Barka offer was taken out
  const c={route:'muscat',available:[{id:'B1',branch_key:'barka',area:'الصومحان الجنوبية'}],prop:{id:'B1',branch_key:'barka'}};
  r=decide(['اقرب شي عندنا فيلا في الصومحان بـ 69 الف','اذا يناسبك تزيدها نرتب لك زيارة'],[IN('65')],{request:{areas:['مسقط']}},c);assert.deepEqual(r.texts,['اول ما يتوفر بتواصل معك']);
+});
+test('last runs of 16 Nov: the Barka branch line as an offer, and «قبل بيوم» when the day named is ahead',()=>{
+ const c={route:'muscat',available:[{id:'B1',branch_key:'barka',area:'الصومحان الجنوبية'}],prop:{id:'B1',branch_key:'barka'}};
+ let r=decide(['هذا العقار تتابعه معنا على رقم بركاء 92344273 واتساب','اول ما يتوفر بتواصل معك'],[IN('65')],{request:{areas:['مسقط']}},c);
+ assert.deepEqual(r.texts,['اول ما يتوفر بتواصل معك']);
+ r=decide(['هذا العقار تتابعه معنا على رقم بركاء 92344273 واتساب'],[OUT('هذا العقار تتابعه معنا على رقم بركاء 92344273 واتساب'),IN('طيب')],{},c);assert.equal(r.texts.length,1,'the line was already said in this chat: R48 decides');
+ const LINE='تواصل مع صاحب العقار مباشرة ونسق معه وقت الزيارة',prop={id:'H1',visit_method:'owner_lives'},chat=[IN('متى ممكن الزيارة؟'),IN('بكرة ممكن؟')];
+ r=decide(['ممكن بكره بس الزيارة تحتاج تنسيق مع المالك قبل بيوم','اسمك الكريم ؟'],chat,{viewing_date:'2099-01-01'},{prop});
+ assert.equal(r.out.action,'send_owner_number');assert.deepEqual(r.texts,[LINE,'اسمك الكريم ؟']);
+ r=decide(['الزيارة تحتاج تنسيق مع المالك قبل بيوم'],chat,{viewing_date:'2020-01-01'},{prop});assert.equal(r.out.action,'none','a day that is not ahead still waits');
+ r=decide(['بكره صعب، يوم ثاني يناسبك ؟'],chat,{viewing_date:'2099-01-01'},{prop});assert.equal(r.out.action,'none');
 });

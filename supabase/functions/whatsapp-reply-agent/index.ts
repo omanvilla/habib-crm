@@ -169,7 +169,9 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     && /بكر|باكر|السبت|ال[اأ]حد|ال[اإ]ثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمع[ةه]/.test(String(c.burstSaid || ""))
     && !c.history.some((h: any) => h.direction === "outbound" && /تواصل\s*مع\s*(صاحب\s*العقار|المالك)/.test(String(h.body || "")))) {
     // (third run of the same message: «ممكن بكره بس». Any short reply goes, unless it says the day does not work.)
-    const NAME_Q = /^\s*و?اسمك\s*الكريم\s*؟\s*$/, DAY_NO = /قبل\s*ب?يوم|يوم\s*ثاني|صعب|ما\s*(ينفع|يصير|يمدي)/;
+    // («الزيارة تحتاج تنسيق مع المالك قبل بيوم» does not hold him back when the day he named is tomorrow or later)
+    const ahead = String(out.viewing_date) > new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
+    const NAME_Q = /^\s*و?اسمك\s*الكريم\s*؟\s*$/, DAY_NO = ahead ? /يوم\s*ثاني|صعب|ما\s*(ينفع|يصير|يمدي)/ : /قبل\s*ب?يوم|يوم\s*ثاني|صعب|ما\s*(ينفع|يصير|يمدي)/;
     if (!texts.some((t) => t.length > 200 || DAY_NO.test(t))) {
       out.action = "send_owner_number"; texts = [OWNER_TIME_LINE, ...texts.filter((t) => NAME_Q.test(t))]; out.guard_owner_number_day = true;
     }
@@ -270,9 +272,10 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     && !inbound.some((h: any) => /instagram\.com|facebook\.com|fb\.watch/.test(body(h)) || ["image", "video"].includes(String(h.message_type || "")))) {
     const barka = (c.available || []).filter((p: any) => p.branch_key === "barka");
     const keys = barka.map((p: any) => areaKey(String(p.area || "").replace(/^\s*(ولاية\s+)?بركاء\s+/, "")).split(" ")[0]).filter((k: string) => k.length > 2 && !R66_GENERIC.includes(k));
-    const offers = (t: string) => t.length <= 250 && /عندنا|[اأ]قرب|متوفر|[0-9٠-٩]\s*[اأ]لف|تزيد/.test(t) && keys.some((k: string) => areaKey(t).includes(k));
+    // (the Barka branch line written by the model itself for a property the client never named is the same offer)
+    const offers = (t: string) => t.length <= 250 && (/92344273/.test(t) || (/عندنا|[اأ]قرب|متوفر|[0-9٠-٩]\s*[اأ]لف|تزيد/.test(t) && keys.some((k: string) => areaKey(t).includes(k))));
     // (a property the office already named in this chat is the topic, not a new offer: R48 answers that)
-    const raised = c.history.some((h: any) => h.direction === "outbound" && keys.some((k: string) => areaKey(body(h)).includes(k)));
+    const raised = c.history.some((h: any) => h.direction === "outbound" && (/92344273/.test(body(h)) || keys.some((k: string) => areaKey(body(h)).includes(k))));
     if (texts.some(offers) && !raised && !nearBarka(inbound.map(body).join(" "), barka.map((p: any) => p.area))) {
       texts = texts.filter((t) => !offers(t) && !(t.length <= 250 && (R66_DETAILS_ASK.test(t) || /تزيد/.test(t))) && !VISIT_Q.test(t));
       const line = (out.request?.areas || []).length ? "اول ما يتوفر بتواصل معك" : "في اي منطقة تبحث ؟";
