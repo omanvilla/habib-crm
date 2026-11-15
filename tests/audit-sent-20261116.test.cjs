@@ -232,5 +232,13 @@ test('R87 / SQL107: the call by number, the agent stays out of a number the staf
  assert(ui.includes("document.querySelector('#crmOwnerHome .coh-now')")&&ui.includes('data-ccm="open-number"'));
  assert(ui.includes("supa.rpc('crm_log_call_number',{p_phone:phone,p_name:byId('ccmName').value||'',...common})"));
  assert(ui.includes("supa.rpc('crm_log_call',{p_client:viewingClient.id,...common})"),'the client page keeps its own call');
- assert(index.includes('crm-calls-meetings.js?v=20261116-ccm2')&&index.includes('crm-calls-meetings.css?v=20261116-ccm2'));
+ assert(index.includes('crm-calls-meetings.js?v=20261116-ccm3')&&index.includes('crm-calls-meetings.css?v=20261116-ccm3'));
+});
+test('the dashboard of 16 Nov: one alert per client and kind, a past meeting leaves, the owner sees each person\'s calls',()=>{
+ const hot=fs.readFileSync('crm-hot-alerts.js','utf8'),ui=fs.readFileSync('crm-calls-meetings.js','utf8'),index=fs.readFileSync('index.html','utf8');
+ assert(hot.includes("if(kind==='meeting'&&day&&day<today)return false;"));
+ assert(hot.includes("const key=n.client_id+'|'+kind;if(once.has(key))return false;once.add(key);return true;"));
+ assert(hot.indexOf('list.sort((a,b)=>String(b.created_at)')<hot.indexOf('once.has(key)'),'the newest of each client is the one kept');
+ assert(ui.includes("if(callsToday&&['owner','manager'].includes(role())){")&&ui.includes('اتصالات اليوم:'));
+ assert(index.includes('crm-hot-alerts.js?v=20261116-once1')&&index.includes('crm-calls-meetings.js?v=20261116-ccm3'));
 });

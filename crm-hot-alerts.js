@@ -85,6 +85,15 @@
       const need=[...new Set(list.filter(n=>!n.phone&&n.client_id).map(n=>n.client_id))];
       if(need.length){const p=await supa.from('clients').select('id,phone,phone_normalized').in('id',need);const m=new Map((p.data||[]).map(x=>[x.id,x.phone_normalized||x.phone]));list.forEach(n=>{if(!n.phone&&n.client_id)n.phone=m.get(n.client_id)||'';});}
       list.sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)));
+      // 16 Nov 2026 (Ahmed: «اجتماع مع جيهان طالع لي 3 مرات… واجتماع مع ايهاب لحد الحين ظاهر»): one row per client and kind (the
+      // newest; «تم» already closes every alert of that client), and a meeting whose written day has passed leaves the list.
+      const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Muscat'}).format(new Date()),once=new Set();
+      list=list.filter(n=>{
+        const kind=kindOf(n.title),day=(String(n.body||'').match(/\b(20\d{2}-\d{2}-\d{2})\b/)||[])[1];
+        if(kind==='meeting'&&day&&day<today)return false;
+        if(!n.client_id)return true;
+        const key=n.client_id+'|'+kind;if(once.has(key))return false;once.add(key);return true;
+      });
       if(seen)ping(list.filter(n=>!seen.has(n.id)));
       seen=new Set(list.map(n=>n.id));items=list.slice(0,20);render();
     }finally{busy=false;}

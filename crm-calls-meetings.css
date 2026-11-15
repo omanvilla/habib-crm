@@ -22,3 +22,4 @@
 .ccm-item small{display:block;color:var(--umber,#7a6650);font-size:12px}.ccm-why{color:#9a3412!important}
 .ccm-home{display:flex;flex-direction:column;gap:6px;align-items:flex-start;margin:0 0 12px}
 #crmCallHomeBtn small{font-weight:700;opacity:.85;margin-inline-start:4px}
+.ccm-people{margin:0;font-size:12.5px;color:var(--espresso,#3b2a1a)}

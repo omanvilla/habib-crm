@@ -48,6 +48,13 @@
     if(w.nextElementSibling!==host)host.parentNode.insertBefore(w,host);
     const n=callsToday?Number(callsToday.mine||0):null,t=callsToday?Number(callsToday.target||20):20;
     byId('crmCallHomeBtn').innerHTML='📞 سجّل اتصال'+(n==null?'':' <small dir="ltr">'+n+'/'+t+'</small>');
+    // 16 Nov 2026 (Ahmed: «وين اقدر اشوف انها اتصلت 20 اتصال في ذاك اليوم؟»): the owner and the manager see each person's calls of today
+    if(callsToday&&['owner','manager'].includes(role())){
+      let p=byId('crmCallPeople');
+      if(!p){p=document.createElement('p');p.id='crmCallPeople';p.className='ccm-people';w.appendChild(p);}
+      const people=callsToday.people||[];
+      p.innerHTML='<b>اتصالات اليوم:</b> '+(people.length?people.map(x=>esc(x.name||'موظف')+' <span dir="ltr">'+Number(x.calls||0)+'/'+t+'</span>').join(' · '):'ما انسجل أي اتصال اليوم');
+    }
   }
   function openCall(byNumber){
     byNumber=byNumber===true;
