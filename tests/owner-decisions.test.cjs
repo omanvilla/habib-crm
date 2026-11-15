@@ -13,6 +13,7 @@ const decide=(texts,history,out,c)=>{const o={action:'none',category:'buyer',...
 
 test('R74: the location goes to a client who needs it to judge the area, once, and no visit is recorded from it',()=>{
  for(const s of ['ي صديقي اريد اشوف الموقع هل مناسب لي او لا مو لازم للزياره','اذا ممكن الموقع عشان اعرف هل يناسبني او لا','اذا نظامك ما ممكن ترسل الموقع خلاص ما ممكن أزور الموقع لاني قلتلك انه زيارة الفيلا تعتمد ع الموقع','إذا ممكن اشوف الموقع اشوفه إذا يناسب او لا'])assert.equal(D.locationForArea(s),true,s);
+ assert.equal(D.locationForArea('اريد اعرف المكان بالضبط ما اريد ازوره'),true,'sixth dry-run batch');
  for(const s of ['ممكن الموقع','طيب هات الموقع','رسل الموقع','اعرف اذا السعر مناسب','ممكن لوكيشن والصوره الله يخليك'])assert.equal(D.locationForArea(s),false,s);
  const chat=[IN('الموقع'),OUT('اللوكيشن نرسله قبل الزيارة عشان نتأكد إن العقار لسا متاح وما تتعنى على الفاضي'),IN('ي صديقي اريد اشوف الموقع هل مناسب لي او لا'),IN('مو لازم للزياره')];
  let r=decide(['الموقع نرسله قبل الزيارة فقط اخوي عشان نتأكد العقار متوفر وقتها'],chat);
