@@ -142,5 +142,5 @@ test('the name question is not glued inside the visit question; R66 leaves no «
  r=decide(['الفيلا في الصومحان سعرها 69 الف'],[OUT('اذا تقبل بركاء عندنا فيلا في الصومحان الجنوبية بـ 69 الف'),IN('كم سعرها')],{},c);assert.deepEqual(r.texts,['الفيلا في الصومحان سعرها 69 الف'],'the office raised it before: R48 answers');
  r=decide(['لا الصومحان في بركاء مو مسقط'],[IN('65')],{},c);assert.deepEqual(r.texts,['لا الصومحان في بركاء مو مسقط'],'a plain answer about the place is not an offer');
  // chat 90f3bf27 (Barka number, a Muscat house): «شكرا» came back as «العفو» with the branch line after it
- assert(agent.includes("} else if (!bKeep && said.length && !hasLine && !bSent && !offer && !(said.length === 1 && /^(العفو|You're welcome)\s*$/.test(said[0]))) {"));
+ assert(agent.includes("} else if (!bKeep && said.length && !hasLine && !bSent && !offer && !(said.length === 1 && /^(العفو|You're welcome)\\s*$/.test(said[0]))) {"));
 });
