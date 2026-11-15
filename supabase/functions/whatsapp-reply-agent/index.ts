@@ -39,7 +39,10 @@ const AREA_REASON = /(اعرف|أعرف|اشوف|أشوف|نشوف|اتاكد|أ
 const locationForArea = (said: string) => LOCATION_ASK.test(said) && AREA_REASON.test(said);
 const LOCATION_HELD = /(موقع|لوكيشن)[^\n]{0,40}(قبل|مع|وقت|بعد)\s*(تحديد|الزيار|موعد)|برسلك\s*الموقع|نرسله/;
 const AREA_LINES = ["تفضل هذا الموقع", "شوف اذا المنطقة تناسبك وخبرني متى يناسبك تزور"];
-const INSIDE_VIDEO_ASK = /(فيديو|فديو|مقطع|تصوير)[^\n]{0,30}داخل|داخل[^\n]{0,30}(فيديو|فديو|مقطع)/;
+const INSIDE_VIDEO_ASK = /(فيديو|فديو|مقطع|تصوير)[^\n]{0,60}داخل|داخل[^\n]{0,30}(فيديو|فديو|مقطع)/;
+const VIDEO_PROMISE = /(برسل|بنرسل|ارسل|نرسل)\s*(لك|لكم)?\s*(ال)?(فيديو|فديو)/;
+const FAREWELL = /الله\s*(يوفقك|يسعدك|يحفظك)|بالتوفيق/;
+const IG_CODE = /instagram\.com\/(?:reels?|p|tv)\/([A-Za-z0-9_-]+)/i;
 const LAYOUT_ASK = /تقسيم|توزيع\s*(ال)?غرف|مساح(ة|ه|ات)\s*(كل\s*)?(ال)?غرف|مخطط|خرا[ئي]ط/;
 const LAYOUT_LINES = ["بخصوص التقسيم الافضل تزور الموقع وتشوفه على الطبيعة لان الخرائط تختلف عن الواقع", "متى يناسبك تزور ؟"];
 const OUR_HOUR = /الساع[ةه]\s*[0-9٠-٩]|[0-9٠-٩]\s*(العصر|الصبح|الصباح|المغرب|المسا|المساء|الظهر|الليل)/;
@@ -61,18 +64,30 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   // whether the place suits him, before he chooses a time, gets it, once. No visit is recorded from it (location_for_area).
   if (locationForArea(recentIn) && out.action === "none" && c.prop?.map_url && ["buyer", "tenant"].includes(out.category) && !sentBefore(String(c.prop.map_url))) {
     out.action = "send_location"; out.location_for_area = true; out.guard_location_for_area = true;
-    texts = texts.filter((t) => !(t.length <= 200 && LOCATION_HELD.test(t)) && !VISIT_Q.test(t)).slice(0, 1);
+    texts = texts.filter((t) => !(t.length <= 200 && (LOCATION_HELD.test(t) || FAREWELL.test(t))) && !VISIT_Q.test(t)).slice(0, 1);
     texts.push(...AREA_LINES);
   }
   // R75 (Ahmed gave the reel): a request for a video of the inside gets the reel marked «من الداخل» in the property's
   // marketing journal. The agent says nothing of its own about what a video shows.
-  if (INSIDE_VIDEO_ASK.test(c.burstSaid) && c.prop?.videoInside && out.action !== "handoff") {
-    const code = (String(c.prop.videoInside).match(/instagram\.com\/(?:reels?|p|tv)\/([A-Za-z0-9_-]+)/i) || [])[1] || String(c.prop.videoInside);
+  // («اقصد من الداخل» after «هل متوفر فيديو للفله» is the same request: the last lines are read together when the new ones say «داخل»)
+  if ((INSIDE_VIDEO_ASK.test(c.burstSaid) || (/داخل/.test(c.burstSaid) && INSIDE_VIDEO_ASK.test(recentIn))) && c.prop?.videoInside && out.action !== "handoff") {
+    const code = (String(c.prop.videoInside).match(IG_CODE) || [])[1] || String(c.prop.videoInside);
     const sent = sentBefore(code);
     texts = texts.filter((t) => !(t.length <= 200 && /فيديو|فديو|تصوير|مصور|الصور|التقسيم/.test(t)) && !/instagram\.com/.test(t));
     texts = [...(sent ? ["الفيديو من الداخل ارسلته لك فوق"] : ["هذا الفيديو من الداخل", String(c.prop.videoInside)]), ...texts];
     if (out.action === "none" && !c.visitedProp && !texts.some((t) => VISIT_Q.test(t))) texts.push("متى يناسبك تزور ؟");
     out.guard_inside_video = true;
+  }
+  // R5 / R34 (dry run of 15 Nov, second part: «تمام برسلك الفيديو» with a handoff «طلب فيديو»): the video is never promised.
+  // The property's reel goes now when it has one and it was not sent in this chat; with no reel the promise is only taken out.
+  if (texts.some((t) => t.length <= 200 && VIDEO_PROMISE.test(t) && !/instagram\.com/.test(t))) {
+    texts = texts.filter((t) => !(t.length <= 200 && VIDEO_PROMISE.test(t) && !/instagram\.com/.test(t)));
+    const vcode = c.prop?.video ? (String(c.prop.video).match(IG_CODE) || [])[1] || String(c.prop.video) : "";
+    if (vcode && !sentBefore(vcode) && !texts.some((t) => t.includes(vcode))) {
+      texts.push(String(c.prop.video));
+      if (out.action === "handoff" && /فيديو|فديو/.test(String(out.handoff_reason || "")) && !c.hardHandoff) { out.action = "none"; out.handoff_reason = null; delete out.soft_handoff_no_reply; }
+    }
+    out.guard_video_promise = true;
   }
   // R76 (Ahmed: «اللي يسأل عن التقسيم يفضل يزور الموقع لان الخرائط تختلف عن الواقع»; changes R41 for this question only)
   if (out.action === "handoff" && UNKNOWN_Q.test(String(out.handoff_reason || "")) && LAYOUT_ASK.test(`${c.burstSaid} ${out.handoff_reason}`)
@@ -1450,7 +1465,7 @@ Deno.serve(async (req) => {
     // last words are thanks only, so the reply is «العفو» alone, with no question, offer or repeated line. Only over a plain reply: not when
     // the model chose to say nothing, not with a handoff or a location going out, and R71 above already took its case.
     if (texts.length && out.action === "none" && !out.search_stopped && thanksOnly(burstSaid) && !(texts.length === 1 && String(texts[0]).trim() === "العفو")) {
-      texts = ["العفو"]; out.guard_thanks_only = true;
+      texts = [/[ء-ي]/.test(burstSaid) ? "العفو" : "You're welcome"]; out.guard_thanks_only = true; // R69: an English-writing client is answered in English
     }
     // the ad text goes once per conversation: if a long office message about this property already went out, drop it
     if (prop) {

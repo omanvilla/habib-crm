@@ -3,7 +3,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8').replace(/\r\n/g,'\n');
 const pickA=(start,end)=>{const a=agent.indexOf(start);assert(a>=0,'missing: '+start);const b=agent.indexOf(end,a);assert(b>a,'no end: '+start);return agent.slice(a,b+end.length);};
-const dsrc=['const UNKNOWN_Q','const LOCATION_ASK','const AREA_REASON','const locationForArea','const LOCATION_HELD','const AREA_LINES','const INSIDE_VIDEO_ASK','const LAYOUT_ASK','const LAYOUT_LINES','const OUR_HOUR','const OWNER_TIME_LINE','const DEPOSIT_SAID','const REASON_Q','const VISIT_Q']
+const dsrc=['const VIDEO_PROMISE','const FAREWELL','const IG_CODE','const UNKNOWN_Q','const LOCATION_ASK','const AREA_REASON','const locationForArea','const LOCATION_HELD','const AREA_LINES','const INSIDE_VIDEO_ASK','const LAYOUT_ASK','const LAYOUT_LINES','const OUR_HOUR','const OWNER_TIME_LINE','const DEPOSIT_SAID','const REASON_Q','const VISIT_Q']
  .map((s)=>pickA(s,'\n')).join('')+pickA('function ownerDecisions','\n}\n');
 const D=new Function(dsrc.replace(/(\w+): (?:string|any)(?:\[\])?(?=[,)])/g,'$1')+';return {ownerDecisions,locationForArea,INSIDE_VIDEO_ASK,LAYOUT_ASK,LAYOUT_LINES,AREA_LINES,OWNER_TIME_LINE,DEPOSIT_SAID};')();
 const IN=(b)=>({direction:'inbound',body:b}),OUT=(b)=>({direction:'outbound',body:b});
@@ -34,6 +34,18 @@ test('R75: a request for the inside video gets the reel marked «من الداخ
  r=decide(['ما عندنا تصوير ثاني للداخل'],[OUT(INSIDE),IN('ابي فيديو من الداخل')]);assert.deepEqual(r.texts,['الفيديو من الداخل ارسلته لك فوق','متى يناسبك تزور ؟']);
  r=decide(['ما عندنا تصوير ثاني للداخل'],[IN('ابي فيديو من الداخل')],{},{prop:{id:'TEST_PROP',videoInside:null}});assert.deepEqual(r.texts,['ما عندنا تصوير ثاني للداخل'],'a property with no inside reel is left alone');
  assert(agent.includes('.ilike("notes", "%من الداخل%")'));
+ // «اقصد من الداخل» after the video question, and the long sentence of the real chat
+ r=decide(['ما عندنا تصوير اضافي من الداخل'],[IN('هل متوفر فيديو للفله'),OUT(MAIN+' متى يناسبك تزور ؟'),IN('اقصد من الداخل'),IN('لأن أنا في الشرقيه')]);assert.equal(r.texts[1],INSIDE);
+ assert(D.INSIDE_VIDEO_ASK.test('ف الفيديو مذكور انه في في يو للبيت من الداخل'));
+});
+test('the video is never promised: the reel goes now, or the promise is taken out; R74 drops a farewell before the location',()=>{
+ const prop={id:'TEST_PROP',map_url:MAP,video:MAIN,videoInside:null};
+ let r=decide(['ما عندنا صور للفيلا حالياً','تمام برسلك الفيديو'],[IN('ممكن صور الفيلا')],{action:'handoff',handoff_reason:'طلب فيديو للفيلا في الصومحان الجنوبية'},{prop});
+ assert.deepEqual(r.texts,['ما عندنا صور للفيلا حالياً',MAIN]);assert.equal(r.out.action,'none');assert.equal(r.out.guard_video_promise,true);
+ r=decide(['ما عندنا صور','تمام برسلك الفيديو'],[IN('فيه صور للمكان')],{action:'handoff',handoff_reason:'طلب فيديو وما عندنا رابط الفيديو'},{prop:{id:'TEST_PROP',video:null}});
+ assert.deepEqual(r.texts,['ما عندنا صور']);assert.equal(r.out.action,'handoff','no reel: Ahmed still gets it, without the promise');
+ r=decide(['الله يوفقك اخوي'],[IN('اذا ممكن الموقع عشان اعرف هل يناسبني او لا')]);assert.deepEqual(r.texts,D.AREA_LINES);
+ assert(agent.includes('texts = [/[ء-ي]/.test(burstSaid) ? "العفو" : "You\'re welcome"];'));
 });
 test('R76: a layout question handed over as unknown gets «الخرائط تختلف عن الواقع» and the visit question',()=>{
  for(const s of ['ممكن مساحات و تقسيمات الفلا قبل ازور الموقع','توزيع الغرف كيف','عندكم مخطط البيت','سؤال ما عندي جوابه: مساحات كل غرفة في الاستراحة'])assert(D.LAYOUT_ASK.test(s),s);
