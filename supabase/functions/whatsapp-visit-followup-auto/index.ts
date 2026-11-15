@@ -545,6 +545,39 @@ function answeredGuard(out: any, o: any) {
   }
   return out;
 }
+// R83 (audit of the sent follow-ups, 16 Nov 2026; waits for Ahmed's word): on 15 Nov «كيف شفت بيت الحيل الجنوبية …» and «كيف شفت
+// فيلا بركاء الرميس …» went by themselves to two clients who had only said «ان شاء الله بكره» / «احاول اليوم المساء او بكره»:
+// the visit was recorded at the default 16:00, but neither the location nor the owner's number was ever sent, so they could
+// not have gone. A visit question (the opinion or «قدرت تزور») is asked only when the chat shows the place reached the client
+// (a map link, a location or a contact card, «تواصل مع صاحب العقار»), the visit is recorded done, or he wrote that he went.
+// Otherwise the row becomes R39's question for a missed visit and waits for the office (never by itself).
+const R83_PLACE = /maps\.|goo\.gl|\[(contacts|location)\]/;
+const R83_WAS_THERE = /(^|\s)(واصل|وصلت|وصلنا|شفت(ه|ها)?|شفنا(ه|ها)?|زرت(ه|ها)?|زرنا(ه|ها)?|دخلت|دخلنا|عاينت|عاينا|مريت|رحت|رحنا)(\s|$)/;
+// o: { group, kind, chat, visitDay, visitDone, name }
+function placeGuard(out: any, o: any) {
+  if (o.group || o.kind !== "visit" || o.visitDone || out.decision !== "followup" || !out.text) return out;
+  const t = normAr(out.text);
+  if (!(R73_OPINION_Q.test(t) || R73_DID_VISIT_Q.test(t))) return out;
+  const turns = chatTurns(o.chat);
+  if (!turns.length) return out;
+  if (turns.some((x) => x.who === "المكتب" && (R83_PLACE.test(x.text) || R64_OWNER.test(normAr(x.text))))) return out;
+  if (turns.some((x) => x.who === "العميل" && (!o.visitDay || x.day >= o.visitDay) && R83_WAS_THERE.test(normAr(x.text)) && !R73_NOT_VISITED.test(normAr(x.text)))) return out;
+  const she = /(قدرتي|شفتي|تزورين|تشوفين)/.test(out.text), name = String(o.name || "").trim();
+  out.text = `السلام عليكم ${name ? `بخصوص ${name} ` : ""}${she ? "تحبين" : "تحب"} نحدد لك موعد ثاني ؟`;
+  out.auto_ok = false; out.stage = "booked_no_show"; out.guard = "guard_place_not_sent";
+  out.reason = short(`(R83) ما انرسل له اللوكيشن ولا رقم صاحب العقار، يعني ما زار: ما ينسأل عن رأيه، والسؤال ينتظر المكتب. ${out.reason || ""}`, 300);
+  return out;
+}
+// R47 / R73 / R83: what may go by itself after a visit is the opinion question only. A row the guards marked for the office, a
+// client the review read as «حدد زيارة وما جاء», or any other text (15 Nov 17:30: «تحب نحدد لك موعد ثاني ؟» went by itself
+// with auto_ok=false) stays on the list for the office.
+function heldForOffice(f: any) {
+  if (/\((R73|R83)\)/.test(String(f?.review_reason || ""))) return "marked";
+  if (String(f?.client_stage || "") === "booked_no_show") return "no_show";
+  const t = String(f?.owner_text || "");
+  if (t && !(R73_OPINION_Q.test(normAr(t)) || t === EN_VISIT)) return "not_opinion";
+  return "";
+}
 // R69 (Ahmed 14 Nov 2026): a client who writes to us in English only gets his follow-up in English. Meta's templates are Arabic,
 // so nothing goes to him by itself past the 24 hours (auto_ok=false): the office sends from the phone. If the text still came
 // out Arabic (the model, or a guard's Arabic wording) a fixed English line goes instead.
@@ -653,6 +686,8 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
     eveningGuard(out, { group, route: String(x.route_key || ""), clientSaid, confirmUnanswered: !!out.confirm_unanswered, visitedDone, offerBranch, barkaAreas: l.barkaAreas, fallback, bookedClosed: !!out.booked_closed });
     // R73: a question the client already answered is not asked again (the note of 15 Nov)
     answeredGuard(out, { group, kind, chat: chatRead, visitDay, visitDone, today: todayRead, name });
+    // R83: no visit question when the place never reached the client
+    placeGuard(out, { group, kind, chat: chatRead, visitDay, visitDone, name });
   }
   const english = !!out.english;
   delete out.english; delete out.confirm_unanswered; delete out.booked_closed;
@@ -904,6 +939,7 @@ async function afterVisit(companyId: string, numbers: string[], out: Record<stri
       const f = await db.from("whatsapp_visit_followups").select("*").eq("id", id).single();
       // R73: the client already answered about this visit, so the row waits for the office and nothing goes by itself
       if (/\(R73\)/.test(String(f.data?.review_reason || ""))) { out.after_visit_held_answered = (out.after_visit_held_answered || 0) + 1; continue; }
+      { const why = heldForOffice(f.data); if (why) { const kh = `after_visit_held_${why}`; out[kh] = (out[kh] || 0) + 1; continue; } }
       const s = await sendOne(f.data, numbers, true);
       const k2 = `after_visit_${s}`; out[k2] = (out[k2] || 0) + 1;
     } catch (e) { out.after_visit_failed = (out.after_visit_failed || 0) + 1; console.error("[followup-auto] after visit", String((e as any)?.message || e)); }
@@ -936,6 +972,8 @@ async function sendInWindow(companyId: string, numbers: string[], out: Record<st
   const fs = await db.from("whatsapp_visit_followups").select("*").eq("company_id", companyId).eq("status", "awaiting_approval").not("reviewed_at", "is", null).not("owner_text", "is", null).in("conversation_id", ids).limit(AFTER_VISIT_PER_RUN);
   for (const f of fs.data || []) {
     if (await unreadVoiceNearEnd(f.conversation_id)) { out.in_window_voice_wait = (out.in_window_voice_wait || 0) + 1; continue; }
+    // R73 / R83: a row the guards left for the office never goes by itself, in the open window either
+    if (/\((R73|R83)\)/.test(String(f.review_reason || ""))) { out.in_window_held_marked = (out.in_window_held_marked || 0) + 1; continue; }
     const r = await sendOne(f, numbers, true);
     const k = `in_window_${r}`; out[k] = (out[k] || 0) + 1;
   }

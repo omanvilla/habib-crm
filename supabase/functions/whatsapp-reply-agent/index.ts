@@ -222,6 +222,27 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     out.handoff_reason = `مشتري جاد: ${String(out.handoff_reason || out.intent || "زار ويسأل عن العربون والحجز").replace(/^[^:\n]{0,30}:\s*/, "")}`;
     out.guard_deposit_serious = true; delete out.soft_handoff_no_reply;
   }
+  // Audit of the replies really sent (11 to 15 Nov 2026), three wordings the code itself produced or let through:
+  // R44: «حي عاصم» becomes «الرميس», which left «الرميس ولا الرميس ؟» and «… قريب الشارع العام او الرميس» in two sent replies.
+  // The second mention in the same line is taken out.
+  if (out.guard_r44) texts = texts.map((t) => (t.length <= 250 ? t.replace(/(الرميس[^\n؟?]{0,60}?)\s+(او|أو|ولا|و)\s*(في\s*|ب)?الرميس(?![ء-ي])/g, "$1") : t));
+  // R45: «متى يناسبك ؟» becomes «يناسبك ؟», which left «… ونعرض لك الوحدات المتوفرة ويناسبك ؟»
+  texts = texts.map((t) => (t.length <= 250 ? t.replace(/\s+و\s*يناسبك\s*؟/g, " يناسبك ؟") : t));
+  // R66: Barka offered on the Muscat number in other words than «اذا تقبل بركاء» («الاقرب لمبلغ التمويل عندنا فيلا في الصومحان
+  // الجنوبية بـ69 الف», 14 Nov, to a client who named no area). Same rule: only for a client who said المعبيلة or near Barka,
+  // and never when he himself sent the property (a link or a picture: R48 answers that).
+  if (c.route === "muscat" && out.action === "none" && ["buyer", "tenant"].includes(out.category)
+    && !inbound.some((h: any) => /instagram\.com|facebook\.com|fb\.watch/.test(body(h)) || ["image", "video"].includes(String(h.message_type || "")))) {
+    const barka = (c.available || []).filter((p: any) => p.branch_key === "barka");
+    const keys = barka.map((p: any) => areaKey(String(p.area || "").replace(/^\s*(ولاية\s+)?بركاء\s+/, "")).split(" ")[0]).filter((k: string) => k.length > 2 && !R66_GENERIC.includes(k));
+    const offers = (t: string) => t.length <= 250 && /عندنا|[اأ]قرب|متوفر/.test(t) && keys.some((k: string) => areaKey(t).includes(k));
+    if (texts.some(offers) && !nearBarka(inbound.map(body).join(" "), barka.map((p: any) => p.area))) {
+      texts = texts.filter((t) => !offers(t) && !(t.length <= 250 && R66_DETAILS_ASK.test(t)) && !VISIT_Q.test(t));
+      const line = (out.request?.areas || []).length ? "اول ما يتوفر بتواصل معك" : "في اي منطقة تبحث ؟";
+      if (!texts.includes(line)) texts.push(line);
+      out.guard_barka_offer = true; out.property_id = null;
+    }
+  }
   return texts;
 }
 const DEPOSIT_SAID = /عربون|مقدم\s*حجز|(ا|أ|ن)حجز\s*(ال)?(فيلا|فل[ةه]|بيت|شق[ةه]|منزل|عقار|[اأ]رض)|لحجز\s*(ال)?(فيلا|فل[ةه]|بيت|شق[ةه]|منزل|عقار|[اأ]رض)/;
@@ -1898,7 +1919,7 @@ Deno.serve(async (req) => {
     // «اذا تقبل» offer of R22 and a strong handoff (R23) stay as they are.
     const branchOf = (k: any) => k === "barka" ? { name: "بركاء", number: "92344273" } : k === "muscat" ? { name: "مسقط", number: "71770030" } : null;
     const propBranch = branchOf(prop?.branch_key);
-    if (!redirectToMuscat && propBranch && branchOf(conv.route_key) && prop.branch_key !== conv.route_key) {
+    if (!redirectToMuscat && propBranch && branchOf(conv.route_key) && prop.branch_key !== conv.route_key && !out.guard_barka_offer) {
       const bLine = `هذا العقار تتابعه معنا على رقم ${propBranch.name} ${propBranch.number} واتساب`;
       const bOut = history.filter((h: any) => h.direction === "outbound" && String(h.body || "").includes(propBranch.number));
       const bSent = bOut.length > 0;
