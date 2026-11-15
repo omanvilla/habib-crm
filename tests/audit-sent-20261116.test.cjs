@@ -113,3 +113,25 @@ test('R47 / R73: after a visit only the opinion question goes by itself',()=>{
  assert(fu.includes('if (/\\((R73|R83)\\)/.test(String(f.review_reason || ""))) { out.in_window_held_marked'));
  assert(fu.indexOf('answeredGuard(out, { group, kind, chat: chatRead')<fu.indexOf('placeGuard(out, { group, kind, chat: chatRead'));
 });
+
+// ---- dry run of 16 Nov on rows 513 to 552 of the list (chats of 28 Oct, the published code plus the fixes above) ----
+test('R77: a client who names the day for a house the owner lives in gets the owner number, not the name question alone',()=>{
+ const LINE='تواصل مع صاحب العقار مباشرة ونسق معه وقت الزيارة',prop={id:'H1',visit_method:'owner_lives'};
+ // chat 97963490: «متى ممكن الزيارة؟» «بكرة ممكن؟» came back as «اسمك الكريم ؟» only
+ let r=decide(['كم الساعة تقريباً ؟','اسمك الكريم ؟'],[OUT('رسلت لك بعض التفاصيل'),IN('متى ممكن الزيارة؟'),IN('بكرة ممكن؟')],{},{prop});
+ assert.equal(r.out.action,'send_owner_number');assert.deepEqual(r.texts,[LINE,'اسمك الكريم ؟']);assert.equal(r.out.guard_owner_number_day,true);
+ r=decide(['كم الساعة تقريباً يوم السبت ؟'],[IN('السبت ان شاء الله')],{},{prop});assert.equal(r.out.action,'send_owner_number');assert.deepEqual(r.texts,[LINE]);
+ // no day named, another sentence left, an open house, an owner: as before
+ r=decide(['كم الساعة تقريباً ؟','اسمك الكريم ؟'],[IN('متى ممكن الزيارة؟')],{},{prop});assert.equal(r.out.action,'none');assert.deepEqual(r.texts,['اسمك الكريم ؟']);
+ r=decide(['الزيارة تحتاج تنسيق مع المالك قبل يوم','كم الساعة تقريباً ؟'],[IN('بكره')],{},{prop});assert.equal(r.out.action,'none');assert.deepEqual(r.texts,['الزيارة تحتاج تنسيق مع المالك قبل يوم']);
+ r=decide(['كم الساعة تقريباً ؟'],[IN('بكره')],{},{prop:{id:'O1',visit_method:'open'}});assert.equal(r.out.action,'none');assert.deepEqual(r.texts,['كم الساعة تقريباً ؟']);
+});
+test('the name question is not glued inside the visit question; R66 leaves no «تقدر تزيد شوي ؟» behind; a bare thanks gets no branch line',()=>{
+ let r=decide(['الكروكي نسلمه للمشتري بعدين','متى يناسبك تزور واسمك الكريم ؟'],[IN('ممكن الكروكي')],{});
+ assert.deepEqual(r.texts,['الكروكي نسلمه للمشتري بعدين','متى يناسبك تزور ؟']);
+ const c={route:'muscat',available:[{id:'B1',branch_key:'barka',area:'الصومحان الجنوبية'}],prop:{id:'B1',branch_key:'barka'}};
+ r=decide(['الاقرب عندنا فيلا في الصومحان الجنوبية بـ69 الف','تقدر تزيد شوي ؟'],[IN('65')],{request:{areas:['مسقط']}},c);
+ assert.deepEqual(r.texts,['اول ما يتوفر بتواصل معك']);
+ // chat 90f3bf27 (Barka number, a Muscat house): «شكرا» came back as «العفو» with the branch line after it
+ assert(agent.includes('} else if (!bKeep && said.length && !hasLine && !bSent && !offer && !out.guard_thanks_only) {'));
+});

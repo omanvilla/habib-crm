@@ -156,6 +156,12 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   if (c.prop?.visit_method === "owner_lives" && texts.some((t) => t.length <= 200 && ASK_HOUR.test(t))) {
     texts = texts.map((t) => (t.length <= 200 && ASK_HOUR.test(t) ? t.replace(/\s*و?\s*كم\s*الساع[ةه][^؟?\n]*[؟?]?/g, "").trim() : t)).filter(Boolean);
     out.guard_owner_time = true;
+    // dry run of 16 Nov (rows 513 to 552): «متى ممكن الزيارة؟ بكرة ممكن؟» was left with «اسمك الكريم ؟» alone. He named the
+    // day, the hour is the owner's: the owner's number goes with the fixed line, as on the chats where the model sends it itself.
+    if (out.action === "none" && ["buyer", "tenant"].includes(out.category) && /بكر|باكر|السبت|ال[اأ]حد|ال[اإ]ثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمع[ةه]/.test(String(c.burstSaid || ""))
+      && !texts.some((t) => !/^\s*و?اسمك\s*الكريم\s*؟\s*$/.test(t))) {
+      out.action = "send_owner_number"; texts = [OWNER_TIME_LINE, ...texts]; out.guard_owner_number_day = true;
+    }
   }
   // R41, same batch: «… يحتاج رد أحمد» with no handoff leaves the client waiting for nobody. It becomes the silent handoff
   // «سؤال ما عندي جوابه:» (R41), unless a handoff or a location is already going out.
@@ -228,6 +234,8 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   if (out.guard_r44) texts = texts.map((t) => (t.length <= 250 ? t.replace(/(الرميس[^\n؟?]{0,60}?)\s+(او|أو|ولا|و)\s*(في\s*|ب)?الرميس(?![ء-ي])/g, "$1") : t));
   // R45: «متى يناسبك ؟» becomes «يناسبك ؟», which left «… ونعرض لك الوحدات المتوفرة ويناسبك ؟»
   texts = texts.map((t) => (t.length <= 250 ? t.replace(/\s+و\s*يناسبك\s*؟/g, " يناسبك ؟") : t));
+  // «متى يناسبك تزور واسمك الكريم ؟» (dry run of 16 Nov): the name question is not glued inside the visit question
+  texts = texts.map((t) => (t.length <= 120 ? t.replace(/(تزور(ون|ين)?)\s*و\s*اسمك\s*الكريم\s*؟/g, "$1 ؟") : t));
   // R66: Barka offered on the Muscat number in other words than «اذا تقبل بركاء» («الاقرب لمبلغ التمويل عندنا فيلا في الصومحان
   // الجنوبية بـ69 الف», 14 Nov, to a client who named no area). Same rule: only for a client who said المعبيلة or near Barka,
   // and never when he himself sent the property (a link or a picture: R48 answers that).
@@ -237,7 +245,7 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     const keys = barka.map((p: any) => areaKey(String(p.area || "").replace(/^\s*(ولاية\s+)?بركاء\s+/, "")).split(" ")[0]).filter((k: string) => k.length > 2 && !R66_GENERIC.includes(k));
     const offers = (t: string) => t.length <= 250 && /عندنا|[اأ]قرب|متوفر/.test(t) && keys.some((k: string) => areaKey(t).includes(k));
     if (texts.some(offers) && !nearBarka(inbound.map(body).join(" "), barka.map((p: any) => p.area))) {
-      texts = texts.filter((t) => !offers(t) && !(t.length <= 250 && R66_DETAILS_ASK.test(t)) && !VISIT_Q.test(t));
+      texts = texts.filter((t) => !offers(t) && !(t.length <= 250 && (R66_DETAILS_ASK.test(t) || /تقدر(ين|ون)?\s*تزيد/.test(t))) && !VISIT_Q.test(t));
       const line = (out.request?.areas || []).length ? "اول ما يتوفر بتواصل معك" : "في اي منطقة تبحث ؟";
       if (!texts.includes(line)) texts.push(line);
       out.guard_barka_offer = true; out.property_id = null;
@@ -1938,7 +1946,7 @@ Deno.serve(async (req) => {
         actionMsgs.length = 0;
         analysis.branch_redirect = prop.branch_key; analysis.viewing_date = null; analysis.viewing_time = null;
         if (bSent) analysis.branch_line_already_sent = true;
-      } else if (!bKeep && said.length && !hasLine && !bSent && !offer) {
+      } else if (!bKeep && said.length && !hasLine && !bSent && !offer && !out.guard_thanks_only) {
         out.reply_messages = [...said.slice(0, 2), bLine];
         analysis.branch_redirect = prop.branch_key;
       }
