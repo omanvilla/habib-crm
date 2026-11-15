@@ -36,7 +36,9 @@ const UNKNOWN_Q = /^\s*سؤال ما عندي جوابه\s*:/;
 // R74 to R79: Ahmed's six decisions of 15 Nov 2026 after the dry run on 124 chats, held by code (brain.ts has no room left)
 const LOCATION_ASK = /موقع|لوكيشن|لوكشن|location|الخريط|المكان\s*بالضبط/i;
 const AREA_REASON = /ما\s*([اأ]ريد|[اأ]بي|[اأ]بغى|[اأ]با|بغيت)\s*[اأ]زور|[اأ]عرف\s*(ال)?(مكان|موقع)\s*بالضبط|(اعرف|أعرف|اشوف|أشوف|نشوف|اتاكد|أتأكد|اتأكد)[^\n]{0,40}(يناسب(ني|نا)|مناسب\s*(لي|لنا)|قريب|بعيد)|(يناسب|مناسب)(ني|نا|ه)?\s*(لي\s*)?(او|أو|ولا|والا)\s*(لا|ما)|مو\s*لازم\s*(لل)?زيار|الزيار[ةه]\s*تعتمد|تعتمد\s*(على|ع)\s*(ال)?موقع/;
-const locationForArea = (said: string) => LOCATION_ASK.test(said) && AREA_REASON.test(said);
+// «اريد أشوف البيت من الخارج لان من سكان الحيل الشماليه» (eleventh dry-run batch): the same wish without the word «موقع»
+const OUTSIDE_LOOK = /([اأ]شوف|نشوف|[اأ]مر|نمر|[اأ]طل)[^\n]{0,25}من\s*(ال)?(خارج|برع|برا)(\s|$)/;
+const locationForArea = (said: string) => (LOCATION_ASK.test(said) && AREA_REASON.test(said)) || OUTSIDE_LOOK.test(said);
 const LOCATION_HELD = /(موقع|لوكيشن)[^\n]{0,40}(قبل|مع|وقت|بعد)\s*(تحديد|الزيار|موعد)|برسلك\s*الموقع|نرسله/;
 const AREA_LINES = ["تفضل هذا الموقع", "شوف اذا المنطقة تناسبك وخبرني متى يناسبك تزور"];
 const INSIDE_VIDEO_ASK = /(فيديو|فديو|مقطع|تصوير)[^\n]{0,60}داخل|داخل[^\n]{0,30}(فيديو|فديو|مقطع)/;
