@@ -6,6 +6,16 @@ Updated 2026-11-16. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 16 November 2026 — daily-plan review: SQL109 (land study → Wednesday) applied; inventory target 25 in AGENTS.md
+
+- **Ahmed** reviewed his «الخطة اليومية» project against the CRM and said to fix every conflict. On the CRM side: **SQL109**
+  (`db/changes/109-land-study-wednesday.forward.sql`, md5-guarded on `crm_repair_private.property_alerts_run()`) changes the
+  WhatsApp alert «دراسة أرض جديدة انضافت ليوم التسعير» from Tuesday to Wednesday; applied live and read back. **AGENTS.md**: the
+  inventory target is 25 good available properties for the company by 12 Feb 2027 (his 90-day plan), replacing «10 per
+  branch»; the Muscat/Barka split in saved branch targets is still his to give, so the code default is not changed yet.
+- Not CRM code: the planner, calendar and the three claude.ai routines of that project are changed from the project itself
+  (a direct routine update was refused here).
+
 ## 16 November 2026 — audit of the replies really sent (11 to 15 Nov), R83 to R86, SQL106, two more dry-run batches — **published** (`0c503e1`)
 
 - **R91, 16 Nov midday: «مسكون» means the owner or his family live in it; a rented property is taken — published** (Ahmed: «إذا العقار مؤجر عادي نستلمه… إذا المالك ساكن ما نستلم»; wording approved «موافق، انشر»). What triggered it: an owner offering a villa in Al Maabilah rented to an investor (`1d66597f`) got «العقار مؤجر حالياً وما نقدر نستلم عقارات مسكونة» at 07:57 (the office then took the chat by hand). Now the owner living in it gets «نعتذر منك احنا ما نستلم عقارات مرهونة او ساكن فيها صاحبها» + «الله يسعدك 🌷»; a rented property goes on through the intake, the key question is replaced by «inspection arranged with the tenant through the owner» (`owner_leads.visit_method=office` with that instruction), the owner is asked «البيت فاضي ولا مؤجر ولا ساكنين فيه ؟». Mortgaged and heirs unchanged (the Al Atkiya villa «مرهونة ومسكونة» stays declined). Also fixed: «وما فيه رهن» was read as mortgaged (the negation needed a space before «ما»). `main` = `712b28e` (fast-forward, CI green); `whatsapp-reply-agent` v84 → `712b28e` (was v83 `387e493`); prompts synced at `712b28e` (`brain_base` 69,592 characters); dry-run copy v61 → `19d23db`. Dry run: last 25 chats + 7 real owner messages naming rent / living / mortgage: rented villa, rented shop, rented building and rented shops all continue the intake; «حاليا ساكنين فيها» and «نعم في رهن وساكنين فيه» get the new apology; nothing else changed. Tests `tests/occupied-r91.test.cjs`. Next free rule number **R92**. Live check after publishing (inline, nothing sent or written): the rented villa got «نقدر نعرضه للباحثين الجادين…» + «وبما ان العقار مؤجر نحتاج تنسيق المعاينة مع المستأجر», «حاليا ساكنين فيها» got the new apology. Not seen yet: a real reply sent to an owner after v84.
