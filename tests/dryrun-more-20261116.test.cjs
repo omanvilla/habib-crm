@@ -43,3 +43,16 @@ test('R78: «ما ناسبك في اللي شفته» only after a visit',()=>{
 test('the two guards live in ownerDecisions and the call passes visitedSome',()=>{
  assert(agent.includes('visitedAny: !out.property_id && visitedIds.size > 0, visitedSome: visitedIds.size > 0,'));
 });
+test('«اسمك الكريم ؟» stuck inside the sold line moves before the last question',()=>{
+ // 307af714: «نستفسر عن هذا الإعلان» for the Al Haram villa that was sold
+ const h=[IN('نستفسر عن هذا الإعلان')];
+ let r=decide(['الفيلا اللي سألت عنها في الهرم بـ 62 الف انباعت\nاسمك الكريم ؟','بس عندنا توين فيلا في الرميس بـ 59 الف متوفرة حالياً\nالسعر: 59,000 ريال عماني','متى يناسبك تزور ؟'],h);
+ assert.deepEqual(r.texts,['الفيلا اللي سألت عنها في الهرم بـ 62 الف انباعت','بس عندنا توين فيلا في الرميس بـ 59 الف متوفرة حالياً\nالسعر: 59,000 ريال عماني','اسمك الكريم ؟','متى يناسبك تزور ؟']);
+ assert.equal(r.out.guard_name_last,true);
+ // no question at the end: it goes last
+ r=decide(['الفيلا ما متوفره حالياً\nاسمك الكريم ؟','عندنا بيت في الحيل الجنوبية بـ 130 الف'],h);
+ assert.deepEqual(r.texts,['الفيلا ما متوفره حالياً','عندنا بيت في الحيل الجنوبية بـ 130 الف','اسمك الكريم ؟']);
+ // the name question as its own message, or in the last message, is left where it is (R20: the owner's first reply starts with it)
+ for(const t of [['اسمك الكريم ؟','ارسل تفاصيل البيت كاملة والمستندات والسعر اللي في بالك اذا ما عليك امر'],['الفيلا ما متوفره حالياً','اسمك الكريم ؟\nمتى يناسبك تزور ؟']])
+  assert.deepEqual(decide(t,h).texts,t);
+});

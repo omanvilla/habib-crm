@@ -324,6 +324,19 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     }
     out.guard_seen_q = true;
   }
+  // dry run of 16 Nov (307af714, b387b2de, 2 more): «اسمك الكريم ؟» stuck inside «الفيلا اللي سألت عنها انباعت», before the
+  // details of the other property, read as one message «انباعت / اسمك الكريم ؟ / بس عندنا…». It moves before the last question.
+  const NAME_LINE = /^\s*اسمك\s*الكريم\s*؟\s*$/;
+  for (let i = 0; i < texts.length - 1; i++) {
+    const ls = texts[i].split("\n");
+    if (ls.length > 1 && ls.some((l) => NAME_LINE.test(l))) {
+      texts[i] = ls.filter((l) => !NAME_LINE.test(l)).join("\n");
+      if (!texts.some((t) => /اسمك\s*الكريم/.test(t))) {
+        if (/؟\s*$/.test(texts[texts.length - 1])) texts.splice(texts.length - 1, 0, "اسمك الكريم ؟"); else texts.push("اسمك الكريم ؟");
+      }
+      out.guard_name_last = true;
+    }
+  }
   return texts;
 }
 const DEPOSIT_SAID = /عربون|مقدم\s*حجز|(ا|أ|ن)حجز\s*(ال)?(فيلا|فل[ةه]|بيت|شق[ةه]|منزل|عقار|[اأ]رض)|لحجز\s*(ال)?(فيلا|فل[ةه]|بيت|شق[ةه]|منزل|عقار|[اأ]رض)/;
