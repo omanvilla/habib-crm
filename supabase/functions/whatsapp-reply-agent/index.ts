@@ -302,6 +302,28 @@ function ownerDecisions(out: any, lines: string[], c: any) {
       out.guard_barka_offer = true; out.property_id = null;
     }
   }
+  // R34 (dry run of 16 Nov, c151bb05 «ما رحت .. انتظر صور الشقق من المالك»): the privacy line went with the reel link and no
+  // visit offer. The house the owner lives in gets the two fixed lines after it, and no video link (that is for an empty one).
+  if (texts.some((t) => /ما\s*صورنا\s*البيت\s*من\s*الداخل/.test(t)) && out.action !== "handoff" && !c.visitedProp) {
+    texts = texts.filter((t) => !/^\s*https?:\/\/(www\.)?instagram\.com\/\S+\s*$/.test(t));
+    const at = texts.findIndex((t) => /ما\s*صورنا\s*البيت\s*من\s*الداخل/.test(t));
+    if (!texts.some((t) => /نرتب\s*لك\s*زيارة/.test(t))) texts.splice(at + 1, 0, "بس نقدر نرتب لك زيارة وتشوف البيت من الداخل على راحتك");
+    if (!texts.some((t) => /يناسبك/.test(t))) texts.push("متى يناسبك ؟");
+    out.guard_privacy_visit = true;
+  }
+  // R78 (dry run of 16 Nov, 550b4985 «ممكن تفاصيل» + a reel, then «؟؟»; de9733c5 «رسلت لهم ما ردوا علي»): «ايش اللي ناقصك او
+  // ما ناسبك في اللي شفته ؟» went to clients who never visited (an old office line «هل الفيلا ما ناسبتك» was read as a visit).
+  // Asked only after a recorded visit or the client's own words; a reel nobody recognised gets the R23 question instead.
+  const SEEN_Q = /ما\s*ناسب(ك|ج|كم)\s*في\s*اللي\s*شف|اللي\s*ناقص(ك|ج|كم)\s*(او|أو)/;
+  if (texts.some((t) => SEEN_Q.test(t)) && !c.visitedProp && !c.visitedSome && !c.saidVisited) {
+    texts = texts.filter((t) => !SEEN_Q.test(t));
+    const linkSent = tail.some((h: any) => /instagram\.com|facebook\.com|fb\.watch/.test(body(h)));
+    if (linkSent && !out.property_id) texts.push("اكتب لي المنطقة او السعر اللي في الاعلان اذا ما عليك امر");
+    if (!texts.some((t) => !/^\s*اسمك\s*الكريم\s*؟?\s*$/.test(t))) {
+      texts = []; out.action = "handoff"; out.handoff_reason = `ما عرفنا: العميل ما زار وكتب «${String(c.burstSaid || "").slice(0, 120)}»`;
+    }
+    out.guard_seen_q = true;
+  }
   return texts;
 }
 const DEPOSIT_SAID = /عربون|مقدم\s*حجز|(ا|أ|ن)حجز\s*(ال)?(فيلا|فل[ةه]|بيت|شق[ةه]|منزل|عقار|[اأ]رض)|لحجز\s*(ال)?(فيلا|فل[ةه]|بيت|شق[ةه]|منزل|عقار|[اأ]رض)/;
@@ -1793,7 +1815,7 @@ Deno.serve(async (req) => {
     });
     // one visit question is enough
     // R74 to R79: Ahmed's decisions of 15 Nov 2026 (ownerDecisions above). The branch rule (R48) still runs after this.
-    texts = ownerDecisions(out, texts, { history, burstSaid, prop, visitedProp: !!prop && visitedIds.has(prop.id), visitedAny: !out.property_id && visitedIds.size > 0,
+    texts = ownerDecisions(out, texts, { history, burstSaid, prop, visitedProp: !!prop && visitedIds.has(prop.id), visitedAny: !out.property_id && visitedIds.size > 0, visitedSome: visitedIds.size > 0,
       saidVisited: history.some((h: any) => h.direction === "inbound" && SAID_VISITED.test(String(h.transcript || h.body || ""))),
       handoffOpen: !!conv.human_handoff_required, hardHandoff: HARD_HANDOFF.test(String(out.handoff_reason || "")),
       gone: goneRows, available: props, route: String(conv.route_key || ""), typeLabel: typeAr, msgType: msg.message_type });
