@@ -1677,7 +1677,8 @@ Deno.serve(async (req) => {
     if (out.category === "seller" && !review && !texts.some((t) => DECLINE_RE.test(t)) && out.action !== "handoff"
       && !history.some((h: any) => h.direction === "outbound" && h.actor_type === "human")) {
       const ownerSaid = history.filter((h: any) => h.direction === "inbound").slice(-8).map((h: any) => String(h.transcript || h.body || "")).join("\n");
-      const neg = (re: RegExp) => new RegExp(`(^|\\s)(ما|مو|مب|ماهو|مافي|بدون|لا|ولا|ليس|غير|مش)\\s*(هو\\s*|هي\\s*|في\\s*|فيه\\s*|عليه\\s*|عليها\\s*|فيها\\s*)?(${re.source})`);
+      // R91 dry run: «مؤجر وما فيه رهن» is a «no» too (the «و» stuck to «ما»)
+      const neg = (re: RegExp) => new RegExp(`(^|\\s)و?(ما|مو|مب|ماهو|مافي|بدون|لا|ولا|ليس|غير|مش)\\s*(هو\\s*|هي\\s*|في\\s*|فيه\\s*|عليه\\s*|عليها\\s*|فيها\\s*)?(${re.source})`);
       const HEIRS = /(مال|حق|ملك|باسم|بين)\s*(ال)?ورث|(البيت|العقار|الارض|الأرض|الفيلا|المزرعة)\s*(هذا\s*|هذي\s*)?(ال)?ورث|للورث|ورثة\s*(ابو|أبو|والد|المرحوم)|تركة|تركه/;
       const MORTGAGED = /مرهون|مرهونة|(عليه|عليها|فيه|فيها|في)\s*رهن/;
       // R91 (Ahmed 16 Nov 2026): «مسكون» means the owner or his family live in it. A rented property (a tenant lives in it) is

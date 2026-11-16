@@ -31,7 +31,7 @@ test('R91: the owner or his family living in it is declined with the new line',(
   const r=run(said);assert.deepEqual(r.texts,DECLINE,said);assert.equal(r.out.guard_owner_decline,'mortgaged_or_occupied',said);assert.equal(r.out.action,'none',said);}
  // a tenant in one line does not excuse the owner living there in another
  const r=run(['احنا ساكنين فيه','الملحق مؤجر']);assert.deepEqual(r.texts,DECLINE);
- for(const said of ['البيت فاضي','مو مسكون','ما احد ساكن فيه'])assert.equal(run(said).out.guard_owner_decline,undefined,said);
+ for(const said of ['البيت فاضي','مو مسكون','ما احد ساكن فيه','البيت فاضي وما فيه رهن','وما عليه رهن'])assert.equal(run(said).out.guard_owner_decline,undefined,said);
 });
 test('R91: mortgaged and heirs are unchanged (the Al Atkiya villa «مرهونة ومسكونة» stays declined)',()=>{
  assert.deepEqual(run('الفيلا مرهونة ومسكونة').texts,DECLINE);
