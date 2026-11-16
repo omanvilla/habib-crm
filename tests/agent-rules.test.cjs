@@ -132,7 +132,7 @@ test('R19: the agent invites an interested lead itself and books the meeting wit
 });
 test('R20: owner intake asks details, documents and price first; occupied or mortgaged is declined at once',()=>{
  assert(brain.includes('ارسل تفاصيل البيت كاملة والمستندات والسعر اللي في بالك اذا ما عليك امر'));
- assert(brain.includes('نعتذر منك احنا ما نستلم عقارات مرهونة او مسكونة'));
+ assert(brain.includes('نعتذر منك احنا ما نستلم عقارات مرهونة او ساكن فيها صاحبها'),'R91 (16 Nov): the line names the owner living in it');
  assert(!brain.includes('سؤالين كل رسالة'),'the 8 Nov two-questions-per-message owner order was replaced by R20');
  assert(rules.includes('| R20 |'));
 });

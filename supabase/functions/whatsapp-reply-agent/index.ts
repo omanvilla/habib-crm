@@ -368,7 +368,7 @@ const noReplyOrder = (t: string) => NO_REPLY_ORDER.test(t) && !ORDER_DO.test(t);
 const NOT_A_VISIT_Q = /فيديو|الصور|صور البيت|صور الفيلا|الرابط|الريل|الاعلان|الإعلان/;
 // R10 / R20 (8 and 10 Nov): an owner is declined politely (heirs, occupied, mortgaged); this reply always goes out.
 // A bare «نعتذر منك» (sorry for the delay) is not a decline.
-const DECLINE_RE = /ما\s*(نقدر\s*)?(نستلم|نقبل|نتعامل\s*مع)|(نعتذر|المعذر[هة])[^\n]{0,40}(ورث|مرهون|مسكون|ساكنين)|نشتغل\s*في\s*مسقط\s*وبركاء\s*فقط/;
+const DECLINE_RE = /ما\s*(نقدر\s*)?(نستلم|نقبل|نتعامل\s*مع)|(نعتذر|المعذر[هة])[^\n]{0,40}(ورث|مرهون|مسكون|ساكن)|نشتغل\s*في\s*مسقط\s*وبركاء\s*فقط/;
 // R56 (Ahmed 14 Nov 2026): the office works in Muscat governorate and wilayat Barka only, because a land or a building must be
 // seen on site. An owner (or a broker) who offers a property anywhere else gets these lines, is asked for nothing, and no
 // price study is opened (the lines match DECLINE_RE, so R37 closes the offer). The place is read from what the model wrote
@@ -1680,11 +1680,15 @@ Deno.serve(async (req) => {
       const neg = (re: RegExp) => new RegExp(`(^|\\s)(ما|مو|مب|ماهو|مافي|بدون|لا|ولا|ليس|غير|مش)\\s*(هو\\s*|هي\\s*|في\\s*|فيه\\s*|عليه\\s*|عليها\\s*|فيها\\s*)?(${re.source})`);
       const HEIRS = /(مال|حق|ملك|باسم|بين)\s*(ال)?ورث|(البيت|العقار|الارض|الأرض|الفيلا|المزرعة)\s*(هذا\s*|هذي\s*)?(ال)?ورث|للورث|ورثة\s*(ابو|أبو|والد|المرحوم)|تركة|تركه/;
       const MORTGAGED = /مرهون|مرهونة|(عليه|عليها|فيه|فيها|في)\s*رهن/;
-      const OCCUPIED = /ساكنين\s*(فيه|فيها|في البيت)|(انا|أنا|احنا|نحن)\s*(ساكن|ساكنين)|مسكون|مسكونة/;
+      // R91 (Ahmed 16 Nov 2026): «مسكون» means the owner or his family live in it. A rented property (a tenant lives in it) is
+      // taken as usual, so the owner's line that names a tenant or a rent never counts as lived in.
+      const OCCUPIED = /ساكنين\s*(فيه|فيها|في البيت)|(انا|أنا|احنا|نحن|اهلي|أهلي|عيالي|عائلتي|العايلة|العائلة|الاهل|الأهل)\s*(ساكن|ساكنين)|مسكون|مسكونة/;
+      const RENTED = /مستأجر|مستاجر|مأجر|ماجر|مؤجر|موجر|ايجار|إيجار|اجار|أجار|للإيجار|ساكن\s*فيه\s*(واحد|ناس|عايلة|عائلة|اجانب|أجانب|وافد)/;
       const says = (re: RegExp) => re.test(ownerSaid) && !neg(re).test(ownerSaid);
-      const heirs = says(HEIRS), held = says(MORTGAGED) || says(OCCUPIED);
+      const ownerLives = ownerSaid.split("\n").some((l: string) => OCCUPIED.test(l) && !neg(OCCUPIED).test(l) && !RENTED.test(l));
+      const heirs = says(HEIRS), held = says(MORTGAGED) || ownerLives;
       if (heirs || held) {
-        texts = [heirs ? "نعتذر منك احنا ما نستلم عقارات الورثة" : "نعتذر منك احنا ما نستلم عقارات مرهونة او مسكونة", "الله يسعدك 🌷"];
+        texts = [heirs ? "نعتذر منك احنا ما نستلم عقارات الورثة" : "نعتذر منك احنا ما نستلم عقارات مرهونة او ساكن فيها صاحبها","الله يسعدك 🌷"];
         out.action = "none"; out.guard_owner_decline = heirs ? "heirs" : "mortgaged_or_occupied";
       }
     }
@@ -1885,6 +1889,12 @@ Deno.serve(async (req) => {
         // R46: the owner's answer to «المفتاح وين يكون ؟» is kept on the offer (SQL100 columns) and never wiped by a later empty answer
         if (o.visit_method && ["open", "lockbox", "office"].includes(o.visit_method)) row.visit_method = o.visit_method;
         if (String(o.visit_instructions || "").trim()) row.visit_instructions = short(o.visit_instructions, 300);
+        // R91 (Ahmed 16 Nov 2026): a rented property is taken; the inspection is arranged with the tenant through the owner
+        const ownerLines = history.filter((h: any) => h.direction === "inbound").slice(-8).map((h: any) => String(h.transcript || h.body || "")).join("\n");
+        if (!row.visit_method && /مستأجر|مستاجر|مؤجر|موجر|مأجر|ماجر/.test(ownerLines) && !/(ما|مو|مب|مش|غير)\s*(مؤجر|موجر|مأجر|ماجر)/.test(ownerLines)) {
+          row.visit_method = "office";
+          if (!row.visit_instructions) row.visit_instructions = "مؤجر: المعاينة تنسيق مع المستأجر عن طريق المالك";
+        }
         // SQL101: electricity and water as the owner said them; an empty answer never wipes a saved one
         if (["yes", "no"].includes(o.electricity)) row.electricity_connected = o.electricity;
         if (["yes", "no"].includes(o.water)) row.water_connected = o.water;
@@ -1959,7 +1969,8 @@ Deno.serve(async (req) => {
       try {
         const reply = out.reply_messages.join(" ");
         const ownerSaid = `${history.filter((h: any) => h.direction === "inbound").slice(-8).map((h: any) => String(h.transcript || h.body || "")).join(" ")} ${out.crm_note || ""}`;
-        const mortgaged = /مرهون|رهن/.test(ownerSaid), occupied = /مسكون|ساكن|مستأجر|مأجر|مؤجر/.test(ownerSaid);
+        // R91: a tenant is not «مسكون» (a rented property is taken), so only the owner's living there counts
+        const mortgaged = /مرهون|رهن/.test(ownerSaid), occupied = /مسكون|ساكن/.test(ownerSaid);
         const why = OUT_OF_AREA_SAID.test(reply) ? "خارج مسقط وبركاء" : /ورث|ترك[ةه]/.test(reply) ? "ورثة" : mortgaged && occupied ? "مرهون ومسكون" : mortgaged ? "مرهون" : occupied ? "مسكون" : "مرهون أو مسكون";
         analysis.owner_offer_closed = why;
         const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());

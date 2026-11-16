@@ -264,7 +264,7 @@ test('14 Nov guards, batch 3: call request (R12), owner declines (R10 / R20), a 
  // R10 / R20: only the owner's own clear words
  const S={out:{category:'seller'},texts:['ارسل الكروكي اذا ما عليك امر']};
  r=run('البيت مال ورثة',S);assert.deepEqual(r.texts,['نعتذر منك احنا ما نستلم عقارات الورثة','الله يسعدك 🌷']);assert.equal(r.out.guard_owner_decline,'heirs');
- r=run('البيت مرهون للبنك',S);assert.deepEqual(r.texts,['نعتذر منك احنا ما نستلم عقارات مرهونة او مسكونة','الله يسعدك 🌷']);
+ r=run('البيت مرهون للبنك',S);assert.deepEqual(r.texts,['نعتذر منك احنا ما نستلم عقارات مرهونة او ساكن فيها صاحبها','الله يسعدك 🌷']);
  r=run('احنا ساكنين فيه بس ممكن تنسيق للزيارة',S);assert.equal(r.out.guard_owner_decline,'mortgaged_or_occupied');
  for(const said of ['لا ما فيه رهن والبيت فاضي','مو مرهون','بدون رهن','البيت مو مال ورثة','ما في رهن'])
   {r=run(said,S);assert.equal(r.out.guard_owner_decline,undefined,said);assert.deepEqual(r.texts,S.texts,said);}
