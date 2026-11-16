@@ -18,7 +18,26 @@ const DEBOUNCE_MS = Number(Deno.env.get("REPLY_DEBOUNCE_MS") || 35000); // wait 
 const HARD_HANDOFF = /^\s*(تفاوض|مشتري جاد|دراسة سعر|سؤال ما عندي جوابه|اجتماع)\s*:/;
 // R61: a question about a contest (we run none). R62: a question about a YouTube channel or video of the property.
 const CONTEST_ASK = /مسابق[ةه]|المسابقات/;
-const STRANGER_OPENER = /سيدي\s*الرئيس|هل\s*هذا\s*[اأ]نت(\s*حق[اًا]*)?\s*[؟?]|هل\s*سبق\s*لك\s*[اأ]ن\s*زرت|is\s*this\s*(really\s*)?you\s*[?؟]/i;
+// R89 (Ahmed 16 Nov 2026, Jehan: he wrote «اليوم مناسب للتواصل الساعة 10:00 صباح، صحيح؟», she answered «نعم بإذن الله», and nobody was
+// at the office phone): when a client confirms a meeting or a call time the office proposed, in a chat the agent stays out of,
+// Ahmed gets a WhatsApp alert from that branch number. Not for a visit to an open house (the client goes alone).
+const MEET_TALK = /اجتماع|ميتينج|ميتنج|meeting|[اأ]ونلاين|online|zoom|زوم|للتواصل|نتواصل|[اأ]تصل|اتصال|المكتب|مكتبهم|مكتبنا|موعد|نلتقي|نتقابل|[اأ]قابلك|نقابلك/i;
+const MEET_TIME = /الساع[ةه]\s*[0-9٠-٩]|[0-9٠-٩]{1,2}\s*[:.]\s*[0-9٠-٩]{2}|[0-9٠-٩]\s*(صباح|الصبح|مساء|العصر|الظهر|المغرب)|اليوم|بكر[هة]|باكر|السبت|ال[اأ]حد|ال[اإ]ثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمع[ةه]/;
+const MEET_VISIT = /تزور|الزيار[ةه]|تشوف(ين|ون)?\s*(ال)?(بيت|فيلا|عقار|شق[ةه]|[اأ]رض)|معاين|لوكيشن|البيت\s*مفتوح/;
+const MEET_YES = /^(?:[\s،,.!؟?]|\p{Extended_Pictographic}|نعم|[اإ]ي\s*نعم|اي|ايه|ايوه|ايوا|تمام|اوكي|اوك|ok(?:ay)?|yes|مناسب(?:\s*لي)?|يناسبني|موافق[ةه]?|[اأ]كيد|خلاص|صحيح|صح|زين|طيب|تم|[اإ]ن\s*شاء\s*الله|ب[اإ]ذن\s*الله|على\s*بركة\s*الله|حياك(?:\s*الله)?)+$/iu;
+// rows: the last messages of the chat, oldest first. Returns what we proposed and what he answered, or null.
+function meetingConfirmed(rows: any[]) {
+  const text = (h: any) => String(h?.transcript || h?.body || "").trim();
+  let lastOut = -1; (rows || []).forEach((h: any, i: number) => { if (h.direction === "outbound") lastOut = i; });
+  if (lastOut < 0) return null;
+  const said = rows.slice(lastOut + 1).filter((h: any) => h.direction === "inbound").map(text).filter(Boolean).join(" ");
+  if (!said || said.length > 60 || !MEET_YES.test(said)) return null;
+  let from = lastOut; while (from > 0 && rows[from - 1].direction === "outbound" && lastOut - from < 2) from--;
+  const ours = rows.slice(from, lastOut + 1).map(text).filter(Boolean).join(" ");
+  if (!MEET_TALK.test(ours) || !MEET_TIME.test(ours) || MEET_VISIT.test(ours)) return null;
+  return { ours: text(rows[lastOut]), said, at: String(rows[lastOut].message_timestamp || "") };
+}
+const STRANGER_OPENER =/سيدي\s*الرئيس|هل\s*هذا\s*[اأ]نت(\s*حق[اًا]*)?\s*[؟?]|هل\s*سبق\s*لك\s*[اأ]ن\s*زرت|is\s*this\s*(really\s*)?you\s*[?؟]/i;
 // R66 (Ahmed 14 Nov 2026, changes R22): a Barka property is offered on the Muscat number only to a client who said he looks
 // in المعبيلة or near Barka (the word بركاء, or the area of a listed Barka property, in his own messages)
 const R66_BARKA_OFFER = /(تقبل|تقبلين|يناسبك|تناسبك)\s*(في\s*)?بركاء/;
@@ -939,7 +958,24 @@ Deno.serve(async (req) => {
     if (!review && rt.mode === "test" && !(rt.allowed_customer_phones || []).map(digits).includes(to)) return fail("not_allowlisted");
     if (!(rt.allowed_routes || []).includes(conv.route_key)) return fail("route_blocked");
     const hardHandoff = !!conv.human_handoff_required && HARD_HANDOFF.test(String(conv.handoff_reason || ""));
-    if (!review && hardHandoff) { await watch(); return fail("human_handoff_open"); }
+    // R89: the client confirmed a meeting or call time the office proposed, in a chat the agent stays out of → Ahmed is told
+    // on WhatsApp from this branch number, once per proposal. An inline dry run sends nothing and shows the text.
+    const meetingAlert = async (why: string) => {
+      try {
+        const r = await db.from("whatsapp_messages").select("direction,body,transcript,message_timestamp").eq("conversation_id", conv.id).lte("message_timestamp", msg.message_timestamp).order("message_timestamp", { ascending: false }).limit(8);
+        const m = meetingConfirmed((r.data || []).reverse());
+        if (!m) return null;
+        const text = [`📅 العميل أكّد الموعد · ${conv.route_key === "barka" ? "بركاء" : "مسقط"}`, `الاسم: ${client.name || conv.customer_name || "عميل"}`, `الرقم: +${to}`, `رسالتنا: ${short(m.ours, 200)}`, `رده: ${short(m.said, 80)}`, "العقل ما رد عليه، الموعد عندك"].join("\n");
+        if (inline) return json({ ok: true, inline: true, ignored: why, meeting_confirmed_alert: text });
+        const key = `meeting_confirmed:${conv.id}:${m.at}`;
+        const told = await db.from("whatsapp_automation_events").select("id").eq("company_id", msg.company_id).eq("action_type", "owner_notify").eq("status", "applied").eq("payload->>event_key", key).limit(1);
+        if ((told.data || []).length) return null; // «نعم» then «بإذن الله» are two messages: one alert
+        await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-owner-hot-alert`, { method: "POST", headers: { "Content-Type": "application/json", "x-crm-agent": secret },
+          body: JSON.stringify({ action: "notify_owner", company_id: msg.company_id, route_key: conv.route_key, text, event_key: key }) });
+      } catch (e) { console.error("[reply-agent] meeting alert", String((e as any)?.message || e)); }
+      return null;
+    };
+    if (!review && hardHandoff) { await watch(); return (await meetingAlert("human_handoff_open")) || fail("human_handoff_open"); }
     if (!review && client.followup_suppressed) { await watch(); return fail("client_paused"); }
 
     // R1: Ahmed (or anyone in the office) typed in this chat and has not handed it back → stay out (fails closed).
@@ -947,7 +983,7 @@ Deno.serve(async (req) => {
     if (!review) {
       const hold = await db.rpc("crm_chat_hold", { p_conversation: conv.id });
       if (hold.error) { await watch(); return fail("hold_check_failed"); }
-      if (hold.data === "manual_reply") { await watch(); return fail("staff_active"); }
+      if (hold.data === "manual_reply") { await watch(); return (await meetingAlert("staff_active")) || fail("staff_active"); }
       if (hold.data === "negotiation") { await watch(); return fail("human_handoff_open"); }
       if (hold.data === "muted") { await watch(); return fail("agent_muted"); }
     }

@@ -264,3 +264,22 @@ test('R88 / SQL108: the study goes by the phone, the pricing list drops what is 
  assert(home.includes("window.crmPriceStudyChats().has(i&&i.conversation_id));")&&home.includes("supa.rpc('crm_price_study_drop',{p_conversation_id:id,p_reason:why.trim()})"));
  assert(index.includes('crm-price-studies.js?v=20261116-ps2')&&index.includes('crm-owner-home.js?v=20261116-pr1'));
 });
+
+// ---- R89 (Ahmed 16 Nov 2026, Jehan): the client confirmed a meeting time while the agent stays out → Ahmed's WhatsApp ----
+test('R89: a confirmed meeting or call time in a chat the agent stays out of reaches Ahmed on WhatsApp; an open-house visit does not',()=>{
+ const src=['const MEET_TALK','const MEET_TIME','const MEET_VISIT','const MEET_YES'].map((s)=>pickA(s,'\n')).join('')+pickA('function meetingConfirmed','\n}\n');
+ const M=new Function(src.replace(/(\w+): (?:string|any|unknown|number)(?:\[\])?(?=[,)])/g,'$1')+';return meetingConfirmed;')();
+ const O=(b)=>({direction:'outbound',body:b,message_timestamp:'2026-11-16T04:18:00Z'}),I=(b)=>({direction:'inbound',body:b});
+ // the real chat fb51edfd, 16 Nov 08:18 and 08:22
+ let r=M([I('الصباح ع الساعه 10 كذا'),O('ان شاء الله نتواصل باكر'),O('اهلين صباح الخير'),O('اليوم مناسب للتواصل الساعة 10:00 صباح، صحيح؟'),I('نعم بإذن الله')]);
+ assert.equal(r.ours,'اليوم مناسب للتواصل الساعة 10:00 صباح، صحيح؟');assert.equal(r.said,'نعم بإذن الله');assert.equal(r.at,'2026-11-16T04:18:00Z');
+ for(const [ours,said] of [['نأكد الاجتماع اونلاين بكره الساعة 5 ؟','تمام 👍'],['تمر المكتب يوم الاحد الساعة 11 ؟','ايوه ان شاء الله'],['اتصل عليك اليوم الساعة 4 العصر ؟','اوكي'],['Meeting online today 10:00 ?','Yes']])assert(M([O(ours),I(said)]),ours);
+ r=M([O('الاجتماع بكره الساعة 5 يناسبك ؟'),I('نعم'),I('بإذن الله')]);assert.equal(r.said,'نعم بإذن الله','two short messages are one answer');
+ // not a confirmation, not a meeting, a visit to an open house, a long answer, nothing from us
+ for(const [ours,said] of [['الاجتماع بكره الساعة 5 يناسبك ؟','لا ما يناسبني'],['الاجتماع بكره الساعة 5 يناسبك ؟','ممكن نخليه الساعة 7'],['البيت مفتوح تقدر تشوفه بكره الساعة 4','تمام'],['نأكد موعد زيارة العقار في بركاء الرميس اليوم الساعة 4 العصر ؟','نعم'],['السعر 59 الف','تمام'],['الاجتماع يناسبك ؟','نعم'],['كم الساعة تقريباً ؟ عشان ارسل لك اللوكيشن','اوكي']])assert.equal(M([O(ours),I(said)]),null,ours+' / '+said);
+ assert.equal(M([I('نعم')]),null);assert.equal(M([O('الاجتماع بكره الساعة 5 ؟')]),null);
+ // wired where the agent stays out, once per proposal, nothing sent by an inline dry run
+ assert(agent.includes('return (await meetingAlert("human_handoff_open")) || fail("human_handoff_open"); }')&&agent.includes('return (await meetingAlert("staff_active")) || fail("staff_active"); }'));
+ assert(agent.includes('const key = `meeting_confirmed:${conv.id}:${m.at}`;')&&agent.includes('.eq("payload->>event_key", key).limit(1);'));
+ assert(agent.indexOf('if (inline) return json({ ok: true, inline: true, ignored: why, meeting_confirmed_alert: text });')<agent.indexOf('action: "notify_owner", company_id: msg.company_id, route_key: conv.route_key'));
+});

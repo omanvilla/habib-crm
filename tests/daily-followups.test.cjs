@@ -106,7 +106,7 @@ test('the agent asks a name once, never guesses, and notes when it was not given
 // R1 (8 Nov): the 30-second rule is gone; crm_chat_hold() decides, and a follow-up sent from the daily list does not count.
 test('the agent stays quiet after a typed office message until handed back (R1)',()=>{
  assert(agent.includes('const hold = await db.rpc("crm_chat_hold", { p_conversation: conv.id });'));
- assert(agent.includes('if (hold.data === "manual_reply") { await watch(); return fail("staff_active"); }'));
+ assert(agent.includes('if (hold.data === "manual_reply") { await watch(); return (await meetingAlert("staff_active")) || fail("staff_active"); }'));
  assert(agent.includes('if (hold.error) { await watch(); return fail("hold_check_failed"); }'),'fails closed');
 });
 test('AI instruction on a follow-up: owner and staff (R28), rewrites from the whole chat, nothing sent, saved as a lesson',()=>{
