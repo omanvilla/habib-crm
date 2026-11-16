@@ -27,8 +27,7 @@
    * «كمّل يا عقل» are unchanged (crm_paused_chats still returns them as kind=negotiation). */
   // 16 Nov 2026 (Ahmed: «هذا خلاص مسعرينه. ليش بعد طالع انه يحتاج تسعير؟»): a chat whose study is already made (waiting for
   // approval, approved, the template went and the owner has not answered) is priced and leaves this list too
-  const studyMade=i=>typeof window.crmPriceStudyChats==='function'&&window.crmPriceStudyChats().has(i&&i.conversation_id);
-  const isPricing=i=>/^\s*دراسة\s*سعر/.test(String(i&&i.reason||''))&&!/انرسلت الدراسة/.test(String(i&&i.reason||''))&&!studyMade(i);
+  const isPricing=i=>/^\s*دراسة\s*سعر/.test(String(i&&i.reason||''))&&!/انرسلت الدراسة/.test(String(i&&i.reason||''))&&!(typeof window!=='undefined'&&typeof window.crmPriceStudyChats==='function'&&window.crmPriceStudyChats().has(i&&i.conversation_id));
   /* SQL94 (11 Nov 2026, Ahmed): once he approves a study and it reaches the owner, the hold stays (the chat is his) and its
    * reason says «دراسة سعر: انرسلت الدراسة للمالك …»; that chat leaves «ملاك ينتظرون تسعيرك» and shows with the other paused
    * chats. Staff still never resume a price study chat (whatsapp-inbox refuses it), so they get no «كمّل يا عقل» on it. */

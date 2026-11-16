@@ -261,6 +261,6 @@ test('R88 / SQL108: the study goes by the phone, the pricing list drops what is 
  assert(ui.includes("(i.status==='waiting_owner'||retry?'<div class=\"cps-phone\">")&&ui.includes('data-cps="phone-done"'));
  assert(ui.includes("'?text='+encodeURIComponent(String(s.owner_message||''))")&&ui.includes("supa.rpc('crm_price_study_sent_by_phone',{p_study_id:id})"));
  assert(ui.includes("window.crmPriceStudyChats=()=>new Set("));
- assert(home.includes("&&!/انرسلت الدراسة/.test(String(i&&i.reason||''))&&!studyMade(i);")&&home.includes("supa.rpc('crm_price_study_drop',{p_conversation_id:id,p_reason:why.trim()})"));
+ assert(home.includes("window.crmPriceStudyChats().has(i&&i.conversation_id));")&&home.includes("supa.rpc('crm_price_study_drop',{p_conversation_id:id,p_reason:why.trim()})"));
  assert(index.includes('crm-price-studies.js?v=20261116-ps2')&&index.includes('crm-owner-home.js?v=20261116-pr1'));
 });
