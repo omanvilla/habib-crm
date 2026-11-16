@@ -23,7 +23,7 @@ const CONTEST_ASK = /مسابق[ةه]|المسابقات/;
 // Ahmed gets a WhatsApp alert from that branch number. Not for a visit to an open house (the client goes alone).
 const MEET_TALK = /اجتماع|ميتينج|ميتنج|meeting|[اأ]ونلاين|online|zoom|زوم|للتواصل|نتواصل|[اأ]تصل|اتصال|المكتب|مكتبهم|مكتبنا|موعد|نلتقي|نتقابل|[اأ]قابلك|نقابلك/i;
 const MEET_TIME = /الساع[ةه]\s*[0-9٠-٩]|[0-9٠-٩]{1,2}\s*[:.]\s*[0-9٠-٩]{2}|[0-9٠-٩]\s*(صباح|الصبح|مساء|العصر|الظهر|المغرب)|اليوم|بكر[هة]|باكر|السبت|ال[اأ]حد|ال[اإ]ثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمع[ةه]/;
-const MEET_VISIT = /تزور|الزيار[ةه]|تشوف(ين|ون)?\s*(ال)?(بيت|فيلا|عقار|شق[ةه]|[اأ]رض)|معاين|لوكيشن|البيت\s*مفتوح/;
+const MEET_VISIT = /تزور|زيار[ةه]|تشوف(ين|ون)?\s*(ال)?(بيت|فيلا|عقار|شق[ةه]|[اأ]رض)|معاين|لوكيشن|البيت\s*مفتوح/;
 const MEET_YES = /^(?:[\s،,.!؟?]|\p{Extended_Pictographic}|نعم|[اإ]ي\s*نعم|اي|ايه|ايوه|ايوا|تمام|اوكي|اوك|ok(?:ay)?|yes|مناسب(?:\s*لي)?|يناسبني|موافق[ةه]?|[اأ]كيد|خلاص|صحيح|صح|زين|طيب|تم|[اإ]ن\s*شاء\s*الله|ب[اإ]ذن\s*الله|على\s*بركة\s*الله|حياك(?:\s*الله)?)+$/iu;
 // rows: the last messages of the chat, oldest first. Returns what we proposed and what he answered, or null.
 function meetingConfirmed(rows: any[]) {
