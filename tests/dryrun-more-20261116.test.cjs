@@ -19,6 +19,9 @@ test('R34: the privacy line for a house the owner lives in comes with the visit 
  let r=decide(['بحكم إن المالك ساكن في البيت ما صورنا البيت من الداخل عشان الخصوصية','https://www.instagram.com/reel/DfBvGuAtTMe/'],h);
  assert.deepEqual(r.texts,['بحكم إن المالك ساكن في البيت ما صورنا البيت من الداخل عشان الخصوصية','بس نقدر نرتب لك زيارة وتشوف البيت من الداخل على راحتك','متى يناسبك ؟']);
  assert.equal(r.out.guard_privacy_visit,true);
+ // the live check after v85 on the same message: «ما صورنا الشقق من الداخل»
+ r=decide(['بحكم إن المالك ساكن في البيت ما صورنا الشقق من الداخل عشان الخصوصية','https://www.instagram.com/reel/DfBvGuAtTMe/'],h);
+ assert.deepEqual(r.texts,['بحكم إن المالك ساكن في البيت ما صورنا الشقق من الداخل عشان الخصوصية','بس نقدر نرتب لك زيارة وتشوف البيت من الداخل على راحتك','متى يناسبك ؟']);
  // the full answer of R34 is left as it is
  const full=['بحكم إن المالك ساكن في البيت ما صورنا البيت من الداخل عشان الخصوصية','بس نقدر نرتب لك زيارة وتشوف البيت من الداخل على راحتك','متى يناسبك ؟'];
  assert.deepEqual(decide(full,h).texts,full);

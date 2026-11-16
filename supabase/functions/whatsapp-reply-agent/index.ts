@@ -304,9 +304,10 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   }
   // R34 (dry run of 16 Nov, c151bb05 «ما رحت .. انتظر صور الشقق من المالك»): the privacy line went with the reel link and no
   // visit offer. The house the owner lives in gets the two fixed lines after it, and no video link (that is for an empty one).
-  if (texts.some((t) => /ما\s*صورنا\s*البيت\s*من\s*الداخل/.test(t)) && out.action !== "handoff" && !c.visitedProp) {
+  // (live check after v85: «ما صورنا الشقق من الداخل» is the same line)
+  if (texts.some((t) => /ما\s*صورنا\s*[^\n]{0,20}?من\s*الداخل/.test(t)) && out.action !== "handoff" && !c.visitedProp) {
     texts = texts.filter((t) => !/^\s*https?:\/\/(www\.)?instagram\.com\/\S+\s*$/.test(t));
-    const at = texts.findIndex((t) => /ما\s*صورنا\s*البيت\s*من\s*الداخل/.test(t));
+    const at = texts.findIndex((t) => /ما\s*صورنا\s*[^\n]{0,20}?من\s*الداخل/.test(t));
     if (!texts.some((t) => /نرتب\s*لك\s*زيارة/.test(t))) texts.splice(at + 1, 0, "بس نقدر نرتب لك زيارة وتشوف البيت من الداخل على راحتك");
     if (!texts.some((t) => /يناسبك/.test(t))) texts.push("متى يناسبك ؟");
     out.guard_privacy_visit = true;
