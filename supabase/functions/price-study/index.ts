@@ -43,6 +43,10 @@ const REPORT_NAME = "دراسة سعر العقار.pdf";
 const PRICE_STUDY = /^\s*دراسة\s*سعر/;
 // the owner answered the template with a plain «لا»: nothing is sent, Ahmed is told
 const SAID_NO = /^\s*(لا|لأ|لاء|no|مو الحين|مب الحين|بعدين)\s*[.!،]*\s*(شكرا|شكراً|مشكور)?\s*$/i;
+// R90 (Ahmed 16 Nov 2026): an owner answered the template «أنا غيرت رأيي خلاص ما أحتاجه» and the study went to her in the same
+// minute. Any answer that says he no longer wants it, sold it or asks us not to send holds the study the same way.
+const OWNER_DECLINED = /غي[ّ]?رت\s*ر[اأ]يي|ما\s*عاد\s*([اأ]بغ|[اأ]بي|[اأ]ريد|[اأ]حتاج|ابا)|ما\s*[اأ]حتاج|مو\s*محتاج|مب\s*محتاج|ما\s*[اأ]بغ[اى]|ما\s*[اأ]بي(ه|ها)?(\s|$)|ما\s*[اأ]ريد|ما\s*ابا(ه|ها)?(\s|$)|ما\s*يحتاج|لا\s*ترسل|ما\s*ترسل|لا\s*تطرش|[اأ]لغ(ي|وا|يت)|كنسل|(^|\s)بعت(ه|ها)?(\s|$)|انباع|تم\s*البيع|سحبت\s*(ال)?(عرض|عقار|بيت|[اأ]رض)|مو\s*للبيع|ما\s*(ناوي|ناويه|ناوية)\s*[اأ]بيع|لا\s*شكر/;
+const ownerDeclined = (t: unknown) => { const s = String(t ?? ""); return SAID_NO.test(s) || OWNER_DECLINED.test(s); };
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const enc = new TextEncoder();
@@ -421,15 +425,15 @@ async function readReaction(s: any, secret: string) {
 async function ownerInbound(convId: string, messageId: string, secret: string) {
   const q = await db.from("owner_price_studies").select("*").eq("conversation_id", convId).in("status", ["waiting_owner", "sent", "approved"]).order("updated_at", { ascending: false }).limit(5);
   const rows = q.data || [];
-  const m = messageId ? await db.from("whatsapp_messages").select("id,message_type,body,media_id").eq("id", messageId).maybeSingle() : { data: null };
+  const m = messageId ? await db.from("whatsapp_messages").select("id,message_type,body,transcript,media_id").eq("id", messageId).maybeSingle() : { data: null };
   const msg: any = m.data;
   if (msg?.media_id && ["image", "document", "video"].includes(msg.message_type)) background(saveDocs(convId));
   const waiting = rows.find((s: any) => s.status === "waiting_owner");
   if (waiting) {
-    if (msg && msg.message_type === "text" && SAID_NO.test(String(msg.body || ""))) {
+    if (msg && ["text", "audio", "button", "interactive"].includes(String(msg.message_type)) && ownerDeclined(msg.transcript || msg.body)) {
       await db.from("owner_price_studies").update({ status: "send_failed", send_error: "owner_said_no_to_the_template", updated_at: new Date().toISOString() }).eq("id", waiting.id).eq("status", "waiting_owner");
       const { name, phone, conv } = await studyContext(waiting);
-      await tellAhmed(secret, waiting.company_id, conv?.route_key === "barka" ? "barka" : "muscat", `ℹ️ المالك ${name} رد «${short(msg.body, 60)}» على رسالة «دراسة سعر عقارك جاهزة»، فما انرسلت له الدراسة\nافتح المحادثة: https://wa.me/${phone}`, `price_study_no:${waiting.id}`);
+      await tellAhmed(secret, waiting.company_id, conv?.route_key === "barka" ? "barka" : "muscat", `ℹ️ المالك ${name} رد «${short(msg.transcript || msg.body, 60)}» على رسالة «دراسة سعر عقارك جاهزة»، فما انرسلت له الدراسة\nافتح المحادثة: https://wa.me/${phone}`, `price_study_no:${waiting.id}`);
       return { study_id: waiting.id, held: "owner_said_no" };
     }
     return await sendStudy(waiting.id, "waiting_owner");

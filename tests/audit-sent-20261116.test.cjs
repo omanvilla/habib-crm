@@ -262,7 +262,7 @@ test('R88 / SQL108: the study goes by the phone, the pricing list drops what is 
  assert(ui.includes("'?text='+encodeURIComponent(String(s.owner_message||''))")&&ui.includes("supa.rpc('crm_price_study_sent_by_phone',{p_study_id:id})"));
  assert(ui.includes("window.crmPriceStudyChats=()=>new Set("));
  assert(home.includes("window.crmPriceStudyChats().has(i&&i.conversation_id));")&&home.includes("supa.rpc('crm_price_study_drop',{p_conversation_id:id,p_reason:why.trim()})"));
- assert(index.includes('crm-price-studies.js?v=20261116-ps2')&&index.includes('crm-owner-home.js?v=20261116-pr1'));
+ assert(index.includes('crm-price-studies.js?v=20261116-ps3')&&index.includes('crm-owner-home.js?v=20261116-pr1'));
 });
 
 // ---- R89 (Ahmed 16 Nov 2026, Jehan): the client confirmed a meeting time while the agent stays out → Ahmed's WhatsApp ----
@@ -282,4 +282,18 @@ test('R89: a confirmed meeting or call time in a chat the agent stays out of rea
  assert(agent.includes('return (await meetingAlert("human_handoff_open")) || fail("human_handoff_open"); }')&&agent.includes('return (await meetingAlert("staff_active")) || fail("staff_active"); }'));
  assert(agent.includes('const key = `meeting_confirmed:${conv.id}:${m.at}`;')&&agent.includes('.eq("payload->>event_key", key).limit(1);'));
  assert(agent.indexOf('if (inline) return json({ ok: true, inline: true, ignored: why, meeting_confirmed_alert: text });')<agent.indexOf('action: "notify_owner", company_id: msg.company_id, route_key: conv.route_key'));
+});
+
+// ---- R90 (Ahmed 16 Nov 2026): the owner answered the template that she no longer wants the study, and it went to her anyway ----
+test('R90: an owner who says he no longer wants the study, sold the property or asks us not to send gets nothing; Ahmed is told',()=>{
+ const ps=fs.readFileSync('supabase/functions/price-study/index.ts','utf8').replace(/\r\n/g,'\n');
+ const pk=(start)=>{const a=ps.indexOf(start);assert(a>=0,start);return ps.slice(a,ps.indexOf('\n',a)+1);};
+ const declined=new Function((pk('const SAID_NO')+pk('const OWNER_DECLINED')+pk('const ownerDeclined')).replace(/\(t: unknown\)/,'(t)')+';return ownerDeclined;')();
+ // the real answer of chat dee610c9, 16 Nov 08:44
+ assert.equal(declined('أهلين أختي الله يسلمك، أنا غيرت رأيي خلاص ما أحتاجه، يعطيكم العافية'),true);
+ for(const s of ['لا','لا شكرا','خلاص بعته','الارض انباعت','لا ترسلها','ما ابغى الدراسة','ما عاد احتاجها','الغي الدراسة','سحبت العرض','ما ناوي ابيع الحين'])assert.equal(declined(s),true,s);
+ for(const s of ['نعم ارسلها','ايوا لو سمحت','شخباركم','تمام','ارسلها الله يعطيك العافية','وعليكم السلام ارسل','ابيها اليوم اذا ممكن',''])assert.equal(declined(s),false,s);
+ assert(ps.includes('&& ownerDeclined(msg.transcript || msg.body)) {'));
+ assert(ps.indexOf('ownerDeclined(msg.transcript || msg.body)')<ps.indexOf('return await sendStudy(waiting.id, "waiting_owner");'),'checked before the study is sent');
+ assert(ps.includes('send_error: "owner_said_no_to_the_template"'));
 });
