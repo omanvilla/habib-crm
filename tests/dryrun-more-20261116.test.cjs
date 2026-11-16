@@ -53,6 +53,6 @@ test('«اسمك الكريم ؟» stuck inside the sold line moves before the l
  r=decide(['الفيلا ما متوفره حالياً\nاسمك الكريم ؟','عندنا بيت في الحيل الجنوبية بـ 130 الف'],h);
  assert.deepEqual(r.texts,['الفيلا ما متوفره حالياً','عندنا بيت في الحيل الجنوبية بـ 130 الف','اسمك الكريم ؟']);
  // the name question as its own message, or in the last message, is left where it is (R20: the owner's first reply starts with it)
- for(const t of [['اسمك الكريم ؟','ارسل تفاصيل البيت كاملة والمستندات والسعر اللي في بالك اذا ما عليك امر'],['الفيلا ما متوفره حالياً','اسمك الكريم ؟\nمتى يناسبك تزور ؟']])
+ for(const t of [['اسمك الكريم ؟','ارسل تفاصيل البيت كاملة والمستندات والسعر اللي في بالك اذا ما عليك امر'],['الفيلا ما متوفره حالياً','اسمك الكريم ؟\nفي اي منطقة تبحث ؟']])
   assert.deepEqual(decide(t,h).texts,t);
 });
