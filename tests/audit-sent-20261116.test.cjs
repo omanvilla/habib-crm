@@ -242,3 +242,25 @@ test('the dashboard of 16 Nov: one alert per client and kind, a past meeting lea
  assert(ui.includes("if(callsToday&&['owner','manager'].includes(role())){")&&ui.includes('اتصالات اليوم:'));
  assert(index.includes('crm-hot-alerts.js?v=20261116-once1')&&index.includes('crm-calls-meetings.js?v=20261116-ccm3'));
 });
+
+// ---- R88 / SQL108 (Ahmed 16 Nov 2026): a study by the phone's WhatsApp, an owner we do not price, the priced leave the list ----
+test('R88 / SQL108: the study goes by the phone, the pricing list drops what is priced or not ours, the report opens in the chat',()=>{
+ const f=fs.readFileSync('db/changes/108-study-sent-by-phone.forward.sql','utf8').replace(/\r\n/g,'\n'),rb=fs.readFileSync('db/changes/108-study-sent-by-phone.rollback.sql','utf8');
+ assert.equal(f,fs.readFileSync('supabase/migrations/20261116110000_study_sent_by_phone_20261116.sql','utf8').replace(/\r\n/g,'\n'));
+ assert(f.includes("IF st NOT IN ('waiting_owner', 'approved', 'send_failed') THEN RAISE EXCEPTION 'study_not_waiting'"));
+ assert(f.includes("jsonb_build_object('action', 'sent_by_phone', 'study_id', p_study_id, 'by', u)"));
+ assert(f.includes("IF why IS NULL THEN RAISE EXCEPTION 'reason_required'")&&f.includes("s.status IN ('submitted', 'awaiting_approval', 'approved', 'waiting_owner', 'send_failed')"),'a study already sent is never cancelled');
+ assert(f.includes('REVOKE ALL ON FUNCTION public.crm_price_study_sent_by_phone(uuid) FROM PUBLIC, anon;')&&f.includes('REVOKE ALL ON FUNCTION public.crm_price_study_drop(uuid, text) FROM PUBLIC, anon;'));
+ assert(rb.includes('DROP FUNCTION IF EXISTS public.crm_price_study_sent_by_phone(uuid);')&&rb.includes('DROP FUNCTION IF EXISTS public.crm_price_study_drop(uuid, text);'));
+ const ps=fs.readFileSync('supabase/functions/price-study/index.ts','utf8');
+ assert(ps.includes('if (action === "sent_by_phone") {')&&ps.includes('.in("status", ["waiting_owner", "approved", "send_failed"])'));
+ assert(ps.includes('const after = conv ? await afterSent(s, conv, now) : ["conversation"];')&&ps.includes('const after = await afterSent(s, conv, now);'),'the phone send closes like the automatic one');
+ assert(ps.includes('media_id: (extra as any)?.media?.id ?? null'),'the report sent to the owner opens from the chat');
+ assert(!/sentByPhone[\s\S]{0,900}metaSend\(/.test(ps.slice(ps.indexOf('async function sentByPhone'),ps.indexOf('async function afterSent'))),'recording sends nothing');
+ const ui=fs.readFileSync('crm-price-studies.js','utf8'),home=fs.readFileSync('crm-owner-home.js','utf8'),index=fs.readFileSync('index.html','utf8');
+ assert(ui.includes("(i.status==='waiting_owner'||retry?'<div class=\"cps-phone\">")&&ui.includes('data-cps="phone-done"'));
+ assert(ui.includes("'?text='+encodeURIComponent(String(s.owner_message||''))")&&ui.includes("supa.rpc('crm_price_study_sent_by_phone',{p_study_id:id})"));
+ assert(ui.includes("window.crmPriceStudyChats=()=>new Set("));
+ assert(home.includes("&&!/انرسلت الدراسة/.test(String(i&&i.reason||''))&&!studyMade(i);")&&home.includes("supa.rpc('crm_price_study_drop',{p_conversation_id:id,p_reason:why.trim()})"));
+ assert(index.includes('crm-price-studies.js?v=20261116-ps2')&&index.includes('crm-owner-home.js?v=20261116-pr1'));
+});

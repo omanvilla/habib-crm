@@ -256,6 +256,12 @@
           +'<small class="cps-facts">يحفظ المعاينة ويرجّع الدراسة لـ Claude بملاحظة «معاينة المكتب» عشان يدرسها من جديد</small></div>':''):'')
       +'<label class="cps-label">الرسالة اللي توصل المالك'+(open?' (تقدر تعدلها)':'')
       +'<textarea class="fi" rows="6" dir="auto" data-cps-msg="'+id+'"'+(open?'':' readonly')+'>'+esc(i.owner_message||'')+'</textarea></label>'
+      /* R88 / SQL108 (Ahmed 16 Nov 2026): the owner did not answer «دراسة سعر عقارك جاهزة» (WhatsApp lets the system send only that
+         after 24 hours), or the send failed: the office sends it from the phone's WhatsApp, message and report ready here. */
+      +(i.status==='waiting_owner'||retry?'<div class="cps-phone"><small class="cps-facts">ما رد المالك؟ ارسلها له بنفسك من واتساب الجوال: الرسالة تنفتح جاهزة، أرفق معها ملف التقرير، وبعدها اضغط «تم الإرسال»</small>'
+        +'<div class="cps-actions"><button type="button" class="btn-primary" data-cps="phone" data-id="'+id+'">افتح واتساب والرسالة جاهزة</button>'
+        +'<button type="button" class="btn-secondary" data-cps="phone-file" data-id="'+id+'">ملف التقرير (شارك أو حمّل)</button>'
+        +'<button type="button" class="btn-secondary" data-cps="phone-done" data-id="'+id+'">تم الإرسال من الجوال</button></div></div>':'')
       +(open?'<div class="cps-actions"><button type="button" class="btn-primary" data-cps="approve" data-id="'+id+'">موافق</button>'
         +'<button type="button" class="btn-secondary" data-cps="reject" data-id="'+id+'">رفض مع ملاحظة</button></div>'
         +'<div class="cps-reject" data-cps-reject="'+id+'" hidden><textarea class="fi" rows="3" dir="auto" data-cps-note="'+id+'" placeholder="اكتب ملاحظتك لـ Claude: وش يعدل في الدراسة"></textarea>'
@@ -331,9 +337,39 @@
       setTimeout(()=>refresh().then(()=>{redraw();tell();}),6000);setTimeout(()=>refresh().then(redraw),20000);
     }
   }
+  // R88: the study by the phone's WhatsApp
+  const studyOf=id=>((data&&data.items)||[]).find(x=>x.id===id)||null;
+  // chats whose study is made (waiting for approval, approved, on its way, sent): they are priced, so they leave «ملاك ينتظرون تسعيرك»
+  window.crmPriceStudyChats=()=>new Set(((data&&data.items)||[]).filter(i=>['awaiting_approval','approved','sending','waiting_owner','sent'].includes(i.status)).map(i=>i.conversation_id));
+  function phoneOpen(id){
+    const s=studyOf(id),d=s?String(s.phone||'').replace(/\D/g,''):'';
+    if(!s||d.length<8){toast('رقم المالك مو مسجل','error');return;}
+    window.open('https://wa.me/'+(d.length===8?'968'+d:d)+'?text='+encodeURIComponent(String(s.owner_message||'')),'_blank','noopener');
+  }
+  async function phoneFile(id){
+    const s=studyOf(id);if(!s||!s.owner_report_path){toast('الملف ما انحفظ','error');return;}
+    const r=await supa.storage.from('price-studies').createSignedUrl(s.owner_report_path,600);
+    const url=r&&r.data&&r.data.signedUrl;if(!url){toast('ما قدرت أفتح الملف. جرب مرة ثانية','error');return;}
+    try{
+      const blob=await (await fetch(url)).blob(),file=new File([blob],'دراسة سعر العقار.pdf',{type:'application/pdf'});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file]});return;}
+    }catch(e){if(e&&e.name==='AbortError')return;}
+    window.open(url,'_blank','noopener');
+  }
+  async function phoneDone(b){
+    const id=b.dataset.id;
+    if(!window.confirm('أكدت إنك أرسلت الرسالة وملف التقرير للمالك من واتساب الجوال؟'))return;
+    b.disabled=true;
+    const r=await supa.rpc('crm_price_study_sent_by_phone',{p_study_id:id});
+    if(r.error){b.disabled=false;toast('ما انحفظ: '+(r.error.message||''),'error');return;}
+    toast('انسجلت كمرسلة','success');setTimeout(()=>refresh().catch(()=>{}),2500);
+  }
   document.addEventListener('click',e=>{
     const b=e.target.closest&&e.target.closest('[data-cps]');if(!b)return;
     const act=b.dataset.cps;
+    if(act==='phone'){phoneOpen(b.dataset.id);return;}
+    if(act==='phone-file'){phoneFile(b.dataset.id).catch(()=>toast('ما قدرت أفتح الملف','error'));return;}
+    if(act==='phone-done'){phoneDone(b).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});return;}
     if(act==='file')openFile(b.dataset.path).catch(()=>toast('ما قدرت أفتح الملف','error'));
     else if(act==='approve')decide(b,true).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});
     else if(act==='reject'){const f=document.querySelector('[data-cps-reject="'+CSS.escape(b.dataset.id)+'"]');if(f){f.hidden=!f.hidden;if(!f.hidden){const t=f.querySelector('textarea');if(t)t.focus();}}}

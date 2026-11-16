@@ -25,7 +25,10 @@
   /* «دراسة سعر:» handoffs (11 Nov 2026, Ahmed): owners waiting for a price have their own tile and list, so the
    * paused list keeps only chats that need another decision. Display only: the hold, the reason text and
    * «كمّل يا عقل» are unchanged (crm_paused_chats still returns them as kind=negotiation). */
-  const isPricing=i=>/^\s*دراسة\s*سعر/.test(String(i&&i.reason||''))&&!/انرسلت الدراسة/.test(String(i&&i.reason||''));
+  // 16 Nov 2026 (Ahmed: «هذا خلاص مسعرينه. ليش بعد طالع انه يحتاج تسعير؟»): a chat whose study is already made (waiting for
+  // approval, approved, the template went and the owner has not answered) is priced and leaves this list too
+  const studyMade=i=>typeof window.crmPriceStudyChats==='function'&&window.crmPriceStudyChats().has(i&&i.conversation_id);
+  const isPricing=i=>/^\s*دراسة\s*سعر/.test(String(i&&i.reason||''))&&!/انرسلت الدراسة/.test(String(i&&i.reason||''))&&!studyMade(i);
   /* SQL94 (11 Nov 2026, Ahmed): once he approves a study and it reaches the owner, the hold stays (the chat is his) and its
    * reason says «دراسة سعر: انرسلت الدراسة للمالك …»; that chat leaves «ملاك ينتظرون تسعيرك» and shows with the other paused
    * chats. Staff still never resume a price study chat (whatsapp-inbox refuses it), so they get no «كمّل يا عقل» on it. */
@@ -140,7 +143,8 @@
       +(pricing||!canResume()||(!isOwner()&&isStudyChat(i))?'':'<button type="button" class="btn-primary coh-go" data-coh="presume" data-id="'+esc(i.conversation_id)+'">كمّل يا عقل</button>')
       // R40: «تجاهل نهائي» = no reply and no follow-up ever, and the chat leaves this list
       +(pricing||!canResume()||isStudyChat(i)?'':'<button type="button" class="btn-secondary coh-go coh-ignore" data-coh="pignore" data-id="'+esc(i.conversation_id)+'">تجاهل نهائي</button>')
-      +(pricing&&canResume()?'<button type="button" class="btn-primary coh-go" data-coh="pprice" data-id="'+esc(i.conversation_id)+'">ارسل السعر للمالك</button>':'')+'</div>'
+      +(pricing&&canResume()?'<button type="button" class="btn-primary coh-go" data-coh="pprice" data-id="'+esc(i.conversation_id)+'">ارسل السعر للمالك</button>'
+        +'<button type="button" class="btn-secondary coh-go" data-coh="pdrop" data-id="'+esc(i.conversation_id)+'">ما نسعّره (الغِ)</button>':'')+'</div>'
       +(pricing&&canResume()?priceForm(i):'')+'</li>').join('');
   }
   /* 12 Nov 2026 (Ahmed: «سوي زر يكون افضل»): the priced answer goes back to the owner from the chat's branch number, through
@@ -347,6 +351,15 @@
     else if(act==='sclose')closeSheet();
     else if(act==='pfilter'){pausedFilter=b.dataset.v||'all';drawSheet();}
     else if(act==='prbranch'){pricingBranch=b.dataset.v||'all';drawSheet();}
+    else if(act==='pdrop'){
+      // R88 / SQL108: an owner who should not be priced leaves the list (the task, his offers and the hold close; nothing is sent)
+      const id=b.dataset.id,why=window.prompt('ليش ما نسعّره؟ (مثلاً: خارج مسقط وبركاء، مسكون، انسحب المالك)','');
+      if(!why||!why.trim()||b.disabled)return;b.disabled=true;
+      supa.rpc('crm_price_study_drop',{p_conversation_id:id,p_reason:why.trim()}).then(r=>{
+        if(r.error){b.disabled=false;toast('ما انحفظ: '+(r.error.message||''),'error');return;}
+        paused.items=paused.items.filter(i=>i.conversation_id!==id);toast('انشال من التسعير','success');drawSheet();if(last)drawTiles(last.data,last.pending);
+      });
+    }
     else if(act==='ptoggle-ignored'){ignoredOpen=!ignoredOpen;if(ignoredOpen)loadIgnored();else drawSheet();}
     else if(act==='pignore'||act==='punignore'){
       const id=b.dataset.id,on=act==='pignore';if(b.disabled)return;b.disabled=true;

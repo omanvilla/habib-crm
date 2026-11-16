@@ -259,7 +259,7 @@ async function recordOut(s: any, conv: any, phoneId: string, to: string, wamid: 
   const r = await db.from("whatsapp_messages").insert({
     company_id: s.company_id, conversation_id: conv.id, client_id: s.client_id || conv.client_id || null, actor_type: "automated", channel_source: "crm_price_study",
     whatsapp_message_id: wamid, direction: "outbound", message_type: type, sender_wa_id: phoneId, recipient_wa_id: to, body, message_timestamp: new Date().toISOString(),
-    delivery_status: "sent", raw_payload: { source: "crm_price_study", study_id: s.id, approved_by: s.decided_by, ...extra },
+    delivery_status: "sent", media_id: (extra as any)?.media?.id ?? null, raw_payload: { source: "crm_price_study", study_id: s.id, approved_by: s.decided_by, ...extra },
   });
   if (r.error && r.error.code !== "23505") console.error("[price-study] record", r.error.message);
 }
@@ -325,7 +325,28 @@ async function sendStudy(studyId: string, from: "approved" | "waiting_owner") {
     await recordOut(s, conv, phoneId, to, d.id, "document", REPORT_NAME, { document: { filename: REPORT_NAME }, media: { kind: "document", mime_type: "application/pdf", filename: REPORT_NAME, id: up.id } });
     const now = new Date().toISOString();
     await db.from("owner_price_studies").update({ status: "sent", sent_at: now, owner_report_wamid: d.id, send_error: null, updated_at: now }).eq("id", s.id);
-    // the task closes, the owner offer becomes «studied», the chat stays with Ahmed (the hold is kept, its reason says the study went)
+    const after = await afterSent(s, conv, now);
+    if (after.length) await db.from("owner_price_studies").update({ send_error: `sent, not recorded: ${after.join(", ")}` }).eq("id", s.id);
+    return { study_id: studyId, status: "sent", not_recorded: after };
+  } catch (e) {
+    return await set("send_failed", short(String((e as any)?.message || e), 300));
+  }
+}
+// R88 / SQL108 (Ahmed 16 Nov 2026): the office sent the study itself from the phone's WhatsApp (the owner had not answered the
+// template, or the send failed). It is closed like an automatic send, so the owner's later answer does not bring it again.
+async function sentByPhone(studyId: string, by: string) {
+  const claim = await db.from("owner_price_studies").update({ status: "sending", updated_at: new Date().toISOString() }).eq("id", studyId).in("status", ["waiting_owner", "approved", "send_failed"]).select("*");
+  const s: any = (claim.data || [])[0];
+  if (!s) return { study_id: studyId, skipped: "not_waiting" };
+  const now = new Date().toISOString();
+  await db.from("owner_price_studies").update({ status: "sent", sent_at: now, send_error: `sent_by_phone${by ? `:${by}` : ""}`, updated_at: now }).eq("id", s.id);
+  const { conv } = await studyContext(s);
+  const after = conv ? await afterSent(s, conv, now) : ["conversation"];
+  return { study_id: studyId, status: "sent", by_phone: true, not_recorded: after };
+}
+// the task closes, the owner offer becomes «studied», the chat stays with Ahmed (the hold is kept, its reason says the study went)
+async function afterSent(s: any, conv: any, now: string) {
+  {
     const after: string[] = [];
     if (s.task_id) { const t = await db.from("tasks").update({ done: true, completed_at: now }).eq("id", s.task_id); if (t.error) after.push("task"); }
     const leads = await db.from("owner_leads").select("id,notes,status,conversation_id").eq("company_id", s.company_id).eq("status", "open").or(`id.eq.${s.owner_lead_id || "00000000-0000-0000-0000-000000000000"},conversation_id.eq.${conv.id}`);
@@ -339,10 +360,7 @@ async function sendStudy(studyId: string, from: "approved" | "waiting_owner") {
       const h = await db.from("whatsapp_conversations").update({ handoff_reason: short(`دراسة سعر: انرسلت الدراسة للمالك ${dayAr()} · ${rest}`, 600) }).eq("id", conv.id).eq("human_handoff_required", true);
       if (h.error) after.push("chat_reason");
     }
-    if (after.length) await db.from("owner_price_studies").update({ send_error: `sent, not recorded: ${after.join(", ")}` }).eq("id", s.id);
-    return { study_id: studyId, status: "sent", not_recorded: after };
-  } catch (e) {
-    return await set("send_failed", short(String((e as any)?.message || e), 300));
+    return after;
   }
 }
 
@@ -550,6 +568,7 @@ Deno.serve(async (req) => {
     if (action === "sign_inspection") { const id = uuid(body?.task_id); return id ? json({ ok: true, photos: await signInspection(id) }) : json({ ok: false, error: "task_id_required" }, 400); }
     if (action === "pull_files") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await pullFiles(id, secret) }) : json({ ok: false, error: "study_id_required" }, 400); }
     if (action === "send") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await sendStudy(id, "approved") }) : json({ ok: false, error: "study_id_required" }, 400); }
+    if (action === "sent_by_phone") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await sentByPhone(id, uuid(body?.by)) }) : json({ ok: false, error: "study_id_required" }, 400); }
     if (action === "owner_inbound") { const id = uuid(body?.conversation_id); return id ? json({ ok: true, result: await ownerInbound(id, uuid(body?.message_id), secret) }) : json({ ok: false, error: "conversation_id_required" }, 400); }
     if (action === "held_tick") return json({ ok: true, results: await heldTick(secret) });
     if (action === "unpriced_tick") return json({ ok: true, results: await unpricedTick(secret) });
