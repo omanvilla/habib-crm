@@ -395,7 +395,8 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   // dry run rows 701-740 (17 Nov), 2abc2e0b «فلة الرميس اللي ب59 الف» with no ad sent: «الفيلا اللي سألتي عنها انباعت» + «بس عندنا
   // فيلا ثانية في الرميس بـ 59 الف». She named the one we have (another 59 in Al Rumais was sold): the sold line goes.
   {
-    const SOLD_ASKED = /(اللي\s*)?(سألت|سألتي|سألتو|سألتوا)\s*عنها\s*(انباعت|ما\s*متوفر[هة]?(\s*حالي\S*)?)/;
+    // (live check after v91: «سألتِ» with a kasra slipped through; the diacritics are allowed)
+    const SOLD_ASKED = /(اللي\s*)?(سألت|سألتي|سألتو|سألتوا)[ً-ْ]*\s*عنها\s*(انباعت|ما\s*متوفر[هة]?(\s*حالي\S*)?)/;
     const west = String(c.burstSaid || "").replace(/[٠-٩]/g, (d: string) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
     const n = Number((west.match(/([0-9]{2,3})\s*(ال|أل|ا)?ف/) || [])[1] || 0);
     const said = areaKey(c.burstSaid);

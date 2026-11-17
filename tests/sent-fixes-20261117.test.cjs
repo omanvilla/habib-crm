@@ -86,6 +86,8 @@ test('dry run rows 701-740: the property she named by area and price is not call
  const h=[IN('ممكن الموقع'),OUT('موقع ايش ؟'),IN('فلة الرميس اللي ب59 الف')];
  const r=decide(['الفيلا اللي سألتي عنها انباعت','بس عندنا فيلا ثانية في الرميس بـ 59 الف متوفرة حالياً','اسمك الكريم ؟ ومتى يناسبك تزورين ؟'],h,null,{available,route:'barka'});
  assert.deepEqual(r.texts,['عندنا فيلا في الرميس بـ 59 الف متوفرة حالياً','اسمك الكريم ؟ ومتى يناسبك تزورين ؟']);assert.equal(r.out.property_id,'h59');
+ // live check after v91: «سألتِ» with a kasra
+ assert.deepEqual(decide(['الفيلا اللي سألتِ عنها انباعت','بس عندنا فيلا ثانية في الرميس بـ 59 الف متوفره حالياً'],h,null,{available,route:'barka'}).texts,['عندنا فيلا في الرميس بـ 59 الف متوفره حالياً']);
  // with an ad sent (the sold one) the line stays
  const withAd=[IN('https://www.instagram.com/reel/DfeJC4ICmTO/'),IN('فلة الرميس اللي ب59 الف')];
  assert.equal(decide(['الفيلا اللي سألتي عنها انباعت','بس عندنا فيلا ثانية في الرميس بـ 59 الف'],withAd,null,{available,route:'barka'}).texts[0],'الفيلا اللي سألتي عنها انباعت');
