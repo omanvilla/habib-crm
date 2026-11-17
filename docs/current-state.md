@@ -6,6 +6,19 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 17 November 2026 — full system check and menu cleanup (`claude/cleanup-attribution-20261117`)
+
+Report (Arabic): [docs/فحص-شامل-20261117.md](فحص-شامل-20261117.md), every page as owner, Muscat and Barka in the preview
+plus live usage counts. Done after Ahmed's yes (`crm-simple-ui.js/.css` v `20261117-menu1`): the «ابدأ يومك» guide and «؟»
+button removed; calendar, deposits, expenses, activity log and backup leave the menu (`RETIRED_NAV`, class
+`crm-nav-retired` so role code cannot re-show them); the owner opens the log and backup from Settings «أدوات المالك».
+Owner menu 20 → 15 links, staff 14 → 12. Pages stay reachable by `navigate()`. Not done, on purpose: hot alerts stay (they
+carry visit-result notifications, call/meeting requests and phone notifications that the paused sheet does not);
+no SQL for visit attribution (branch performance counts visits by the property's branch: Barka 31 done, Muscat 9 in 14
+days; only per-person attribution is missing and targets are per branch); no file deletion (`modern-v17.js` is still run
+by `tests/security-regressions.cjs`). Corrected in the report the same day: my first claim that the 5-visit target could
+not be measured was wrong.
+
 ## 17 November 2026 — test accounts for checking changes (owner + staff), CLAUDE.md
 
 Ahmed's order (CLAUDE.md «فحص التعديلات بنفسك»): check every change myself as an owner and as a staff account, never his account.
