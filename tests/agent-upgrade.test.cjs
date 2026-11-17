@@ -163,6 +163,9 @@ test('14 Nov guards: rules that were words only are held by code (R16, R24, R34,
  // before a visit the line stays, and so does the pair the R2 code itself wrote
  r=await run([...SEE]);assert.deepEqual(r.texts,SEE);assert.equal(r.out.action,'none');
  r=await run([...SEE],{out:{visit_first:true},said:'زرت البيت'});assert.deepEqual(r.texts,SEE);
+ // dry run rows 1046-1085 (17 Nov): a tenant who got the location asks «شي معكم مؤثثه؟»: not «مشتري جاد … السعر»
+ r=await run(['اسمك الكريم ؟',...SEE],{r16:'انرسل له اللوكيشن',said:'شي معكم مؤثثه؟',out:{category:'tenant'}});
+ assert.deepEqual(r.texts,[]);assert.equal(r.out.action,'handoff');assert.match(r.out.handoff_reason,/^سؤال ما عندي جوابه: شي معكم مؤثثه/);
  // R24: withdrawn is «ما متوفره», a property the owner sold is still «انباع»
  const hist=[{direction:'inbound',body:'متوفره ؟',matched_property_id:'g1'}];
  r=await run(['للاسف انباع'],{history:hist,gone:[{id:'g1',archive_reason:'owner_withdrew'}]});

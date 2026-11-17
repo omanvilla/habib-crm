@@ -1695,8 +1695,14 @@ Deno.serve(async (req) => {
       if (seen) {
         texts = texts.filter((t) => !SEE_FIRST.test(t) && !(t.length < 90 && /(تزور|تزورون|تزورين)\s*؟/.test(t)));
         out.r16_seen = seen; out.guard_see_first = true;
-        if (out.action === "none" && (prop?.price_negotiable !== "fixed" || !texts.length)) {
+        // (dry run rows 1046-1085, 17 Nov: a tenant asking «شي معكم مؤثثه؟» got «مشتري جاد: … يسأل عن السعر». The label is for
+        // a price question; anything else left with no reply is «سؤال ما عندي جوابه:».)
+        const lastSaid = history.filter((h: any) => h.direction === "inbound").slice(-3).map((h: any) => String(h.transcript || h.body || "")).join(" ");
+        const askedPrice = /سعر|بكم|كم\s*(المطلوب|اخر|آخر|النهائي)|تفاوض|ينزل|تنزل|خصم|نهائي|مجال/.test(lastSaid);
+        if (out.action === "none" && askedPrice && (prop?.price_negotiable !== "fixed" || !texts.length)) {
           out.action = "handoff"; out.handoff_reason = short(`مشتري جاد: زار العقار ويسأل عن السعر. ${out.intent || ""}`, 300);
+        } else if (out.action === "none" && !askedPrice && !texts.filter((t) => !/^\s*اسمك\s*الكريم\s*؟?\s*$/.test(t)).length) {
+          texts = []; out.action = "handoff"; out.handoff_reason = short(`سؤال ما عندي جوابه: ${lastSaid.replace(/\s+/g, " ").trim()}`, 300);
         }
       }
     }
@@ -1829,6 +1835,14 @@ Deno.serve(async (req) => {
       if (heirs || held) {
         texts = [heirs ? "نعتذر منك احنا ما نستلم عقارات الورثة" : "نعتذر منك احنا ما نستلم عقارات مرهونة او ساكن فيها صاحبها","الله يسعدك 🌷"];
         out.action = "none"; out.guard_owner_decline = heirs ? "heirs" : "mortgaged_or_occupied";
+      }
+      // dry run rows 1046-1085 (17 Nov): «تعرض فيلا للبيع مسكونه سنه» (lived in for a year: its age) got the R91 apology from
+      // the model itself. When «مسكون» only gives how long it was lived in, and nothing else says the owner lives there or it is
+      // mortgaged or heirs', the owner is asked R91's question instead.
+      const LIVED_AGE = /مسكون[هة]?\s*(من\s*|لمد[ةه]\s*)?(سن[هة]|سنتين|شهور|[0-9٠-٩]+\s*(سن|شه))/;
+      if (!heirs && !says(MORTGAGED) && LIVED_AGE.test(ownerSaid) && !ownerSaid.replace(LIVED_AGE, " ").split("\n").some((l: string) => OCCUPIED.test(l) && !neg(OCCUPIED).test(l) && !RENTED.test(l))
+        && texts.some((t) => /ساكن\s*فيها\s*صاحبها|ما\s*نستلم\s*عقارات\s*(مسكون|ساكن)/.test(t))) {
+        texts = ["البيت الحين فاضي ولا مؤجر ولا ساكنين فيه ؟"]; out.action = "none"; delete out.guard_owner_decline; out.guard_lived_age = true;
       }
     }
     // R23, measured only: a soft handoff that leaves the customer with no reply is marked, so it can be counted

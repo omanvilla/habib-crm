@@ -136,6 +136,15 @@ test('rows 930-969: a location asked for a property nobody named gets the R23 qu
  // a real answer is left alone
  assert.deepEqual(decide(['ارسل لي رابط الفيديو'],[IN('ممكن الموقع')]).texts,['ارسل لي رابط الفيديو']);
 });
+test('rows 1046-1085: «مسكونه سنه» (how long it was lived in) gets the R91 question, not the apology',()=>{
+ const line=agent.split('\n').find((l)=>l.includes('const LIVED_AGE ='));
+ const LIVED_AGE=new RegExp(line.match(/const LIVED_AGE = \/(.*)\/;/)[1]);
+ assert(LIVED_AGE.test('تعرض فيلا للبيع مسكونه سنه'));
+ assert(LIVED_AGE.test('البيت مسكون من 3 سنوات'));
+ assert(!LIVED_AGE.test('حاليا ساكنين فيها'));
+ assert(!LIVED_AGE.test('البيت مسكون'));
+ assert(agent.includes('texts = ["البيت الحين فاضي ولا مؤجر ولا ساكنين فيه ؟"]; out.action = "none"; delete out.guard_owner_decline; out.guard_lived_age = true;'));
+});
 test('the R11 check reads «ليوم» as a day too',()=>{
  assert(agent.includes('const TIME_SAID = /ا?ليوم|الحين'));
 });
