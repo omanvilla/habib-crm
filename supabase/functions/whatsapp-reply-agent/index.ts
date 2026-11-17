@@ -412,7 +412,8 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   // فيلا ثانية في الرميس بـ 59 الف». She named the one we have (another 59 in Al Rumais was sold): the sold line goes.
   {
     // (live check after v91: «سألتِ» with a kasra slipped through; the diacritics are allowed)
-    const SOLD_ASKED = /(اللي\s*)?(سألت|سألتي|سألتو|سألتوا)[ً-ْ]*\s*عنها\s*(انباعت|ما\s*متوفر[هة]?(\s*حالي\S*)?)/;
+    // (dry run, same day: «الفيلا اللي سألتي عنها في الرميس بـ59 الف انباعت»: words between «عنها» and «انباعت»)
+    const SOLD_ASKED = /(اللي\s*)?(سألت|سألتي|سألتو|سألتوا)[ً-ْ]*\s*عنها[^\n]{0,40}?(انباعت|ما\s*متوفر[هة]?(\s*حالي\S*)?)/;
     const west = String(c.burstSaid || "").replace(/[٠-٩]/g, (d: string) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
     const n = Number((west.match(/([0-9]{2,3})\s*(ال|أل|ا)?ف/) || [])[1] || 0);
     const said = areaKey(c.burstSaid);
@@ -422,6 +423,11 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     if (named && texts.some((t) => t.length <= 250 && SOLD_ASKED.test(t))) {
       texts = texts.map((t) => (t.length <= 250 && SOLD_ASKED.test(t) ? t.split("\n").filter((l) => !SOLD_ASKED.test(l)).join("\n").trim() : t)).filter(Boolean)
         .map((t) => t.replace(/^(\s*)بس\s+عندنا/, "$1عندنا").replace(/(فيلا|فل[ةه]|بيت|شق[ةه])\s+ثاني[ةه]/, "$1"));
+      // (and when what is left offers another area, the one she named is sent instead)
+      const namedBase = areaKey(named.area).replace(/^(ولايه\s+)?(بركاء|مسقط)\s+/, "");
+      if (!texts.some((t) => areaKey(t).includes(namedBase)) && named.marketing && !/تم\s*البيع|sold\s*out|نبارك\s*للشاري/i.test(String(named.marketing))) {
+        texts = [String(named.marketing), "متى يناسبك تزور ؟"];
+      }
       out.property_id = named.id; out.guard_named_price_available = true;
     }
   }
