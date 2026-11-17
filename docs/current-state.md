@@ -6,6 +6,17 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 17 November 2026 — «مهام مجدولة متعطلة الحين» (SQL111) and the National Day holiday on the call targets
+
+- **Ahmed:** «صلّح عنوان مهام مجدولة فشلت اليوم». The «مشاكل» tile counted every failed cron run of the last 24 hours (12 on 17 Nov, all one
+  startup timeout at 09:30 on 16 Nov). **SQL111** (`db/changes/111-jobs-broken-now.forward.sql`) replaces only that statement of
+  `crm_owner_home()` (live body md5 `b7fb01ab…` checked, one `replace()`): it counts the active jobs whose **last** run within 8 days failed,
+  titled «مهام مجدولة متعطلة الحين» with their names. A job that failed once and ran again leaves by itself. Checked in a rolled-back
+  transaction (forward, rollback back to the exact old md5, forward again), then applied from commit `c4ccdab`; new md5 `63b3617e…`.
+  As the owner the tile now shows only «صفقات زيارة بدون أي حركة من شهر 2» (no job is broken). No front-end change. Next SQL number **112**.
+- **Ahmed: «نعم، سجّلها»:** 18 and 19 Nov 2026 are «إجازة رسمية» for everyone («العيد الوطني») in `crm_call_day_notes` (written through
+  `crm_call_day_note` as the owner). مرام's week target is now 30 and November 200.
+
 ## 17 November 2026 — calls: owners and advertisers only, 10 a day, weekly / monthly targets, call log with reasons (SQL110)
 
 - **Ahmed (voice, 17 Nov):** «سجّل اتصال» is only for calls (not people after a visit): «اتصلت على» = مالك / معلن («عميل بعد معاينة»
