@@ -122,7 +122,8 @@ function freeFinRow(g, taken) {                         // the first row under t
   for (let r = last + 1; r <= FIN_LAST; r++) if (!taken.has(r)) return r;
   return null;
 }
-const isFormula = (v) => typeof v === 'string' && v.startsWith('=');
+const squash = (v) => String(v ?? '').replace(/\s+/g, '').toUpperCase();
+const sameFormula = (v, wants) => wants.some((w) => squash(v) === squash(w));
 
 // ---- the plan ----
 // deals: rows from crm_sheet_sync_deals; links: sheet_sync_rows by deal id; grids: { sales, salesFormulas, finance }
@@ -190,10 +191,12 @@ export function plan(deals, links, grids, cfg) {
       }
       const touched = writes.some((w) => w.tab === 'sales' && w.row === sr);
       if (touched) {                                                         // I and J stay formulas
-        const fi = grids.salesFormulas ? cell(grids.salesFormulas, sr, 'I') : '=';
-        const fj = grids.salesFormulas ? cell(grids.salesFormulas, sr, 'J') : '=';
-        if (!isFormula(fi)) put('sales', sr, 'I', 'formula', `=IF(L${sr}="","",L${sr}-M${sr})`, d.id);
-        if (!isFormula(fj)) put('sales', sr, 'J', 'formula', `=(M${sr}-O${sr})`, d.id);
+        // anything but the original formula of the row (empty, a value, or the old «=L42-M42») is put back
+        const wantI = `=IF(L${sr}="","",L${sr}-M${sr})`, wantJ = `=(M${sr}-O${sr})`;
+        const fi = grids.salesFormulas ? sameFormula(cell(grids.salesFormulas, sr, 'I'), [wantI]) : true;
+        const fj = grids.salesFormulas ? sameFormula(cell(grids.salesFormulas, sr, 'J'), [wantJ, `=M${sr}-O${sr}`]) : true;
+        if (!fi) put('sales', sr, 'I', 'formula', wantI, d.id);
+        if (!fj) put('sales', sr, 'J', 'formula', wantJ, d.id);
       }
     }
 
@@ -246,7 +249,7 @@ export function adopt(deals, links, grids, forced = {}) {
   const found = [], missing = [], diffs = [];
   const takenS = new Set(Object.values(links).map((l) => l.sales_row).filter(Boolean));
   const takenF = new Set(Object.values(links).map((l) => l.finance_row).filter(Boolean));
-  for (const f of Object.values(forced)) { takenS.add(f.sales_row); takenF.add(f.finance_row); }
+  for (const f of Object.values(forced)) { if (f.sales_row) takenS.add(f.sales_row); if (f.finance_row) takenF.add(f.finance_row); }
   // the named rows first, then the others; a row is never given to two deals
   const order = [...deals].sort((a, b) => (forced[b.id] ? 1 : 0) - (forced[a.id] ? 1 : 0));
   for (const d of order) {
@@ -254,7 +257,8 @@ export function adopt(deals, links, grids, forced = {}) {
     const s = dealState(d);
     if (!s.sale) continue;
     const f = forced[d.id] || {};
-    const sr = f.sales_row || salesRowFor(grids.sales, s, takenS);
+    const forcedOk = f.sales_row && s.ownerPhone && digits(cell(grids.sales, f.sales_row, 'T')) === String(s.ownerPhone);
+    const sr = forcedOk ? f.sales_row : salesRowFor(grids.sales, s, takenS);   // a named row is used only if it still holds this owner
     let fr = f.finance_row || null;
     if (!fr) { const r = finRowFor(grids.finance, s); if (r && !takenF.has(r)) fr = r; }
     if (!fr) {                     // no date in A: owner's first name + the amount + (the received date, or still «منتظرة»)

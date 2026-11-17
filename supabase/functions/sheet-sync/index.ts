@@ -10,9 +10,11 @@ import { plan, adopt, muscatSerial } from "./plan.mjs";
 const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false } });
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json" } });
 const short = (t: string, n: number) => (t.length > n ? t.slice(0, n) + "…" : t);
-const FORCED: Record<string, { sales_row: number; finance_row: number }> = {   // the two rows Ahmed named (17 Nov 2026)
-  "03d66096-c655-4f4f-82b3-e0751581c76f": { sales_row: 38, finance_row: 14 },
-  "10ce4b8d-7abc-47d8-a5a4-4df24b2e8e93": { sales_row: 30, finance_row: 7 },
+// the two «2026» rows Ahmed named (17 Nov 2026). Their «العمولات» rows are found by content: that tab gets re-sorted
+// (Hisham moved from row 14 to row 8 the same afternoon), so a fixed row number there would point at another deal.
+const FORCED: Record<string, { sales_row: number }> = {
+  "03d66096-c655-4f4f-82b3-e0751581c76f": { sales_row: 38 },
+  "10ce4b8d-7abc-47d8-a5a4-4df24b2e8e93": { sales_row: 30 },
 };
 
 // ---- Google ----
@@ -191,6 +193,23 @@ async function planWith(body: any) {
   };
 }
 
+// test_live: real writes on the TEST COPIES only, with deal changes made up in the request (body.override, body.drop);
+// nothing is written to the CRM and no link is saved. Refused while the config points at Ahmed's original sheets.
+const ORIGINALS = ["1S9pmFG5zNNoR4q5MXj-JpHnF3PKP7xpl819b63GTF7s", "1zR0ELZb5POPcSim2NDG4CkpqFPkPxTbJdOJ91ep3BtQ"];
+async function testLive(body: any, run: string) {
+  const { cfg, deals, links } = await load("2026-01-01");
+  if (ORIGINALS.includes(cfg.sales_spreadsheet_id) || ORIGINALS.includes(cfg.finance_spreadsheet_id)) throw new Error("test_live_only_on_copies");
+  const salesTab = cfg.sales_tabs?.[0] ?? "2026";
+  const grids = await readGrids(cfg, salesTab);
+  const L: Record<string, any> = { ...links };
+  for (const id of body?.drop ?? []) delete L[id];
+  const p = plan(deals.map((d) => ({ ...d, ...(body?.override?.[d.id] ?? {}) })), L, grids, { sales_tab: salesTab,
+    cancel_totals_mode: cfg.cancel_totals_mode, create_from_serial: muscatSerial(`${body?.create_from ?? cfg.create_from}T00:00:00+04:00`) });
+  if (p.writes.length) await applyWrites(cfg, salesTab, p.writes);
+  await log(run, "info", "test_live", `${p.writes.length} كتابة على نسخ الفحص`, p);
+  return p;
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ ok: false }, 405);
   const secret = req.headers.get("x-crm-agent") || "";
@@ -203,11 +222,12 @@ Deno.serve(async (req) => {
     try { return json({ ok: true, result: await planWith(body) }); }
     catch (e) { return json({ ok: false, error: short(String((e as any)?.message || e), 300) }, 500); }
   }
-  if (!["run", "dry_run", "adopt"].includes(action)) return json({ ok: false, error: "unknown_action" }, 400);
+  if (!["run", "dry_run", "adopt", "test_live"].includes(action)) return json({ ok: false, error: "unknown_action" }, 400);
   const lease = await db.rpc("crm_sheet_sync_lease", { p_take: true });
   if (lease.error || lease.data !== true) return json({ ok: true, skipped: "another_run" });
   try {
-    const result = action === "adopt" ? await doAdopt(body?.confirm === true, runId) : await run(action as "run" | "dry_run", runId);
+    const result = action === "adopt" ? await doAdopt(body?.confirm === true, runId)
+      : action === "test_live" ? await testLive(body, runId) : await run(action as "run" | "dry_run", runId);
     return json({ ok: true, run: runId, result });
   } catch (e) {
     const msg = String((e as any)?.message || e);

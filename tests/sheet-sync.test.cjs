@@ -92,7 +92,7 @@ test('commission received, amount changed, cancelled: only those cells change', 
 test('I and J are put back as formulas only when they are not formulas; a moved row is a problem, not a write', async () => {
   const { adopt, plan } = await load();
   const g = grids(), links = linksOf(adopt([hisham], {}, g, {}).found);
-  g.salesFormulas = salesGrid(); g.salesFormulas[37][8] = ''; g.salesFormulas[37][9] = '=(M38-O38)';
+  g.salesFormulas = salesGrid(); g.salesFormulas[37][8] = '=L38-M38'; g.salesFormulas[37][9] = '=(M38-O38)';   // the old I formula
   const p = plan([{ ...hisham, commission_total: 1100 }], links, g, cfg);
   assert.deepEqual(p.writes.filter((w) => w.kind === 'formula').map((w) => `${w.col}${w.row}=${w.v}`), ['I38==IF(L38="","",L38-M38)']);
   g.sales[37][19] = 99999999;                                                // someone typed another owner over row 38
