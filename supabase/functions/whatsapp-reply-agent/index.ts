@@ -454,7 +454,8 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   {
     const ACK_ONLY = /^\s*(طيب|تمام|اوك|اوكي|ok|okay|زين|ابشر|ان\s*شاء\s*الله|إن\s*شاء\s*الله|ان\s*شاءالله)\s*[.!]*\s*$/i;
     const REDIRECT = /تتابعه\s*معنا\s*على\s*رقم|هذا\s*الرقم\s*خاص|تتابعها\s*معنا\s*على\s*رقم/;
-    const pointed = c.history.some((h: any) => h.direction === "outbound" && (String(h.message_type || "") === "contacts" || /\[contacts\]|71770030|92344273|تواصل\s*على\s*(هذا|هالرقم|هال)\s*الرقم|تتابعه\s*معنا\s*على\s*رقم/.test(String(h.body || ""))));
+    // (only the office's own pointer: the contact card or «تواصل على هذا الرقم»; after the agent's own line R48 decides)
+    const pointed = c.history.some((h: any) => h.direction === "outbound" && (String(h.message_type || "") === "contacts" || /\[contacts\]|تواصل\s*على\s*(هذا|هال)\s*الرقم/.test(String(h.body || ""))));
     if (ACK_ONLY.test(String(c.burstSaid || "")) && texts.length && texts.every((t) => REDIRECT.test(t)) && pointed) { texts = []; out.guard_ack_after_redirect = true; }
   }
   const NAME_LINE = /^\s*اسمك\s*الكريم\s*؟\s*$/;
