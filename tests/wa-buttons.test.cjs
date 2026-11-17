@@ -79,6 +79,13 @@ test('handoffs close by themselves, crm_mark_handoff_done is service_role only, 
  assert(sql.includes('SECURITY INVOKER'),'the list goes through RLS');
  assert(hot.includes("+': '+hotName(w)+' · '")&&hot.includes('const hasLetters=t=>/\\p{L}/u.test'),'emoji names show the phone');
 });
+test('a reserved / sold property suggests an alternative to Ahmed only when one exists (SQL121)',()=>{
+ const sql=fs.readFileSync('db/changes/121-reserved-property-alternative.forward.sql','utf8'),hot=fs.readFileSync('crm-hot-alerts.js','utf8');
+ assert.equal(sql,fs.readFileSync('supabase/migrations/20261117210000_reserved_property_alternative_20261117.sql','utf8'));
+ assert(sql.includes("IF n > 0 AND alt IS NOT NULL")&&sql.includes("'🔥 بديل: '"),'only closed chats, only with an alternative');
+ assert(sql.includes("pr.role = 'owner'")&&!/whatsapp-send|net\.http_post/.test(sql),'to the owner in the CRM, nothing goes to the client');
+ assert(hot.includes("/^🔥 بديل:/.test(String(n.title||''))||!done.some("),'not hidden by the «تم» written in the same moment');
+});
 // 11 Nov 2026 (Ahmed): price study report to his WhatsApp from the branch number, one block per client with separators
 test('price study report: details, number, owner offer, words, documents, separators; once per handoff (SQL89)',()=>{
  const f=fs.readFileSync('supabase/functions/whatsapp-owner-hot-alert/index.ts','utf8'),s=fs.readFileSync('db/changes/89-price-study-report.forward.sql','utf8');

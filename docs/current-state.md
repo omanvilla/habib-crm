@@ -71,7 +71,15 @@ live database: advisors, RLS, cron runs, 24 hours of Postgres and edge logs, `pg
   activity; call → out; property sold → out; meeting-only close leaves a «مشتري جاد». Open list went 8 → 7 (ايهاب's
   meeting, done 15 Nov, came back only because of the moved time). Not done: the 19:30 routine still has its own query
   (needs Ahmed to paste the new line); the deal trigger was not run live (deal workflow guards need full sale data).
-  Rollback: `120-handoff-autoclose.rollback.sql`. Next SQL number **121**.
+  Rollback: `120-handoff-autoclose.rollback.sql`. Same day: خالد الرزيقي (`8c51877c`, last message 8 Nov, waiting for
+  Housing Bank approval, asked how long the wait is if he reserves) marked «تم» with `crm_mark_handoff_done` at Ahmed's word.
+- **SQL121 applied (Ahmed: «إذا كان في بديل أعرض عليه بديل»):** when a property turns sold / reserved and SQL120 closes a
+  client's open handoff, Ahmed gets «🔥 بديل: <client> · <property> انحجز / اعرض عليه بديل: <alt> · <area> · <price>» in
+  «عملاء يحتاجونك الحين» (notification to active owners, type whatsapp_handoff) — only if
+  `crm_repair_private.property_alternative` finds one (available, not archived, same type, purpose and wilayat, 80-125% of
+  the price, closest first), and never for the buyer of that property's deal. Nothing goes to the client. Tested rolled
+  back: Hasna + «فيلا رضوان الصومحان 69 -3» reserved → alt «-2 · 69,000 ر.ع», notification to the owner, staff test account
+  sees 0; «استراحة الرميس 109» sold → no alternative, no notification. Rollback: `121-…rollback.sql`. Next SQL number **122**.
 - **Left as they are, on purpose:** the two SECURITY DEFINER views (`crm_properties_access`, `crm_deals_access`) hide money
   columns from staff by design; 346 «duplicate key» answers a day on `whatsapp_messages` and 95 on `activities` are the
   webhook's own duplicate guard; leaked-password protection is a switch in the Supabase dashboard (Ahmed).
