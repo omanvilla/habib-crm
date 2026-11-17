@@ -14,6 +14,13 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
   titled «مهام مجدولة متعطلة الحين» with their names. A job that failed once and ran again leaves by itself. Checked in a rolled-back
   transaction (forward, rollback back to the exact old md5, forward again), then applied from commit `c4ccdab`; new md5 `63b3617e…`.
   As the owner the tile now shows only «صفقات زيارة بدون أي حركة من شهر 2» (no job is broken). No front-end change. Next SQL number **112**.
+- **Ahmed: «كمل على صفقات الزيارة اللي بدون حركة»:** the two cards were `dfe3a998` (تيمور ناصر, `viewing_no_show`, visit 31 May) and
+  `81c87556` (محمد الكندي, `visit`, visit 5 Jun), both «فيلا حي عاصم 57», both `entry_mode = legacy` cards made on 13 Sep from old
+  visits, no message, call or activity since. The villa is reserved for another buyer (card `10ce4b8d`, `awaiting_clearance` since
+  19–20 Oct). Both closed as `lost` from their stage with reason `property_unavailable` and a note that it is not a refusal recorded from the
+  client (direct update the way `crm_close_stale_visit_deals` does it; the stage-history trigger records it). The «مشاكل» tile is empty now.
+  **Seen, not changed:** `crm_close_stale_visit_deals(90)` counts a card's `created_at` as movement, so a legacy card made on 13 Sep from a
+  June visit would only close on 12 Dec, and a card that absorbed a merged duplicate (5 Nov) in February.
 - **Ahmed: «نعم، سجّلها»:** 18 and 19 Nov 2026 are «إجازة رسمية» for everyone («العيد الوطني») in `crm_call_day_notes` (written through
   `crm_call_day_note` as the owner). مرام's week target is now 30 and November 200.
 
