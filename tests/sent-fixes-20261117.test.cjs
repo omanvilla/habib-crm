@@ -268,3 +268,6 @@ test('R93: «الرقم ما يرد» goes to Ahmed as «ما يردون:» with
  assert(agent.includes('event_key: `no_answer:${conv.id}:${msg.id}`'),'one alert per client message');
  assert(agent.includes('texts = saidIt ? [] : [R12_LINE];'),'the sentence is said once');
 });
+test('R93: «ما يردون» is kept over the Barka→Muscat owner redirect (row 1366)',()=>{
+ assert(agent.includes('const keepHandoff = out.action === "handoff" && (HARD_HANDOFF.test(why) || /^\s*(طلب اتصال|ما يردون)/.test(why));'));
+});

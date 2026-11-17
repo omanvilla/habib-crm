@@ -2270,7 +2270,8 @@ Deno.serve(async (req) => {
       const redirectLines = [...(salam ? [salam] : []), line, "هذا الرقم خاص لعقارات بركاء"];
       // R23: a handoff the model chose for negotiation, a serious buyer, a price study or a call request stays as it is, its silence too
       const why = String(out.handoff_reason || "");
-      const keepHandoff = out.action === "handoff" && (HARD_HANDOFF.test(why) || /^\s*طلب اتصال/.test(why));
+      // (R93: «ما يردون» stays with Ahmed too: the same number is not sent again to a client who says it does not answer)
+      const keepHandoff = out.action === "handoff" && (HARD_HANDOFF.test(why) || /^\s*(طلب اتصال|ما يردون)/.test(why));
       if (!keepHandoff && !redirectSent) out.reply_messages = redirectLines;
       // otherwise the model's own reply goes (after the line the brain answers and reminds once, and «تمام» gets nothing), but never a
       // project or a figure on the Barka number (R9): such a reply becomes the line again, unless it went out in the last 15 minutes (R14)
