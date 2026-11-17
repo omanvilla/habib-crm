@@ -257,3 +257,12 @@ test('rows 1521-1560: R74 sends no location for a property the reply says is gon
  // an available one still gets it
  assert.equal(decide(['تمام'],h,null,{prop:{...P,status:'available'}}).out.action,'send_location');
 });
+test('R93: «الرقم ما يرد» goes to Ahmed as «ما يردون:» with R12\'s sentence once and a WhatsApp alert',()=>{
+ const line=agent.split('\n').find((l)=>l.trim().startsWith('const NO_ANSWER ='));
+ const re=new RegExp(line.match(/const NO_ANSWER = \/(.*)\/;/)[1]);
+ for(const s of ['تواصلت معهم محد يرد','تواصلت اخي محد يرد','رسلت لهم ما ردوا علي','م يردوا','تواصلت ع الرقم هذا وم حصلت رد نهائي','اتصلت فيهم وما ردو'])assert(re.test(s),s);
+ for(const s of ['ردوا علي امس','محد يقدر يساعدني','ما رديت عليه','ابي اتصل'])assert(!re.test(s),s);
+ assert(agent.includes('out.action = "handoff"; out.handoff_reason = short(`ما يردون: ${burstSaid.replace(/\s+/g, " ").trim()}`, 300);'));
+ assert(agent.includes('event_key: `no_answer:${conv.id}:${msg.id}`'),'one alert per client message');
+ assert(agent.includes('texts = saidIt ? [] : [R12_LINE];'),'the sentence is said once');
+});

@@ -1888,6 +1888,17 @@ Deno.serve(async (req) => {
       texts = []; out.action = "handoff"; out.handoff_reason = short(`طلب اتصال: ${out.intent || out.crm_note || "العميل طلب اتصال"}`, 300);
       out.guard_call_request = true;
     }
+    // R93 (Ahmed 17 Nov 2026 night: «ايه حوّله لي بتنبيه»): a client who says the number we gave (the owner's, the other
+    // branch's) or ours did not answer («تواصلت محد يرد», «رسلت لهم ما ردوا علي», «م يردوا») was sent back to the same number.
+    // Now he gets R12's allowed sentence once, the chat goes to Ahmed as «ما يردون:», and Ahmed is told on WhatsApp.
+    const NO_ANSWER = /(تواصلت|اتصلت|راسلت|رسلت|ارسلت|أرسلت|دقيت|كلمت|حاولت)[^\n]{0,40}(محد|ماحد|ما\s*حد|(ما|م)\s*رد(و|وا)?|(ما|م)\s*ير?د(و|ون|وا)?(\s|$)|ولا\s*رد|(ما|م)\s*حصلت\s*رد)|(^|\s)(محد|ماحد)\s*ير?د|(^|\s)(ما|م)\s*(يردوا|يردون|يردو|ردوا|ردو)(\s|$)/;
+    if (NO_ANSWER.test(burstSaid) && !ignored && !review && out.action !== "book_meeting" && !/^\s*(تفاوض|مشتري جاد|دراسة سعر|اجتماع)\s*:/.test(String(out.handoff_reason || ""))) {
+      const R12_LINE = "حاليا الاستاذ احمد مشغول ان شاء الله اول ما يفضى يتصل فيك بس خبرنا وش الموضوع ونقدر نساعدك هنا في الواتساب";
+      const saidIt = history.slice(-6).some((h: any) => h.direction === "outbound" && String(h.body || "").includes("اول ما يفضى يتصل فيك"));
+      texts = saidIt ? [] : [R12_LINE];
+      out.action = "handoff"; out.handoff_reason = short(`ما يردون: ${burstSaid.replace(/\s+/g, " ").trim()}`, 300);
+      out.guard_no_answer = true; out.no_answer_alert = true;
+    }
     // R10 / R20: an owner who says the property belongs to heirs, or is mortgaged or lived in, is declined with the fixed lines and
     // asked for nothing. Only on his own clear words (never on «ما فيه رهن» / «فاضي»), and never in a chat where the office wrote
     // itself (the property Ahmed brought is the written exception).
@@ -2415,6 +2426,14 @@ Deno.serve(async (req) => {
     await db.from("whatsapp_conversations").update(convPatch).eq("id", conv.id);
     // an open handoff already on Ahmed's list does not alert him again unless it turned into negotiation / serious buyer / price study
     if (out.action === "handoff" && (!conv.human_handoff_required || HARD_HANDOFF.test(String(out.handoff_reason || "")))) await notifyHandoff(msg.company_id, conv, client, out.handoff_reason || out.crm_note || out.intent);
+    // R93: «ما يردون» reaches Ahmed on WhatsApp from this branch number, once per client message
+    if (out.no_answer_alert) {
+      try {
+        const text = [`📵 العميل يقول ما أحد رد عليه · ${conv.route_key === "barka" ? "بركاء" : conv.route_key === "muscat" ? "مسقط" : ""}`, `الاسم: ${client.name || conv.customer_name || "عميل"}`, `الرقم: +${to}`, `كلامه: ${short(String(out.handoff_reason || "").replace(/^ما يردون:\s*/, ""), 240)}`].join("\n");
+        await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-owner-hot-alert`, { method: "POST", headers: { "Content-Type": "application/json", "x-crm-agent": secret },
+          body: JSON.stringify({ action: "notify_owner", company_id: msg.company_id, route_key: conv.route_key, text, event_key: `no_answer:${conv.id}:${msg.id}` }) });
+      } catch (e) { console.error("[reply-agent] no-answer alert", String((e as any)?.message || e)); }
+    }
     // a booked meeting reaches Ahmed once, with a task on the meeting day (like the price study task); the same slot again does not.
     // The alert goes to the owner himself, not to whoever holds the chat (a retired account, or a branch agent: investment is owner-only)
     if (meetingBooked && !out.meeting_already_booked) {
