@@ -160,7 +160,18 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   // for the reel marked «من الداخل» (above); elsewhere the claim is taken out of the line.
   if (!out.guard_inside_video) texts = texts.map((t) => (t.length <= 200 && /فيديو|فديو/.test(t) ? t.replace(/\s*من\s*(ال)?(داخل|خارج|برع)(\s*و\s*(من\s*)?(ال)?(داخل|خارج|برع))?/g, "") : t));
   // «… والتملك حر لأي جنسية واسمك الكريم ؟»: the name question is not glued to the end of a sentence about something else
-  texts = texts.map((t) => ((t.length > 60 || VISIT_Q.test(t)) && !/^https?:/.test(t) ? t.replace(/\s*و\s*اسمك\s*الكريم\s*؟/g, "").trim() : t)).filter(Boolean);
+  // (dry run rows 711-776, 17 Nov: «الفيلا اللي سألت عنها انباعت واسمك الكريم ؟» is short; the sold line is cut too, and the
+  // name question comes back on its own before the last question)
+  {
+    const glued = (t: string) => (t.length > 60 || VISIT_Q.test(t) || /انباع|ما\s*متوفر/.test(t)) && !/^https?:/.test(t) && /\S\s*و\s*اسمك\s*الكريم\s*؟/.test(t);
+    const cut = texts.some(glued);
+    texts = texts.map((t) => (glued(t) ? t.replace(/\s*و\s*اسمك\s*الكريم\s*؟/g, "").trim() : t)).filter(Boolean);
+    if (cut && /انباع|ما\s*متوفر/.test(texts.join("\n")) && !texts.some((t) => /اسمك\s*الكريم/.test(t))) {
+      if (texts.length > 1 && /؟\s*$/.test(texts[texts.length - 1])) texts.splice(texts.length - 1, 0, "اسمك الكريم ؟"); else texts.push("اسمك الكريم ؟");
+    }
+  }
+  // (same rows: an owner was told «وبعدها نسألك عن سكن المالك والرهن»: the next questions are asked, not announced)
+  texts = texts.filter((t) => !(t.length <= 120 && /^\s*(و\s*)?بعدها\s*(ن|ب)?(سأل|نسأل)/.test(t)));
   // the fixed project line is said once («… ⏎ العرض الحالي … والاسعار تختلف حسب الوحدة والمساحة والمرحلة»)
   if (texts.includes(FIXED_PRICE_LINE)) texts = texts.map((t) => (t === FIXED_PRICE_LINE ? t : t.replace(new RegExp(`\\s*و?${FIXED_PRICE_LINE}`), "").trim())).filter(Boolean);
   // R76 (Ahmed: «اللي يسأل عن التقسيم يفضل يزور الموقع لان الخرائط تختلف عن الواقع»; changes R41 for this question only)

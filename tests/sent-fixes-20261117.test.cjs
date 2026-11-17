@@ -93,6 +93,15 @@ test('dry run rows 701-740: the waiting-list line goes when something is offered
  const ad='للبيع توين فيلا في الرميس بركاء\n'+'تفاصيل '.repeat(40).trim();
  assert.deepEqual(decide(['الفيلا اللي سألت عنها انباعت',ad,'متى يناسبك تزور ؟'],[IN('ارسل التفاصيل')]).texts,['الفيلا اللي سألت عنها انباعت',ad,'متى يناسبك تزور ؟']);
 });
+test('dry run rows 711-776: the name question is not glued to the sold line; the next owner questions are not announced',()=>{
+ const ad='للبيع توين فيلا في الرميس بركاء\n'+'تفاصيل '.repeat(40).trim();
+ let r=decide(['الفيلا اللي سألت عنها انباعت واسمك الكريم ؟','بس عندنا فيلا ثانية في الرميس بـ 59 الف\n'+ad,'متى يناسبك تزور ؟'],[IN('ارسل التفاصيل')]);
+ assert.deepEqual(r.texts,['الفيلا اللي سألت عنها انباعت','بس عندنا فيلا ثانية في الرميس بـ 59 الف\n'+ad,'اسمك الكريم ؟','متى يناسبك تزور ؟']);
+ // a short line that is only a greeting with the name stays
+ assert.deepEqual(decide(['تشرفنا واسمك الكريم ؟'],[IN('هلا')]).texts,['تشرفنا واسمك الكريم ؟']);
+ r=decide(['اسمك الكريم ؟','ارسل الملكية والكروكي وشهادة اتمام البناء اذا ما عليك امر','وبعدها نسألك عن سكن المالك والرهن'],[IN('فيديو توضيحي للوصول منطقة جديدة')],{category:'seller'});
+ assert.deepEqual(r.texts,['اسمك الكريم ؟','ارسل الملكية والكروكي وشهادة اتمام البناء اذا ما عليك امر']);
+});
 test('the R11 check reads «ليوم» as a day too',()=>{
  assert(agent.includes('const TIME_SAID = /ا?ليوم|الحين'));
 });
