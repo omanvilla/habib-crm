@@ -75,6 +75,24 @@ test('«موجود جنب الفيلا» is a visit now: saved at the current ho
  assert(re.test('واقف عند البيت'));
  assert(!re.test('بمر بكره العصر'));
 });
+test('dry run rows 701-740: the property she named by area and price is not called sold (2abc2e0b)',()=>{
+ const available=[{id:'h59',branch_key:'barka',area:'بركاء الرميس',price:59000},{id:'s69',branch_key:'barka',area:'الصومحان الجنوبية',price:69000}];
+ const h=[IN('ممكن الموقع'),OUT('موقع ايش ؟'),IN('فلة الرميس اللي ب59 الف')];
+ const r=decide(['الفيلا اللي سألتي عنها انباعت','بس عندنا فيلا ثانية في الرميس بـ 59 الف متوفرة حالياً','اسمك الكريم ؟ ومتى يناسبك تزورين ؟'],h,null,{available,route:'barka'});
+ assert.deepEqual(r.texts,['عندنا فيلا في الرميس بـ 59 الف متوفرة حالياً','اسمك الكريم ؟ ومتى يناسبك تزورين ؟']);assert.equal(r.out.property_id,'h59');
+ // with an ad sent (the sold one) the line stays
+ const withAd=[IN('https://www.instagram.com/reel/DfeJC4ICmTO/'),IN('فلة الرميس اللي ب59 الف')];
+ assert.equal(decide(['الفيلا اللي سألتي عنها انباعت','بس عندنا فيلا ثانية في الرميس بـ 59 الف'],withAd,null,{available,route:'barka'}).texts[0],'الفيلا اللي سألتي عنها انباعت');
+ // another price: nothing changes
+ assert.equal(decide(['الفيلا اللي سألتي عنها انباعت','بس عندنا فيلا ثانية'],[IN('فلة الرميس اللي ب75 الف')],null,{available,route:'barka'}).texts[0],'الفيلا اللي سألتي عنها انباعت');
+});
+test('dry run rows 701-740: the waiting-list line goes when something is offered; the full ad keeps the visit question',()=>{
+ const r=decide(['الفيلا اللي سألت عنها ما متوفره حالياً','اول ما يتوفر بتواصل معك\nبس عندنا بيت في الحيل الجنوبية بـ 130 الف تحب ارسلك تفاصيله ؟'],[IN('نعم')]);
+ assert.deepEqual(r.texts,['الفيلا اللي سألت عنها ما متوفره حالياً','بس عندنا بيت في الحيل الجنوبية بـ 130 الف تحب ارسلك تفاصيله ؟']);
+ assert.deepEqual(decide(['الفيلا اللي سألت عنها ما متوفره حالياً','اول ما يتوفر بتواصل معك'],[IN('نعم')]).texts,['الفيلا اللي سألت عنها ما متوفره حالياً','اول ما يتوفر بتواصل معك']);
+ const ad='للبيع توين فيلا في الرميس بركاء\n'+'تفاصيل '.repeat(40);
+ assert.deepEqual(decide(['الفيلا اللي سألت عنها انباعت',ad,'متى يناسبك تزور ؟'],[IN('ارسل التفاصيل')]).texts,['الفيلا اللي سألت عنها انباعت',ad,'متى يناسبك تزور ؟']);
+});
 test('the R11 check reads «ليوم» as a day too',()=>{
  assert(agent.includes('const TIME_SAID = /ا?ليوم|الحين'));
 });

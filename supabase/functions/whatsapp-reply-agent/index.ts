@@ -151,7 +151,8 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   }
   // fourth dry-run batch: «الفيلا اللي سألت عنها ما متوفره حالياً» + «متى يناسبك تزور ؟» with nothing offered in its place.
   // The visit question goes only with a property to visit.
-  if (texts.some((t) => t.length <= 200 && /ما\s*متوفر[هة]?\s*حالي|انباع/.test(t)) && !texts.some((t) => /عندنا|متوفر[هة]?\s*(الحين|حالياً\s*و)|المتبقي/.test(t.replace(/ما\s*متوفر[هة]?\s*حالي\S*/g, ""))) && out.action === "none") {
+  // (dry run rows 701-740, 17 Nov: the other property's full ad, with no «عندنا» in it, counts as the offer: the visit question stays)
+  if (texts.some((t) => t.length <= 200 && /ما\s*متوفر[هة]?\s*حالي|انباع/.test(t)) && !texts.some((t) => t.length > 200 || /عندنا|متوفر[هة]?\s*(الحين|حالياً\s*و)|المتبقي/.test(t.replace(/ما\s*متوفر[هة]?\s*حالي\S*/g, ""))) && out.action === "none") {
     const kept = texts.filter((t) => !VISIT_Q.test(t));
     if (kept.length !== texts.length) { texts = kept; out.guard_visit_nothing = true; }
   }
@@ -369,6 +370,28 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     // (dry run on the branch: «الحمدلله التثمين تبيه للبنك…» rode along; only a line that is nothing but the greeting stays)
     texts = [...texts.filter((t) => /^\s*(وعليكم\s*السلام(\s*ورحمة\s*الله(\s*وبركاته)?)?|الحمد\s*لله|مرحبتين(\s*تفضل)?)\s*$/.test(t)), "ارسل لي رابط الفيديو او صورة منه عشان ارسلك التفاصيل والسعر بالضبط"];
     out.category = "buyer"; out.guard_our_price = true;
+  }
+  // dry run rows 701-740 (17 Nov), 2abc2e0b «فلة الرميس اللي ب59 الف» with no ad sent: «الفيلا اللي سألتي عنها انباعت» + «بس عندنا
+  // فيلا ثانية في الرميس بـ 59 الف». She named the one we have (another 59 in Al Rumais was sold): the sold line goes.
+  {
+    const SOLD_ASKED = /(اللي\s*)?(سألت|سألتي|سألتو|سألتوا)\s*عنها\s*(انباعت|ما\s*متوفر[هة]?(\s*حالي\S*)?)/;
+    const west = String(c.burstSaid || "").replace(/[٠-٩]/g, (d: string) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
+    const n = Number((west.match(/([0-9]{2,3})\s*(ال|أل|ا)?ف/) || [])[1] || 0);
+    const said = areaKey(c.burstSaid);
+    const adSent = inbound.slice(-6).some((h: any) => /instagram\.com|facebook\.com|fb\.watch/.test(body(h)) || ["image", "video"].includes(String(h.message_type || "")));
+    const named = n && !adSent ? (c.available || []).find((p: any) => p.branch_key === c.route && Math.round(Number(p.price || 0) / 1000) === n
+      && areaKey(p.area).split(" ").some((w: string) => w.length > 2 && said.includes(w))) : null;
+    if (named && texts.some((t) => t.length <= 250 && SOLD_ASKED.test(t))) {
+      texts = texts.map((t) => (t.length <= 250 && SOLD_ASKED.test(t) ? t.split("\n").filter((l) => !SOLD_ASKED.test(l)).join("\n").trim() : t)).filter(Boolean)
+        .map((t) => t.replace(/^(\s*)بس\s+عندنا/, "$1عندنا").replace(/(فيلا|فل[ةه]|بيت|شق[ةه])\s+ثاني[ةه]/, "$1"));
+      out.property_id = named.id; out.guard_named_price_available = true;
+    }
+  }
+  // same rows (5d29…, Al Khoud 7): «اول ما يتوفر بتواصل معك» and then «بس عندنا بيت في الحيل الجنوبية…»: with something offered
+  // the waiting-list line is taken out.
+  if (texts.some((t) => /(^|\n)\s*بس\s*عندنا/.test(t)) && texts.some((t) => /اول\s*ما\s*يتوفر\s*بتواصل\s*معك/.test(t))) {
+    texts = texts.map((t) => t.split("\n").filter((l) => !/^\s*اول\s*ما\s*يتوفر\s*بتواصل\s*معك\s*$/.test(l)).join("\n").trim()).filter(Boolean);
+    out.guard_wait_and_offer = true;
   }
   const NAME_LINE = /^\s*اسمك\s*الكريم\s*؟\s*$/;
   for (let i = 0; i < texts.length - 1; i++) {
