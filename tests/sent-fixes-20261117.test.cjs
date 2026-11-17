@@ -229,3 +229,11 @@ test('rows 1321-1360: no commission lines after a decline; «جزا الله خ�
  const w=agent.split('\n').find((l)=>l.startsWith('const THANKS_WORD ='));
  assert(new RegExp(w.match(/= \/(.*)\/i;/)[1],'i').test('جزا الله خيرا'));
 });
+test('rows 1361-1400: a request in Salalah / Ibri / Al Suwaiq gets R56\'s line, not «اول ما يتوفر»',()=>{
+ const L='نعتذر منك احنا حالياً نشتغل في مسقط وبركاء فقط';
+ assert.deepEqual(decide(['وعليكم السلام ورحمة الله وبركاته','حالياً ما متوفر بيت للايجار في صلاله','اول ما يتوفر بتواصل معك\nاسمك الكريم ؟'],[IN('في عندكم بيوت ارضي للايجار في صلاله؟')],{category:'tenant'}).texts,['وعليكم السلام ورحمة الله وبركاته',L]);
+ assert.deepEqual(decide(['حالياً ما متوفر شقة للايجار في عبري','اول ما يتوفر بتواصل معك'],[IN('ممكن احصل شقق للايجار في عبري')],{category:'tenant'}).texts,[L]);
+ // Al Amerat and Al Mabaila are ours; «صور» as photos is no place
+ assert.deepEqual(decide(['حالياً ما عندنا أرض في العامرات','اول ما يتوفر بتواصل معك'],[IN('اريد أرض فا العامرات')]).texts,['حالياً ما عندنا أرض في العامرات','اول ما يتوفر بتواصل معك']);
+ assert.deepEqual(decide(['ما متوفر صور'],[IN('عندك صور للبيت')]).texts,['ما متوفر صور']);
+});

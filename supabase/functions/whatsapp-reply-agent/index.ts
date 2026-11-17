@@ -469,6 +469,17 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     const pointed = c.history.some((h: any) => h.direction === "outbound" && (String(h.message_type || "") === "contacts" || /\[contacts\]|تواصل\s*على\s*(هذا|هال)\s*الرقم/.test(String(h.body || ""))));
     if (ACK_ONLY.test(String(c.burstSaid || "")) && texts.length && texts.every((t) => REDIRECT.test(t)) && pointed) { texts = []; out.guard_ack_after_redirect = true; }
   }
+  // rows 1361-1400 (and 900, 970): a tenant asking for a house in Salalah («بيوت ارضي للايجار في صلاله») or Ibri got «حالياً ما
+  // متوفر… اول ما يتوفر بتواصل معك», a promise for a place the office does not work in (R56). He gets R56's line instead.
+  {
+    const FAR = /(^|\s|في|ف|ب)(صلال[هة]|ظفار|صحار|صحم|السويق|الخابور[هة]|شناص|لوى|البريمي|نزوى|بهلاء|ازكي|إزكي|سمائل|عبري|الرستاق|ابراء|إبراء|المضيبي|جعلان|الدقم|مسندم|خصب|(مدين[ةه]\s*)?صور(\s|$))/;
+    const OURS = /مسقط|بركاء|بركا(\s|$)|المعبيل|السيب|بوشر|الخوض|العامرات|الموالح|الحيل|العذيب|الغبر|القرم|الانصب|الأنصب|الرميس|الصومحان|الشخاخيط|المنوم/;
+    const said = String(c.burstSaid || "");
+    if (["buyer", "tenant"].includes(out.category) && out.action === "none" && FAR.test(said) && !OURS.test(said) && texts.some((t) => /اول\s*ما\s*يتوفر|ما\s*متوفر/.test(t))) {
+      texts = [...texts.filter((t) => /^\s*(وعليكم\s*السلام(\s*ورحمة\s*الله(\s*وبركاته)?)?|مرحبتين)\s*$/.test(t)), "نعتذر منك احنا حالياً نشتغل في مسقط وبركاء فقط"];
+      out.guard_far_request = true;
+    }
+  }
   const NAME_LINE = /^\s*اسمك\s*الكريم\s*؟\s*$/;
   for (let i = 0; i < texts.length - 1; i++) {
     const ls = texts[i].split("\n");
