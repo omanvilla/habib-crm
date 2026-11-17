@@ -32,7 +32,7 @@ test('the call button on the home keeps its count; its explanation is inside the
  const homeCall=calls.slice(calls.indexOf('  function paintHomeCall(){'),calls.indexOf('  function openCall('));
  assert(!homeCall.includes('ccm-note'));
  assert(calls.includes("(byNumber?'<small class=\"ccm-note\">سجّل كل اتصال برقم صاحبه"));
- assert(homeCall.includes('اتصالات اليوم:'),'the owner still sees each person\'s calls');
+ assert(homeCall.includes('اتصالات الموظفين:'),'the owner still sees each person\'s calls');
 });
 
 test('system updates fold into one closed line and keep «تم» on each',()=>{
@@ -69,5 +69,5 @@ test('the agent\'s inventory reminder is not said twice on the home; the work li
  assert(home.includes('قائمة العمل الكاملة'));
  const base=fs.readFileSync('app-base-v15.html','utf8');
  assert.equal((base.slice(base.indexOf('<div class="dash-toolbar"'),base.indexOf('</div></div>',base.indexOf('<div class="dash-toolbar"'))).match(/class="qa-btn"/g)||[]).length,4);
- assert(index.includes('crm-owner-home.js?v=20261117-dash1')&&index.includes('crm-owner-home.css?v=20261117-dash1')&&index.includes('crm-calls-meetings.js?v=20261117-dash1'));
+ assert(index.includes('crm-owner-home.js?v=20261117-dash1')&&index.includes('crm-owner-home.css?v=20261117-dash1')&&index.includes('crm-calls-meetings.js?v=20261117-call1'));
 });

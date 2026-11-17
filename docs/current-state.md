@@ -6,6 +6,34 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 17 November 2026 — calls: owners and advertisers only, 10 a day, weekly / monthly targets, call log with reasons (SQL110)
+
+- **Ahmed (voice, 17 Nov):** «سجّل اتصال» is only for calls (not people after a visit): «اتصلت على» = مالك / معلن («عميل بعد معاينة»
+  out); results unchanged; next step = «يرسل التفاصيل على الواتساب», or «يتصل بعدين» with a fixed day, or «ما في خطوة» for no answer /
+  refused (no price study, no visit there); the target goes from 20 to **10 a day** for now, then up step by step; a weekly and a monthly
+  target; a call log he can open to see each day's count, and a reason on every day under target (busy with a تنازل, official holiday,
+  annual leave for a period, which take the day out); the employee sees her own count on the button (1, 2, 3 … /10).
+- **SQL110** (`db/changes/110-call-targets.forward.sql`, md5-guarded on `crm_log_call`, `crm_log_call_number`, `crm_calls_today`):
+  - `crm_log_call(p_client, p_kind, p_result, p_next_step, p_next_at, p_note, p_key)` and `crm_log_call_number(p_phone, p_name, p_kind,
+    p_result, p_next_step, p_next_at, p_note, p_key)` replace the old signatures; both go through `crm_repair_private.call_insert`, which
+    refuses `after_visit`, forces «ما في خطوة» after «ما رد» / «رد ورفض», asks a next step after «رد ووافق», and a future day and hour
+    (≤ 90 days) for «يتصل بعدين». A call back adds a task for the caller on that day («📞 اتصل على … الساعة …», high).
+  - `crm_call_day_notes` (RLS on, no policy; written by `crm_call_day_note` / `crm_call_day_note_clear`): «إجازة رسمية» (owner / manager,
+    one person or everyone) and «إجازة» (a range up to 60 days) make the day's target 0; «انشغل بشغل أهم» / «سبب ثاني» need words, are for
+    a past or today's day, and keep the target (the day still shows «ناقص»).
+  - Target per day `crm_repair_private.call_day_target`: 10 Sunday to Thursday, 0 Friday / Saturday / holiday / leave. Week Sunday to
+    Saturday and calendar month are sums (full week 50, November 2026 = 220 before holidays).
+  - `crm_calls_today()` now returns today, `week`, `month` and, for the owner / manager, each person (active agents and managers plus anyone
+    who logged a call). `crm_calls_log(p_days)`: each day with calls, target, reason and the calls; staff see their own days only.
+- **Screen** (`crm-calls-meetings.js/.css?v=20261117-call1`): the call window asks name, then number, then مالك / معلن, the result, and
+  the next step drawn from the result (day and hour for a call back, tomorrow 10:00 by default). On the home: «📞 سجّل اتصال 3/10»,
+  «سجل الاتصالات», «الأسبوع x/50 · الشهر x/220», and for the owner each person's day / week / month. The log: a tab per person, each day
+  coloured (reached / over / short / day off), «اكتب السبب» on a short day, the calls of the day, and «+ سجّل إجازة أو إجازة رسمية».
+- **Checked:** SQL110 run inside a rolled-back transaction as مرام (agreed + send, call back with a task, no answer, the four refusals,
+  her own busy reason, holiday for all refused for her, a three-day leave, week target 30 and month 200 with that leave, the log), unit tests
+  `tests/call-targets-20261117.test.cjs` on CI, the window and the log on a local mock in the browser pane. **Not seen** in a signed-in browser.
+- Old calls keep their text (four of مرام on 16 and 17 Nov say «زيارة» as next step).
+
 ## 17 November 2026 — «لوحة العمل» checked and simplified (display only, no SQL)
 
 - **Ahmed:** «تدخل على crm وتعمل فحص للوحه العمل … وتلغي اي شي متشابه وتبسط الصفحه ولكن تكون عمليه ومفيده».
