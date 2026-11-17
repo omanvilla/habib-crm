@@ -237,3 +237,14 @@ test('rows 1361-1400: a request in Salalah / Ibri / Al Suwaiq gets R56\'s line, 
  assert.deepEqual(decide(['حالياً ما عندنا أرض في العامرات','اول ما يتوفر بتواصل معك'],[IN('اريد أرض فا العامرات')]).texts,['حالياً ما عندنا أرض في العامرات','اول ما يتوفر بتواصل معك']);
  assert.deepEqual(decide(['ما متوفر صور'],[IN('عندك صور للبيت')]).texts,['ما متوفر صور']);
 });
+test('rows 1441-1480: «صومحان» alone gets the Al Sawmhan ad; a reel answered with a greeting only gets the R23 question',()=>{
+ const ad='فيلا للبيع في الصومحان جنوب\n'+'تفاصيل '.repeat(30).trim();
+ const available=[{id:'s2',branch_key:'barka',area:'الصومحان الجنوبية',type:'villa',owner_id:'o1',price:69000,marketing:ad}];
+ assert.deepEqual(decide(['ايش المواصفات اللي تبحث عنها في الصومحان وفي حدود كم تقريباً ؟','اسمك الكريم ؟'],[IN('صومحان')],null,{available,route:'barka'}).texts,[ad,'متى يناسبك تزور ؟']);
+ // a long request with specs keeps the model's question
+ assert.deepEqual(decide(['ايش المواصفات اللي تبحث عنها في الصومحان ؟'],[IN('ابي بيت في الصومحان 5 غرف وارض كبيرة ودور ارضي')],null,{available,route:'barka'}).texts,['ايش المواصفات اللي تبحث عنها في الصومحان ؟']);
+ let r=decide(['وعليكم السلام ورحمة الله وبركاته\nالحمدلله'],[IN('https://www.instagram.com/reel/Dcp0X9MKWXA/')]);
+ assert.deepEqual(r.texts,['وعليكم السلام ورحمة الله وبركاته\nالحمدلله','اكتب لي المنطقة او السعر اللي في الاعلان اذا ما عليك امر']);
+ // a real answer to the reel is left alone
+ assert.deepEqual(decide(['هذي الفيلا انباعت'],[IN('https://www.instagram.com/reel/x/')]).texts,['هذي الفيلا انباعت']);
+});

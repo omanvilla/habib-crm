@@ -251,7 +251,10 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     const asOwner = out.action === "none" && out.category === "seller" && WE_SHOW.test(c.burstSaid) && !MY_OWN.test(recentIn);
     // (dry run rows 1086-1125, 17 Nov: «بكم الفلل الي ف الصومحان» got «ارسل لي رابط الفيديو» although the Al Sawmhan units are
     // listed: a link asked for an area we have counts too, and units with the same ad and price count as one)
-    const linkAsk = out.action === "none" && !c.prop && ["buyer", "tenant"].includes(out.category) && texts.some((t) => t.length <= 200 && ASK_LINK.test(t));
+    // (rows 1441-1480: «صومحان» alone got «ايش المواصفات اللي تبحث عنها في الصومحان…»: a short message naming an area we list
+    // counts like a link request)
+    const linkAsk = out.action === "none" && !c.prop && ["buyer", "tenant"].includes(out.category)
+      && texts.some((t) => t.length <= 200 && (ASK_LINK.test(t) || (/ايش\s*المواصفات\s*اللي\s*تبحث/.test(t) && String(c.burstSaid || "").trim().length <= 30)));
     if (echo || asOwner || linkAsk) {
       const said = areaKey(c.burstSaid);
       // «الصومحان» names «الصومحان الجنوبية» and «الرميس» names «بركاء الرميس» when the client gives no north / south of his own
@@ -404,6 +407,12 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   const FILLER_ONLY = /^\s*(تمام|طيب|اوكي|ان\s*شاء\s*الله|حياك\s*الله)(\s*(خذ\s*راحتك|ان\s*شاء\s*الله))?\s*$/;
   if (out.action === "none" && ["buyer", "tenant"].includes(out.category) && !c.prop && !out.property_id && LOCATION_ASK.test(String(c.burstSaid || "")) && texts.length && texts.every((t) => FILLER_ONLY.test(t))) {
     texts = ["اكتب لي المنطقة او السعر اللي في الاعلان اذا ما عليك امر"]; out.guard_location_which = true;
+  }
+  // rows 1441-1480: a reel link nobody recognised got «وعليكم السلام ورحمة الله وبركاته / الحمدلله» and nothing else: the R23
+  // question is added
+  if (out.action === "none" && !c.prop && !out.property_id && /instagram\.com|facebook\.com|fb\.watch/.test(String(c.burstSaid || ""))
+    && texts.length && texts.every((t) => /^[\s\n]*(وعليكم\s*السلام(\s*ورحمة\s*الله(\s*وبركاته)?)?|الحمد\s*لله|مرحبتين|تفضل)[\s\n]*((وعليكم\s*السلام[^\n]*|الحمد\s*لله|تفضل)[\s\n]*)*$/.test(t))) {
+    texts = [...texts, "اكتب لي المنطقة او السعر اللي في الاعلان اذا ما عليك امر"]; out.guard_link_greeting_only = true;
   }
   const WHICH_ASK = /اكتب\s*(لي\s*)?(ال)?(رقم|سعر|منطق[ةه])|رابط\s*(ال)?(فيديو|اعلان|إعلان)|صور[ةه]\s*منه|احدد\s*العقار/;
   if (out.action === "none" && !c.prop && texts.some((t) => t.length <= 200 && WHICH_ASK.test(t))
