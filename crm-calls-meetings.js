@@ -168,7 +168,11 @@
     const tabs=people.length>1?'<div class="cfu-tabs">'+people.map(x=>'<button type="button" class="cfu-tab'+(x.user_id===logUser?' on':'')+'" data-ccm="log-user" data-user="'+esc(x.user_id)+'">'+esc(x.name)+'</button>').join('')+'</div>':'';
     let sums='';
     if(callsToday&&p){const s=p.user_id===self?callsToday:(callsToday.people||[]).find(x=>x.user_id===p.user_id)||{};
-      if(s.week)sums='<p class="ccm-people"><b>الأسبوع</b> '+pair(s.week)+' · <b>الشهر</b> '+pair(s.month)+'<br><small class="ccm-note">الهدف 10 اتصالات في اليوم من الأحد للخميس. الجمعة والسبت والإجازات ما تنحسب</small></p>';}
+      if(s.week)sums='<p class="ccm-people"><b>الأسبوع</b> '+pair(s.week)+' · <b>الشهر</b> '+pair(s.month)+'<br><small class="ccm-note">الهدف 10 اتصالات في اليوم من الأحد للخميس، والأسبوع مجموع أيامه. الجمعة والسبت والإجازات ما تنحسب'
+        // SQL113 (17 Nov 2026, Ahmed: «خلي التارجت 100 اتصال مبدئيا الشهر الأول … بعدين نزيد شوية شوية»): the month has its own number
+        +(s.month&&s.month.fixed?'. هدف الشهر حدده أحمد':'')+'</small></p>';}
+    // the owner sets this month's number here (empty = 10 × working days again)
+    if(role()==='owner'&&callsToday&&callsToday.month)sums+='<div class="ccm-row ccm-month"><label>هدف الشهر للموظف<input class="fi" type="number" inputmode="numeric" dir="ltr" min="1" max="2000" id="ccmMonthTarget" value="'+(callsToday.month.fixed?Number(callsToday.month.target):'')+'" placeholder="'+Number(callsToday.month.target||0)+'"></label><button type="button" class="btn-secondary" data-ccm="month-save">حفظ</button></div>';
     d.innerHTML='<div class="ccm-form"><h3>سجل الاتصالات <small>آخر 31 يوم</small></h3>'+tabs+sums
       +'<button type="button" class="coh-add" data-ccm="leave-open">+ سجّل إجازة'+(manages()?' أو إجازة رسمية':'')+'</button><div id="ccmLeaveBox"></div>'
       +(p?'<ul class="ccm-days">'+(p.days||[]).map(x=>dayRow(p,x,callLog.today,manages()||p.user_id===self)).join('')+'</ul>':'<p class="ccm-note">ما في اتصالات</p>')
@@ -198,6 +202,14 @@
       +'<div class="ccm-row"><label>من<input class="fi" type="date" dir="ltr" id="ccmLeaveFrom" value="'+muscatDay(0)+'"></label><label>إلى<input class="fi" type="date" dir="ltr" id="ccmLeaveTo" value="'+muscatDay(0)+'"></label></div>'
       +'<input class="fi" id="ccmLeaveNote" maxlength="300" dir="auto" placeholder="ملاحظة (مثلاً: سنوية، العيد الوطني)">'
       +'<div class="ccm-actions"><button type="button" class="btn-primary" data-ccm="leave-save">حفظ</button></div><small class="ccm-note">أيام الإجازة ما تنحسب في الهدف</small></div>';
+  }
+  async function saveMonth(b){
+    const raw=String(byId('ccmMonthTarget').value||'').trim(),n=raw===''?null:Math.round(Number(raw));
+    if(n!==null&&!(n>=1&&n<=2000)){toast('اكتب رقم من 1 إلى 2000، أو خله فاضي','error');return;}
+    b.disabled=true;
+    const r=await supa.rpc('crm_set_call_month_target',{p_month:muscatDay(0),p_target:n});
+    if(r.error){b.disabled=false;toast('ما انحفظ: '+(r.error.message||''),'error');return;}
+    toast(n===null?'رجع هدف الشهر 10 × أيام الدوام':'هدف الشهر صار '+n,'success');await loadCalls();loadLog();
   }
   async function saveLeave(b){
     const who=byId('ccmLeaveWho')?byId('ccmLeaveWho').value:'me',from=byId('ccmLeaveFrom').value,to=byId('ccmLeaveTo').value||from;
@@ -300,6 +312,7 @@
     else if(b.dataset.ccm==='why-save')saveWhy(b);
     else if(b.dataset.ccm==='leave-open')leaveForm();
     else if(b.dataset.ccm==='leave-save')saveLeave(b);
+    else if(b.dataset.ccm==='month-save')saveMonth(b);
     else if(b.dataset.ccm==='toggle-unasked'){unaskedOpen=!unaskedOpen;drawUnasked();}
   });
   const vc=window.viewClient;

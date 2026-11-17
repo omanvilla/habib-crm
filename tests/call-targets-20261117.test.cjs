@@ -85,5 +85,5 @@ test('the home shows today, the week and the month; the call log opens from it w
  assert(leave.includes('إجازة رسمية')&&leave.includes('(للكل)')&&!leave.includes('اكتب السبب'));
  const busy=dayRow(p,{day:'2026-11-16',target:10,calls:4,note:{kind:'busy',note:'تنازل'},list:[]},'2026-11-17',false);
  assert(busy.includes('انشغل بشغل أهم: تنازل')&&busy.includes('ناقص 6'),'the reason is shown and the day still counts short');
- assert(index.includes('crm-calls-meetings.js?v=20261117-call1')&&index.includes('crm-calls-meetings.css?v=20261117-call1'));
+ assert(index.includes('crm-calls-meetings.js?v=20261117-call2')&&index.includes('crm-calls-meetings.css?v=20261117-call2'));
 });

@@ -36,3 +36,4 @@
 .ccm-calls{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:2px}
 .ccm-why-box{display:grid;gap:6px}.ccm-why-box>button{justify-self:start;width:auto!important}
 .ccm-log .cfu-tabs{margin-bottom:4px}
+.ccm-month{align-items:flex-end;margin:4px 0}.ccm-month>button{width:auto!important;flex:0 0 auto}
