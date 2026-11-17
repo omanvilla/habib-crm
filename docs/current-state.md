@@ -6,6 +6,26 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 17 November 2026 — goals on the home, quick property, call next, last visit, staff confirm (SQL114)
+
+Ahmed: «سوّ الإضافات كلها» (the additions of the full check). Versions `crm-owner-home.js/.css`, `crm-calls-meetings.js/.css`
+and the new `crm-quick-property.js` at `20261117-goal1`.
+- **Goals card** under «المطلوب منك الآن» (`drawGoals`, from `crm_branch_target_snapshot`): completed visits this week /5,
+  documented human follow-ups today /10, new properties this week /2, paid bookings this month /2, and for the owner only the
+  expected commission /4,000. Staff see their branch, the owner both. The week summary drops its visits and bookings once
+  the card is drawn.
+- **Quick property** (`crmQuickProperty`): branch, type, sale/rent, wilayat, area, price, owner name + phone, owner/broker,
+  note. The owner is found by the last 8 digits or added; the property goes through `crmDataFrom('properties')` with
+  `branch_key` sent (the branch guard maps only بركاء / مسقط / السيب by itself). «＋ عقار» and «+ إضافة عقار» open it;
+  «النموذج الكامل» opens the old form. After a call to an owner who agreed, the call window offers «سجّل العقار».
+- **«اتصل بعدهم»** on the home call row: `crm_call_next` = open `owner_leads` whose number has no human call in 30 days,
+  newest first, with the offers page visibility (no owner line, `can_access_client`). Live trial (rolled back): owner 50,
+  staff 5 of 257 open, 190 ms. «سجّل الاتصال» opens the call window filled.
+- **Last visit**: `crm_mark_seen` (at most every 5 minutes) writes `profiles.last_login_at`; owner / manager see «آخر دخول»
+  on each person's call line.
+- **Staff confirm meetings**: «أكّد الموعد» in a meeting task now for owner, manager and agent (a task is only open to its
+  person). Not tried with a real send.
+
 ## 17 November 2026 — full system check and menu cleanup (`claude/cleanup-attribution-20261117`)
 
 Report (Arabic): [docs/فحص-شامل-20261117.md](فحص-شامل-20261117.md), every page as owner, Muscat and Barka in the preview
