@@ -449,6 +449,14 @@ function ownerDecisions(out: any, lines: string[], c: any) {
       out.action = "none"; out.handoff_reason = null; out.guard_prompt_word = true;
     }
   }
+  // dry run rows 1161-1200 (and 914, 1058): an owner the office already sent to the other number («تواصل على هذا الرقم» + the
+  // contact card) answered «طيب», and got «عقارك تتابعه معنا على رقم مسقط…» again. A bare acknowledgement after that gets nothing.
+  {
+    const ACK_ONLY = /^\s*(طيب|تمام|اوك|اوكي|ok|okay|زين|ابشر|ان\s*شاء\s*الله|إن\s*شاء\s*الله|ان\s*شاءالله)\s*[.!]*\s*$/i;
+    const REDIRECT = /تتابعه\s*معنا\s*على\s*رقم|هذا\s*الرقم\s*خاص|تتابعها\s*معنا\s*على\s*رقم/;
+    const pointed = c.history.some((h: any) => h.direction === "outbound" && (String(h.message_type || "") === "contacts" || /\[contacts\]|71770030|92344273|تواصل\s*على\s*(هذا|هالرقم|هال)\s*الرقم|تتابعه\s*معنا\s*على\s*رقم/.test(String(h.body || ""))));
+    if (ACK_ONLY.test(String(c.burstSaid || "")) && texts.length && texts.every((t) => REDIRECT.test(t)) && pointed) { texts = []; out.guard_ack_after_redirect = true; }
+  }
   const NAME_LINE = /^\s*اسمك\s*الكريم\s*؟\s*$/;
   for (let i = 0; i < texts.length - 1; i++) {
     const ls = texts[i].split("\n");

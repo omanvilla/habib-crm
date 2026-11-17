@@ -202,3 +202,12 @@ test('R92: an owner who will move in later if it does not sell is taken, with th
  assert.deepEqual(run([...APOL],['تعرض فيلا للبيع مسكونه سنه']).texts,['البيت الحين فاضي ولا مؤجر ولا ساكنين فيه ؟']);
  assert.deepEqual(run([...APOL],['البيت مسكون']).texts,APOL);
 });
+test('rows 1161-1200: «طيب» after the office sent the other number gets no second redirect',()=>{
+ const R=['عقارك تتابعه معنا على رقم مسقط 71770030 واتساب','هذا الرقم خاص لعقارات بركاء'];
+ let r=decide([...R],[IN('عندي ارض فالعامرات'),OUT('[contacts]'),OUT('تواصل على هذا الرقم'),IN('طيب')],{category:'seller'});
+ assert.deepEqual(r.texts,[]);assert.equal(r.out.guard_ack_after_redirect,true);
+ // the first redirect stays
+ assert.deepEqual(decide([...R],[IN('عندي ارض فالعامرات')],{category:'seller'}).texts,R);
+ // a real question after the redirect is answered
+ assert.deepEqual(decide([...R],[OUT('تواصل على هذا الرقم'),IN('طيب وكم العمولة')],{category:'seller'}).texts.length>0,true);
+});
