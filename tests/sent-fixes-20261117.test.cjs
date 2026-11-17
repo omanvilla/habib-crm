@@ -211,3 +211,9 @@ test('rows 1161-1200: «طيب» after the office sent the other number gets no 
  // a real question after the redirect is answered
  assert.deepEqual(decide([...R],[OUT('تواصل على هذا الرقم'),IN('طيب وكم العمولة')],{category:'seller'}).texts.length>0,true);
 });
+test('rows 1201-1240: the opinion question after a visit does not come with «متى يناسبك تزور ؟»',()=>{
+ const r=decide(['وايش انطباعك عن الفيلا بعد ما شفتها ؟','متى يناسبك تزور ؟'],[IN('بنمر اليوم نعاين الڤيلا'),OUT('عاينت الفيلا ؟'),IN('ايوا')]);
+ assert.deepEqual(r.texts,['وايش انطباعك عن الفيلا بعد ما شفتها ؟']);
+ // a visit question alone stays
+ assert.deepEqual(decide(['متى يناسبك تزور ؟'],[IN('ممكن تفاصيل')]).texts,['متى يناسبك تزور ؟']);
+});

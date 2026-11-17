@@ -386,6 +386,11 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     if (!texts.some((t) => t.replace(/حياك\s*الله|[^ء-ي]/g, "").length > 2)) texts = ["حياك الله خذ راحتك"];
     out.guard_arrived = true;
   }
+  // rows 1201-1240: «عاينت الفيلا ؟» → «ايوا» got «وايش انطباعك عن الفيلا بعد ما شفتها ؟» and «متى يناسبك تزور ؟» together. Asking
+  // what he thought of it means he saw it: the visit question goes.
+  if (texts.some((t) => t.length <= 200 && OPINION_Q.test(t) && /بعد\s*ما\s*شفت|شفتها|شفته|زرت/.test(t)) && texts.some((t) => VISIT_Q.test(t))) {
+    texts = texts.filter((t) => !(VISIT_Q.test(t) && !OPINION_Q.test(t))); out.guard_opinion_no_visit = true;
+  }
   // 4736075f: a video we could not read, then «السعر موجود في الفيديو اللي رسلته لك», then «انت ما تعرف تقرأ الرقم ؟؟»: the
   // same «اكتب لي السعر / المنطقة» went three times. Asked once; asked again, it goes to Ahmed with no reply (he can watch it).
   // rows 930-969: «اشوف الموقع اخي اذا ناسبني بزورها» about an ad picture nobody recognised got «تمام» alone. A location asked
