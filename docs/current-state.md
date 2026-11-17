@@ -21,9 +21,15 @@ Ahmed's order (CLAUDE.md «فحص التعديلات بنفسك»): check every 
   staff = all branches (Ahmed's SQL79), owner-line client 0, owner_price_studies 0, crm_owner_notes 0, instagram catalog 0,
   own new client visible. After: accounts still inactive/outside, 0 temporary rows left, 1 active owner.
 - **Screen check without Node:** `preview/serve.ps1` serves the current files with the synthetic `preview/fixture-sdk.js`
-  (`/after/owner/`, `/after/muscat/`). Limits: the fixture is from 30 Sep, so newer RPCs are missing (e.g. `crm_paused_chats`
-  → a console error in `crm-owner-home.js` pricingItems on both roles, fixture gap only) and its staff are still limited to
-  one branch, unlike SQL79. The real login step itself is not checked.
+  (`/after/owner/`, `/after/muscat/`). The real login step itself is not checked.
+- **Fixture updated the same day** (`preview/fixture-sdk.js`): staff read both branches like SQL79 (own tasks only, only their
+  own route row), while dashboard work and the contact queue stay per branch (`branchMember`, like `staff_is_branch_member`);
+  investment stays hidden from staff. 21 RPCs added since 30 Sep (owner/staff home, paused and ignored chats, follow-ups today,
+  calls today and call log, branch performance and people, price studies, projects, usage, reply stats …) with the live
+  shapes (keys read as the test accounts in a rolled-back transaction) and synthetic values. Checked: owner, Muscat and Barka
+  load with 0 console errors (only the blocked Facebook SDK); staff see no investment and no money; each branch's work list
+  has only its branch. The old `tests/*-browser.cjs` suites run only on retired `codex/*` branches and were not rerun; some of
+  their branch assertions predate SQL79.
 
 ## 17 November 2026 — the month's call target is Ahmed's number: 100 for November (SQL113)
 

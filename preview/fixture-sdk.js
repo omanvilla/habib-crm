@@ -84,6 +84,18 @@ function allowed(row,table){
   if(row.lead_route==='investment'||row.route_key==='investment'||row.branch_key==='investment'||privateClient(row.client_id)||request&&(request.route_key==='investment'||request.branch_key==='investment'||privateClient(request.client_id)))return false;
  }
  if(profile.role!=='agent')return true;
+ // SQL79 (Ahmed): Muscat and Barka staff read each other's properties, owners, clients, requests, visits, deals and
+ // chats. Own tasks only. Per-branch membership still governs targets, performance, dashboard work and follow-up
+ // lists: that is branchMember() below.
+ if(table==='tasks')return row.user_id===profile.id;
+ if(table==='company_lead_routes')return row.assigned_to===profile.id;
+ if(table==='rejection_reasons')return row.company_id==null||row.company_id===company;
+ if(table==='companies')return row.id===company;
+ return !row.company_id||row.company_id===company;
+}
+// The pre-SQL79 branch boundary, kept for the lists that are still per branch (staff_is_branch_member).
+function branchMember(row,table){
+ if(!row||profile.role!=='agent')return !!row;
  const branch=actor;
  if(['properties'].includes(table))return row.branch_key===branch;
  if(table==='clients')return row.lead_route===branch;
@@ -186,6 +198,75 @@ function fixtureBranchGoal(branch,month){
  if(stored)for(const key of Object.keys(targets))targets[key]=stored[key];
  return {id:branch,branch,branch_key:branch,name:branch==='muscat'?'مسقط':'بركاء',month_start:month,goals:Object.fromEntries(Object.entries(fixtureGoalKeys).map(([key,column])=>[key,targets[column]])),targets,updated_at:stored?.updated_at||null,configured:!!stored};
 }
+// 17 Nov 2026: home, calls, follow-up and owner-tool RPCs added since 30 Sep. Shapes copied from the live functions
+// (keys only, read as the test accounts in a rolled-back transaction); every value below is synthetic.
+function fixtureExtraRpc(name,args){
+ const ok=data=>({data,error:null}),isOwner=profile.role==='owner',staff=profile.role==='agent';
+ const branchName=b=>({muscat:'مسقط',barka:'بركاء'}[b]||b);
+ const mineRow=(row,table)=>allowed(row,table)&&branchMember(row,table);
+ const ownerOnly=()=>({data:null,error:{message:'TEST owner only',code:'42501'}});
+ const weekStart=relative(-((new Date(today+'T12:00:00Z').getUTCDay()+1)%7));
+ const visitRow=v=>({id:v.id,client:clients.find(c=>c.id===v.client_id)?.name||'عميل',property:properties.find(p=>p.id===v.property_id)?.title||'',viewing_date:v.viewing_date,viewing_time:v.viewing_time,notes:'بيانات اصطناعية'});
+ const chat=(c,extra)=>({client_id:c.id,name:c.name,phone:c.phone,route_key:c.lead_route,conversation_id:uuid(1500+Number(c.id.slice(-3))),last_message:'رسالة اصطناعية من العميل',last_inbound_at:relative(-1)+'T09:30:00Z',...extra});
+ const home=()=>{
+  const vs=db.viewings.filter(v=>mineRow(v,'viewings')&&!v.archived),overdue=vs.filter(v=>v.viewing_date<today&&['scheduled','confirmed'].includes(v.status)),
+   upcoming=vs.filter(v=>v.viewing_date>=today&&['scheduled','confirmed'].includes(v.status));
+  const branches=fixtureBranchKeys().map(b=>({branch:b,available:properties.filter(p=>p.branch_key===b&&p.status==='available').length,reserved:properties.filter(p=>p.branch_key===b&&p.status==='reserved').length}));
+  return {today,report:{week_start:weekStart,new_clients:clients.filter(c=>mineRow(c,'clients')).length,sales_month:0,visits_done:vs.filter(v=>v.status==='done').length,agent_replies:isOwner?12:null,bookings_month:1},
+   overdue:overdue.map(visitRow),overdue_total:overdue.length,upcoming:upcoming.map(visitRow),problems:[],
+   properties:{branches,no_video:[],unchecked:1,added_week:2},owner_leads_new:isOwner?1:0};
+ };
+ const callPeople=()=>profiles.filter(p=>p.role==='agent'&&(!staff||p.id===profile.id));
+ const span=(from,to,calls,target,extra)=>({from,to,calls,target,...extra});
+ switch(name){
+  case 'crm_owner_home':return isOwner?ok({...home(),auto_visits:1}):ownerOnly();
+  case 'crm_staff_home':return isOwner?ownerOnly():ok({...home(),scope:'staff'});
+  case 'crm_paused_chats':{
+   const items=clients.filter(c=>c.lead_route!=='investment'&&allowed(c,'clients')).slice(0,2).map((c,i)=>chat(c,i===0
+    ?{kind:'negotiation',reason:'العميل يسأل عن خصم على السعر',summary:'يبي ينزل السعر 3 آلاف'}
+    :{kind:'negotiation',reason:'دراسة سعر: مالك ينتظر تسعيرك',summary:'أرض في '+(c.preferred_area||'المنطقة')}));
+   return ok({items,total:items.length,ignored:1});
+  }
+  case 'crm_ignored_chats':{const c=clients.find(x=>x.lead_route==='barka');return ok({items:c&&allowed(c,'clients')?[chat(c,{reason:'رقم مكتب عقاري',ignored_at:relative(-3)+'T10:00:00Z',ignore_kind:'manual'})]:[],total:1});}
+  case 'crm_property_twins':return ok([]);
+  case 'crm_followups_today':{
+   const items=clients.filter(c=>mineRow(c,'clients')&&c.lead_route!=='investment').map(c=>({id:uuid(1600+Number(c.id.slice(-3))),client_id:c.id,client:c.name,phone:c.phone,route_key:c.lead_route,lane:c.lead_route,
+    reason:'ما رد من يومين',text:'هلا '+c.name+'، حاب أطمن هل لقيت اللي يناسبك؟',sends_text:'هلا، حاب أطمن هل لقيت اللي يناسبك؟',source:'auto',can_auto:false,has_chat:true,property:null,
+    auto_after:relative(0)+'T14:00:00Z',created_at:now,instructed_at:null,template_name:'followup_check_v1',conversation_id:uuid(1500+Number(c.id.slice(-3))),owner_instruction:null}));
+   return ok({items,auto_on:false,waiting_review:0});
+  }
+  case 'crm_calls_today':{
+   const people=callPeople().map((p,i)=>({user_id:p.id,name:p.full_name,calls:4+i*3,target:10,week:span(weekStart,today,18+i*5,50),month:span(today.slice(0,8)+'01',today,60+i*9,100,{fixed:true})}));
+   const mine=staff?people[0]?.calls||0:0,sum=k=>people.reduce((n,p)=>n+(k?p[k].calls:p.calls),0);
+   return ok({day:today,mine,target:10,daily_target:10,week:span(weekStart,today,sum('week'),50*Math.max(1,people.length)),month:span(today.slice(0,8)+'01',today,sum('month'),100,{fixed:true}),people:staff?[]:people});
+  }
+  case 'crm_calls_log':{
+   const days=Math.max(1,Math.min(62,args.p_days||31)),list=[...Array(7).keys()].map(i=>relative(-i));
+   return ok({from:relative(-(days-1)),today,daily_target:10,people:callPeople().map((p,j)=>({user_id:p.id,name:p.full_name,
+    days:list.map((d,i)=>{const wd=new Date(d+'T12:00:00Z').getUTCDay(),off=wd===5||wd===6;return {day:d,calls:off?0:(3+i+j)%11,target:off?0:10,note:off?null:(i===2?'اجتماع في المكتب':null),list:[]};})}))});
+  }
+  case 'crm_visits_unasked':return ok([]);
+  case 'crm_price_studies_pending':return ok({items:[],send_mode:'manual'});
+  case 'crm_investment_projects':return isOwner?ok([{id:uuid(1701),name:'مشروع اصطناعي على البحر',developer:'مطور اختبار',area:null,notes:null,aliases:['المشروع الاصطناعي'],videos:[],clients:[]}]):ok([]);
+  case 'crm_branch_people':return ok(['muscat','barka'].map(b=>({branch:b,name:profiles.find(p=>p.id===(b==='muscat'?muscat:barka)).full_name})));
+  case 'crm_branch_performance':{
+   const row=b=>{const pid=b==='muscat'?muscat:barka,n=b==='muscat';return {id:b,branch:b,branch_key:b,name:branchName(b),employee_id:pid,targets:{...fixtureGoalFields},
+    active_inventory:properties.filter(x=>x.branch_key===b&&!x.archived&&!['sold','not_available'].includes(x.status)).length,new_properties:0,inquiries:n?6:3,inquiry_property_pairs:n?6:3,inquiry_pair_to_visit:0,
+    inquiry_clients:n?4:2,replied_inquiry_clients:n?3:1,successful_staff_messages:n?7:5,outbound_messages:0,visits_booked:0,visits_done:0,visit_cohort_total:0,visit_cohort_done:0,visit_cohort_pending:0,visit_cohort_cancelled:0,
+    inquiry_to_visit:0,visit_to_sale:0,followup_clients:0,activities:0,sales:0,sales_goal_met:false,reservations:0,active_reservations:0,cancelled_reservations:0,sales_without_reservation:0,receipt_count:0,
+    company_commission:isOwner?20:null,expected_commission:isOwner?900:null,commission_collected:isOwner?0:null,unknown_company_commission:0,unknown_expected_commission:0};};
+   const branches=fixtureBranchKeys().map(row);
+   return ok({from:args.p_from,to:args.p_to,scope:staff?'branch':'company',branches,employees:branches.map(b=>({...b,id:b.employee_id,name:profiles.find(p=>p.id===b.employee_id).full_name}))});
+  }
+  case 'crm_whatsapp_usage':return isOwner?ok(['muscat','barka'].map((b,i)=>({route_key:b,used:120+i*40,free_limit:1000,blocked:false,last_ok:now}))):ownerOnly();
+  case 'crm_reply_auto_send_get':return isOwner?ok({categories:[]}):ownerOnly();
+  case 'crm_followup_variant_results':return isOwner?ok({variants:[],reply_hours:24}):ownerOnly();
+  case 'crm_reply_variant_stats':return isOwner?ok({days:args.p_days||90,rows:[]}):ownerOnly();
+  case 'crm_public_business_routes':return ok([]);
+  case 'get_public_company_name':return ok(db.companies[0].name);
+ }
+ return null;
+}
 const client={
 from:query,
 rpc:async(name,args={})=>{
@@ -250,12 +331,12 @@ rpc:async(name,args={})=>{
  if(name==='crm_dashboard_work'){
   const scope=args.p_scope||'branches';if(scope==='investment'&&profile.role!=='owner')return {data:null,error:{message:'TEST owner only',code:'42501'}};
   const privateRow=row=>row?.lead_route==='investment'||row?.route_key==='investment'||row?.branch_key==='investment'||clients.find(c=>c.id===row?.client_id)?.lead_route==='investment'||requests.find(r=>r.id===row?.request_id)?.route_key==='investment';
-  const scoped=(table)=>db[table].filter(row=>allowed(row,table)&&!!privateRow(row)===(scope==='investment'));
+  const scoped=(table)=>db[table].filter(row=>allowed(row,table)&&branchMember(row,table)&&!!privateRow(row)===(scope==='investment'));
   const active=scoped('client_requests').filter(r=>r.status==='active'),cs=scoped('clients').filter(c=>!c.archived),due=active.filter(r=>r.next_followup&&r.next_followup.slice(0,10)<=today),hot=active.filter(r=>r.lead_temperature==='hot'),vs=scoped('viewings').filter(v=>!v.archived),ds=scoped('deals').filter(d=>!d.archived&&!['closed','commission_collected','lost'].includes(d.stage)),ts=scoped('tasks').filter(t=>!t.done),urgent=ts.filter(t=>t.priority==='high'||t.due_date&&t.due_date.slice(0,10)<=today),contact=cs.filter(c=>!c.human_contact_at).map(c=>({client_id:c.id})),unique=rows=>[...new Set(rows.map(r=>r.client_id))];
   const selectedVisits=vs.filter(v=>v.viewing_date===today&&v.status!=='cancelled'||v.viewing_date>today&&['scheduled','confirmed','postponed'].includes(v.status)),limit=Math.max(1,Math.min(200,args.p_limit||20)),offset=Math.max(0,args.p_offset||0),page=rows=>rows.slice(offset,offset+limit).map(decorate);
   return {data:{scope,as_of:today,generated_at:now,counts:{uncontacted:contact.length,followups_due:unique(due).length,hot_requests:unique(hot).length,viewings_today:vs.filter(v=>v.viewing_date===today&&v.status!=='cancelled').length,open_deals:ds.length,urgent_tasks:urgent.length,open_tasks:ts.length},requests:page(active),followups:page(due),hotRequests:page(hot),clients:cs,visits:page(selectedVisits),deals:page(ds),tasks:page(urgent),contactQueue:page(contact),totals:{requests:active.length,followups:due.length,hotRequests:hot.length,visits:selectedVisits.length,deals:ds.length,tasks:urgent.length,contactQueue:contact.length},clientFilters:{uncontacted:unique(contact),due:unique(due),hotfocus:unique(hot)}},error:null};
  }
- if(name==='crm_client_contact_queue')return {data:clients.filter(c=>allowed(c,'clients')&&!c.human_contact_at).map(c=>({client_id:c.id})),error:null};
+ if(name==='crm_client_contact_queue')return {data:clients.filter(c=>allowed(c,'clients')&&branchMember(c,'clients')&&!c.human_contact_at).map(c=>({client_id:c.id})),error:null};
  if(name==='crm_property_action_queue')return {data:[],error:null};
  // Distinct canned metric counts exercise frontend field mapping and role scope.
  // Their SQL calculation (unique clients, successful human messages) is tested separately.
@@ -283,6 +364,7 @@ rpc:async(name,args={})=>{
   return {data:{client,customer_kind:rows.length>1?'returning':'new',metrics:{requests_total:rows.length,active_requests:rows.filter(r=>r.status==='active').length,properties_inquired:0,properties_shown:0,properties_visited:0,rejected_properties:0,appointments_attended:0,appointments_no_show:0,negotiations:0,deposits:0,closed_deals:0,whatsapp_inbound:0,whatsapp_outbound:0,open_tasks:0,overdue_followups:0},requests:rows,property_journey:[],appointments:[],activities:[],open_tasks:[],deals:[],recent_whatsapp:[]},error:null};
  }
  if(name==='crm_data_quality_summary')return {data:[],error:null};
+ const extra=fixtureExtraRpc(name,args);if(extra)return extra;
  return {data:[],error:null};
 },
 auth:{
