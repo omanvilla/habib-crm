@@ -269,5 +269,5 @@ test('R93: «الرقم ما يرد» goes to Ahmed as «ما يردون:» with
  assert(agent.includes('texts = saidIt ? [] : [R12_LINE];'),'the sentence is said once');
 });
 test('R93: «ما يردون» is kept over the Barka→Muscat owner redirect (row 1366)',()=>{
- assert(agent.includes('const keepHandoff = out.action === "handoff" && (HARD_HANDOFF.test(why) || /^\s*(طلب اتصال|ما يردون)/.test(why));'));
+ assert(agent.includes('const keepHandoff = out.action === "handoff" && (HARD_HANDOFF.test(why) || /^\\s*(طلب اتصال|ما يردون)/.test(why));'));
 });
