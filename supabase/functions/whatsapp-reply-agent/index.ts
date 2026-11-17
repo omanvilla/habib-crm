@@ -261,7 +261,7 @@ function ownerDecisions(out: any, lines: string[], c: any) {
         .filter((p: any, i: number, a: any[]) => a.findIndex((q: any) => Number(q.price || 0) === Number(p.price || 0)
           && (String(q.marketing || "").slice(0, 80) === String(p.marketing || "").slice(0, 80) || (!!q.owner_id && q.owner_id === p.owner_id && q.type === p.type && q.area === p.area))) === i);
       // («شفتك مصور بيت في رميس فله»: Al Rumais has a villa and a rest house; the word «فله» picks the villa)
-      const homes = /فيل|فل[ةه]|فلل|توين/.test(said) ? here.filter((x: any) => /villa|twin|house/i.test(String(x.type || ""))) : here;
+      const homes = /فيل|فل[ةه]|فلل|توين/.test(said) ? here.filter((x: any) => /villa|twin/i.test(String(x.type || "")) || String(x.type || "") === "house") : here;
       const p = here.length === 1 ? here[0] : homes.length === 1 ? homes[0] : null;
       if (p && p.marketing && !sentBefore(String(p.marketing).slice(0, 40))) {
         texts = [String(p.marketing), "متى يناسبك تزور ؟"];
