@@ -247,9 +247,16 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   {
     const echo = out.action === "none" && texts.some((t) => ASK_CONFIRM.test(t.trim()));
     const asOwner = out.action === "none" && out.category === "seller" && WE_SHOW.test(c.burstSaid) && !MY_OWN.test(recentIn);
-    if (echo || asOwner) {
+    // (dry run rows 1086-1125, 17 Nov: «بكم الفلل الي ف الصومحان» got «ارسل لي رابط الفيديو» although the Al Sawmhan units are
+    // listed: a link asked for an area we have counts too, and units with the same ad and price count as one)
+    const linkAsk = out.action === "none" && !c.prop && ["buyer", "tenant"].includes(out.category) && texts.some((t) => t.length <= 200 && ASK_LINK.test(t));
+    if (echo || asOwner || linkAsk) {
       const said = areaKey(c.burstSaid);
-      const here = (c.available || []).filter((p: any) => p.branch_key === c.route && areaKey(p.area).length > 2 && said.includes(areaKey(p.area)));
+      // «الصومحان» names «الصومحان الجنوبية» and «الرميس» names «بركاء الرميس» when the client gives no north / south of his own
+      const base = (a: unknown) => areaKey(a).replace(/^(ولايه\s+)?(بركاء|مسقط)\s+/, "").replace(/\s+(جنوبيه|شماليه|جنوب|شمال)$/, "");
+      const names = (a: unknown) => said.includes(areaKey(a)) || (base(a).length > 2 && said.includes(base(a)) && !/جنوب|شمال/.test(said));
+      const here = (c.available || []).filter((p: any) => p.branch_key === c.route && areaKey(p.area).length > 2 && names(p.area))
+        .filter((p: any, i: number, a: any[]) => a.findIndex((q: any) => Number(q.price || 0) === Number(p.price || 0) && String(q.marketing || "").slice(0, 80) === String(p.marketing || "").slice(0, 80)) === i);
       const p = here.length === 1 ? here[0] : null;
       if (p && p.marketing && !sentBefore(String(p.marketing).slice(0, 40))) {
         texts = [String(p.marketing), "متى يناسبك تزور ؟"];
