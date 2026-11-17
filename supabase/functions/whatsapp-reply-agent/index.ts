@@ -241,6 +241,7 @@ function ownerDecisions(out: any, lines: string[], c: any) {
       out.guard_named_gone = true;
     }
   }
+  const SOLD_AD = /تم\s*البيع|sold\s*out|نبارك\s*للشاري|تم\s*الحجز|انباع(ت)?(\s|$)/i;
   // R44 / R32, tenth dry-run batch: «شفت بيت معروض فحيل الجنوبية عطوني تفاصيل» got «قصدك البيت المعروض في الحيل الجنوبية ؟»,
   // and «عارضين بيت للبيع ف الحيل الجنوبية» was answered as an owner («ارسل تفاصيل البيت والمستندات»). The client names an
   // area where this number has exactly one available property and no word says the property is his: he gets its details.
@@ -257,13 +258,16 @@ function ownerDecisions(out: any, lines: string[], c: any) {
       const names = (a: unknown) => said.includes(areaKey(a)) || (base(a).length > 2 && said.includes(base(a)) && !/جنوب|شمال/.test(said));
       const here = (c.available || []).filter((p: any) => p.branch_key === c.route && areaKey(p.area).length > 2 && names(p.area))
         // (units of one owner, same area, type and price are one offer; the fullest ad of them is sent)
-        .sort((a: any, b: any) => String(b.marketing || "").length - String(a.marketing || "").length)
+        // (dry run on the branch: one unit's longest caption is the «تم البيع Sold out … نبارك للشاري» post of its sold sibling;
+        // an ad that says sold is never the one sent, and goes last)
+        .sort((a: any, b: any) => (SOLD_AD.test(String(a.marketing || "")) ? 1 : 0) - (SOLD_AD.test(String(b.marketing || "")) ? 1 : 0)
+          || String(b.marketing || "").length - String(a.marketing || "").length)
         .filter((p: any, i: number, a: any[]) => a.findIndex((q: any) => Number(q.price || 0) === Number(p.price || 0)
           && (String(q.marketing || "").slice(0, 80) === String(p.marketing || "").slice(0, 80) || (!!q.owner_id && q.owner_id === p.owner_id && q.type === p.type && q.area === p.area))) === i);
       // («شفتك مصور بيت في رميس فله»: Al Rumais has a villa and a rest house; the word «فله» picks the villa)
       const homes = /فيل|فل[ةه]|فلل|توين/.test(said) ? here.filter((x: any) => /villa|twin/i.test(String(x.type || "")) || String(x.type || "") === "house") : here;
       const p = here.length === 1 ? here[0] : homes.length === 1 ? homes[0] : null;
-      if (p && p.marketing && !sentBefore(String(p.marketing).slice(0, 40))) {
+      if (p && p.marketing && !SOLD_AD.test(String(p.marketing)) && !sentBefore(String(p.marketing).slice(0, 40))) {
         texts = [String(p.marketing), "متى يناسبك تزور ؟"];
         out.property_id = p.id; if (asOwner) out.category = "buyer";
         out.guard_named_available = true;

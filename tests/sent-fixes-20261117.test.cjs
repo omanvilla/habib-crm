@@ -153,6 +153,11 @@ test('rows 1086-1125: «بكم الفلل الي ف الصومحان» gets the 
  // dry run on the branch: the two units' ad texts differ (one has the reel caption); one owner, area, type and price = one offer, fullest ad
  const unitsDiffer=[{id:'s3',branch_key:'barka',area:'الصومحان الجنوبية',type:'villa',owner_id:'o1',price:69000,marketing:'قصير'},{id:'s2',branch_key:'barka',area:'الصومحان الجنوبية',type:'villa',owner_id:'o1',price:69000,marketing:ad}];
  assert.deepEqual(decide(['ارسل لي رابط الفيديو او صورة منه'],[IN('بكم الفلل الي ف الصومحان')],null,{available:unitsDiffer,route:'barka'}).texts,[ad,'متى يناسبك تزور ؟']);
+ // dry run on the branch: one unit's longest caption is a «تم البيع Sold out … نبارك للشاري» post; it is never sent
+ const soldPost='تم البيع\nSold out\nنبارك للشاري والبائع\n'+'كلام '.repeat(60).trim();
+ const withSold=[{id:'s3',branch_key:'barka',area:'الصومحان الجنوبية',type:'villa',owner_id:'o1',price:69000,marketing:soldPost},{id:'s2',branch_key:'barka',area:'الصومحان الجنوبية',type:'villa',owner_id:'o1',price:69000,marketing:ad}];
+ assert.deepEqual(decide(['ارسل لي رابط الفيديو او صورة منه'],[IN('بكم الفلل الي ف الصومحان')],null,{available:withSold,route:'barka'}).texts,[ad,'متى يناسبك تزور ؟']);
+ assert.deepEqual(decide(['ارسل لي رابط الفيديو او صورة منه'],[IN('بكم الفلل الي ف الصومحان')],null,{available:[withSold[0]],route:'barka'}).texts,['ارسل لي رابط الفيديو او صورة منه']);
  // «شفتك مصور بيت في رميس فله»: a villa and a rest house in Al Rumais; «فله» picks the villa
  const rumais=[{id:'h59',branch_key:'barka',area:'بركاء الرميس',type:'villa',price:59000,marketing:'فيلا الرميس '+'تفاصيل '.repeat(30).trim()},{id:'r109',branch_key:'barka',area:'بركاء الرميس',type:'rest_house',price:109000,marketing:'استراحة'}];
  assert.equal(decide(['ارسل لي رابط الفيديو او صورة منه'],[IN('شفتك مصور بيت في رميس فله')],null,{available:rumais,route:'barka'}).out.property_id,'h59');
