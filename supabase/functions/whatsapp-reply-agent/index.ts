@@ -113,7 +113,8 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   // whether the place suits him, before he chooses a time, gets it, once. No visit is recorded from it (location_for_area).
   if (locationForArea(recentIn) && out.action === "none" && c.prop?.map_url && ["buyer", "tenant"].includes(out.category) && !sentBefore(String(c.prop.map_url))) {
     out.action = "send_location"; out.location_for_area = true; out.guard_location_for_area = true;
-    texts = texts.filter((t) => !(t.length <= 200 && (LOCATION_HELD.test(t) || FAREWELL.test(t))) && !VISIT_Q.test(t)).slice(0, 1);
+    // (17 Nov: «تمام شوف الموقع اول واذا ناسبك خبرني» before «تفضل هذا الموقع / شوف اذا المنطقة تناسبك» said it twice)
+    texts = texts.filter((t) => !(t.length <= 200 && (LOCATION_HELD.test(t) || FAREWELL.test(t) || /شوف\s*(ال)?(موقع|لوكيشن|منطق)|ناسب(ك|تك)\s*خبرني/.test(t))) && !VISIT_Q.test(t)).slice(0, 1);
     texts.push(...AREA_LINES);
   }
   // R75 (Ahmed gave the reel): a request for a video of the inside gets the reel marked «من الداخل» in the property's
@@ -361,7 +362,8 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   // بالك»). «بكم تعرضون / بكم معروض» is a buyer asking our price: he is asked which property, as for any unnamed one.
   const ASK_OUR_PRICE = /بكم\s*(تعرض(ون)?|معروض[هة]?|عارضين|تبيع(ون)?)\s*(ال)?(بيت|فيلا|فل[ةه]|شق[ةه]|[اأ]رض|منزل|عقار)/;
   if (out.action === "none" && out.category === "seller" && ASK_OUR_PRICE.test(String(c.burstSaid || "")) && !MY_OWN.test(recentIn)) {
-    texts = [...texts.filter((t) => /^\s*(وعليكم\s*السلام|الحمد\s*لله|مرحبتين)/.test(t)), "ارسل لي رابط الفيديو او صورة منه عشان ارسلك التفاصيل والسعر بالضبط"];
+    // (dry run on the branch: «الحمدلله التثمين تبيه للبنك…» rode along; only a line that is nothing but the greeting stays)
+    texts = [...texts.filter((t) => /^\s*(وعليكم\s*السلام(\s*ورحمة\s*الله(\s*وبركاته)?)?|الحمد\s*لله|مرحبتين(\s*تفضل)?)\s*$/.test(t)), "ارسل لي رابط الفيديو او صورة منه عشان ارسلك التفاصيل والسعر بالضبط"];
     out.category = "buyer"; out.guard_our_price = true;
   }
   const NAME_LINE = /^\s*اسمك\s*الكريم\s*؟\s*$/;

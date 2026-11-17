@@ -31,6 +31,9 @@ test('R74: «أبغى أشوف وين عن الشارع، وإذا ناسبني 
  const r=decide(['اللوكيشن نرسله قبل الزيارة عشان نتأكد إن العقار لسا متاح وما تتعنى على الفاضي','متى يناسبك تزور ؟'],h,null,{prop:RUMAIS});
  assert.equal(r.out.action,'send_location');assert.equal(r.out.location_for_area,true);
  assert.deepEqual(r.texts,['تفضل هذا الموقع','شوف اذا المنطقة تناسبك وخبرني متى يناسبك تزور']);
+ // 5161592b on the branch: the model's own «شوف الموقع اول واذا ناسبك خبرني» is not said before the same two lines
+ const r2=decide(['تمام شوف الموقع اول واذا ناسبك خبرني'],[IN('ممكن موقعه الفلة اخي'),OUT('ان شاء الله برسلك الموقع'),IN('بس اريد اتاكد من لوكيش اذا مناسب لي او لا')],null,{prop:RUMAIS});
+ assert.deepEqual(r2.texts,['تفضل هذا الموقع','شوف اذا المنطقة تناسبك وخبرني متى يناسبك تزور']);
 });
 test('a client who only arrived is not asked his opinion (007be129 «هذا هو», e06229f1 «جالس أشوفها»)',()=>{
  let r=decide(['حياك الله وايش انطباعك بعد ما شفتها ؟'],[OUT('تمام ان شاء الله'),IN('','image'),IN('هذا هو')]);
@@ -54,12 +57,15 @@ test('«بكم تعرض البيت للبيع ؟» is a buyer asking our price, 
  const r=decide(['وعليكم السلام ورحمة الله وبركاته','الحمدلله','ارسل تفاصيل البيت كاملة والسعر اللي في بالك اذا ما عليك امر'],[IN('سلام عليكم اخي كيف الحال'),IN('اخي بكم تعرض البيت للبيع'),IN('؟')],{category:'seller'});
  assert.equal(r.out.category,'buyer');
  assert.deepEqual(r.texts,['وعليكم السلام ورحمة الله وبركاته','الحمدلله','ارسل لي رابط الفيديو او صورة منه عشان ارسلك التفاصيل والسعر بالضبط']);
+ // dry run on the branch: a model line about valuation does not ride along with the greeting
+ assert.deepEqual(decide(['وعليكم السلام ورحمة الله وبركاته','الحمدلله التثمين تبيه للبنك ولا تبي تعرف سعر السوق ؟'],[IN('بكم تعرض البيت للبيع')],{category:'seller'}).texts,
+  ['وعليكم السلام ورحمة الله وبركاته','ارسل لي رابط الفيديو او صورة منه عشان ارسلك التفاصيل والسعر بالضبط']);
  // an owner who says the house is his stays an owner
  assert.equal(decide(['ارسل التفاصيل'],[IN('عندي بيت بكم تعرضونه للبيع')],{category:'seller'}).out.category,'seller');
 });
 test('«موجود جنب الفيلا» is a visit now: saved at the current hour, not 16:00 (e06229f1)',()=>{
  const line=agent.split('\n').find((l)=>l.includes('const immediate ='));
- const re=new RegExp(line.match(/const immediate = \/(.*)\/\.test\(lastIn\)/)[1]);
+ const re=new RegExp(line.match(/const immediate = \/(.*?)\/\.test\(lastIn\)/)[1]);
  assert(re.test('أنا موجود جنب الفيلا. إذا تأذن لي إني أدخل أشوف الفيلا'));
  assert(re.test('واقف عند البيت'));
  assert(!re.test('بمر بكره العصر'));
