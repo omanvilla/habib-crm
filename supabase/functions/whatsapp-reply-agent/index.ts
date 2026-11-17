@@ -1891,7 +1891,7 @@ Deno.serve(async (req) => {
     // R93 (Ahmed 17 Nov 2026 night: «ايه حوّله لي بتنبيه»): a client who says the number we gave (the owner's, the other
     // branch's) or ours did not answer («تواصلت محد يرد», «رسلت لهم ما ردوا علي», «م يردوا») was sent back to the same number.
     // Now he gets R12's allowed sentence once, the chat goes to Ahmed as «ما يردون:», and Ahmed is told on WhatsApp.
-    const NO_ANSWER = /(تواصلت|اتصلت|راسلت|رسلت|ارسلت|أرسلت|دقيت|كلمت|حاولت)[^\n]{0,40}(محد|ماحد|ما\s*حد|(ما|م)\s*رد(و|وا)?|(ما|م)\s*ير?د(و|ون|وا)?(\s|$)|ولا\s*رد|(ما|م)\s*حصلت\s*رد)|(^|\s)(محد|ماحد)\s*ير?د|(^|\s)(ما|م)\s*(يردوا|يردون|يردو|ردوا|ردو)(\s|$)/;
+    const NO_ANSWER = /(تواصلت|اتصلت|راسلت|رسلت|ارسلت|أرسلت|دقيت|كلمت|حاولت)[^\n]{0,40}(محد|ماحد|ما\s*حد|(ما|م)\s*رد(و|وا)?(\s|$)|(ما|م)\s*ير?د(و|ون|وا)?(\s|$)|ولا\s*رد|(ما|م)\s*حصلت\s*رد)|(^|\s)(محد|ماحد)\s*ير?د|(^|\s)(ما|م)\s*(يردوا|يردون|يردو|ردوا|ردو)(\s|$)/;
     if (NO_ANSWER.test(burstSaid) && !ignored && !review && out.action !== "book_meeting" && !/^\s*(تفاوض|مشتري جاد|دراسة سعر|اجتماع)\s*:/.test(String(out.handoff_reason || ""))) {
       const R12_LINE = "حاليا الاستاذ احمد مشغول ان شاء الله اول ما يفضى يتصل فيك بس خبرنا وش الموضوع ونقدر نساعدك هنا في الواتساب";
       const saidIt = history.slice(-6).some((h: any) => h.direction === "outbound" && String(h.body || "").includes("اول ما يفضى يتصل فيك"));

@@ -262,7 +262,9 @@ test('R93: «الرقم ما يرد» goes to Ahmed as «ما يردون:» with
  const re=new RegExp(line.match(/const NO_ANSWER = \/(.*)\/;/)[1]);
  for(const s of ['تواصلت معهم محد يرد','تواصلت اخي محد يرد','رسلت لهم ما ردوا علي','م يردوا','تواصلت ع الرقم هذا وم حصلت رد نهائي','اتصلت فيهم وما ردو'])assert(re.test(s),s);
  for(const s of ['ردوا علي امس','محد يقدر يساعدني','ما رديت عليه','ابي اتصل'])assert(!re.test(s),s);
- assert(agent.includes('out.action = "handoff"; out.handoff_reason = short(`ما يردون: ${burstSaid.replace(/\s+/g, " ").trim()}`, 300);'));
+ assert(agent.includes('out.action = "handoff"; out.handoff_reason = short(`ما يردون: ${burstSaid.replace(/\\s+/g, " ").trim()}`, 300);'));
+ // «حاولت اتصل فيك وما رديت» is about us: R12's own exception (the brain) answers it, not R93
+ assert(!re.test('حاولت اتصل فيك وما رديت'));
  assert(agent.includes('event_key: `no_answer:${conv.id}:${msg.id}`'),'one alert per client message');
  assert(agent.includes('texts = saidIt ? [] : [R12_LINE];'),'the sentence is said once');
 });
