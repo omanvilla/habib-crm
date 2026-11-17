@@ -150,6 +150,9 @@ test('rows 1086-1125: «بكم الفلل الي ف الصومحان» gets the 
  const available=[{id:'s2',branch_key:'barka',area:'الصومحان الجنوبية',price:69000,marketing:ad},{id:'s3',branch_key:'barka',area:'الصومحان الجنوبية',price:69000,marketing:ad},{id:'h59',branch_key:'barka',area:'بركاء الرميس',price:59000,marketing:'رميس'}];
  const r=decide(['ارسل لي رابط الفيديو او صورة منه عشان ارسلك التفاصيل والسعر بالضبط','اسمك الكريم ؟'],[IN('مرحبا'),IN('بكم الفلل الي ف الصومحان')],null,{available,route:'barka'});
  assert.deepEqual(r.texts,[ad,'متى يناسبك تزور ؟']);assert.equal(r.out.property_id,'s2');
+ // dry run on the branch: the two units' ad texts differ (one has the reel caption); one owner, area, type and price = one offer, fullest ad
+ const unitsDiffer=[{id:'s3',branch_key:'barka',area:'الصومحان الجنوبية',type:'villa',owner_id:'o1',price:69000,marketing:'قصير'},{id:'s2',branch_key:'barka',area:'الصومحان الجنوبية',type:'villa',owner_id:'o1',price:69000,marketing:ad}];
+ assert.deepEqual(decide(['ارسل لي رابط الفيديو او صورة منه'],[IN('بكم الفلل الي ف الصومحان')],null,{available:unitsDiffer,route:'barka'}).texts,[ad,'متى يناسبك تزور ؟']);
  // two different properties in the area: the link question stays
  const two=[...available,{id:'x',branch_key:'barka',area:'الصومحان الجنوبية',price:90000,marketing:'غير'}];
  assert.deepEqual(decide(['ارسل لي رابط الفيديو او صورة منه'],[IN('بكم الفلل الي ف الصومحان')],null,{available:two,route:'barka'}).texts,['ارسل لي رابط الفيديو او صورة منه']);

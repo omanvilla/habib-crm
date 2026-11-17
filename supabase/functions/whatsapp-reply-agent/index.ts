@@ -256,7 +256,10 @@ function ownerDecisions(out: any, lines: string[], c: any) {
       const base = (a: unknown) => areaKey(a).replace(/^(ولايه\s+)?(بركاء|مسقط)\s+/, "").replace(/\s+(جنوبيه|شماليه|جنوب|شمال)$/, "");
       const names = (a: unknown) => said.includes(areaKey(a)) || (base(a).length > 2 && said.includes(base(a)) && !/جنوب|شمال/.test(said));
       const here = (c.available || []).filter((p: any) => p.branch_key === c.route && areaKey(p.area).length > 2 && names(p.area))
-        .filter((p: any, i: number, a: any[]) => a.findIndex((q: any) => Number(q.price || 0) === Number(p.price || 0) && String(q.marketing || "").slice(0, 80) === String(p.marketing || "").slice(0, 80)) === i);
+        // (units of one owner, same area, type and price are one offer; the fullest ad of them is sent)
+        .sort((a: any, b: any) => String(b.marketing || "").length - String(a.marketing || "").length)
+        .filter((p: any, i: number, a: any[]) => a.findIndex((q: any) => Number(q.price || 0) === Number(p.price || 0)
+          && (String(q.marketing || "").slice(0, 80) === String(p.marketing || "").slice(0, 80) || (!!q.owner_id && q.owner_id === p.owner_id && q.type === p.type && q.area === p.area))) === i);
       const p = here.length === 1 ? here[0] : null;
       if (p && p.marketing && !sentBefore(String(p.marketing).slice(0, 40))) {
         texts = [String(p.marketing), "متى يناسبك تزور ؟"];
