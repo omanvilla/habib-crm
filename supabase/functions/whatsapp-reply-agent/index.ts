@@ -55,7 +55,7 @@ const YOUTUBE_LINES = ["الافضل تشوف العقار على الطبيعة
 const UNKNOWN_Q = /^\s*سؤال ما عندي جوابه\s*:/;
 // R74 to R79: Ahmed's six decisions of 15 Nov 2026 after the dry run on 124 chats, held by code (brain.ts has no room left)
 const LOCATION_ASK = /موقع|لوكيشن|لوكشن|location|الخريط|المكان\s*بالضبط/i;
-const AREA_REASON = /ما\s*([اأ]ريد|[اأ]بي|[اأ]بغى|[اأ]با|بغيت)\s*[اأ]زور|[اأ]عرف\s*(ال)?(مكان|موقع)\s*بالضبط|(اعرف|أعرف|اشوف|أشوف|نشوف|اتاكد|أتأكد|اتأكد)[^\n]{0,40}(يناسب(ني|نا)|مناسب\s*(لي|لنا)|قريب|بعيد)|(يناسب|مناسب)(ني|نا|ه)?\s*(لي\s*)?(او|أو|ولا|والا)\s*(لا|ما)|مو\s*لازم\s*(لل)?زيار|الزيار[ةه]\s*تعتمد|تعتمد\s*(على|ع)\s*(ال)?موقع/;
+const AREA_REASON = /ما\s*([اأ]ريد|[اأ]بي|[اأ]بغى|[اأ]با|بغيت)\s*[اأ]زور|[اأ]عرف\s*(ال)?(مكان|موقع)\s*بالضبط|(اعرف|أعرف|اشوف|أشوف|نشوف|اتاكد|أتأكد|اتأكد)[^\n]{0,40}(يناسب(ني|نا)|مناسب\s*(لي|لنا)|قريب|بعيد)|(يناسب|مناسب)(ني|نا|ه)?\s*(لي\s*)?(او|أو|ولا|والا)\s*(لا|ما)|مو\s*لازم\s*(لل)?زيار|الزيار[ةه]\s*تعتمد|تعتمد\s*(على|ع)\s*(ال)?موقع|[اأ]شوف\s*وين|(اذا|إذا|لو)\s*ي?ناسب(ني|نا)/;
 // «اريد أشوف البيت من الخارج لان من سكان الحيل الشماليه» (eleventh dry-run batch): the same wish without the word «موقع»
 const OUTSIDE_LOOK = /([اأ]شوف|نشوف|[اأ]مر|نمر|[اأ]طل)[^\n]{0,25}من\s*(ال)?(خارج|برع|برا)(\s|$)/;
 const locationForArea = (said: string) => (LOCATION_ASK.test(said) && AREA_REASON.test(said)) || OUTSIDE_LOOK.test(said);
@@ -327,6 +327,43 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   }
   // dry run of 16 Nov (307af714, b387b2de, 2 more): «اسمك الكريم ؟» stuck inside «الفيلا اللي سألت عنها انباعت», before the
   // details of the other property, read as one message «انباعت / اسمك الكريم ؟ / بس عندنا…». It moves before the last question.
+  // ---- audit of the replies really sent 16 Nov 12:20 to 17 Nov 13:00 (Ahmed 17 Nov: «إيه صلّحهم») ----
+  // R11 (401f1402 «وزين ترسلي الموقع بحاول باذن الله امر ليوم»): he asked for the location and named the day, and got the reel
+  // and «متى يناسبك تزور ؟» with no location. A day said with the request is enough (R11: the day or the hour).
+  const DAY_WITH = /(^|[\s،,.])(ا?ليوم|الحين|ال[اآ]ن|بكر[ةه]?|باكر|الليل[ةه]|السبت|ال[اأ]حد|ال[اإ]ثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمع[ةه])($|[\s،,.؟?!])/;
+  const DAY_NOT = /ما\s*(يناسب|[اأ]قدر|بقدر|اقدر|بيمدي|يمدي)|صعب|مب\s*ا?ليوم|مو\s*ا?ليوم/;
+  if (out.action === "none" && ["buyer", "tenant"].includes(out.category) && !c.hardHandoff && c.prop?.map_url
+    && !["owner_lives", "office"].includes(String(c.prop.visit_method || "")) && !sentBefore(String(c.prop.map_url))
+    && LOCATION_ASK.test(String(c.burstSaid || "")) && DAY_WITH.test(String(c.burstSaid || "")) && !DAY_NOT.test(String(c.burstSaid || ""))) {
+    texts = texts.filter((t) => !(t.length <= 200 && LOCATION_HELD.test(t)) && !VISIT_Q.test(t));
+    out.action = "send_location"; out.guard_location_day = true;
+  }
+  // 007be129 «هذا هو» at the door, e06229f1 «أنا موجود حالياً في الفيلا. جالس أشوفها»: «وايش انطباعك بعد ما شفتها ؟» went to a
+  // client who had only arrived. The opinion is asked once he has seen it; now he gets «حياك الله خذ راحتك».
+  const OPINION_Q = /انطباع(ك|ج|كم)|كيف\s*(شفت|لقيت)(ها|ه|يها|يه)?|(ايش|وش)\s*ر[اأ]ي(ك|ج)\s*(فيها|فيه|بعد)/;
+  const ARRIVING = /^\s*(هذا|هذي|هذه|هاذا)\s*(هو|هي)?\s*[.!]*\s*$|(^|\s)(وصلت|وصلنا|بدخل|ندخل|[اأ]دخل|تدخل|جالس\s*[اأ]شوف|موجود\s*(حالياً|حاليا|الحين)?\s*(جنب|عند|قدام|في)\s*(ال)?(فيلا|فل[ةه]|بيت|موقع))/;
+  const SEEN_WORDS = /عجب|حلو|حلوه|ناسب|ما\s*ناسب|شفته|شفتها|شفناه|شفناها|خلصت|طلعت|زرت|غال(ي|يه)|صغير|ضيق|واسع|زين/;
+  if (texts.some((t) => t.length <= 200 && OPINION_Q.test(t)) && ARRIVING.test(String(c.burstSaid || "")) && !SEEN_WORDS.test(String(c.burstSaid || "")) && out.action !== "handoff") {
+    texts = texts.map((t) => (t.length <= 200 && OPINION_Q.test(t) ? t.replace(/\s*و?\s*(ايش|وش|كيف)?\s*(انطباع(ك|ج|كم)|ر[اأ]ي(ك|ج)|شفت(ها|ه)?|لقيت(ها|ه)?)[^؟?\n]*[؟?]?/g, "").trim() : t))
+      .filter((t) => t.replace(/[^ء-ي]/g, "").length > 0);
+    if (!texts.some((t) => t.replace(/حياك\s*الله|[^ء-ي]/g, "").length > 2)) texts = ["حياك الله خذ راحتك"];
+    out.guard_arrived = true;
+  }
+  // 4736075f: a video we could not read, then «السعر موجود في الفيديو اللي رسلته لك», then «انت ما تعرف تقرأ الرقم ؟؟»: the
+  // same «اكتب لي السعر / المنطقة» went three times. Asked once; asked again, it goes to Ahmed with no reply (he can watch it).
+  const WHICH_ASK = /اكتب\s*(لي\s*)?(ال)?(رقم|سعر|منطق[ةه])|رابط\s*(ال)?(فيديو|اعلان|إعلان)|صور[ةه]\s*منه|احدد\s*العقار/;
+  if (out.action === "none" && !c.prop && texts.some((t) => t.length <= 200 && WHICH_ASK.test(t))
+    && c.history.slice(-8).some((h: any) => h.direction === "outbound" && WHICH_ASK.test(String(h.body || "")))) {
+    texts = []; out.action = "handoff"; out.guard_which_twice = true;
+    out.handoff_reason = `ما عرفنا: العميل أرسل العقار وما قدرنا نحدده وكتب «${String(c.burstSaid || "").replace(/\s+/g, " ").trim().slice(0, 120)}»`;
+  }
+  // 247f8277 «بكم تعرض البيت للبيع ؟» as a first message was answered as an owner («ارسل تفاصيل البيت كاملة والسعر اللي في
+  // بالك»). «بكم تعرضون / بكم معروض» is a buyer asking our price: he is asked which property, as for any unnamed one.
+  const ASK_OUR_PRICE = /بكم\s*(تعرض(ون)?|معروض[هة]?|عارضين|تبيع(ون)?)\s*(ال)?(بيت|فيلا|فل[ةه]|شق[ةه]|[اأ]رض|منزل|عقار)/;
+  if (out.action === "none" && out.category === "seller" && ASK_OUR_PRICE.test(String(c.burstSaid || "")) && !MY_OWN.test(recentIn)) {
+    texts = [...texts.filter((t) => /^\s*(وعليكم\s*السلام|الحمد\s*لله|مرحبتين)/.test(t)), "ارسل لي رابط الفيديو او صورة منه عشان ارسلك التفاصيل والسعر بالضبط"];
+    out.category = "buyer"; out.guard_our_price = true;
+  }
   const NAME_LINE = /^\s*اسمك\s*الكريم\s*؟\s*$/;
   for (let i = 0; i < texts.length - 1; i++) {
     const ls = texts[i].split("\n");
@@ -813,7 +850,9 @@ async function watchVisit(msg: any, dry = false) {
   const addNote = () => [time ? String(open?.notes || "").replace(/ ?\(الساعة ما تحددت\)/g, "") : open?.notes, short(out.note, 500)].filter(Boolean).join("\n").slice(0, 1000);
   const date = /^\d{4}-\d{2}-\d{2}$/.test(out.date || "") ? out.date : (open?.viewing_date || null);
   // "الحين" / "طالع" / "بروح الحين" (8 Nov, Ahmed): the visit is now, so it is recorded at the current Muscat time, not a guessed 16:00
-  const immediate = /(الحين|الان|الآن|طالع|وصلت|وصلنا)/.test(lastIn) && !/بكر|باكر|العصر|الصبح|المغرب|الظهر/.test(lastIn);
+  // (17 Nov, e06229f1 «أنا موجود جنب الفيلا… إذا تأذن لي إني أدخل»: saved at 16:00 with «الساعة ما تحددت», so the opinion
+  // question went 5 minutes later while he was inside. Standing by the property is now too.)
+  const immediate = /(الحين|الان|الآن|طالع|وصلت|وصلنا|(موجود|واقف)\s*(حالياً|حاليا)?\s*(جنب|عند|قدام)|جالس\s*[اأ]شوف)/.test(lastIn) && !/بكر|باكر|العصر|الصبح|المغرب|الظهر/.test(lastIn);
   const nowHM = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Muscat", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
   const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(out.time || "") ? out.time : (out.event === "agreed" && immediate ? nowHM : null);
   const provenance = { created_via: "whatsapp_ai", source_whatsapp_message_id: msg.id, auto_confidence: out.confidence };
@@ -1655,7 +1694,7 @@ Deno.serve(async (req) => {
     }
     // R11: the location, the lockbox or the owner's number never goes out before the client said when he is coming
     if (["send_location", "send_owner_number", "send_lockbox"].includes(out.action)) {
-      const TIME_SAID = /اليوم|الحين|الان|الآن|بكر|باكر|بعد|العصر|الصبح|الصباح|المغرب|الظهر|الليل|المسا|الساع|طالع|جاي|في الطريق|وصلت|وصلنا|السبت|ال[اأ]حد|ال[اإ]ثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمعة|[0-9٠-٩]/;
+      const TIME_SAID = /ا?ليوم|الحين|الان|الآن|بكر|باكر|بعد|العصر|الصبح|الصباح|المغرب|الظهر|الليل|المسا|الساع|طالع|جاي|في الطريق|وصلت|وصلنا|السبت|ال[اأ]حد|ال[اإ]ثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمعة|[0-9٠-٩]/;
       const recentIn = history.filter((h: any) => h.direction === "inbound").slice(-6).map((h: any) => String(h.transcript || h.body || "")).join(" ");
       const booked = visits.some((v: any) => (!prop || v.property_id === prop.id) && ["scheduled", "confirmed", "postponed"].includes(v.status));
       if (!out.viewing_date && !out.viewing_time && !booked && !TIME_SAID.test(recentIn)) {

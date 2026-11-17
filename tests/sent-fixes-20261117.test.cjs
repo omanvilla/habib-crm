@@ -1,0 +1,69 @@
+'use strict';
+// 17 Nov 2026, audit of the replies really sent from 16 Nov 12:20 (Ahmed: «إيه صلّحهم»). Each case is the real chat; all
+// were still wrong when run again on v85 (inline dry run, nothing sent). Held by code in ownerDecisions and watchVisit.
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
+const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8').replace(/\r\n/g,'\n');
+const pickFrom=(src)=>(start,end)=>{const a=src.indexOf(start);assert(a>=0,'missing: '+start);const b=src.indexOf(end,a);assert(b>a,'no end: '+start);return src.slice(a,b+end.length);};
+const pickA=pickFrom(agent);
+const dsrc=['const THEIR_OFFICE','const ASK_CONFIRM','const WE_SHOW','const MY_OWN','const SILENT_TYPES','const COMMISSION_ASK','const COMMISSION_BUYER_LINES','const COMMISSION_OWNER_LINES','const ASK_LINK','const areaKey','const BOOKING_ASK','const BOOKING_NOT','const ASK_HOUR','const NEEDS_AHMED','const VIDEO_PROMISE','const FAREWELL','const FIXED_PRICE_LINE','const IG_CODE','const UNKNOWN_Q','const LOCATION_ASK','const AREA_REASON','const OUTSIDE_LOOK','const locationForArea','const LOCATION_HELD','const AREA_LINES','const INSIDE_VIDEO_ASK','const LAYOUT_ASK','const LAYOUT_LINES','const OUR_HOUR','const HOUR_SAID','const OWNER_TIME_LINE','const DEPOSIT_SAID','const REASON_Q','const VISIT_Q','const R66_DETAILS_ASK','const R66_GENERIC']
+ .map((s)=>pickA(s,'\n')).join('')+pickA('function nearBarka','\n}\n')+pickA('function ownerDecisions','\n}\n');
+const D=new Function(dsrc.replace(/(\w+): (?:string|any|unknown|number)(?:\[\])?(?=[,)])/g,'$1')+';return {ownerDecisions};')();
+const IN=(b,type)=>({direction:'inbound',body:b,message_type:type||'text'}),OUT=(b)=>({direction:'outbound',body:b});
+const decide=(texts,history,out,c)=>{const o={action:'none',category:'buyer',...(out||{})};const burst=[];for(const h of history){if(h.direction==='outbound')burst.length=0;else if(h.body)burst.push(h.body);}
+ const t=D.ownerDecisions(o,texts,{history,burstSaid:burst.join(' '),prop:null,visitedProp:false,visitedAny:false,saidVisited:false,handoffOpen:false,hardHandoff:false,...(c||{})});return {out:o,texts:t};};
+const RUMAIS={id:'p1',map_url:'https://maps.app.goo.gl/As6gtsQ8QLjcZG3r5',visit_method:'open',video:'https://www.instagram.com/reel/DfrPGgoCOOp/'};
+
+test('R11: the location asked with the day goes now (401f1402 «امر ليوم»)',()=>{
+ const h=[OUT('اقرب شي عندنا في الرميس 59 الف'),IN('ممكن ترسلي اذا صور'),IN('وزين ترسلي الموقع بحاول باذن الله امر ليوم')];
+ const r=decide(['الصور ما متوفره عندنا هذا رابط الفيديو','https://www.instagram.com/reel/DfrPGgoCOOp/','متى يناسبك تزور ؟'],h,null,{prop:RUMAIS});
+ assert.equal(r.out.action,'send_location');assert.equal(r.out.guard_location_day,true);
+ assert.deepEqual(r.texts,['الصور ما متوفره عندنا هذا رابط الفيديو','https://www.instagram.com/reel/DfrPGgoCOOp/']);
+ // not when the day does not work, not without a location ask, not for a house the owner lives in, not when it went already
+ assert.equal(decide(['تمام'],[IN('ارسل الموقع بس اليوم ما اقدر')],null,{prop:RUMAIS}).out.action,'none');
+ assert.equal(decide(['تمام'],[IN('بمر اليوم')],null,{prop:RUMAIS}).out.action,'none');
+ assert.equal(decide(['تمام'],[IN('ارسل الموقع بجي بكره')],null,{prop:{...RUMAIS,visit_method:'owner_lives'}}).out.action,'none');
+ assert.equal(decide(['تمام'],[OUT(RUMAIS.map_url),IN('ارسل الموقع بجي بكره')],null,{prop:RUMAIS}).out.action,'none');
+ // «اليوم» inside another word is no day
+ assert.equal(decide(['تمام'],[IN('ارسل الموقع واليومية كم')],null,{prop:RUMAIS}).out.action,'none');
+});
+test('R74: «أبغى أشوف وين عن الشارع، وإذا ناسبني بزور» gets the location to judge the area (f6bcc8ac)',()=>{
+ const h=[IN('ممكن لوكيشن هذي الڤلل'),OUT('ان شاء الله برسلك الموقع\nمتى يناسبك تزور ؟'),IN('بس أرسل لي الموقع، أبغى أشوف وين عن الشارع وكذا، وإذا ناسبني إن شاء الله بزور المكان')];
+ const r=decide(['اللوكيشن نرسله قبل الزيارة عشان نتأكد إن العقار لسا متاح وما تتعنى على الفاضي','متى يناسبك تزور ؟'],h,null,{prop:RUMAIS});
+ assert.equal(r.out.action,'send_location');assert.equal(r.out.location_for_area,true);
+ assert.deepEqual(r.texts,['تفضل هذا الموقع','شوف اذا المنطقة تناسبك وخبرني متى يناسبك تزور']);
+});
+test('a client who only arrived is not asked his opinion (007be129 «هذا هو», e06229f1 «جالس أشوفها»)',()=>{
+ let r=decide(['حياك الله وايش انطباعك بعد ما شفتها ؟'],[OUT('تمام ان شاء الله'),IN('','image'),IN('هذا هو')]);
+ assert.deepEqual(r.texts,['حياك الله خذ راحتك']);assert.equal(r.out.guard_arrived,true);
+ r=decide(['كيف شفتها ؟'],[OUT('البيت مفتوح'),IN('أنا موجود حالياً في الفيلا. جالس أشوفها')]);
+ assert.deepEqual(r.texts,['حياك الله خذ راحتك']);
+ // after he saw it the question stays
+ assert.deepEqual(decide(['وايش انطباعك ؟'],[OUT('حياك الله'),IN('وصلت وشفتها حلوة')]).texts,['وايش انطباعك ؟']);
+ assert.deepEqual(decide(['كيف شفت فيلا الرميس ؟'],[OUT('حياك الله'),IN('خلصت الزيارة')]).texts,['كيف شفت فيلا الرميس ؟']);
+});
+test('the same «which property» ask is not sent twice: the second goes to Ahmed (4736075f)',()=>{
+ const h=[IN('كم مساحة البناء لهذا البيت ؟'),IN('','video'),OUT('اكتب لي المنطقة او السعر اللي في الاعلان اذا ما عليك امر'),IN('السعر موجود في الفيديو اللي رسلته لك')];
+ const r=decide(['اكتب لي السعر اللي ظاهر في الفيديو او المنطقة اذا ما عليك امر'],h);
+ assert.deepEqual(r.texts,[]);assert.equal(r.out.action,'handoff');assert.match(r.out.handoff_reason,/^ما عرفنا: العميل أرسل العقار/);
+ // the first ask stays
+ assert.deepEqual(decide(['اكتب لي المنطقة او السعر اللي في الاعلان اذا ما عليك امر'],[IN('','video'),IN('كم السعر')]).texts,['اكتب لي المنطقة او السعر اللي في الاعلان اذا ما عليك امر']);
+ // a known property is answered, never handed over for this
+ assert.equal(decide(['اكتب لي السعر'],h,null,{prop:RUMAIS}).out.action,'none');
+});
+test('«بكم تعرض البيت للبيع ؟» is a buyer asking our price, not an owner (247f8277)',()=>{
+ const r=decide(['وعليكم السلام ورحمة الله وبركاته','الحمدلله','ارسل تفاصيل البيت كاملة والسعر اللي في بالك اذا ما عليك امر'],[IN('سلام عليكم اخي كيف الحال'),IN('اخي بكم تعرض البيت للبيع'),IN('؟')],{category:'seller'});
+ assert.equal(r.out.category,'buyer');
+ assert.deepEqual(r.texts,['وعليكم السلام ورحمة الله وبركاته','الحمدلله','ارسل لي رابط الفيديو او صورة منه عشان ارسلك التفاصيل والسعر بالضبط']);
+ // an owner who says the house is his stays an owner
+ assert.equal(decide(['ارسل التفاصيل'],[IN('عندي بيت بكم تعرضونه للبيع')],{category:'seller'}).out.category,'seller');
+});
+test('«موجود جنب الفيلا» is a visit now: saved at the current hour, not 16:00 (e06229f1)',()=>{
+ const line=agent.split('\n').find((l)=>l.includes('const immediate ='));
+ const re=new RegExp(line.match(/const immediate = \/(.*)\/\.test\(lastIn\)/)[1]);
+ assert(re.test('أنا موجود جنب الفيلا. إذا تأذن لي إني أدخل أشوف الفيلا'));
+ assert(re.test('واقف عند البيت'));
+ assert(!re.test('بمر بكره العصر'));
+});
+test('the R11 check reads «ليوم» as a day too',()=>{
+ assert(agent.includes('const TIME_SAID = /ا?ليوم|الحين'));
+});
