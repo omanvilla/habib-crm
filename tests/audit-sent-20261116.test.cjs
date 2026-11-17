@@ -240,7 +240,7 @@ test('the dashboard of 16 Nov: one alert per client and kind, a past meeting lea
  assert(hot.includes("const key=n.client_id+'|'+kind;if(once.has(key))return false;once.add(key);return true;"));
  assert(hot.indexOf('list.sort((a,b)=>String(b.created_at)')<hot.indexOf('once.has(key)'),'the newest of each client is the one kept');
  assert(ui.includes('if(callsToday&&manages()){')&&ui.includes('اتصالات الموظفين:'));
- assert(index.includes('crm-hot-alerts.js?v=20261117-sql120')&&index.includes('crm-calls-meetings.js?v=20261117-goal1'));
+ assert(index.includes('crm-hot-alerts.js?v=20261117-sql121')&&index.includes('crm-calls-meetings.js?v=20261117-goal1'));
 });
 
 // ---- R88 / SQL108 (Ahmed 16 Nov 2026): a study by the phone's WhatsApp, an owner we do not price, the priced leave the list ----

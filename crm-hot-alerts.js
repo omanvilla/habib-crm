@@ -72,7 +72,8 @@
       if(nc.length){
         const d=await supa.from('whatsapp_conversations').select('client_id,owner_alert_done_at,owner_alert_done_reason,last_inbound_at').in('client_id',nc).not('owner_alert_done_at','is',null);
         const done=d.error?[]:(d.data||[]);
-        list=list.filter(n=>!done.some(x=>x.client_id===n.client_id&&!reopened(x.owner_alert_done_at,n.created_at,x.last_inbound_at)));
+        // «🔥 بديل:» (SQL121) is written in the same moment the chat is closed, so it is not hidden by that «تم»
+        list=list.filter(n=>/^🔥 بديل:/.test(String(n.title||''))||!done.some(x=>x.client_id===n.client_id&&!reopened(x.owner_alert_done_at,n.created_at,x.last_inbound_at)));
       }
       const c=await supa.from('whatsapp_conversations').select('id,client_id,customer_name,customer_wa_id,route_key,handoff_reason,handoff_updated_at,owner_alert_done_at,owner_alert_done_reason,last_inbound_at,updated_at,clients(name,phone,phone_normalized)')
         .eq('human_handoff_required',true).in('route_key',['barka','muscat']).gte('updated_at',since).order('updated_at',{ascending:false}).limit(80);
