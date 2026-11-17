@@ -133,6 +133,7 @@
     ['التقارير',['reports','expenses','activityLog']],
     ['الإدارة',['team','backup','settings','ai']]
   ];
+  const RETIRED_NAV=['calendar','deposits','expenses','activityLog','backup'];
   const navKey=link=>((link.getAttribute('onclick')||'').match(/navigate\('([^']+)'/)||[])[1]||'';
   function groupNav(){
     const area=document.querySelector('#sidebar .nav-area');if(!area)return;
@@ -152,10 +153,12 @@
       const text=(link.querySelector('.nav-text')||link).textContent.trim();
       if(text&&link.title!==text)link.title=text;
     }
-    // The backup page is owner-only; staff no longer see a link that opens a locked page.
-    const backup=byId('navBackup');if(backup&&typeof isOwner==='function'&&currentProfileReady())backup.style.display=isOwner()?'':'none';
+    // 17 Nov 2026 (Ahmed): retired from the menu. Calendar repeats tasks + visits, deposits live inside the deal,
+    // expenses were never used; the activity log and backup moved into Settings (ownerToolsCard). The pages stay
+    // reachable by navigate() for the links that still open them (a deal's deposit, a task's day).
+    for(const link of area.querySelectorAll('.nav-link'))if(RETIRED_NAV.includes(navKey(link)))link.classList.add('crm-nav-retired');
     for(const old of area.querySelectorAll('.nav-group:not(.crm-nav-group)'))if(!old.querySelector('.nav-link'))old.remove();
-    for(const g of groups)g.hidden=![...g.querySelectorAll('.nav-link')].some(l=>l.style.display!=='none');
+    for(const g of groups)g.hidden=![...g.querySelectorAll('.nav-link')].some(l=>l.style.display!=='none'&&!l.classList.contains('crm-nav-retired'));
   }
   const currentProfileReady=()=>typeof currentProfile!=='undefined'&&!!currentProfile;
 
@@ -265,58 +268,25 @@
     };
   }
 
-  // ---- Phase 3: quick guide for new staff ----------------------------------
-  // Shown once per account on each browser; the "؟" button in the top bar reopens it.
-  const GUIDE=[
-    {nav:'dash',title:'ابدأ يومك من «لوحة العمل»',text:'في الأعلى المحادثات التي تحتاج تدخلك، وتحتها أعمال اليوم: المتابعات والزيارات والمهام وأرقام فرعك.'},
-    {nav:'whatsapp',title:'ردّ على العملاء من «واتساب»',text:'كل رسائل العملاء في مكان واحد. افتح المحادثة وردّ مباشرة، ويمكنك إرسال الصور والفيديو والرسائل الصوتية.'},
-    {nav:'daily',title:'أنجز «المهام» و«الزيارات»',text:'كل صف مهمة مطلوبة منك. اضغط المربع عند الإنجاز. وبعد كل زيارة افتح «الزيارات» واضغط «تسجيل النتيجة».'},
-    {nav:'clients',title:'أضف عميلًا أو عقارًا',text:'من زر «عميل جديد» أو «عقار جديد» في لوحة العمل. ابحث برقم الهاتف أولًا في «العملاء» حتى لا يتكرر العميل.'}
-  ];
-  const guideKey=()=>'crmGuideSeen:'+(typeof currentUser!=='undefined'&&currentUser?currentUser.id:'');
-  let guideDialog=null,guideStep=0,guideOffered=false;
-  function focusNav(key){
-    document.querySelectorAll('#sidebar .crm-guide-focus').forEach(n=>n.classList.remove('crm-guide-focus'));
-    const link=[...document.querySelectorAll('#sidebar .nav-link')].find(l=>navKey(l)===key);if(link)link.classList.add('crm-guide-focus');
-  }
-  function drawGuide(){
-    const s=GUIDE[guideStep],last=guideStep===GUIDE.length-1;
-    guideDialog.innerHTML='<div class="crm-guide-step">'+(guideStep+1)+' من '+GUIDE.length+'</div><h3>'+esc(s.title)+'</h3><p>'+esc(s.text)+'</p>'
-      +'<div class="crm-guide-dots">'+GUIDE.map((_,i)=>'<span'+(i===guideStep?' class="on"':'')+'></span>').join('')+'</div>'
-      +'<div class="crm-guide-actions"><button type="button" class="btn-secondary" data-guide="close">إغلاق</button>'
-      +(guideStep?'<button type="button" class="btn-secondary" data-guide="prev">السابق</button>':'')
-      +'<button type="button" class="btn-primary" data-guide="'+(last?'done':'next')+'">'+(last?'ابدأ العمل':'التالي')+'</button></div>';
-    focusNav(s.nav);
-  }
-  function closeGuide(){
-    try{localStorage.setItem(guideKey(),'1');}catch(e){}
-    document.querySelectorAll('#sidebar .crm-guide-focus').forEach(n=>n.classList.remove('crm-guide-focus'));
-    if(guideDialog&&guideDialog.open)guideDialog.close();
-  }
-  function openGuide(){
-    if(!guideDialog){
-      guideDialog=document.createElement('dialog');guideDialog.className='crm-guide';guideDialog.setAttribute('dir','rtl');guideDialog.setAttribute('aria-label','دليل سريع');
-      document.body.append(guideDialog);
-      guideDialog.addEventListener('click',e=>{const b=e.target.closest('[data-guide]');if(!b)return;const a=b.dataset.guide;
-        if(a==='next'){guideStep++;drawGuide();}else if(a==='prev'){guideStep--;drawGuide();}else closeGuide();});
-      guideDialog.addEventListener('close',()=>{if(guideDialog.dataset.closing)return;guideDialog.dataset.closing='1';closeGuide();delete guideDialog.dataset.closing;});
-    }
-    guideStep=0;drawGuide();if(!guideDialog.open)guideDialog.showModal();
-  }
-  window.crmOpenGuide=openGuide;
-  function guideButton(){
-    const bell=document.querySelector('.topbar .bell-wrapper');
-    if(!bell||document.querySelector('.crm-guide-btn'))return;
-    bell.parentElement.insertAdjacentHTML('beforebegin','<button type="button" class="crm-guide-btn" onclick="crmOpenGuide()" title="دليل سريع" aria-label="دليل سريع">؟</button>');
-  }
-  function maybeGuide(){
-    let seen=true;try{seen=localStorage.getItem(guideKey())==='1';}catch(e){}
-    if(!seen&&!guideOffered&&typeof currentUser!=='undefined'&&currentUser&&!document.querySelector('dialog[open]')){guideOffered=true;openGuide();}
+  // 17 Nov 2026 (Ahmed): the 4-step «ابدأ يومك» guide and the «؟» button are gone; he trains each employee himself.
+  // Leftover «seen» flags in localStorage are harmless.
+
+  // ---- Owner tools inside Settings (17 Nov 2026, Ahmed) -----------------------
+  // The activity log and backup left the menu; the owner opens them from here. The pages themselves are unchanged.
+  function ownerToolsCard(){
+    const page=byId('page-settings');if(!page||!currentProfileReady())return;
+    const owner=typeof isOwner==='function'&&isOwner(),card=byId('crmOwnerTools');
+    if(!owner){if(card)card.remove();return;}
+    if(card)return;
+    page.insertAdjacentHTML('beforeend','<div class="card crm-owner-tools" id="crmOwnerTools"><div class="card-head"><h3>أدوات المالك</h3></div>'
+      +'<p class="crm-owner-tools-note">صفحات قليلة الاستخدام، انشالت من القائمة.</p><div class="crm-owner-tools-row">'
+      +'<button type="button" class="btn-secondary" onclick="navigate(\'activityLog\',null)">سجل النشاط</button>'
+      +'<button type="button" class="btn-secondary" onclick="navigate(\'backup\',null)">النسخ الاحتياطي</button></div></div>');
   }
 
-  function refresh(){enhanceFilters();watchLists();groupNav();calNavState();guideButton();}
+  function refresh(){enhanceFilters();watchLists();groupNav();calNavState();ownerToolsCard();}
   const loadApp=window.loadDashboard;
-  if(typeof loadApp==='function')window.loadDashboard=function(){const r=loadApp.apply(this,arguments);setTimeout(groupNav,0);setTimeout(maybeGuide,1500);return r;};
+  if(typeof loadApp==='function')window.loadDashboard=function(){const r=loadApp.apply(this,arguments);setTimeout(groupNav,0);return r;};
   const nav=window.navigate;
   if(typeof nav==='function')window.navigate=function(){const result=nav.apply(this,arguments);setTimeout(refresh,0);return result;};
   refresh();setTimeout(refresh,1500);

@@ -137,12 +137,21 @@ test('menu, top bar and page titles use the same short names',()=>{
   assert(base.includes('<div class="page-title">إدارة <span>الصفقات والزيارات</span></div>'),'Deals page is left as it was');
 });
 
-test('quick guide opens once per account and the top-bar button reopens it',()=>{
-  assert.match(simple,/'crmGuideSeen:'\+/);
-  assert.match(simple,/localStorage\.setItem\(guideKey\(\),'1'\)/);
-  assert.match(simple,/!seen&&!guideOffered/);
-  assert.match(simple,/onclick="crmOpenGuide\(\)" title="دليل سريع"/);
-  assert.equal((simple.match(/\{nav:'/g)||[]).length,4);
+test('17 Nov: the «ابدأ يومك» guide and its «؟» button are gone (Ahmed trains staff himself)',()=>{
+  assert(!/crmGuideSeen|crmOpenGuide|maybeGuide|guideButton|\{nav:'/.test(simple));
+  assert(!/crm-guide/.test(fs.readFileSync('crm-simple-ui.css','utf8')));
+});
+
+test('17 Nov: calendar, deposits, expenses, activity log and backup leave the menu; log and backup move into Settings for the owner',()=>{
+  assert.match(simple,/const RETIRED_NAV=\['calendar','deposits','expenses','activityLog','backup'\]/);
+  assert.match(simple,/link\.classList\.add\('crm-nav-retired'\)/);
+  assert.match(fs.readFileSync('crm-simple-ui.css','utf8'),/#sidebar \.nav-link\.crm-nav-retired\{display:none!important\}/);
+  // A group whose links are all retired is hidden too
+  assert.match(simple,/l\.style\.display!=='none'&&!l\.classList\.contains\('crm-nav-retired'\)/);
+  // Owner-only card; staff get none
+  assert.match(simple,/const owner=typeof isOwner==='function'&&isOwner\(\),card=byId\('crmOwnerTools'\);\s*if\(!owner\)\{if\(card\)card\.remove\(\);return;\}/);
+  assert.match(simple,/navigate\(\\'activityLog\\',null\)">سجل النشاط/);
+  assert.match(simple,/navigate\(\\'backup\\',null\)">النسخ الاحتياطي/);
 });
 
 test('deposit cells show amounts and dates as text, never as raw markup',()=>{
