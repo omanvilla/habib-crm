@@ -307,7 +307,7 @@ rpc:async(name,args={})=>{
     const eligible=db.properties.filter(p=>p.branch_key===branch&&!p.archived&&!privateProperty(p.id));
     const inventoryIds=eligible.filter(p=>p.status==='available').map(p=>p.id).sort(),newIds=eligible.filter(p=>{const day=new Date(p.created_at).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'});return Number(p.price)>0&&day>=weekStart&&day<=today;}).map(p=>p.id).sort();
     const followups=new Set((db.activities||[]).filter(a=>a.actor_type==='human'&&a.outcome&&a.type!=='note'&&(requests.find(r=>r.id===a.request_id)?.route_key||clients.find(c=>c.id===a.client_id)?.lead_route)===branch).map(a=>a.client_id)).size;
-    return {...fixtureBranchGoal(branch,month),inventory:inventoryIds.length,inventory_property_ids:inventoryIds,new_properties:newIds.length,new_property_ids:newIds,followups,viewings:0,bookings:0,live_bookings:0,cancelled_bookings:0,expected_commission:0,collected_commission:0,sales_goal_met:false};
+    return {...fixtureBranchGoal(branch,month),inventory:inventoryIds.length,inventory_property_ids:inventoryIds,new_properties:newIds.length,new_property_ids:newIds,followups,viewings:0,bookings:0,live_bookings:0,cancelled_bookings:0,expected_commission:profile.role==='owner'?0:null,collected_commission:profile.role==='owner'?0:null,sales_goal_met:false};
    });
    return {data:{scope:'branch',today,week_start:weekStart,week_end:new Date(week.getTime()+6*86400000).toISOString().slice(0,10),month_start:month,month_end:new Date(Date.UTC(Number(today.slice(0,4)),Number(today.slice(5,7)),0)).toISOString().slice(0,10),branches,employees:branches},error:null};
   }
