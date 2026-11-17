@@ -169,3 +169,12 @@ test('rows 1086-1125: «بكم الفلل الي ف الصومحان» gets the 
 test('the R11 check reads «ليوم» as a day too',()=>{
  assert(agent.includes('const TIME_SAID = /ا?ليوم|الحين'));
 });
+test('17 Nov: a reel captioned «تم البيع Sold out» is never an available property\'s video or ad text',()=>{
+ const at=agent.indexOf('const soldCap = (c: any) =>');assert(at>0);
+ const block=agent.slice(at,agent.indexOf('p.marketing =',at));
+ assert(block.includes('c.property_id === p.id && !soldCap(c) && /^https'),'the video skips it');
+ assert(block.includes('c.property_id === p.id && !soldCap(c)).map('),'the ad text skips it');
+ const soldCap=new Function('c','return '+agent.slice(at).match(/const soldCap = \(c: any\) => (.*);/)[1].replace(/;$/,''));
+ assert.equal(soldCap({caption:'⁨ تم البيع ✅ Sold out ✅ ولله الحمد ❤️ نبارك للشاري والبائع'}),true);
+ assert.equal(soldCap({caption:'🏡 فيلا للبيع في الصومحان جنوب'}),false);
+});

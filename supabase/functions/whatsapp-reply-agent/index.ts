@@ -1204,10 +1204,14 @@ Deno.serve(async (req) => {
     for (const p of props as any[]) {
       p.videoInside = (((insideR as any).data || []).find((e: any) => e.property_id === p.id && /^https:\/\/(www\.)?instagram\.com\//.test(String(e.url || ""))) || {}).url || null;
       // the video to send when someone asks for it: the reel of this property that did best
-      const vids = ((capR as any).data || []).filter((c: any) => c.property_id === p.id && /^https:\/\/(www\.)?instagram\.com\//.test(String(c.permalink || "")))
+      // (17 Nov: two reels of an available Al Sawmhan unit were re-captioned «تم البيع Sold out … نبارك للشاري» when its sibling
+      // sold; one went to a customer as «the video» and the office deleted it. A reel whose caption says sold is never this
+      // property's video or ad text.)
+      const soldCap = (c: any) => /تم\s*البيع|sold\s*out|نبارك\s*للشاري/i.test(String(c.caption || ""));
+      const vids = ((capR as any).data || []).filter((c: any) => c.property_id === p.id && !soldCap(c) && /^https:\/\/(www\.)?instagram\.com\//.test(String(c.permalink || "")))
         .sort((a: any, b: any) => (Number(b.likes || 0) + Number(b.comments || 0)) - (Number(a.likes || 0) + Number(a.comments || 0)));
       p.video = vids[0]?.permalink || null;
-      const caps = ((capR as any).data || []).filter((c: any) => c.property_id === p.id).map((c: any) => publicText(c.caption)).sort((a: string, b: string) => b.length - a.length);
+      const caps = ((capR as any).data || []).filter((c: any) => c.property_id === p.id && !soldCap(c)).map((c: any) => publicText(c.caption)).sort((a: string, b: string) => b.length - a.length);
       p.marketing = [publicText(p.public_details), publicText(p.description), caps[0] || ""].sort((a: string, b: string) => b.length - a.length)[0] || ""; // the fullest ad text wins
     }
     // 15 Nov 2026 (dry run, three chats): the reel of a group of similar units is saved on one unit, so a photo request about
