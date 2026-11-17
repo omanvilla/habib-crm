@@ -54,7 +54,24 @@ live database: advisors, RLS, cron runs, 24 hours of Postgres and edge logs, `pg
   three old md5s back. Staff screen (preview): «هدف الحجوزات: 0 / 2 أو عمولة متوقعة محجوبة», no console error. What an
   agent still gets is only goal numbers (`goals.expected_commission`, `booking_commission_target`, also in
   `crm_branch_monthly_targets`), `sales_goal_met` and the counts of deals with unknown commission.
-  `crm_commission_report` is owner only and the deal / property views give staff no money. Next SQL number **120**.
+  `crm_commission_report` is owner only and the deal / property views give staff no money.
+- **SQL120 applied (17 Nov 2026, Ahmed: «نعم، طبّق»): handed-over chats close by themselves.** Why: the 19:30 report and
+  «العملاء اللي يحتاجون أحمد الحين» kept showing finished chats (👑💜 / حسناء `4850e47a`, her villa reserved by someone
+  else); «تم» was compared with `handoff_updated_at`, which the agent moves with no new client message (16 Nov 09:26-09:58).
+  One rule, `crm_hot_handoff_open(row)`: open = no «تم», or the client wrote after «تم» AND the agent handed over again.
+  Auto «تم» (only `owner_alert_done_at` + reason and one `activities` row «تم تلقائي (…)», nothing deleted,
+  `human_handoff_required` untouched): deal `closed` / `commission_collected` / reservation confirmed; the client's latest
+  inquired property (or his deal's property) turns `sold` / `reserved`; a call logged after the handoff; a meeting task
+  closed by «أكّد الموعد» (notes «تأكد الموعد:», only «اجتماع:» handoffs). `crm_mark_handoff_done(conversation, note)`:
+  service_role only (owner, staff, anon denied), for Claude at Ahmed's explicit word. `crm_owner_open_handoffs()`: the
+  list with `display_name` (clients.name, or phone · last property when the name is emoji/empty), security invoker.
+  `crm-hot-alerts.js` uses the same rule (replaces SQL88's «same kind stays hidden») and shows the phone for emoji names.
+  Tested live in rolled-back transactions on حسناء: moved handoff only → stays out; new message + new handoff → back, named
+  «حسناء» (with an emoji name: «+96871214316 · فيلا الرميس 59 هشام / بركاء الرميس»); `crm_mark_handoff_done` → out + one
+  activity; call → out; property sold → out; meeting-only close leaves a «مشتري جاد». Open list went 8 → 7 (ايهاب's
+  meeting, done 15 Nov, came back only because of the moved time). Not done: the 19:30 routine still has its own query
+  (needs Ahmed to paste the new line); the deal trigger was not run live (deal workflow guards need full sale data).
+  Rollback: `120-handoff-autoclose.rollback.sql`. Next SQL number **121**.
 - **Left as they are, on purpose:** the two SECURITY DEFINER views (`crm_properties_access`, `crm_deals_access`) hide money
   columns from staff by design; 346 «duplicate key» answers a day on `whatsapp_messages` and 95 on `activities` are the
   webhook's own duplicate guard; leaked-password protection is a switch in the Supabase dashboard (Ahmed).

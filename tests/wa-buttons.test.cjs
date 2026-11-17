@@ -63,8 +63,21 @@ test('«تم» closes everything of the client and stays closed for the same kin
  const hot=fs.readFileSync('crm-hot-alerts.js','utf8'),sql=fs.readFileSync('db/changes/88-hot-alert-done-sticks.forward.sql','utf8');
  assert(sql.includes('owner_alert_done_reason = left(handoff_reason, 500)'));
  assert(hot.includes("eq('type','whatsapp_handoff').eq('client_id',n.client_id).eq('is_read',false)"),'all his notifications');
- assert(hot.includes("kindOf(w.owner_alert_done_reason)===kindOf(why)"),'a re-handoff of the same kind stays hidden');
- assert(hot.includes('kindOf(x.owner_alert_done_reason)===kindOf(n.title)'),'a new notification of the same kind stays hidden');
+ // SQL120 replaced «same kind stays hidden» with «comes back only after a new client message and a new handoff»
+ assert(hot.includes('const reopened=(doneAt,handoffAt,inboundAt)=>new Date(handoffAt||0)>new Date(doneAt)&&new Date(inboundAt||0)>new Date(doneAt);'));
+ assert(hot.includes('!reopened(w.owner_alert_done_at,at,w.last_inbound_at)'),'a re-handoff without a new client message stays hidden');
+ assert(hot.includes('!reopened(x.owner_alert_done_at,n.created_at,x.last_inbound_at)'),'a re-notify without a new client message stays hidden');
+});
+// 17 Nov 2026 (Ahmed): handed-over chats close by themselves; Claude can mark «تم»; readable names (SQL120)
+test('handoffs close by themselves, crm_mark_handoff_done is service_role only, one open rule (SQL120)',()=>{
+ const sql=fs.readFileSync('db/changes/120-handoff-autoclose.forward.sql','utf8'),hot=fs.readFileSync('crm-hot-alerts.js','utf8');
+ assert.equal(sql,fs.readFileSync('supabase/migrations/20261117200000_handoff_autoclose_20261117.sql','utf8'));
+ assert(sql.includes("AND w.last_inbound_at > w.owner_alert_done_at"),'a moved handoff_updated_at alone does not reopen');
+ for(const t of ['crm_handoff_close_on_deal','crm_handoff_close_on_property','crm_handoff_close_on_call','crm_handoff_close_on_meeting_task'])assert(sql.includes('CREATE TRIGGER '+t),t);
+ assert(sql.includes('REVOKE ALL ON FUNCTION public.crm_mark_handoff_done(uuid, text) FROM PUBLIC, anon, authenticated;')&&sql.includes('GRANT EXECUTE ON FUNCTION public.crm_mark_handoff_done(uuid, text) TO service_role;'));
+ assert(!/DELETE FROM/i.test(sql),'nothing is deleted');
+ assert(sql.includes('SECURITY INVOKER'),'the list goes through RLS');
+ assert(hot.includes("+': '+hotName(w)+' · '")&&hot.includes('const hasLetters=t=>/\\p{L}/u.test'),'emoji names show the phone');
 });
 // 11 Nov 2026 (Ahmed): price study report to his WhatsApp from the branch number, one block per client with separators
 test('price study report: details, number, owner offer, words, documents, separators; once per handoff (SQL89)',()=>{

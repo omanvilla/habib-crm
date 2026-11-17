@@ -26,7 +26,12 @@
     if(/iPhone|iPad|iPod/i.test(ua))return 'whatsapp-smb://send?phone='+d;
     return waLink(d);
   };
-  // 11 Nov 2026 (Ahmed): «تم» sticks. A chat comes back only for a different kind of handoff (SQL88 keeps the one closed).
+  // 11 Nov 2026 (Ahmed): «تم» sticks (SQL88). 17 Nov 2026 (SQL120): after «تم» a chat comes back only when the client wrote again
+  // after «تم» AND the agent handed it over again — the same rule as public.crm_hot_handoff_open / crm_owner_open_handoffs().
+  const reopened=(doneAt,handoffAt,inboundAt)=>new Date(handoffAt||0)>new Date(doneAt)&&new Date(inboundAt||0)>new Date(doneAt);
+  // an emoji or empty name («👑💜») shows the phone instead
+  const hasLetters=t=>/\p{L}/u.test(String(t||''));
+  const hotName=w=>{const c=w.clients||{};return hasLetters(c.name)?String(c.name).trim():hasLetters(w.customer_name)?String(w.customer_name).trim():(c.phone_normalized||c.phone||w.customer_wa_id||'عميل');};
   const kindOf=t=>{t=String(t||'');return /^\s*(📞|طلب اتصال)/.test(t)?'call':/^\s*(📅|اجتماع|طلب اجتماع)/.test(t)?'meeting':/^\s*(🔥|مشتري جاد|تفاوض)/.test(t)?'hot':'other';};
   const ago=d=>typeof timeAgo==='function'?timeAgo(d):String(d||'').slice(0,16);
   function host(){
@@ -62,25 +67,25 @@
         .eq('is_read',false).gte('created_at',since).order('created_at',{ascending:false}).limit(60);
       if(r.error)return;
       let list=(r.data||[]).filter(n=>/^(🔥|📞|📅)/.test(String(n.title||''))).map(n=>({...n,kind:'n'}));
-      // a new notification of the same kind for a client Ahmed already marked «تم» stays away (the agent re-notifies hard handoffs)
+      // a notification for a client already marked «تم» (by Ahmed or automatically, SQL120) stays away unless he wrote again after it
       const nc=[...new Set(list.map(n=>n.client_id).filter(Boolean))];
       if(nc.length){
-        const d=await supa.from('whatsapp_conversations').select('client_id,owner_alert_done_at,owner_alert_done_reason').in('client_id',nc).not('owner_alert_done_at','is',null);
+        const d=await supa.from('whatsapp_conversations').select('client_id,owner_alert_done_at,owner_alert_done_reason,last_inbound_at').in('client_id',nc).not('owner_alert_done_at','is',null);
         const done=d.error?[]:(d.data||[]);
-        list=list.filter(n=>!done.some(x=>x.client_id===n.client_id&&(new Date(x.owner_alert_done_at)>=new Date(n.created_at)||kindOf(x.owner_alert_done_reason)===kindOf(n.title))));
+        list=list.filter(n=>!done.some(x=>x.client_id===n.client_id&&!reopened(x.owner_alert_done_at,n.created_at,x.last_inbound_at)));
       }
-      const c=await supa.from('whatsapp_conversations').select('id,client_id,customer_name,customer_wa_id,route_key,handoff_reason,handoff_updated_at,owner_alert_done_at,owner_alert_done_reason,updated_at,clients(name,phone,phone_normalized)')
+      const c=await supa.from('whatsapp_conversations').select('id,client_id,customer_name,customer_wa_id,route_key,handoff_reason,handoff_updated_at,owner_alert_done_at,owner_alert_done_reason,last_inbound_at,updated_at,clients(name,phone,phone_normalized)')
         .eq('human_handoff_required',true).in('route_key',['barka','muscat']).gte('updated_at',since).order('updated_at',{ascending:false}).limit(80);
       for(const w of (c.error?[]:c.data||[])){
         const why=String(w.handoff_reason||'');if(!/^(مشتري جاد|تفاوض|طلب اتصال)/.test(why)&&!/^\s*اجتماع/.test(why))continue;
         const at=w.handoff_updated_at||w.updated_at;
-        if(w.owner_alert_done_at&&(new Date(w.owner_alert_done_at)>=new Date(at)||kindOf(w.owner_alert_done_reason)===kindOf(why)))continue;
+        if(w.owner_alert_done_at&&!reopened(w.owner_alert_done_at,at,w.last_inbound_at))continue;
         const old='c-'+w.id+'-'+w.updated_at;
         if(hidden[old]){supa.rpc('crm_hot_alert_done',{p_conversation_id:w.id}).then(r=>{if(!r.error){delete hidden[old];saveHidden();}});continue;}
         const id='c-'+w.id+'-'+at;
         if(list.some(n=>n.client_id&&n.client_id===w.client_id))continue;
         list.push({id,kind:'c',conversation_id:w.id,client_id:w.client_id,created_at:w.updated_at,phone:(w.clients&&(w.clients.phone_normalized||w.clients.phone))||w.customer_wa_id,
-          title:(/^طلب اتصال/.test(why)?'📞 طلب اتصال':/^\s*اجتماع/.test(why)?'📅 اجتماع':'🔥 مشتري جاد')+': '+((w.clients&&w.clients.name)||w.customer_name||'عميل')+' · '+(LABEL[w.route_key]||''),body:why});
+          title:(/^طلب اتصال/.test(why)?'📞 طلب اتصال':/^\s*اجتماع/.test(why)?'📅 اجتماع':'🔥 مشتري جاد')+': '+hotName(w)+' · '+(LABEL[w.route_key]||''),body:why});
       }
       const need=[...new Set(list.filter(n=>!n.phone&&n.client_id).map(n=>n.client_id))];
       if(need.length){const p=await supa.from('clients').select('id,phone,phone_normalized').in('id',need);const m=new Map((p.data||[]).map(x=>[x.id,x.phone_normalized||x.phone]));list.forEach(n=>{if(!n.phone&&n.client_id)n.phone=m.get(n.client_id)||'';});}
