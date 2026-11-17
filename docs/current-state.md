@@ -42,6 +42,14 @@ live database: advisors, RLS, cron runs, 24 hours of Postgres and edge logs, `pg
   `client_request_events` (47 MB) was **kept**: it is the history of every request and `crm_activity_metrics` reads it.
   **SQL117** (`db/changes/117-prune-old-logs.forward.sql`, Ahmed: «نعم، سوّها»): `crm_repair_private.prune_old_logs()`
   (backend only) runs the same rule every Friday 05:35 Oman time, cron `crm_prune_old_logs`. Next SQL number **118**.
+- **SQL118 applied (Ahmed: «احجب العمولة عن الموظف»):** `crm_branch_target_snapshot()` gives `expected_commission` and
+  `collected_commission` to the owner only (was: also the branch's own agent); new md5 `c6218dd3…`. Tried live in a
+  rolled-back transaction with the staff test account put on the Barka route: owner reads both, the agent reads NULL and
+  still reads bookings and inventory; the old target card then says «محجوبة لهذا الدور» (preview, fixture updated). The
+  goal number 4,000 and `sales_goal_met` stay in the answer. **Still open, Ahmed's to decide:** the same agent still reads
+  office commission figures from `crm_branch_performance`, `crm_employee_performance` (company, expected, collected),
+  `crm_branch_monthly_targets` (expected) and `crm_employee_target_snapshot` (expected, collected); `crm_commission_report`
+  is owner only and the deal / property views give staff no money. Next SQL number **119**.
 - **Left as they are, on purpose:** the two SECURITY DEFINER views (`crm_properties_access`, `crm_deals_access`) hide money
   columns from staff by design; 346 «duplicate key» answers a day on `whatsapp_messages` and 95 on `activities` are the
   webhook's own duplicate guard; leaked-password protection is a switch in the Supabase dashboard (Ahmed).
