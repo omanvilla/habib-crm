@@ -268,6 +268,9 @@ function fixtureExtraRpc(name,args){
   case 'crm_reply_variant_stats':return isOwner?ok({days:args.p_days||90,rows:[]}):ownerOnly();
   case 'crm_public_business_routes':return ok([]);
   case 'get_public_company_name':return ok(db.companies[0].name);
+  // SQL114 (17 Nov 2026)
+  case 'crm_mark_seen':profile.last_login_at=new Date().toISOString();return ok(null);
+  case 'crm_call_next':return ok(clients.filter(c=>c.is_seller&&allowed(c,'clients')).map((c,i)=>({lead_id:uuid(1800+i),client_id:c.id,name:c.name,phone:c.phone,kind:'villa',area:c.preferred_area,wilayat:c.lead_route==='barka'?'بركاء':'السيب',price:75000,status:'open',created_at:relative(-i-1)+'T09:00:00Z',last_called_at:null})));
  }
  return null;
 }

@@ -30,9 +30,50 @@
   const muscatDay=plus=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Muscat'}).format(new Date(Date.now()+(plus||0)*86400000));
   const me=()=>(typeof currentUser!=='undefined'&&currentUser)?currentUser.id:'';
   const manages=()=>['owner','manager'].includes(role());
+  /* 17 Nov 2026 (Ahmed, SQL114): the app records each account's last visit (crm_mark_seen, at most every 5 minutes), and the
+   * owner / manager see «آخر دخول» next to each person's calls. */
+  let seenSent=0,lastSeen={};
   async function loadCalls(){
     if(!staff())return;
+    if(Date.now()-seenSent>300000){seenSent=Date.now();supa.rpc('crm_mark_seen').then(()=>{},()=>{});}
     try{const r=await supa.rpc('crm_calls_today');if(!r.error&&r.data){callsToday=r.data;paintCallBtn();paintHomeCall();}}catch(_){}
+    if(manages()&&callsToday&&(callsToday.people||[]).length){
+      try{const p=await supa.from('profiles').select('id,last_login_at').in('id',callsToday.people.map(x=>x.user_id));
+        if(!p.error){lastSeen={};(p.data||[]).forEach(x=>{lastSeen[x.id]=x.last_login_at;});paintHomeCall();}}catch(_){}
+    }
+  }
+  const seenText=id=>{if(!Object.prototype.hasOwnProperty.call(lastSeen,id))return '';const t=lastSeen[id];if(!t)return ' · آخر دخول: ما في سجل';
+    const day=muscatDay(0),d=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Muscat'}).format(new Date(t));
+    return ' · آخر دخول: '+(d===day?'اليوم ':d===muscatDay(-1)?'أمس ':esc(fmtDay(d))+' ')+esc(fmtTime(t));};
+
+  /* «اتصل بعدهم» (17 Nov 2026, Ahmed, SQL114 crm_call_next): open owner offers nobody called in the last 30 days, newest first.
+   * «اتصل» dials from the phone; «سجّل الاتصال» opens the call window with the number and name filled. */
+  let nextList=null;
+  function nextDlg(){
+    let d=byId('crmCallNextDlg');
+    if(!d){d=document.createElement('dialog');d.id='crmCallNextDlg';d.className='ccm-dlg ccm-log';d.setAttribute('dir','rtl');document.body.appendChild(d);
+      d.addEventListener('click',e=>{if(e.target===d)d.close();});}
+    return d;
+  }
+  const KIND_AR={villa:'فيلا',house:'بيت',land:'أرض',apartment:'شقة',building:'مبنى',farm:'مزرعة',shop:'محل',chalet:'شاليه',resthouse:'استراحة'};
+  async function openNext(){
+    const d=nextDlg();d.innerHTML='<div class="ccm-form"><p class="ccm-note">جاري التحميل…</p></div>';if(!d.open)d.showModal();
+    try{const r=await supa.rpc('crm_call_next',{p_limit:30});if(r.error)throw r.error;nextList=r.data||[];}
+    catch(e){d.innerHTML='<div class="ccm-form"><p class="ccm-err">ما قدرت أفتح القائمة: '+esc(e.message||e)+'</p><div class="ccm-actions"><button type="button" class="btn-secondary" data-ccm="next-close">إغلاق</button></div></div>';return;}
+    const rows=nextList.map((x,i)=>{const tel=String(x.phone||'').replace(/[^\d+]/g,'');
+      const what=[KIND_AR[x.kind]||x.kind,x.area||x.wilayat,x.price?Number(x.price).toLocaleString('en-US')+' ر.ع':''].filter(Boolean).join(' · ');
+      return '<li class="ccm-next"><div><strong dir="auto">'+esc(x.name||'مالك')+'</strong> <bdi dir="ltr">'+esc(x.phone||'')+'</bdi><br><small>'+esc(what)
+        +(x.last_called_at?' · آخر اتصال '+esc(fmtDay(String(x.last_called_at).slice(0,10))):' · ما انتصل فيه')+'</small></div>'
+        +'<div class="ccm-next-act">'+(tel?'<a class="btn-secondary crm-wa-small" href="tel:'+esc(tel)+'">اتصل</a>':'')
+        +'<button type="button" class="btn-primary crm-wa-small" data-ccm="next-log" data-i="'+i+'">سجّل الاتصال</button></div></li>';}).join('');
+    d.innerHTML='<div class="ccm-form"><h3>اتصل بعدهم <small>عروض ملاك ما انتصل فيها آخر 30 يوم</small></h3>'
+      +(rows?'<ul class="ccm-days">'+rows+'</ul>':'<p class="ccm-note">ما في أحد في القائمة الحين</p>')
+      +'<div class="ccm-actions"><button type="button" class="btn-secondary" data-ccm="next-close">إغلاق</button></div></div>';
+  }
+  function logFromNext(i){
+    const x=nextList&&nextList[i];if(!x)return;byId('crmCallNextDlg').close();openCall(true);
+    const ph=byId('ccmPhone'),nm=byId('ccmName');if(ph)ph.value=String(x.phone||'').replace(/[^\d]/g,'').replace(/^968(?=\d{8}$)/,'');if(nm)nm.value=x.name||'';
+    const k=document.querySelector('#crmCallDlg input[name="ccmKind"][value="owner"]');if(k)k.checked=true;
   }
   // today's count and target on the button: «3/10»; a day off shows «3/—»
   function todayLabel(){
@@ -59,6 +100,7 @@
     if(!w){w=document.createElement('div');w.id='crmCallHome';w.className='ccm-home';
       // 17 Nov 2026: the explanation moved inside the call window (it showed on the home page all day)
       w.innerHTML='<div class="ccm-home-row"><button type="button" class="btn-primary" id="crmCallHomeBtn" data-ccm="open-number"></button>'
+        +'<button type="button" class="btn-secondary" data-ccm="next-open">اتصل بعدهم</button>'
         +'<button type="button" class="btn-secondary" data-ccm="open-log">سجل الاتصالات</button></div><p class="ccm-people" id="crmCallMine"></p>';}
     if(w.nextElementSibling!==host)host.parentNode.insertBefore(w,host);
     byId('crmCallHomeBtn').innerHTML='📞 سجّل اتصال'+todayLabel();
@@ -69,7 +111,7 @@
       let p=byId('crmCallPeople');
       if(!p){p=document.createElement('p');p.id='crmCallPeople';p.className='ccm-people';w.appendChild(p);}
       const people=callsToday.people||[];
-      p.innerHTML='<b>اتصالات الموظفين:</b> '+(people.length?people.map(x=>esc(x.name||'موظف')+': اليوم '+pair({calls:x.calls,target:x.target})+' · الأسبوع '+pair(x.week)+' · الشهر '+pair(x.month)).join('<br>'):'ما في موظف');
+      p.innerHTML='<b>اتصالات الموظفين:</b> '+(people.length?people.map(x=>esc(x.name||'موظف')+': اليوم '+pair({calls:x.calls,target:x.target})+' · الأسبوع '+pair(x.week)+' · الشهر '+pair(x.month)+seenText(x.user_id)).join('<br>'):'ما في موظف');
     }
   }
   function openCall(byNumber){
@@ -127,7 +169,16 @@
       const r=byNumber?await supa.rpc('crm_log_call_number',{p_phone:phone,p_name:byId('ccmName').value||'',...common})
         :await supa.rpc('crm_log_call',{p_client:viewingClient.id,...common});
       if(r.error)throw r.error;
-      d.close();toast(next==='call_later'?'انسجل الاتصال وانضافت مهمة يوم الاتصال':'انسجل الاتصال','success');await loadCalls();
+      // 17 Nov 2026 (Ahmed): an owner who agreed → «سجّل العقار» opens the quick property sheet with his name and phone
+      if(kind==='owner'&&result==='agreed'&&typeof window.crmQuickProperty==='function'){
+        const nm=byNumber?(byId('ccmName').value||'').trim():(viewingClient&&viewingClient.name)||'';
+        const ph=byNumber?phone:String(viewingClient&&(viewingClient.phone||viewingClient.phone_normalized)||'').replace(/\D/g,'');
+        d.dataset.propName=nm;d.dataset.propPhone=ph.replace(/^968(?=\d{8}$)/,'');
+        d.innerHTML='<div class="ccm-form"><h3>انسجل الاتصال</h3><p class="ccm-note">المالك وافق. سجّل عقاره الحين وهو في بالك.</p>'
+          +'<div class="ccm-actions"><button type="button" class="btn-primary" data-ccm="to-property">سجّل العقار</button><button type="button" class="btn-secondary" data-ccm="close">بعدين</button></div></div>';
+        toast('انسجل الاتصال','success');
+      }else{d.close();toast(next==='call_later'?'انسجل الاتصال وانضافت مهمة يوم الاتصال':'انسجل الاتصال','success');}
+      await loadCalls();
       const lg=byId('crmCallLogDlg');if(lg&&lg.open)loadLog();
       if(typeof loadClientActivities==='function')try{loadClientActivities();}catch(_){}
     }catch(e){err.textContent='ما انحفظ: '+(e.message||e);btn.disabled=false;}
@@ -230,7 +281,8 @@
     return 'السلام عليكم\nتم تأكيد موعد الاجتماع'+(day?' يوم '+day:'')+(time?' الساعة '+hour12(time):'')+(place?'\n'+place:'');
   }
   async function confirmBox(task){
-    const body=byId('taskDetailsBody');if(!body||!task||task.done||!/^\s*اجتماع/.test(String(task.title||''))||!['owner','manager'].includes(role())||!task.client_id)return;
+    // 17 Nov 2026 (Ahmed, after the full check): staff confirm too (owner, manager, agent); a task is only open to the person it belongs to.
+    const body=byId('taskDetailsBody');if(!body||!task||task.done||!/^\s*اجتماع/.test(String(task.title||''))||!staff()||!task.client_id)return;
     const t=String(task.title),dm=t.match(/(\d{4}-\d{2}-\d{2})/),tm=t.match(/\b(\d{2}:\d{2})\b/),pl=PLACES.find(p=>t.includes(p))||(/اونلاين/.test(t)?'اونلاين':'');
     const date=dm?dm[1]:'',time=tm?tm[1]:'';
     const box=document.createElement('div');box.className='ccm-meet';
@@ -314,6 +366,10 @@
     else if(b.dataset.ccm==='leave-save')saveLeave(b);
     else if(b.dataset.ccm==='month-save')saveMonth(b);
     else if(b.dataset.ccm==='toggle-unasked'){unaskedOpen=!unaskedOpen;drawUnasked();}
+    else if(b.dataset.ccm==='next-open')openNext();
+    else if(b.dataset.ccm==='next-close')byId('crmCallNextDlg').close();
+    else if(b.dataset.ccm==='next-log')logFromNext(Number(b.dataset.i));
+    else if(b.dataset.ccm==='to-property'){const d=byId('crmCallDlg'),nm=d.dataset.propName||'',ph=d.dataset.propPhone||'';d.close();window.crmQuickProperty({name:nm,phone:ph,source:'owner'});}
   });
   const vc=window.viewClient;
   if(typeof vc==='function')window.viewClient=async function(){const r=await vc.apply(this,arguments);paintCallBtn();loadCalls();return r;};

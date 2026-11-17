@@ -37,3 +37,10 @@
 .ccm-why-box{display:grid;gap:6px}.ccm-why-box>button{justify-self:start;width:auto!important}
 .ccm-log .cfu-tabs{margin-bottom:4px}
 .ccm-month{align-items:flex-end;margin:4px 0}.ccm-month>button{width:auto!important;flex:0 0 auto}
+/* 17 Nov 2026: «اتصل بعدهم» list (crm_call_next) and the quick property sheet (crm-quick-property.js) */
+.ccm-next{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid #eee5d3;min-width:0}
+.ccm-next:first-child{border-top:0}
+.ccm-next>div:first-child{flex:1 1 200px;min-width:0;overflow-wrap:anywhere}
+.ccm-next small{color:#6f6552}
+.ccm-next-act{display:flex;gap:6px}
+.cqp-full{display:block;margin:10px auto 0}

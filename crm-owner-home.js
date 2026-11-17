@@ -70,6 +70,7 @@
     box=document.createElement('div');box.id='crmOwnerHome';box.className='coh';box.hidden=true;
     box.innerHTML='<section class="coh-hello" id="cohHello"></section>'
       +'<section class="coh-now" aria-labelledby="cohNowTitle"><h2 class="coh-h" id="cohNowTitle">المطلوب منك الآن</h2><div id="cohTiles" class="coh-tiles"></div></section>'
+      +'<section class="card coh-sec coh-goals" id="cohGoals" hidden></section>'
       +'<section class="coh-quick" id="cohQuick"><div id="cohAuto"></div><div id="cohTwins"></div><div id="cohIg"></div><div id="cohUsage"></div></section>'
       +'<section class="card coh-sec" id="cohSummary"></section>'
       +'<button type="button" class="btn-secondary coh-full" data-coh="full" aria-expanded="false">قائمة العمل الكاملة</button>';
@@ -288,13 +289,33 @@
     // branch targets and their per-branch default are unchanged until he says how the 25 splits.
     const avail=(p.branches||[]).reduce((s,b)=>s+Number(b.available||0),0);
     const props=[['متاح للشركة من '+INVENTORY_TARGET,avail]].concat((p.branches||[]).map(b=>['متاح '+(label[b.branch]||b.branch),b.available])).concat([['أضيفت هذا الأسبوع',p.added_week],['توفرها ما تأكد من شهر',p.unchecked]]);
-    const rep=[['عملاء جدد',r.new_clients],['ردود الوكيل',r.agent_replies],['زيارات تمت',r.visits_done],['حجوزات الشهر',r.bookings_month],['مبيعات الشهر',r.sales_month]].filter(([,v])=>v!=null);
+    // 17 Nov 2026: once the goals card is drawn it carries the visits and bookings, so they are not repeated here
+    const rep=[['عملاء جدد',r.new_clients],['ردود الوكيل',r.agent_replies]].concat(goals?[]:[['زيارات تمت',r.visits_done],['حجوزات الشهر',r.bookings_month]]).concat([['مبيعات الشهر',r.sales_month]]).filter(([,v])=>v!=null);
     const cells=a=>a.map(([l,v])=>'<div class="coh-stat"><strong dir="ltr">'+num(v)+'</strong><small>'+esc(l)+'</small></div>').join('');
     const noVideo=p.no_video||[];
     byId('cohSummary').innerHTML='<h2 class="coh-h">ملخص</h2><h3 class="coh-h3">العقارات</h3><div class="coh-stats">'+cells(props)+'</div>'
       +'<h3 class="coh-h3">هذا الأسبوع <small>من '+esc(r.week_start||'')+'</small></h3><div class="coh-stats">'+cells(rep)+'</div>'
       +(noVideo.length?'<details class="coh-novideo"><summary>متاحة من أكثر من 7 أيام بدون فيديو <b dir="ltr">'+num(noVideo.length)+'</b></summary><p>'+noVideo.map(esc).join(' · ')+'</p></details>':'');
     // 17 Nov 2026: the «كل العقارات» and «التقارير الكاملة» links left the summary: the same two pages are in the side menu
+  }
+  /* 17 Nov 2026 (Ahmed, after the full check: «سوّ الإضافات كلها»): the branch goals on the home, from the same snapshot as
+   * the targets in Reports (crm_branch_target_snapshot): completed visits this week of 5, documented human follow-ups
+   * today of 10, new qualified properties this week of 2, paid bookings this month of 2 (the owner also sees the expected
+   * office commission of 4,000; staff never get money figures). Staff see their branch, the owner both. Display only. */
+  let goals=null;
+  function drawGoals(){
+    const el=byId('cohGoals');if(!el)return;
+    const list=goals&&Array.isArray(goals.branches)?goals.branches:[];
+    if(!list.length){el.hidden=true;el.innerHTML='';return;}
+    const owner=isOwner();
+    const chip=(label,v,g,money)=>{const n=Number(v||0),t=Number(g||0),met=t>0&&n>=t;
+      return '<span class="coh-goal'+(met?' met':'')+'"><b dir="ltr">'+(money?num(Math.round(n)):num(n))+'<small>/'+num(t)+'</small></b><small>'+esc(label)+'</small></span>';};
+    el.innerHTML='<h2 class="coh-h">الأهداف <small>الأسبوع من '+esc(goals.week_start||'')+'</small></h2>'+list.map(b=>{const g=b.goals||{};
+      return '<div class="coh-goal-row">'+(list.length>1||owner?'<h3 class="coh-h3">'+esc(b.name||b.branch||'')+'</h3>':'')+'<div class="coh-goal-chips">'
+        +chip('زيارات تمت هالأسبوع',b.viewings,g.viewings)+chip('متابعات اليوم',b.followups,g.followups)
+        +chip('عقارات جديدة هالأسبوع',b.new_properties,g.new_properties)+chip('حجوزات الشهر',b.bookings,g.bookings)
+        +(owner&&b.expected_commission!=null?chip('عمولة متوقعة الشهر',b.expected_commission,g.expected_commission,true):'')+'</div></div>';}).join('');
+    el.hidden=false;
   }
   async function load(){
     const page=byId('page-dash'),box=mount();if(!page||!box){releaseGate();return;}
@@ -321,6 +342,7 @@
       // after the first draw, so the home never waits for it
       readAutoNotes().then(list=>{if(seq!==sequence||list==null)return;autoNotes=list;drawAuto();});
       supa.rpc('crm_whatsapp_usage').then(r=>{if(seq!==sequence||!r||r.error)return;usage=r.data||[];drawUsage();});
+      supa.rpc('crm_branch_target_snapshot').then(r=>{if(seq!==sequence||!r||r.error||!r.data)return;goals=r.data;drawGoals();if(last)drawSummary(last.data);}).catch(()=>{});
     }finally{if(seq===sequence&&(ok||!retryLater()))releaseGate();}
   }
   /* 14 Nov 2026 (Ahmed, signed in as staff: «يفتحلي الصفحه كذا»): the database restarted at 16:04, the first read of the
