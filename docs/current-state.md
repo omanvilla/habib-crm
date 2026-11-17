@@ -40,7 +40,8 @@ live database: advisors, RLS, cron runs, 24 hours of Postgres and edge logs, `pg
   `whatsapp_webhook_events` older than 30 days (all processed, none dead-lettered; 19,835 left, oldest 18 Oct) and 3,869
   rows of `cron.job_run_details` older than 14 days (21,472 left). `whatsapp_messages` untouched (20,105).
   `client_request_events` (47 MB) was **kept**: it is the history of every request and `crm_activity_metrics` reads it.
-  Nothing prunes these by itself yet.
+  **SQL117** (`db/changes/117-prune-old-logs.forward.sql`, Ahmed: «نعم، سوّها»): `crm_repair_private.prune_old_logs()`
+  (backend only) runs the same rule every Friday 05:35 Oman time, cron `crm_prune_old_logs`. Next SQL number **118**.
 - **Left as they are, on purpose:** the two SECURITY DEFINER views (`crm_properties_access`, `crm_deals_access`) hide money
   columns from staff by design; 346 «duplicate key» answers a day on `whatsapp_messages` and 95 on `activities` are the
   webhook's own duplicate guard; leaked-password protection is a switch in the Supabase dashboard (Ahmed).
