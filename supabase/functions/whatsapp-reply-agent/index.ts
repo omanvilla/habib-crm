@@ -356,7 +356,7 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   // 007be129 «هذا هو» at the door, e06229f1 «أنا موجود حالياً في الفيلا. جالس أشوفها»: «وايش انطباعك بعد ما شفتها ؟» went to a
   // client who had only arrived. The opinion is asked once he has seen it; now he gets «حياك الله خذ راحتك».
   const OPINION_Q = /انطباع(ك|ج|كم)|كيف\s*(شفت|لقيت)(ها|ه|يها|يه)?|(ايش|وش)\s*ر[اأ]ي(ك|ج)\s*(فيها|فيه|بعد)/;
-  const ARRIVING = /^\s*(هذا|هذي|هذه|هاذا)\s*(هو|هي)?\s*[.!]*\s*$|(^|\s)(وصلت|وصلنا|بدخل|ندخل|[اأ]دخل|تدخل|جالس\s*[اأ]شوف|موجود\s*(حالياً|حاليا|الحين)?\s*(جنب|عند|قدام|في)\s*(ال)?(فيلا|فل[ةه]|بيت|موقع))/;
+  const ARRIVING = /^\s*(هذا|هذي|هذه|هاذا)\s*(هو|هي)?\s*[.!]*\s*$|(^|\s)(وصلت|وصلنا|واصل|واصلين|واصله|واصلة|بدخل|ندخل|[اأ]دخل|تدخل|جالس\s*[اأ]شوف|موجود\s*(حالياً|حاليا|الحين)?\s*(جنب|عند|قدام|في)\s*(ال)?(فيلا|فل[ةه]|بيت|موقع))/;
   const SEEN_WORDS = /عجب|حلو|حلوه|ناسب|ما\s*ناسب|شفته|شفتها|شفناه|شفناها|خلصت|طلعت|زرت|غال(ي|يه)|صغير|ضيق|واسع|زين/;
   if (texts.some((t) => t.length <= 200 && OPINION_Q.test(t)) && ARRIVING.test(String(c.burstSaid || "")) && !SEEN_WORDS.test(String(c.burstSaid || "")) && out.action !== "handoff") {
     texts = texts.map((t) => (t.length <= 200 && OPINION_Q.test(t) ? t.replace(/\s*و?\s*(ايش|وش|كيف)?\s*(انطباع(ك|ج|كم)|ر[اأ]ي(ك|ج)|شفت(ها|ه)?|لقيت(ها|ه)?)[^؟?\n]*[؟?]?/g, "").trim() : t))
@@ -1860,7 +1860,9 @@ Deno.serve(async (req) => {
       // not after closing words, and not when the visit is already with the owner or was already asked about
       const onlyClosing = texts.every((t) => t.length < 25 && /العفو|الله يسعدك|مبروك|تسلم|حياك/.test(t));
       const visitHandled = history.some((h: any) => h.direction === "outbound" && /تزور|زيار|المالك مباشرة|نسق مع المالك|\[contacts\]/.test(String(h.body || "") + (h.message_type === "contacts" ? "[contacts]" : "")));
-      if (texts.length && !onlyClosing && !waitsBank && (hasAd || sentAd) && !asksVisit && out.action === "none" && !visitHandled) texts.push("متى يناسبك تزور ؟");
+      // (dry run rows 777-816, 17 Nov: «الفيلا اللي ارسلتها ما متوفره حالياً» + «متى يناسبك تزور ؟» with nothing else offered)
+      const goneOnly = texts.some((t) => t.length <= 200 && /ما\s*متوفر|انباع/.test(t)) && !texts.some((t) => t.length > 250 || /عندنا|المتبقي/.test(t));
+      if (texts.length && !onlyClosing && !waitsBank && (hasAd || sentAd) && !asksVisit && !goneOnly && out.action === "none" && !visitHandled) texts.push("متى يناسبك تزور ؟");
     }
     // ---- R66 (Ahmed 14 Nov 2026, note 85d613bb; changes R22): Barka is not offered to every client of the Muscat number ----
     // «اذا تقبل بركاء عندنا …» and «تحب ارسلك تفاصيلها ؟» are taken out unless he said he looks in المعبيلة or near Barka. A client

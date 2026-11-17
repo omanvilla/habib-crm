@@ -45,6 +45,8 @@ test('a client who only arrived is not asked his opinion (007be129 «هذا هو
  // he asks to go in: the open house is said (dry run on the branch)
  r=decide(['السعر 59 الف','وايش انطباعك ؟'],[IN('أنا موجود جنب الفيلا. إذا تأذن لي إني أدخل أشوف الفيلا')],null,{prop:RUMAIS});
  assert.deepEqual(r.texts,['السعر 59 الف','البيت مفتوح تفضل']);
+ // dry run rows 777-816: «انا واصل»
+ assert.deepEqual(decide(['حياك الله وايش انطباعك بعد ما شفتها ؟'],[OUT('البيت مفتوح'),IN('انا واصل')]).texts,['حياك الله خذ راحتك']);
  // after he saw it the question stays
  assert.deepEqual(decide(['وايش انطباعك ؟'],[OUT('حياك الله'),IN('وصلت وشفتها حلوة')]).texts,['وايش انطباعك ؟']);
  assert.deepEqual(decide(['كيف شفت فيلا الرميس ؟'],[OUT('حياك الله'),IN('خلصت الزيارة')]).texts,['كيف شفت فيلا الرميس ؟']);
@@ -101,6 +103,14 @@ test('dry run rows 711-776: the name question is not glued to the sold line; the
  assert.deepEqual(decide(['تشرفنا واسمك الكريم ؟'],[IN('هلا')]).texts,['تشرفنا واسمك الكريم ؟']);
  r=decide(['اسمك الكريم ؟','ارسل الملكية والكروكي وشهادة اتمام البناء اذا ما عليك امر','وبعدها نسألك عن سكن المالك والرهن'],[IN('فيديو توضيحي للوصول منطقة جديدة')],{category:'seller'});
  assert.deepEqual(r.texts,['اسمك الكريم ؟','ارسل الملكية والكروكي وشهادة اتمام البناء اذا ما عليك امر']);
+});
+test('dry run rows 777-816: no visit question after the ad when the reply says the property is gone and offers nothing',()=>{
+ const line=agent.split('\n').find((l)=>l.includes('const goneOnly ='));
+ const goneOnly=new Function('texts',line.trim().replace(/^const goneOnly = /,'return ').replace(/;$/,''));
+ assert.equal(goneOnly(['وعليكم السلام ورحمة الله وبركاته','الفيلا اللي ارسلتها ما متوفره حالياً']),true);
+ assert.equal(goneOnly(['الفيلا اللي سألت عنها انباعت','بس عندنا فيلا ثانية في الرميس بـ 59 الف']),false);
+ assert.equal(goneOnly(['الفيلا متوفرة حالياً']),false);
+ assert(agent.includes('!asksVisit && !goneOnly && out.action === "none"'));
 });
 test('the R11 check reads «ليوم» as a day too',()=>{
  assert(agent.includes('const TIME_SAID = /ا?ليوم|الحين'));
