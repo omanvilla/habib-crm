@@ -18,6 +18,8 @@ test('R11: the location asked with the day goes now (401f1402 «امر ليوم�
  const r=decide(['الصور ما متوفره عندنا هذا رابط الفيديو','https://www.instagram.com/reel/DfrPGgoCOOp/','متى يناسبك تزور ؟'],h,null,{prop:RUMAIS});
  assert.equal(r.out.action,'send_location');assert.equal(r.out.guard_location_day,true);
  assert.deepEqual(r.texts,['الصور ما متوفره عندنا هذا رابط الفيديو','https://www.instagram.com/reel/DfrPGgoCOOp/']);
+ // dry run on the branch: «… خبرني عشان ارسل لك الموقع» does not stay beside the location
+ assert.deepEqual(decide(['اذا تأكدت من الوقت يوم الخميس خبرني عشان ارسل لك الموقع'],[IN('اريد اعرف الموقع اول حاجه يمكن السبت')],null,{prop:RUMAIS}).texts,['تفضل هذا الموقع']);
  // not when the day does not work, not without a location ask, not for a house the owner lives in, not when it went already
  assert.equal(decide(['تمام'],[IN('ارسل الموقع بس اليوم ما اقدر')],null,{prop:RUMAIS}).out.action,'none');
  assert.equal(decide(['تمام'],[IN('بمر اليوم')],null,{prop:RUMAIS}).out.action,'none');
@@ -40,6 +42,9 @@ test('a client who only arrived is not asked his opinion (007be129 «هذا هو
  assert.deepEqual(r.texts,['حياك الله خذ راحتك']);assert.equal(r.out.guard_arrived,true);
  r=decide(['كيف شفتها ؟'],[OUT('البيت مفتوح'),IN('أنا موجود حالياً في الفيلا. جالس أشوفها')]);
  assert.deepEqual(r.texts,['حياك الله خذ راحتك']);
+ // he asks to go in: the open house is said (dry run on the branch)
+ r=decide(['السعر 59 الف','وايش انطباعك ؟'],[IN('أنا موجود جنب الفيلا. إذا تأذن لي إني أدخل أشوف الفيلا')],null,{prop:RUMAIS});
+ assert.deepEqual(r.texts,['السعر 59 الف','البيت مفتوح تفضل']);
  // after he saw it the question stays
  assert.deepEqual(decide(['وايش انطباعك ؟'],[OUT('حياك الله'),IN('وصلت وشفتها حلوة')]).texts,['وايش انطباعك ؟']);
  assert.deepEqual(decide(['كيف شفت فيلا الرميس ؟'],[OUT('حياك الله'),IN('خلصت الزيارة')]).texts,['كيف شفت فيلا الرميس ؟']);

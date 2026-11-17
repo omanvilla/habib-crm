@@ -336,7 +336,9 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   if (out.action === "none" && ["buyer", "tenant"].includes(out.category) && !c.hardHandoff && c.prop?.map_url
     && !["owner_lives", "office"].includes(String(c.prop.visit_method || "")) && !sentBefore(String(c.prop.map_url))
     && LOCATION_ASK.test(String(c.burstSaid || "")) && DAY_WITH.test(String(c.burstSaid || "")) && !DAY_NOT.test(String(c.burstSaid || ""))) {
-    texts = texts.filter((t) => !(t.length <= 200 && LOCATION_HELD.test(t)) && !VISIT_Q.test(t));
+    // (dry run on the branch: «اذا تأكدت من الوقت يوم الخميس خبرني عشان ارسل لك الموقع» stayed beside the location itself)
+    texts = texts.filter((t) => !(t.length <= 200 && (LOCATION_HELD.test(t) || /(ارسل|أرسل|برسل|نرسل)\s*(لك|ل[كج])?\s*(ال)?(موقع|لوكيشن|اللوكيشن)/.test(t))) && !VISIT_Q.test(t));
+    if (!texts.length) texts = ["تفضل هذا الموقع"];
     out.action = "send_location"; out.guard_location_day = true;
   }
   // 007be129 «هذا هو» at the door, e06229f1 «أنا موجود حالياً في الفيلا. جالس أشوفها»: «وايش انطباعك بعد ما شفتها ؟» went to a
@@ -347,6 +349,8 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   if (texts.some((t) => t.length <= 200 && OPINION_Q.test(t)) && ARRIVING.test(String(c.burstSaid || "")) && !SEEN_WORDS.test(String(c.burstSaid || "")) && out.action !== "handoff") {
     texts = texts.map((t) => (t.length <= 200 && OPINION_Q.test(t) ? t.replace(/\s*و?\s*(ايش|وش|كيف)?\s*(انطباع(ك|ج|كم)|ر[اأ]ي(ك|ج)|شفت(ها|ه)?|لقيت(ها|ه)?)[^؟?\n]*[؟?]?/g, "").trim() : t))
       .filter((t) => t.replace(/[^ء-ي]/g, "").length > 0);
+    // (dry run on the branch, e06229f1 «إذا تأذن لي إني أدخل أشوف الفيلا»: he asked to go in, he is told the house is open)
+    if (/[اأ]دخل/.test(String(c.burstSaid || "")) && c.prop?.visit_method === "open" && !texts.some((t) => /مفتوح/.test(t))) texts.push("البيت مفتوح تفضل");
     if (!texts.some((t) => t.replace(/حياك\s*الله|[^ء-ي]/g, "").length > 2)) texts = ["حياك الله خذ راحتك"];
     out.guard_arrived = true;
   }
