@@ -6,6 +6,33 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 17 November 2026 (evening) — check of the live database, SQL116 (`claude/system-check-20261117`)
+
+Ahmed: «سوّ فحص شامل للنظام وعدّل عليه». The screens were checked the same morning (section below), so this one read the
+live database: advisors, RLS, cron runs, 24 hours of Postgres and edge logs, `pg_stat_statements`. Arabic report: section 7 of
+[docs/فحص-شامل-20261117.md](فحص-شامل-20261117.md).
+- **Clean:** no table without RLS, no `USING (true)` policy, nothing granted to `anon`, no SECURITY DEFINER function open to
+  `anon`; the 21 active jobs that have run all ended their last run fine; `client_behavior_refresh` last failed on 9 Nov.
+- **Why the home is slow (measured, not fixed here):** `crm_owner_home` mean 3.2 s (max 7.7 s, 3 statement timeouts in 24 h),
+  `crm_dashboard_work` 2.5 s, `crm_staff_home` 2.0 s, `crm_branch_target_snapshot` 1.9 s, `crm_paused_chats` 1.7 s. The same
+  calls take 45 / 23 / 48 ms the second time in a session. The first read of a table that was not read for some minutes is
+  about 1 ms per 8 kB page although every buffer is a «shared hit» (activities 768 ms then 91 ms, reply drafts 321 then 50,
+  `clients`, read all the time, 18 and 18); CPU is normal (200k rows in 50 ms). That is the pattern of a server short of
+  memory (shared buffers swapped out by the OS); the database is 227 MB. Planning is not the cost (0.1 to 6 ms). **Ahmed's
+  to decide:** a larger compute size in Supabase (paid), and pruning the logs that fill the memory (`whatsapp_webhook_events`
+  45 MB, `client_request_events` 47 MB, `cron.job_run_details` 25,294 rows since 16 Sep): nothing was deleted.
+- **The home asks twice:** per home load `crm_followups_today` is read 2.4 times, `crm_dashboard_work` 1.4,
+  `crm_branch_target_snapshot` 1.3 (each `loadDashboard` wrapper reads again). Not changed; proposed.
+- **SQL116 applied** (`db/changes/116-system-check.forward.sql`): `crm_properties_missing_details()` had no company filter
+  (an account outside the company read 4 rows; now 0, owner and staff 4); `crm_property_missing` has a fixed search_path;
+  eight jobs moved off the shared :00 / :30 second to their own minute, same cadence and hours (edge 503s clustered at
+  minute 0: 6 of the 10 failed calls in 6 hours). `outreach_send_approved`, the every-minute tick and SQL115's
+  `sheet_sync_every_5_min` were left. Tried forward, rollback (md5 back to `a08d6e6d…`) and forward again in a rolled-back
+  transaction with the two test accounts. Next SQL number **117** (115 is the sheet sync of the other session).
+- **Left as they are, on purpose:** the two SECURITY DEFINER views (`crm_properties_access`, `crm_deals_access`) hide money
+  columns from staff by design; 346 «duplicate key» answers a day on `whatsapp_messages` and 95 on `activities` are the
+  webhook's own duplicate guard; leaked-password protection is a switch in the Supabase dashboard (Ahmed).
+
 ## 17 November 2026 — goals on the home, quick property, call next, last visit, staff confirm (SQL114)
 
 Ahmed: «سوّ الإضافات كلها» (the additions of the full check). Versions `crm-owner-home.js/.css`, `crm-calls-meetings.js/.css`
