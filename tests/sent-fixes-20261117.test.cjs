@@ -116,6 +116,9 @@ test('dry run rows 817-852: «بروم» / «لبرووم» get the prompt line'
  const P='ارسل على الفيديو نفسه في الانستجرام وراح يوصلك البرومبت';
  assert.deepEqual(decide(['اكتب لي طلبك اذا ما عليك امر'],[IN('بروم')],{category:'general'}).texts,[P]);
  assert.deepEqual(decide(['وعليكم السلام ورحمة الله وبركاته','تقصد البرومبت ولا عرض عقاري ؟','اسمك الكريم ؟'],[IN('سلام عليكم ممكن لبرووم')],{category:'general'}).texts,['وعليكم السلام ورحمة الله وبركاته',P]);
+ // rows 853-892: «ماذا اقوول لشات جي بي تي» as a first message; once the line went, the brain answers what follows
+ assert.deepEqual(decide([],[IN('ماذا اقوول لشات جي بي تي')],{category:'general'}).texts,[P]);
+ assert.deepEqual(decide([],[OUT(P),IN('ماذا اقوول لشات جي بي تي')],{category:'general'}).texts,[]);
  // a word that only starts the same is not it
  assert.deepEqual(decide(['تفضل'],[IN('برومو العقار وصل ؟')],{category:'general'}).texts,['تفضل']);
 });

@@ -409,7 +409,9 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   {
     const said = String(c.burstSaid || "").replace(/\s+/g, " ").trim();
     const PROMPT_LINE = "ارسل على الفيديو نفسه في الانستجرام وراح يوصلك البرومبت";
-    if (said.length <= 50 && /(^|\s|ل)(ال)?بر+و+م+(ت|بت|يت)?(\s|$|[؟?.!])/.test(said) && ["none", "handoff"].includes(out.action) && !c.hardHandoff && !texts.includes(PROMPT_LINE)) {
+    // (rows 853-892: «ماذا اقوول لشات جي بي تي» as a first message got no reply; asked once, before the line went in this chat)
+    const askGpt = said.length <= 60 && /شات\s*جي\s*بي\s*تي|جي\s*بي\s*تي|chat\s*gpt/i.test(said) && !sentBefore(PROMPT_LINE);
+    if (((said.length <= 50 && /(^|\s|ل)(ال)?بر+و+م+(ت|بت|يت)?(\s|$|[؟?.!])/.test(said)) || askGpt) && ["none", "handoff"].includes(out.action) && !c.hardHandoff && !texts.includes(PROMPT_LINE)) {
       texts = [...texts.filter((t) => /^\s*(وعليكم\s*السلام(\s*ورحمة\s*الله(\s*وبركاته)?)?|مرحبتين)\s*$/.test(t)), PROMPT_LINE];
       out.action = "none"; out.handoff_reason = null; out.guard_prompt_word = true;
     }
