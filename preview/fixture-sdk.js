@@ -20,10 +20,12 @@ const clients=[
 {id:uuid(101),name:'عميل مسقط التجريبي',phone:'+96800000001',assigned_to:muscat,lead_route:'muscat',client_type:'buyer',is_buyer:true,lead_temperature:'warm',status:'warm',preferred_area:'الخوض',budget_max:95000,next_followup:relative(-2),human_contact_at:now},
 {id:uuid(102),name:'عميلة بطلبين مستقلين',phone:'+96800000002',assigned_to:muscat,lead_route:'muscat',client_type:'buyer',is_buyer:true,lead_temperature:'hot',status:'hot',preferred_area:'الموالح',budget_max:130000,human_contact_at:now},
 {id:uuid(103),name:'عميل متابعة بركاء',phone:'+96800000003',assigned_to:barka,lead_route:'barka',client_type:'buyer',is_buyer:true,lead_temperature:'warm',status:'warm',preferred_area:'الصومحان',budget_max:68000,next_followup:relative(0),human_contact_at:now},
+{id:uuid(106),name:'مستثمر مسقط الاصطناعي',phone:'+96800000006',assigned_to:owner,lead_route:'muscat',client_type:'investor',is_investor:true,lead_temperature:'warm',status:'warm',preferred_area:'مشروع على البحر',next_followup:relative(0)},
 {id:uuid(105),name:'المستثمر الخاص الاصطناعي',phone:'+96800000005',assigned_to:owner,lead_route:'investment',client_type:'investor',is_investor:true,lead_temperature:'cold',status:'cold'},
 {id:uuid(104),name:'بائعة بركاء التجريبية',phone:'+96800000004',assigned_to:barka,lead_route:'barka',client_type:'seller',is_seller:true,lead_temperature:'cold',status:'cold',preferred_area:'حي عاصم',human_contact_at:null}
 ].map((c,i)=>({...c,phone_normalized:c.phone,company_id:company,archived:false,followup_suppressed:false,created_at:relative(-i-2)+'T08:00:00Z',lead_score:i===1?80:40,notes:'بيانات اصطناعية؛ لا يوجد عميل حقيقي'}));
 const requests=[
+{id:uuid(207),client_id:uuid(106),assigned_to:owner,branch_key:'muscat',route_key:'muscat',request_type:'investor',preferred_area:'مشروع على البحر',budget_max:60000,next_followup:relative(0),pipeline_stage:'new'},
 {id:uuid(206),client_id:uuid(105),assigned_to:owner,branch_key:'investment',route_key:'investment',request_type:'investor',preferred_area:null,pipeline_stage:'new'},
 {id:uuid(201),client_id:uuid(101),assigned_to:muscat,branch_key:'muscat',route_key:'muscat',request_type:'buyer',preferred_area:'الخوض',budget_min:70000,budget_max:95000,next_followup:relative(-2),pipeline_stage:'qualified',qualified_at:now},
 {id:uuid(202),client_id:uuid(102),assigned_to:muscat,branch_key:'muscat',route_key:'muscat',request_type:'buyer',preferred_area:'الموالح',budget_min:100000,budget_max:130000,next_followup:relative(0),pipeline_stage:'negotiation'},
@@ -142,6 +144,7 @@ function query(name){
  is(k,v){predicates.push(r=>r[k]===v||(v===null&&r[k]==null));return q;},
  not(k,op,v){const values=String(v).replace(/[()]/g,'').split(',');predicates.push(r=>!values.includes(r[k]));return q;},
  ilike(k,v){predicates.push(r=>String(r[k]||'').toLowerCase().includes(String(v).replace(/%/g,'').toLowerCase()));return q;},
+ like(k,v){const re=new RegExp('^'+String(v).replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/%/g,'.*').replace(/_/g,'.')+'$');predicates.push(r=>re.test(String(r[k]??'')));return q;},
  or(){return q;},order(k,opts={}){orders.push([k,opts.ascending!==false]);return q;},
  range(a,b){range=[a,b];return q;},limit(v){limit=v;return q;},single(){single=true;return q;},maybeSingle(){single=true;return q;},
  insert(v){operation=['insert',v];return q;},update(v){operation=['update',v];return q;},upsert(v){operation=['upsert',v];return q;},
@@ -247,7 +250,8 @@ function fixtureExtraRpc(name,args){
   }
   case 'crm_visits_unasked':return ok([]);
   case 'crm_price_studies_pending':return ok({items:[],send_mode:'manual'});
-  case 'crm_investment_projects':return isOwner?ok([{id:uuid(1701),name:'مشروع اصطناعي على البحر',developer:'مطور اختبار',area:null,notes:null,aliases:['المشروع الاصطناعي'],videos:[],clients:[]}]):ok([]);
+  // Staff read projects too (SQL82); Muscat investors are ordinary Muscat clients shared with staff (SQL79).
+  case 'crm_investment_projects':return ok([{id:uuid(1701),name:'مشروع اصطناعي على البحر',developer:'مطور اختبار',area:null,notes:null,aliases:['المشروع الاصطناعي'],videos:[],clients:[{id:uuid(106),name:'مستثمر مسقط الاصطناعي',at:now}]}]);
   case 'crm_branch_people':return ok(['muscat','barka'].map(b=>({branch:b,name:profiles.find(p=>p.id===(b==='muscat'?muscat:barka)).full_name})));
   case 'crm_branch_performance':{
    const row=b=>{const pid=b==='muscat'?muscat:barka,n=b==='muscat';return {id:b,branch:b,branch_key:b,name:branchName(b),employee_id:pid,targets:{...fixtureGoalFields},
