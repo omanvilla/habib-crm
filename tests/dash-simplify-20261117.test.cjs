@@ -31,7 +31,7 @@ test('yesterday\'s unasked visits open from the visits tile, not as a card above
 test('the call button on the home keeps its count; its explanation is inside the call window',()=>{
  const homeCall=calls.slice(calls.indexOf('  function paintHomeCall(){'),calls.indexOf('  function openCall('));
  assert(!homeCall.includes('ccm-note'));
- assert(calls.includes("(byNumber?'<small class=\"ccm-note\">سجّل كل اتصال برقم صاحبه"));
+ assert(calls.includes("(byNumber?'<small class=\"ccm-note\">سجّل كل اتصال على مالك أو معلن"));
  assert(homeCall.includes('اتصالات الموظفين:'),'the owner still sees each person\'s calls');
 });
 

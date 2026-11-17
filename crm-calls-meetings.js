@@ -17,7 +17,7 @@
   const uuid=()=>(crypto.randomUUID?crypto.randomUUID():'10000000-1000-4000-8000-100000000000'.replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)));
 
   /* ---------- 1. call log ---------- */
-  /* 17 Nov 2026 (Ahmed, SQL110): calls to owners and advertisers only («عميل بعد معاينة» left); the next step follows the result:
+  /* 17 Nov 2026 (Ahmed, SQL110): calls to owners and advertisers only (the after-visit kind left); the next step follows the result:
    * «رد ووافق» → send the details on WhatsApp or call back at a day and hour; «يتصل بعدين» → the day and hour; «ما رد» / «رد ورفض» →
    * no step. A call back becomes a task for the caller. Target 10 a working day (Sunday to Thursday), the week and the month are
    * the sum of their days; leave and official holidays take days out; a short day gets its reason in the call log. */
