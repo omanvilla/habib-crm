@@ -175,9 +175,30 @@ test('the R11 check reads «ليوم» as a day too',()=>{
 test('17 Nov: a reel captioned «تم البيع Sold out» is never an available property\'s video or ad text',()=>{
  const at=agent.indexOf('const soldCap = (c: any) =>');assert(at>0);
  const block=agent.slice(at,agent.indexOf('p.marketing =',at));
- assert(block.includes('c.property_id === p.id && !soldCap(c) && /^https'),'the video skips it');
+ // (Ahmed, same evening: the shared reel still goes for the units left; one without «تم البيع» is preferred)
+ assert(block.includes('.sort((a: any, b: any) => (soldCap(a) ? 1 : 0) - (soldCap(b) ? 1 : 0) ||'),'a reel without the sold caption comes first');
  assert(block.includes('c.property_id === p.id && !soldCap(c)).map('),'the ad text skips it');
  const soldCap=new Function('c','return '+agent.slice(at).match(/const soldCap = \(c: any\) => (.*);/)[1].replace(/;$/,''));
  assert.equal(soldCap({caption:'⁨ تم البيع ✅ Sold out ✅ ولله الحمد ❤️ نبارك للشاري والبائع'}),true);
  assert.equal(soldCap({caption:'🏡 فيلا للبيع في الصومحان جنوب'}),false);
+});
+test('R92: an owner who will move in later if it does not sell is taken, with the line; «مسكونه سنه» when the model declined',()=>{
+ const a=agent.indexOf('    // R92 (Ahmed 17 Nov 2026 evening'),b=agent.indexOf('    // R23, measured only:',a);assert(a>0&&b>a);
+ const src=agent.slice(a,b).replace(/\((\w+): (?:string|any)\)/g,'($1)');
+ const run=(texts,said,o={})=>{const out={category:'seller',action:'none',...(o.out||{})};const history=[...(o.before||[]),...said.map((b)=>({direction:'inbound',body:b}))];
+  const r=new Function('out','texts','history','review',src+';return {out,texts};')(out,texts,history,false);return r;};
+ const APOL=['نعتذر منك احنا ما نستلم عقارات مرهونة او ساكن فيها صاحبها','الله يسعدك 🌷'];
+ const LINE='اذا تبي تعرضه معانا لازم يظل البيت فاضي فترة التسويق، واذا ما انباع بعدين لك الحرية تسكن فيه';
+ // 060fadae without the mortgage: «محصلت حد صراحه وقلت بسكن فيها من بداية شهر ١٢»
+ let r=run([...APOL],['امس مغسلنهن بالكامل','محصلت حد صراحه وقلت بسكن فيها من بداية شهر ١٢']);
+ assert.deepEqual(r.texts,[LINE,'يناسبك ؟']);assert.equal(r.out.guard_future_live,true);
+ // the intake goes on with the line first, once
+ r=run(['ارسل الملكية والكروكي'],['بسكن فيها اذا ما انباعت']);assert.deepEqual(r.texts,[LINE,'ارسل الملكية والكروكي']);
+ r=run(['ارسل الملكية والكروكي'],['بسكن فيها اذا ما انباعت'],{before:[{direction:'outbound',body:LINE}]});assert.deepEqual(r.texts,['ارسل الملكية والكروكي']);
+ // the real chat had a mortgage: the apology stays; living there now stays declined
+ assert.deepEqual(run([...APOL],['بسكن فيها من بداية شهر ١٢','في رهن']).texts,APOL);
+ assert.deepEqual(run([...APOL],['حاليا ساكنين فيها وبعدين بنسكن غيرها']).texts,APOL);
+ // «مسكونه سنه» with the apology written by the model
+ assert.deepEqual(run([...APOL],['تعرض فيلا للبيع مسكونه سنه']).texts,['البيت الحين فاضي ولا مؤجر ولا ساكنين فيه ؟']);
+ assert.deepEqual(run([...APOL],['البيت مسكون']).texts,APOL);
 });

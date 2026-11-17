@@ -1214,8 +1214,11 @@ Deno.serve(async (req) => {
       // sold; one went to a customer as «the video» and the office deleted it. A reel whose caption says sold is never this
       // property's video or ad text.)
       const soldCap = (c: any) => /تم\s*البيع|sold\s*out|نبارك\s*للشاري/i.test(String(c.caption || ""));
-      const vids = ((capR as any).data || []).filter((c: any) => c.property_id === p.id && !soldCap(c) && /^https:\/\/(www\.)?instagram\.com\//.test(String(c.permalink || "")))
-        .sort((a: any, b: any) => (Number(b.likes || 0) + Number(b.comments || 0)) - (Number(a.likes || 0) + Number(a.comments || 0)));
+      // (Ahmed, same evening: units 1, 2 and 3 of one owner share their reels on purpose, «حتى لو سوينا عليه تم البيع عادي»:
+      // the reel still goes for the units left. A reel without «تم البيع» is preferred when there is one; the sold caption
+      // text itself is never used as the ad, below.)
+      const vids = ((capR as any).data || []).filter((c: any) => c.property_id === p.id && /^https:\/\/(www\.)?instagram\.com\//.test(String(c.permalink || "")))
+        .sort((a: any, b: any) => (soldCap(a) ? 1 : 0) - (soldCap(b) ? 1 : 0) || (Number(b.likes || 0) + Number(b.comments || 0)) - (Number(a.likes || 0) + Number(a.comments || 0)));
       p.video = vids[0]?.permalink || null;
       const caps = ((capR as any).data || []).filter((c: any) => c.property_id === p.id && !soldCap(c)).map((c: any) => publicText(c.caption)).sort((a: string, b: string) => b.length - a.length);
       p.marketing = [publicText(p.public_details), publicText(p.description), caps[0] || ""].sort((a: string, b: string) => b.length - a.length)[0] || ""; // the fullest ad text wins
@@ -1869,6 +1872,30 @@ Deno.serve(async (req) => {
       if (!heirs && !says(MORTGAGED) && LIVED_AGE.test(ownerSaid) && !ownerSaid.replace(LIVED_AGE, " ").split("\n").some((l: string) => OCCUPIED.test(l) && !neg(OCCUPIED).test(l) && !RENTED.test(l))
         && texts.some((t) => /ساكن\s*فيها\s*صاحبها|ما\s*نستلم\s*عقارات\s*(مسكون|ساكن)/.test(t))) {
         texts = ["البيت الحين فاضي ولا مؤجر ولا ساكنين فيه ؟"]; out.action = "none"; delete out.guard_owner_decline; out.guard_lived_age = true;
+      }
+    }
+    // R92 (Ahmed 17 Nov 2026 evening: an owner who says he will move in later if it does not sell, «بسكن فيها من بداية شهر ١٢»,
+    // is taken, not declined: «اذا تريد تعرض معانا… ما يصير بعدين تسكن في البيت، لازم تنتظر شوية… واذا ما بتاع… عندك الحرية
+    // التامة»). Also the «مسكونه سنه» case when the apology came from the model itself (the block above only runs when the model
+    // did not decline). Never over a mortgage, heirs, or the owner living there now.
+    if (out.category === "seller" && !review && out.action !== "handoff") {
+      const said2 = history.filter((h: any) => h.direction === "inbound").slice(-8).map((h: any) => String(h.transcript || h.body || "")).join("\n");
+      const declinedLived = texts.some((t) => /ساكن\s*فيها\s*صاحبها|ما\s*نستلم\s*عقارات\s*(مسكون|ساكن)/.test(t));
+      const mortgaged2 = /مرهون|(عليه|عليها|فيه|فيها|في)\s*رهن/.test(said2) && !/(^|\s)و?(ما|مو|مب|بدون|لا|مافي)\s*(في\s*|فيه\s*|عليه\s*|عليها\s*)?(رهن|مرهون)/.test(said2);
+      const heirs2 = /(مال|حق|ملك|باسم|بين)\s*(ال)?ورث|ورثة|تركة|تركه/.test(said2);
+      const LIVED_AGE2 = /مسكون[هة]?\s*(من\s*|لمد[ةه]\s*)?(سن[هة]|سنتين|شهور|[0-9٠-٩]+\s*(سن|شه))/;
+      const FUTURE_LIVE = /(^|\s)(بسكن|بنسكن|بسكنها|بنسكنها|راح\s*(اسكن|نسكن)|ناوي\s*(اسكن|نسكن)|ننوي\s*نسكن|بنتقل\s*(فيه|فيها|له|لها))/;
+      const NOW_LIVE = /ساكنين\s*(فيه|فيها|في\s*البيت)|(انا|أنا|احنا|نحن|اهلي|أهلي|عيالي|عائلتي|الاهل|الأهل)\s*(ساكن|ساكنين)|حاليا\s*ساكن/;
+      const nowLives = said2.split("\n").some((l: string) => NOW_LIVE.test(l) || (/مسكون/.test(l) && !LIVED_AGE2.test(l) && !/مستأجر|مستاجر|مؤجر|موجر|ايجار|إيجار/.test(l)));
+      const FUTURE_LINE = "اذا تبي تعرضه معانا لازم يظل البيت فاضي فترة التسويق، واذا ما انباع بعدين لك الحرية تسكن فيه";
+      if (!mortgaged2 && !heirs2 && !nowLives) {
+        if (FUTURE_LIVE.test(said2)) {
+          const told = history.some((h: any) => h.direction === "outbound" && String(h.body || "").includes("لازم يظل البيت فاضي"));
+          if (declinedLived) { texts = [FUTURE_LINE, "يناسبك ؟"]; out.action = "none"; delete out.guard_owner_decline; out.guard_future_live = true; }
+          else if (!told && texts.length) { texts = [FUTURE_LINE, ...texts]; out.guard_future_live = true; }
+        } else if (declinedLived && LIVED_AGE2.test(said2)) {
+          texts = ["البيت الحين فاضي ولا مؤجر ولا ساكنين فيه ؟"]; out.action = "none"; delete out.guard_owner_decline; out.guard_lived_age = true;
+        }
       }
     }
     // R23, measured only: a soft handoff that leaves the customer with no reply is marked, so it can be counted
