@@ -248,3 +248,12 @@ test('rows 1441-1480: «صومحان» alone gets the Al Sawmhan ad; a reel answ
  // a real answer to the reel is left alone
  assert.deepEqual(decide(['هذي الفيلا انباعت'],[IN('https://www.instagram.com/reel/x/')]).texts,['هذي الفيلا انباعت']);
 });
+test('rows 1521-1560: R74 sends no location for a property the reply says is gone',()=>{
+ const P={id:'p1',map_url:'https://maps.app.goo.gl/x',visit_method:'open'};
+ const h=[IN('ممكن الموقع اشوف اذا يناسبني'),IN('ان شاء الله راح أبلغكم قبل لا ادخل الفيلا')];
+ let r=decide(['الفيلا اللي سألت عنها ما متوفره حالياً'],h,null,{prop:P});
+ assert.equal(r.out.action,'none');assert.deepEqual(r.texts,['الفيلا اللي سألت عنها ما متوفره حالياً']);
+ r=decide(['تمام'],h,null,{prop:{...P,status:'sold'}});assert.equal(r.out.action,'none');
+ // an available one still gets it
+ assert.equal(decide(['تمام'],h,null,{prop:{...P,status:'available'}}).out.action,'send_location');
+});

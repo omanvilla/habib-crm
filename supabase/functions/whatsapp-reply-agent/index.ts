@@ -111,7 +111,10 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   }
   // R74 (Ahmed: «نعم نرسل الموقع في هذه الحاله»; changes R11 in this case only): a client who asks for the location to see
   // whether the place suits him, before he chooses a time, gets it, once. No visit is recorded from it (location_for_area).
-  if (locationForArea(recentIn) && out.action === "none" && c.prop?.map_url && ["buyer", "tenant"].includes(out.category) && !sentBefore(String(c.prop.map_url))) {
+  // (rows 1521-1560: «الفيلا اللي سألت عنها ما متوفره حالياً» went with the location of that same villa: not for a property the
+  // reply says is gone, nor one whose status is not available)
+  if (locationForArea(recentIn) && out.action === "none" && c.prop?.map_url && ["buyer", "tenant"].includes(out.category) && !sentBefore(String(c.prop.map_url))
+    && !texts.some((t) => t.length <= 200 && /ما\s*متوفر|انباع|انحجز(ت)?\s*(ال|$)/.test(t)) && (!c.prop.status || ["available", "reserved"].includes(String(c.prop.status)))) {
     out.action = "send_location"; out.location_for_area = true; out.guard_location_for_area = true;
     // (17 Nov: «تمام شوف الموقع اول واذا ناسبك خبرني» before «تفضل هذا الموقع / شوف اذا المنطقة تناسبك» said it twice)
     texts = texts.filter((t) => !(t.length <= 200 && (LOCATION_HELD.test(t) || FAREWELL.test(t) || /شوف\s*(ال)?(موقع|لوكيشن|منطق)|ناسب(ك|تك)\s*خبرني/.test(t))) && !VISIT_Q.test(t)).slice(0, 1);
