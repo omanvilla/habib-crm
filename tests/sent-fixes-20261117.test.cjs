@@ -217,3 +217,7 @@ test('rows 1201-1240: the opinion question after a visit does not come with «م
  // a visit question alone stays
  assert.deepEqual(decide(['متى يناسبك تزور ؟'],[IN('ممكن تفاصيل')]).texts,['متى يناسبك تزور ؟']);
 });
+test('rows 1241-1280: «تمام خذ راحتك» comes without «متى يناسبك تزور ؟»',()=>{
+ assert.deepEqual(decide(['تمام خذ راحتك','متى يناسبك تزور ؟'],[IN('لكن انا مامن مسقط ف بنسق معك لما تكون لي جيه هناك')]).texts,['تمام خذ راحتك']);
+ assert.deepEqual(decide(['تمام خذ راحتك'],[IN('بفكر')]).texts,['تمام خذ راحتك']);
+});

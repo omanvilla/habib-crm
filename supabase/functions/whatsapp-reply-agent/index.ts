@@ -391,6 +391,11 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   if (texts.some((t) => t.length <= 200 && OPINION_Q.test(t) && /بعد\s*ما\s*شفت|شفتها|شفته|زرت/.test(t)) && texts.some((t) => VISIT_Q.test(t))) {
     texts = texts.filter((t) => !(VISIT_Q.test(t) && !OPINION_Q.test(t))); out.guard_opinion_no_visit = true;
   }
+  // rows 1241-1280 (and 1132): «بنسق معك لما تكون لي جيه هناك» got «تمام خذ راحتك» + «متى يناسبك تزور ؟». «خذ راحتك» leaves
+  // the time to him: no visit question beside it.
+  if (texts.some((t) => t.length <= 80 && /خذ(وا|ي)?\s*راحت(ك|كم|ج)/.test(t)) && texts.some((t) => VISIT_Q.test(t))) {
+    texts = texts.filter((t) => !(VISIT_Q.test(t) && t.length <= 40)); out.guard_take_time = true;
+  }
   // 4736075f: a video we could not read, then «السعر موجود في الفيديو اللي رسلته لك», then «انت ما تعرف تقرأ الرقم ؟؟»: the
   // same «اكتب لي السعر / المنطقة» went three times. Asked once; asked again, it goes to Ahmed with no reply (he can watch it).
   // rows 930-969: «اشوف الموقع اخي اذا ناسبني بزورها» about an ad picture nobody recognised got «تمام» alone. A location asked
