@@ -36,6 +36,11 @@ live database: advisors, RLS, cron runs, 24 hours of Postgres and edge logs, `pg
   minute 0: 6 of the 10 failed calls in 6 hours). `outreach_send_approved`, the every-minute tick and SQL115's
   `sheet_sync_every_5_min` were left. Tried forward, rollback (md5 back to `a08d6e6d…`) and forward again in a rolled-back
   transaction with the two test accounts. Next SQL number **117** (115 is the sheet sync of the other session).
+- **Old logs deleted at Ahmed's word («نعم، احذف», 17 Nov evening, data only, no SQL file):** 15,143 rows of
+  `whatsapp_webhook_events` older than 30 days (all processed, none dead-lettered; 19,835 left, oldest 18 Oct) and 3,869
+  rows of `cron.job_run_details` older than 14 days (21,472 left). `whatsapp_messages` untouched (20,105).
+  `client_request_events` (47 MB) was **kept**: it is the history of every request and `crm_activity_metrics` reads it.
+  Nothing prunes these by itself yet.
 - **Left as they are, on purpose:** the two SECURITY DEFINER views (`crm_properties_access`, `crm_deals_access`) hide money
   columns from staff by design; 346 «duplicate key» answers a day on `whatsapp_messages` and 95 on `activities` are the
   webhook's own duplicate guard; leaked-password protection is a switch in the Supabase dashboard (Ahmed).
