@@ -217,7 +217,8 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   // R80 (Ahmed 15 Nov 2026 evening): who pays the commission. A buyer on a property we list for its owner is told he pays the
   // office nothing: the party who mandated us (the owner) does. An owner who asks our commission is told we visit first and
   // agree after. No figure ever (the brain's line stays). A broker is still not answered (brain, 9 Nov).
-  if (COMMISSION_ASK.test(c.burstSaid) && (out.action === "none" || (out.action === "handoff" && !c.hardHandoff) || UNKNOWN_Q.test(String(out.handoff_reason || "")))) {
+  // (rows 1321-1360: «نعتذر منك احنا ما نستلم عقارات مرهونة» then the commission lines; after a decline nothing more is said)
+  if (COMMISSION_ASK.test(c.burstSaid) && !texts.some((t) => /ما\s*(نقدر\s*)?(نستلم|نقبل)|نعتذر[^\n]{0,40}(ورث|مرهون|مسكون|ساكن)|نشتغل\s*في\s*مسقط\s*وبركاء\s*فقط/.test(t)) && (out.action === "none" || (out.action === "handoff" && !c.hardHandoff) || UNKNOWN_Q.test(String(out.handoff_reason || "")))) {
     const lines = out.category === "seller" ? COMMISSION_OWNER_LINES : out.category === "buyer" && c.prop?.owner_id && c.prop?.listing_purpose !== "rent" ? COMMISSION_BUYER_LINES : null;
     if (lines) {
       texts = [...texts.filter((t) => !(t.length <= 250 && /عمول|[اأ]حمد/.test(t))).slice(0, 1), ...lines];
@@ -517,7 +518,7 @@ const BOUGHT_RE = /(اشتري|اشترينا|اشتريت|شرينا|شريت|�
 // a client told us she booked or bought, we congratulated her, and her answer is only closing words («الله يبارك فيك», «شكراً»,
 // 🌷): no reply and no draft (this changes R49 here only), her active requests close (search_stopped) and nothing follows her.
 const BOOKED_RE = /(اشترينا|اشتريت|شرينا|شريت|حجزنا|حجزت|دفعنا|دفعت|عربون|استلمنا|وقعنا|وقعت|تم\s*البيع|تم\s*الحجز)/;
-const CLOSING_WORDS = /(الله\s*)?(يبارك|بارك)(\s*الله)?(\s*(فيك|فيكي|فيكم|فيج|بك|بكم))?|شكرا|شكراً|جزيلا|جزيلاً|مشكور(ين|ه|ة)?|تسلم(ون|ين)?|(الله\s*)?يسلمك|يعطيك\s*العافي[هة]|جزاك(م)?\s*الله\s*خير(ا|اً)?|[اآ]مين|(الله\s*)?يحفظك|ما\s*قصرت(وا)?|الحمد\s*لله|ولله\s*الحمد|خلاص|تمام|اوكي|ok|thanks|thank\s*you|وياك(م)?|حياك(م)?(\s*الله)?|ان\s*شاء\s*الله|الله\s*يسعدك|يعطيك\s*الصح[هة]/gi;
+const CLOSING_WORDS = /(الله\s*)?(يبارك|بارك)(\s*الله)?(\s*(فيك|فيكي|فيكم|فيج|بك|بكم))?|شكرا|شكراً|جزيلا|جزيلاً|مشكور(ين|ه|ة)?|تسلم(ون|ين)?|(الله\s*)?يسلمك|يعطيك\s*العافي[هة]|جزا(ك|كم)?\s*الله\s*خير(ا|اً)?|[اآ]مين|(الله\s*)?يحفظك|ما\s*قصرت(وا)?|الحمد\s*لله|ولله\s*الحمد|خلاص|تمام|اوكي|ok|thanks|thank\s*you|وياك(م)?|حياك(م)?(\s*الله)?|ان\s*شاء\s*الله|الله\s*يسعدك|يعطيك\s*الصح[هة]/gi;
 function closingOnly(h: any) {
   if (["reaction", "sticker"].includes(String(h.message_type || ""))) return true;
   const s = `${h.body || ""} ${h.transcript || ""}`;
@@ -525,7 +526,8 @@ function closingOnly(h: any) {
   return !s.replace(CLOSING_WORDS, " ").replace(/[^ء-يA-Za-z]+/g, "");
 }
 // R49 by code (15 Nov 2026): the client's words are thanks and nothing else (greeting and filler words aside)
-const THANKS_WORD = /شكر|مشكور|تسلم|يسلمو|يعطيك\s*العافي|جزاك|جزيت|بارك\s*الله|يبارك|ما\s*قصرت|ما\s*تقصر|thank/i;
+// (rows 1321-1360: «جزا الله خيرا» got «تفضل»)
+const THANKS_WORD = /شكر|مشكور|تسلم|يسلمو|يعطيك\s*العافي|جزاك|جزا\s*الله|جزيت|بارك\s*الله|يبارك|ما\s*قصرت|ما\s*تقصر|thank/i;
 const THANKS_FILLER = /(^|\s)(تم|طيب|اخي|اخوي|أخي|أخوي|الغالي|عزيزي|حبيبي|يا|والله|خير|خيرا|خيراً|كثير|كثيرا|جدا|لك|لكم|وعليكم السلام|ورحمة الله|ورحمه الله|وبركاته|استاذ|أستاذ)(?=\s|$)/g;
 const thanksOnly = (s: string) => !/[؟?]/.test(s) && THANKS_WORD.test(s) && !s.replace(/[ً-ْ]/g, "").replace(CLOSING_WORDS, " ").replace(THANKS_FILLER, " ").replace(/[^ء-يA-Za-z]+/g, "");
 function closedAfterBooking(history: any[]) {

@@ -221,3 +221,11 @@ test('rows 1241-1280: «تمام خذ راحتك» comes without «متى ينا
  assert.deepEqual(decide(['تمام خذ راحتك','متى يناسبك تزور ؟'],[IN('لكن انا مامن مسقط ف بنسق معك لما تكون لي جيه هناك')]).texts,['تمام خذ راحتك']);
  assert.deepEqual(decide(['تمام خذ راحتك'],[IN('بفكر')]).texts,['تمام خذ راحتك']);
 });
+test('rows 1321-1360: no commission lines after a decline; «جزا الله خيرا» is thanks',()=>{
+ const DEC=['نعتذر منك احنا ما نستلم عقارات مرهونة','الله يسعدك 🌷'];
+ assert.deepEqual(decide([...DEC],[IN('كيف طريقة الاعلان عن هذي الأرض..وبالنسبة للعمولة وغيره أريد أبيعها')],{category:'seller'}).texts,DEC);
+ // the commission answer itself still goes to an owner who asks
+ assert.equal(decide(['تمام'],[IN('كم العمولة حقكم')],{category:'seller'}).out.guard_commission,true);
+ const w=agent.split('\n').find((l)=>l.startsWith('const THANKS_WORD ='));
+ assert(new RegExp(w.match(/= \/(.*)\/i;/)[1],'i').test('جزا الله خيرا'));
+});
