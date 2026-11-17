@@ -19,8 +19,14 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
   visits, no message, call or activity since. The villa is reserved for another buyer (card `10ce4b8d`, `awaiting_clearance` since
   19–20 Oct). Both closed as `lost` from their stage with reason `property_unavailable` and a note that it is not a refusal recorded from the
   client (direct update the way `crm_close_stale_visit_deals` does it; the stage-history trigger records it). The «مشاكل» tile is empty now.
-  **Seen, not changed:** `crm_close_stale_visit_deals(90)` counts a card's `created_at` as movement, so a legacy card made on 13 Sep from a
-  June visit would only close on 12 Dec, and a card that absorbed a merged duplicate (5 Nov) in February.
+  `crm_close_stale_visit_deals(90)` counted a card's `created_at` as movement (a legacy card made on 13 Sep from a June visit would only
+  close on 12 Dec, a card that absorbed a duplicate made on 5 Nov in February). **Ahmed: «نعم، صلّحه» → SQL112**
+  (`db/changes/112-visit-deal-real-movement.forward.sql`, md5-guarded on the closer and on `crm_owner_home`): one rule
+  `crm_repair_private.visit_deal_last_move(deal)` = latest of the visit date (creation day only for a card with no visit), the same for
+  merged cards, the client's last inbound WhatsApp, and the last activity a person recorded on the client. The closer (same reason, note,
+  90 days) and the home tile (30 days, merged cards skipped) both use it. Checked in a rolled-back transaction (rollback gives back md5
+  `84fade95…` / `63b3617e…` exactly; a closer run closed 0; محمد الكندي's card moves from 5 Jun), applied from `0c4b8ce`; new md5 closer
+  `ea28fed1…`, home `66fa3f0d…`. 55 open visit deals, none past 30 days under the rule. Next SQL number **113**.
 - **Ahmed: «نعم، سجّلها»:** 18 and 19 Nov 2026 are «إجازة رسمية» for everyone («العيد الوطني») in `crm_call_day_notes` (written through
   `crm_call_day_note` as the owner). مرام's week target is now 30 and November 200.
 
