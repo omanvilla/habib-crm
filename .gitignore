@@ -1,3 +1,6 @@
 /preview-results/
 
 supabase/.temp/
+
+# Test account details (CLAUDE.md «فحص التعديلات بنفسك»), never committed
+*.local.json

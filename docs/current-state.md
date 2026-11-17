@@ -6,6 +6,25 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 17 November 2026 — test accounts for checking changes (owner + staff), CLAUDE.md
+
+Ahmed's order (CLAUDE.md «فحص التعديلات بنفسك»): check every change myself as an owner and as a staff account, never his account.
+- **Two auth users created** (data change only, no SQL migration): `owner-check@habib-crm.test` («حساب فحص - مالك») and
+  `staff-check@habib-crm.test` («حساب فحص - موظف»). No password, `banned_until` 2999, `app_metadata.crm_test_account=true`.
+  Profiles stay `role=viewer`, `is_active=false`, `company_id=null`, so no list, report, target, export or alert sees them.
+  Ids in the git-ignored `tests/test-accounts.local.json`.
+- **Why not active in the company:** several places pick "the owner" with `role='owner' AND is_active ... LIMIT 1` without an
+  order (`crm_match_owner_leads`, edge `whatsapp-owner-hot-alert` ×4, `whatsapp-reply-agent` ×4); a second active owner could
+  take Ahmed's alerts. `crm_instagram_notify` and `instagram-discovery` notify every active owner.
+- **Permission check:** `tests/fixtures/test-accounts-rls.sql` switches both on inside one transaction, reads 16 tables through
+  RLS as each, writes temporary rows, then raises to roll back. Run 17 Nov: owner = all counts and sees an owner-line client;
+  staff = all branches (Ahmed's SQL79), owner-line client 0, owner_price_studies 0, crm_owner_notes 0, instagram catalog 0,
+  own new client visible. After: accounts still inactive/outside, 0 temporary rows left, 1 active owner.
+- **Screen check without Node:** `preview/serve.ps1` serves the current files with the synthetic `preview/fixture-sdk.js`
+  (`/after/owner/`, `/after/muscat/`). Limits: the fixture is from 30 Sep, so newer RPCs are missing (e.g. `crm_paused_chats`
+  → a console error in `crm-owner-home.js` pricingItems on both roles, fixture gap only) and its staff are still limited to
+  one branch, unlike SQL79. The real login step itself is not checked.
+
 ## 17 November 2026 — the month's call target is Ahmed's number: 100 for November (SQL113)
 
 - **Ahmed:** the week 30 / month 200 did not look right to him. Explained: this week is 30 because of the National Day (18–19 Nov); a normal
