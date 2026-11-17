@@ -62,7 +62,8 @@
     try{
       // Owner: the new home loads first (crm-owner-home.js boot gate); this section is behind «قائمة العمل الكاملة».
       if(window.crmHomeFirst){await window.crmHomeFirst;if(seq!==targetLoadSeq||!crmSessionCurrent(generation,user))return;}
-      const result=await bounded(supa.rpc('crm_branch_target_snapshot'));
+      // the home's goals card reads the same snapshot at the same moment: one shared read (crm-owner-home.js)
+      const result=await bounded(typeof window.crmBranchSnapshot==='function'?window.crmBranchSnapshot():supa.rpc('crm_branch_target_snapshot'));
       if(seq!==targetLoadSeq||!crmSessionCurrent(generation,user))return;
       if(result.error)throw result.error;
       const data=result.data,branches=branchRows(data);

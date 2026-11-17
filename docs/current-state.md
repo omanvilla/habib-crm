@@ -21,8 +21,15 @@ live database: advisors, RLS, cron runs, 24 hours of Postgres and edge logs, `pg
   memory (shared buffers swapped out by the OS); the database is 227 MB. Planning is not the cost (0.1 to 6 ms). **Ahmed's
   to decide:** a larger compute size in Supabase (paid), and pruning the logs that fill the memory (`whatsapp_webhook_events`
   45 MB, `client_request_events` 47 MB, `cron.job_run_details` 25,294 rows since 16 Sep): nothing was deleted.
-- **The home asks twice:** per home load `crm_followups_today` is read 2.4 times, `crm_dashboard_work` 1.4,
-  `crm_branch_target_snapshot` 1.3 (each `loadDashboard` wrapper reads again). Not changed; proposed.
+- **The home asked twice for the goals** (Ahmed: «صلّح تكرار طلبات الرئيسية»; `crm-owner-home.js` and
+  `crm-operations-v6.js` at `20261117-snap1`): since the goals card of SQL114 the home and the old target card each read
+  `crm_branch_target_snapshot` on every load (staff a third time, the inventory reminder in the base). They share one read
+  now, `window.crmBranchSnapshot()`: a request on its way or answered under 3 seconds ago, same signed-in session, a failed
+  read never kept. Preview: owner 2 → 1 read, Muscat staff 3 → 2, both cards drawn, no console error. The other counts of
+  the first report were not duplicates: `crm_followups_today` (2.4 per load) is the wanted refresh on coming back from
+  WhatsApp and after «أرسلتها», and `crm_dashboard_work` is one read per scope (the owner has two). **Seen, not changed:**
+  the live snapshot gives an agent of a branch that branch's expected and collected office commission (by its own CASE),
+  and the old target card behind «قائمة العمل الكاملة» shows it, while the new goals card hides money from staff.
 - **SQL116 applied** (`db/changes/116-system-check.forward.sql`): `crm_properties_missing_details()` had no company filter
   (an account outside the company read 4 rows; now 0, owner and staff 4); `crm_property_missing` has a fixed search_path;
   eight jobs moved off the shared :00 / :30 second to their own minute, same cadence and hours (edge 503s clustered at

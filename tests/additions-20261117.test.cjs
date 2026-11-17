@@ -10,7 +10,7 @@ const fwd=read('db/changes/114-call-next-last-seen.forward.sql'),back=read('db/c
 
 test('index loads the quick property module right after the call module, versions moved on',()=>{
   assert(index.includes('<script src="crm-calls-meetings.js?v=20261117-goal1"><\\/script><script src="crm-quick-property.js?v=20261117-goal1"><\\/script>'));
-  assert(index.includes('crm-owner-home.js?v=20261117-goal1')&&index.includes('crm-owner-home.css?v=20261117-goal1')&&index.includes('crm-calls-meetings.css?v=20261117-goal1'));
+  assert(index.includes('crm-owner-home.js?v=20261117-snap1')&&index.includes('crm-owner-home.css?v=20261117-goal1')&&index.includes('crm-calls-meetings.css?v=20261117-goal1'));
 });
 
 test('home goals come from the branch target snapshot; staff never get the commission chip',()=>{

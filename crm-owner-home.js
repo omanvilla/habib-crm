@@ -317,6 +317,16 @@
         +(owner&&b.expected_commission!=null?chip('عمولة متوقعة الشهر',b.expected_commission,g.expected_commission,true):'')+'</div></div>';}).join('');
     el.hidden=false;
   }
+  /* 17 Nov 2026 (full check, Ahmed: «صلّح تكرار طلبات الرئيسية»): since the goals card, the home and the old target card
+   * (crm-operations-v6.js) each read crm_branch_target_snapshot on every load. They now share one read: a request still
+   * on its way, or one answered less than 3 seconds ago, for the same signed-in session. A failed read is never kept. */
+  let snapKey='',snapDone=0,snapRead=null;
+  window.crmBranchSnapshot=function(){
+    const key=(typeof crmSessionGeneration==='undefined'?'':crmSessionGeneration)+':'+(typeof currentUser!=='undefined'&&currentUser?currentUser.id:'');
+    if(snapRead&&snapKey===key&&(!snapDone||Date.now()-snapDone<3000))return snapRead;
+    const read=Promise.resolve(supa.rpc('crm_branch_target_snapshot')).then(r=>{if(snapRead===read){if(!r||r.error)snapRead=null;else snapDone=Date.now();}return r;},e=>{if(snapRead===read)snapRead=null;throw e;});
+    snapKey=key;snapDone=0;snapRead=read;return read;
+  };
   async function load(){
     const page=byId('page-dash'),box=mount();if(!page||!box){releaseGate();return;}
     if(!hasHome()||typeof supa==='undefined'){box.hidden=true;page.classList.remove('coh-on');releaseGate();return;}
@@ -342,7 +352,7 @@
       // after the first draw, so the home never waits for it
       readAutoNotes().then(list=>{if(seq!==sequence||list==null)return;autoNotes=list;drawAuto();});
       supa.rpc('crm_whatsapp_usage').then(r=>{if(seq!==sequence||!r||r.error)return;usage=r.data||[];drawUsage();});
-      supa.rpc('crm_branch_target_snapshot').then(r=>{if(seq!==sequence||!r||r.error||!r.data)return;goals=r.data;drawGoals();if(last)drawSummary(last.data);}).catch(()=>{});
+      window.crmBranchSnapshot().then(r=>{if(seq!==sequence||!r||r.error||!r.data)return;goals=r.data;drawGoals();if(last)drawSummary(last.data);}).catch(()=>{});
     }finally{if(seq===sequence&&(ok||!retryLater()))releaseGate();}
   }
   /* 14 Nov 2026 (Ahmed, signed in as staff: «يفتحلي الصفحه كذا»): the database restarted at 16:04, the first read of the
