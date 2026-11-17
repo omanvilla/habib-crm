@@ -46,10 +46,15 @@ live database: advisors, RLS, cron runs, 24 hours of Postgres and edge logs, `pg
   `collected_commission` to the owner only (was: also the branch's own agent); new md5 `c6218dd3…`. Tried live in a
   rolled-back transaction with the staff test account put on the Barka route: owner reads both, the agent reads NULL and
   still reads bookings and inventory; the old target card then says «محجوبة لهذا الدور» (preview, fixture updated). The
-  goal number 4,000 and `sales_goal_met` stay in the answer. **Still open, Ahmed's to decide:** the same agent still reads
-  office commission figures from `crm_branch_performance`, `crm_employee_performance` (company, expected, collected),
-  `crm_branch_monthly_targets` (expected) and `crm_employee_target_snapshot` (expected, collected); `crm_commission_report`
-  is owner only and the deal / property views give staff no money. Next SQL number **119**.
+  goal number 4,000 and `sales_goal_met` stay in the answer.
+- **SQL119 applied (Ahmed: «نعم، احجبها كلها»):** `crm_branch_performance` and `crm_employee_performance` (expected,
+  collected and company commission) and `crm_employee_target_snapshot` (expected, collected) are owner only too; each body
+  md5-checked and the condition replaced an exact number of times (3, 3, 2). Live, rolled back, staff test account on the
+  Barka route: no commission number left in any of the four answers, the owner reads all of them; rollback gives the
+  three old md5s back. Staff screen (preview): «هدف الحجوزات: 0 / 2 أو عمولة متوقعة محجوبة», no console error. What an
+  agent still gets is only goal numbers (`goals.expected_commission`, `booking_commission_target`, also in
+  `crm_branch_monthly_targets`), `sales_goal_met` and the counts of deals with unknown commission.
+  `crm_commission_report` is owner only and the deal / property views give staff no money. Next SQL number **120**.
 - **Left as they are, on purpose:** the two SECURITY DEFINER views (`crm_properties_access`, `crm_deals_access`) hide money
   columns from staff by design; 346 «duplicate key» answers a day on `whatsapp_messages` and 95 on `activities` are the
   webhook's own duplicate guard; leaked-password protection is a switch in the Supabase dashboard (Ahmed).
