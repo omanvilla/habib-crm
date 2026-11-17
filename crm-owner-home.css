@@ -111,3 +111,16 @@ body.coh-lock{overflow:hidden}
 .coh-ignored-link{background:none;border:0;padding:6px 2px;color:var(--text-muted,#6b7280);font:inherit;font-size:13px;text-decoration:underline;cursor:pointer}
 .coh-ignored-link b{font-weight:600}
 .coh-paused-actions .coh-ignore{color:var(--text-muted,#6b7280)}
+
+/* 17 Nov 2026 (Ahmed: «تلغي اي شي متشابه وتبسط الصفحه»): a short greeting line, yesterday's unasked visits inside the visits
+ * tile, the agent's inventory reminder said once (the summary has the numbers), system updates and usage folded away. */
+.coh-hello{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:12px 18px;border-radius:16px}
+.coh-hello strong{font-size:18px}
+#crmOwnerHome:not([hidden])>#crmVisitsUnasked{display:none!important}
+#page-dash.coh-on>#employeeInventoryReminder{display:none!important}
+.coh-fold>summary{cursor:pointer;font-size:14px;font-weight:700;list-style-position:inside}
+.coh-fold>summary small{font-weight:400;color:#6f6552;margin-inline-start:6px}
+.coh-fold[open]>summary{margin-bottom:8px}
+.coh-usage-line{margin:0;padding:0 4px;font-size:12px;color:#6f6552}
+#cohSheetBody .ccm-list{margin-bottom:16px}
+.coh-usage-num{white-space:nowrap}

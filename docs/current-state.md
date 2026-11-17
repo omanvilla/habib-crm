@@ -1,10 +1,39 @@
 # Habib CRM — current state
 
-Updated 2026-11-16. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
+Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous Instagram discovery, design, audit history and outstanding limits remain in [the v16 archive](current-state-v16-20261021.md).
 
 > **Date note.** The sections headed «12 November 2026» below (and «12 Nov» / «12 نوفمبر» in R32–R35, SQL90/91 comments, file
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
+
+## 17 November 2026 — «لوحة العمل» checked and simplified (display only, no SQL)
+
+- **Ahmed:** «تدخل على crm وتعمل فحص للوحه العمل … وتلغي اي شي متشابه وتبسط الصفحه ولكن تكون عمليه ومفيده».
+- **What the home showed (owner, 17 Nov data from `crm_owner_home` read in a rolled-back transaction):** hot alerts; a separate card
+  «👀 معاينات أمس بدون متابعة من العقل» above the greeting; a big green greeting that repeated the tiles' total («عندك N أشياء»);
+  the call button with a three-line explanation always open; tiles (approvals, follow-ups, studies, paused 33, pricing, owner offers 23,
+  visits followed by the AI 11, problems 2); system updates as a full list; a two-bar WhatsApp usage card; a summary with
+  «بركاء متاح من 10 / مسقط متاح من 10» (old target) and links «كل العقارات» / «التقارير الكاملة» (both in the side menu); for an
+  agent also the inventory reminder card above everything (same numbers as the summary).
+- **Changed** (`crm-owner-home.js/.css?v=20261117-dash1`, `crm-calls-meetings.js?v=20261117-dash1`):
+  - greeting: one line (name and date), the total left (it is on the tiles);
+  - yesterday's unasked visits: no separate card on the home; they are counted in the «زيارات يتابعها الذكاء الاصطناعي» tile
+    (urgent with «N معاينة أمس بدون سؤال، شيكها» when there are any) and listed first in its sheet. The old page (no home) keeps the card;
+  - call button: count and «اتصالات اليوم» stay; the explanation moved inside the call window (by number);
+  - system updates: one closed line «تحديثات تلقائية من النظام N · للاطلاع», «تم» on each row inside;
+  - WhatsApp usage: one small line while both numbers are under 80 %; the full card (bars, warnings) at 80 % or blocked;
+  - summary: «متاح للشركة من 25» (AGENTS.md, 16 Nov) then the available count per branch; display only, the saved branch targets
+    and their per-branch default are unchanged; the two links left;
+  - the agent's inventory reminder card is hidden while the home is shown (the summary has the numbers).
+  - Unchanged: the four shortcuts (already hidden on the home since 9 Nov), «قائمة العمل الكاملة» with its six categories, hot alerts,
+    every tile and sheet, all actions, the boot gate.
+- **Checked:** unit test `tests/dash-simplify-20261117.test.cjs` (+ pins in older tests) on CI; a local mock of the home with the 17 Nov
+  numbers in the Claude browser pane (phone size): tiles, the visits sheet with yesterday's visit first, the folded updates, the usage line,
+  the summary «6 متاح للشركة من 25», the call window text. **Not seen** in a signed-in browser (the pane was not signed in, Claude in Chrome
+  was not connected).
+- **Seen, not changed:** the «مشاكل» tile says «مهام مجدولة فشلت اليوم 12», but all 12 are one «job startup timeout» at 09:30 Muscat on
+  16 Nov (the database was slow to start for one minute) and nothing failed since; the label says «اليوم» for the last 24 hours
+  (inside `crm_owner_home`, SQL).
 
 ## 16 November 2026 — daily-plan review: SQL109 (land study → Wednesday) applied; inventory target 25 in AGENTS.md
 

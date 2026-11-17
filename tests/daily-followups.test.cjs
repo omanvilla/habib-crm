@@ -150,7 +150,7 @@ test('visit results are the AI job: read from the chat, saved on the visit, a se
  assert(fn.includes('pipeline_outcome: o?.outcome'));
  assert(fn.includes('title: `🔥 مشتري جاد: ${name || "عميل"}`'));
  const home=fs.readFileSync('crm-owner-home.js','utf8');
- assert(home.includes('زيارات يتابعها الذكاء الاصطناعي')&&home.includes("if(Number(d.overdue_total))"));
+ assert(home.includes('زيارات يتابعها الذكاء الاصطناعي')&&home.includes("if(Number(d.overdue_total)||un0)"));
  const hot=fs.readFileSync('crm-hot-alerts.js','utf8');
  assert(hot.includes("/^(مشتري جاد|تفاوض|طلب اتصال)/")&&hot.includes("isOwner()"));
  assert(index.includes('crm-hot-alerts.js?v='));

@@ -43,8 +43,8 @@
     const host=document.querySelector('#crmOwnerHome .coh-now');if(!host||!host.parentNode)return;
     let w=byId('crmCallHome');
     if(!w){w=document.createElement('div');w.id='crmCallHome';w.className='ccm-home';
-      w.innerHTML='<button type="button" class="btn-primary" id="crmCallHomeBtn" data-ccm="open-number"></button>'
-        +'<small class="ccm-note">سجّل كل اتصال برقم صاحبه حتى لو مو مسجل عندنا. اللي تتصل عليه كمالك أو معلن، العقل ما يرد عليه إذا أرسل واتساب، والمحادثة تجي عندك</small>';}
+      // 17 Nov 2026: the explanation moved inside the call window (it showed on the home page all day)
+      w.innerHTML='<button type="button" class="btn-primary" id="crmCallHomeBtn" data-ccm="open-number"></button>';}
     if(w.nextElementSibling!==host)host.parentNode.insertBefore(w,host);
     const n=callsToday?Number(callsToday.mine||0):null,t=callsToday?Number(callsToday.target||20):20;
     byId('crmCallHomeBtn').innerHTML='📞 سجّل اتصال'+(n==null?'':' <small dir="ltr">'+n+'/'+t+'</small>');
@@ -64,7 +64,8 @@
       d.addEventListener('click',e=>{if(e.target===d)d.close();});}
     callKey=uuid();d.dataset.mode=byNumber?'number':'client';
     d.innerHTML='<form method="dialog" class="ccm-form"><h3>📞 سجّل اتصال <small>'+esc(byNumber?'':viewingClient.name||'')+'</small></h3>'
-      +(byNumber?'<label class="ccm-q" for="ccmPhone">رقم الجوال</label><input id="ccmPhone" class="fi" type="tel" inputmode="tel" dir="ltr" maxlength="20" autocomplete="off" placeholder="9XXXXXXX">'
+      +(byNumber?'<small class="ccm-note">سجّل كل اتصال برقم صاحبه حتى لو مو مسجل عندنا. اللي تتصل عليه كمالك أو معلن، العقل ما يرد عليه إذا أرسل واتساب، والمحادثة تجي عندك</small>'
+        +'<label class="ccm-q" for="ccmPhone">رقم الجوال</label><input id="ccmPhone" class="fi" type="tel" inputmode="tel" dir="ltr" maxlength="20" autocomplete="off" placeholder="9XXXXXXX">'
         +'<label class="ccm-q" for="ccmName">الاسم (اختياري)</label><input id="ccmName" class="fi" maxlength="80" dir="auto" autocomplete="off">':'')
       +'<div class="ccm-q">اتصلت على</div>'+chips('ccmKind',KINDS)
       +'<div class="ccm-q">النتيجة</div>'+chips('ccmResult',RESULTS)
@@ -148,14 +149,23 @@
     if(box.nextElementSibling!==fu)fu.parentNode.insertBefore(box,fu);
     return box;
   }
-  function drawUnasked(){
-    const box=unaskedHost();if(!box)return;
-    box.hidden=!unasked.length;if(!unasked.length){box.innerHTML='';return;}
+  function unaskedList(){
     const fmt=v=>{try{return new Date(v).toLocaleTimeString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat',hour:'numeric',minute:'2-digit'});}catch(_){return '';}};
-    box.innerHTML='<button type="button" class="ccm-head" data-ccm="toggle-unasked" aria-expanded="'+unaskedOpen+'">👀 معاينات أمس بدون متابعة من العقل <b dir="ltr">'+unasked.length+'</b></button>'
-      +(unaskedOpen?'<ul class="ccm-list">'+unasked.map(i=>'<li class="ccm-item"><div><strong>'+esc(i.client_name||'عميل')+'</strong> <span dir="ltr">'+esc(i.phone||'')+'</span>'
+    return '<ul class="ccm-list">'+unasked.map(i=>'<li class="ccm-item"><div><strong>'+esc(i.client_name||'عميل')+'</strong> <span dir="ltr">'+esc(i.phone||'')+'</span>'
         +'<small>'+esc(i.property_title||'')+' · '+esc(fmt(i.visit_at))+'</small><small class="ccm-why">'+esc(i.why||'')+'</small></div>'
-        +(typeof window.crmWaButtons==='function'?window.crmWaButtons({phone:i.phone,conversationId:i.conversation_id,clientId:i.client_id,cls:'btn-secondary crm-wa-small'}):'')+'</li>').join('')+'</ul>':'');
+        +(typeof window.crmWaButtons==='function'?window.crmWaButtons({phone:i.phone,conversationId:i.conversation_id,clientId:i.client_id,cls:'btn-secondary crm-wa-small'}):'')+'</li>').join('')+'</ul>';
+  }
+  // 17 Nov 2026 (Ahmed: «تلغي اي شي متشابه»): on the home page these visits open from the visits tile, at the top of its sheet
+  // (crm-owner-home.js), instead of a separate card above the greeting. The old page (no home) keeps the card.
+  window.crmVisitsUnaskedCount=()=>unasked.length;
+  window.crmVisitsUnaskedHtml=()=>unasked.length?'<h3 class="coh-h3">👀 معاينات أمس بدون متابعة من العقل <b dir="ltr">'+unasked.length+'</b></h3>'+unaskedList():'';
+  const homeOn=()=>{const h=byId('crmOwnerHome');return !!(h&&!h.hidden);};
+  function drawUnasked(){
+    document.dispatchEvent(new CustomEvent('crm-visits-unasked-updated'));
+    const box=unaskedHost();if(!box)return;
+    box.hidden=!unasked.length||homeOn();if(box.hidden){box.innerHTML='';return;}
+    box.innerHTML='<button type="button" class="ccm-head" data-ccm="toggle-unasked" aria-expanded="'+unaskedOpen+'">👀 معاينات أمس بدون متابعة من العقل <b dir="ltr">'+unasked.length+'</b></button>'
+      +(unaskedOpen?unaskedList():'');
   }
   async function loadUnasked(){
     if(!staff())return;

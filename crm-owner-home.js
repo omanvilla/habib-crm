@@ -83,6 +83,8 @@
     document.body.append(s);return s;
   }
   const followupsCount=()=>typeof window.crmFollowupsCount==='function'?Number(window.crmFollowupsCount()||0):0;
+  const INVENTORY_TARGET=25;
+  const unaskedCount=()=>typeof window.crmVisitsUnaskedCount==='function'?Number(window.crmVisitsUnaskedCount()||0):0;
 
   function tile(label,count,attrs,sub,urgent){
     return '<button type="button" class="coh-tile'+(urgent?' urgent':'')+'" '+attrs+'><b dir="ltr">'+num(count)+'</b><span>'+esc(label)+'</span><small>'+esc(sub)+'</small></button>';
@@ -91,8 +93,8 @@
     const h=Number(new Intl.DateTimeFormat('en-GB',{hour:'numeric',hour12:false,timeZone:'Asia/Muscat'}).format(new Date()));
     const date=new Date().toLocaleDateString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat',weekday:'long',day:'numeric',month:'long'});
     const name=(byId('welcomeName')&&byId('welcomeName').textContent||'').trim();
-    byId('cohHello').innerHTML='<strong>'+(h<12?'صباح الخير':'مساء الخير')+(name?' '+esc(name):'')+'</strong><span>'+esc(date)+'</span>'
-      +'<p>'+(total?'عندك <b dir="ltr">'+num(total)+'</b> أشياء تحتاج تتابعها. ابدأ من الأعلى':isOwner()?'ما في شي يحتاج قرارك الحين':'ما في شي متأخر الحين')+'</p>';
+    // 17 Nov 2026 (Ahmed: «تلغي اي شي متشابه وتبسط الصفحه»): one short line; the count is already on the tiles below
+    byId('cohHello').innerHTML='<strong>'+(h<12?'صباح الخير':'مساء الخير')+(name?' '+esc(name):'')+'</strong><span>'+esc(date)+'</span>';
   }
   function drawTiles(d,pending){
     const t=[];let todo=0;
@@ -105,7 +107,10 @@
     if(pa0){todo+=pa0;t.push(tile('العقل موقوف عندهم',pa0,'data-coh="sheet" data-kind="paused"','شوف السبب وكمّل',true));}
     if(pr0){todo+=pr0;t.push(tile('دراسة سعر',pr0,'data-coh="sheet" data-kind="pricing"','ملاك ينتظرون تسعيرك',true));}
     if(d.owner_leads_new)t.push(tile('عروض ملاك جديدة',d.owner_leads_new,'data-coh="nav" data-nav="owner-leads"','يفتح صفحة العروض',false));
-    if(Number(d.overdue_total))t.push(tile('زيارات يتابعها الذكاء الاصطناعي',d.overdue_total,'data-coh="sheet" data-kind="visits"','للاطلاع، العقل يسأل العميل',false));
+    // 17 Nov 2026: «معاينات أمس بدون متابعة من العقل» (crm-calls-meetings.js) was its own card above the greeting; it is the
+    // same subject, so it now opens from this tile, at the top of the same sheet, and makes the tile urgent
+    const un0=unaskedCount();
+    if(Number(d.overdue_total)||un0){if(un0)todo+=un0;t.push(tile('زيارات يتابعها الذكاء الاصطناعي',Number(d.overdue_total||0)+un0,'data-coh="sheet" data-kind="visits"',un0?un0+' معاينة أمس بدون سؤال، شيكها':'للاطلاع، العقل يسأل العميل',!!un0));}
     const pr=(d.problems||[]).length;
     if(pr)t.push(tile('مشاكل',pr,'data-coh="sheet" data-kind="problems"','تحتاج انتباه',false));
     byId('cohTiles').innerHTML=t.length?t.join(''):'<p class="coh-empty">'+(isOwner()?'ما في شي يحتاج قرارك الحين ✓':'ما في شي متأخر الحين ✓')+'</p>';
@@ -118,7 +123,8 @@
   }
   function visitsHtml(){
     const o=(last&&last.data.overdue)||[];
-    return '<p class="coh-since">الذكاء الاصطناعي يسأل العميل ويسجل النتيجة لحاله أول ما يرد. تقدر تسجلها أنت إذا تعرفها</p>'
+    const un=typeof window.crmVisitsUnaskedHtml==='function'?window.crmVisitsUnaskedHtml():'';
+    return un+(o.length?'':'<p class="coh-empty">ما في زيارة فات موعدها بدون نتيجة</p>')+'<p class="coh-since">الذكاء الاصطناعي يسأل العميل ويسجل النتيجة لحاله أول ما يرد. تقدر تسجلها أنت إذا تعرفها</p>'
       +'<button type="button" class="coh-add" data-cqv="new">+ زيارة ما كانت مسجّلة</button><ul class="coh-list">'+o.map(visitRow).join('')+'</ul>';
   }
   function problemsHtml(){
@@ -239,6 +245,9 @@
     const rows=(Array.isArray(usage)?usage:[]).filter(u=>u&&(u.route_key==='barka'||u.route_key==='muscat'));
     if(!rows.length){slot.innerHTML='';return;}
     const name={barka:'بركاء',muscat:'مسقط'};
+    // 17 Nov 2026: while both numbers are far from the limit it is one quiet line; the full card only near or past it
+    const calm=rows.every(u=>!u.blocked&&Number(u.used||0)<Number(u.free_limit||1000)*0.8);
+    if(calm){slot.innerHTML='<p class="coh-usage-line">ردود النظام على واتساب هذا الشهر: '+rows.map(u=>'<span class="coh-usage-num">'+esc(name[u.route_key])+' <bdi dir="ltr">'+num(u.used)+' / '+num(u.free_limit||1000)+'</bdi></span>').join(' · ')+'</p>';return;}
     slot.innerHTML='<div class="card coh-sec"><div class="coh-subhead"><h3>ردود النظام على واتساب هذا الشهر</h3></div>'
       +rows.map(u=>{
         const used=Number(u.used||0),lim=Number(u.free_limit||1000),pct=Math.max(0,Math.min(100,Math.round(used/lim*100)));
@@ -262,10 +271,12 @@
     const slot=byId('cohAuto');if(!slot)return;
     if(!autoNotes.length){slot.innerHTML='';return;}
     const when=v=>{try{return new Date(v).toLocaleString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}catch(_){return '';}};
-    slot.innerHTML='<div class="card coh-sec"><div class="coh-subhead"><h3>تحديثات تلقائية من النظام <b dir="ltr">'+num(autoNotes.length)+'</b></h3></div><ul class="coh-list">'
+    // 17 Nov 2026: for reading only (the system already did it), so one closed line instead of a list on the page
+    const wasOpen=!!(slot.querySelector('details')&&slot.querySelector('details').open);
+    slot.innerHTML='<details class="card coh-sec coh-fold"'+(wasOpen?' open':'')+'><summary>تحديثات تلقائية من النظام <b dir="ltr">'+num(autoNotes.length)+'</b> <small>للاطلاع</small></summary><ul class="coh-list">'
       +autoNotes.map(n=>'<li class="coh-row"><div class="coh-info"><strong>'+(n.type==='deal_auto_closed'?'🔒 ':'📦 ')+esc(n.title||'')+'</strong>'
         +(n.body?'<details class="coh-novideo"><summary>'+esc(String(n.body).slice(0,90))+(String(n.body).length>90?'…':'')+'</summary><p>'+esc(n.body)+'</p></details>':'')
-        +'<small>'+esc(when(n.created_at))+'</small></div><button type="button" class="btn-secondary coh-go" data-coh="auto-done" data-id="'+esc(n.id)+'">تم</button></li>').join('')+'</ul></div>';
+        +'<small>'+esc(when(n.created_at))+'</small></div><button type="button" class="btn-secondary coh-go" data-coh="auto-done" data-id="'+esc(n.id)+'">تم</button></li>').join('')+'</ul></details>';
   }
   function drawTwins(groups){
     const open=(groups||[]).filter(g=>!g.dismissed&&g.properties.some(p=>Number(p.videos)<Number(g.videos)));
@@ -273,14 +284,17 @@
   }
   function drawSummary(d){
     const p=d.properties||{},r=d.report||{},label={barka:'بركاء',muscat:'مسقط'};
-    const props=(p.branches||[]).map(b=>[(label[b.branch]||b.branch)+' متاح من 10',b.available]).concat([['أضيفت هذا الأسبوع',p.added_week],['توفرها ما تأكد من شهر',p.unchecked]]);
+    // 17 Nov 2026: the target is now 25 for the company by 12 Feb 2027 (Ahmed, 16 Nov; AGENTS.md). Display only: the saved
+    // branch targets and their per-branch default are unchanged until he says how the 25 splits.
+    const avail=(p.branches||[]).reduce((s,b)=>s+Number(b.available||0),0);
+    const props=[['متاح للشركة من '+INVENTORY_TARGET,avail]].concat((p.branches||[]).map(b=>['متاح '+(label[b.branch]||b.branch),b.available])).concat([['أضيفت هذا الأسبوع',p.added_week],['توفرها ما تأكد من شهر',p.unchecked]]);
     const rep=[['عملاء جدد',r.new_clients],['ردود الوكيل',r.agent_replies],['زيارات تمت',r.visits_done],['حجوزات الشهر',r.bookings_month],['مبيعات الشهر',r.sales_month]].filter(([,v])=>v!=null);
     const cells=a=>a.map(([l,v])=>'<div class="coh-stat"><strong dir="ltr">'+num(v)+'</strong><small>'+esc(l)+'</small></div>').join('');
     const noVideo=p.no_video||[];
     byId('cohSummary').innerHTML='<h2 class="coh-h">ملخص</h2><h3 class="coh-h3">العقارات</h3><div class="coh-stats">'+cells(props)+'</div>'
       +'<h3 class="coh-h3">هذا الأسبوع <small>من '+esc(r.week_start||'')+'</small></h3><div class="coh-stats">'+cells(rep)+'</div>'
-      +(noVideo.length?'<details class="coh-novideo"><summary>متاحة من أكثر من 7 أيام بدون فيديو <b dir="ltr">'+num(noVideo.length)+'</b></summary><p>'+noVideo.map(esc).join(' · ')+'</p></details>':'')
-      +'<div class="coh-links2"><button type="button" class="coh-more" data-coh="nav" data-nav="properties">كل العقارات</button>'+(isOwner()?'<button type="button" class="coh-more" data-coh="nav" data-nav="reports">التقارير الكاملة</button>':'')+'</div>';
+      +(noVideo.length?'<details class="coh-novideo"><summary>متاحة من أكثر من 7 أيام بدون فيديو <b dir="ltr">'+num(noVideo.length)+'</b></summary><p>'+noVideo.map(esc).join(' · ')+'</p></details>':'');
+    // 17 Nov 2026: the «كل العقارات» and «التقارير الكاملة» links left the summary: the same two pages are in the side menu
   }
   async function load(){
     const page=byId('page-dash'),box=mount();if(!page||!box){releaseGate();return;}
@@ -328,6 +342,7 @@
   }
   document.addEventListener('crm-followups-updated',()=>{if(last)drawTiles(last.data,last.pending);});
   document.addEventListener('crm-price-studies-updated',()=>{if(last)drawTiles(last.data,last.pending);});
+  document.addEventListener('crm-visits-unasked-updated',()=>{if(last)drawTiles(last.data,last.pending);if(sheetKind==='visits')drawSheet();});
   window.crmOwnerHomeOpenSheet=kind=>{if(hasHome())openSheet(kind);};
   document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();});
   document.addEventListener('click',e=>{

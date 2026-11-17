@@ -9,7 +9,7 @@ const cut=(from,to)=>vk.slice(vk.indexOf(from),vk.indexOf(to,vk.indexOf(from)));
 
 test('the module is loaded by the page, after the property modules, with the closing tag escaped',()=>{
   new vm.Script(vk);
-  assert(index.includes('<script src="crm-calls-meetings.js?v=20261116-ccm3"><\\/script><script src="crm-visit-key.js?v=20261114-vk2"><\\/script><script>window.APP_VERSION='));
+  assert(index.includes('<script src="crm-calls-meetings.js?v=20261117-dash1"><\\/script><script src="crm-visit-key.js?v=20261114-vk2"><\\/script><script>window.APP_VERSION='));
   assert.match(index,/crm-voice-input\.js\?v=20261114-vk1/);
   assert.equal(index.split('</script>').length-1,1,'only the page\'s own closing tag is unescaped');
 });

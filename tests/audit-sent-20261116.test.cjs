@@ -232,7 +232,7 @@ test('R87 / SQL107: the call by number, the agent stays out of a number the staf
  assert(ui.includes("document.querySelector('#crmOwnerHome .coh-now')")&&ui.includes('data-ccm="open-number"'));
  assert(ui.includes("supa.rpc('crm_log_call_number',{p_phone:phone,p_name:byId('ccmName').value||'',...common})"));
  assert(ui.includes("supa.rpc('crm_log_call',{p_client:viewingClient.id,...common})"),'the client page keeps its own call');
- assert(index.includes('crm-calls-meetings.js?v=20261116-ccm3')&&index.includes('crm-calls-meetings.css?v=20261116-ccm3'));
+ assert(index.includes('crm-calls-meetings.js?v=20261117-dash1')&&index.includes('crm-calls-meetings.css?v=20261116-ccm3'));
 });
 test('the dashboard of 16 Nov: one alert per client and kind, a past meeting leaves, the owner sees each person\'s calls',()=>{
  const hot=fs.readFileSync('crm-hot-alerts.js','utf8'),ui=fs.readFileSync('crm-calls-meetings.js','utf8'),index=fs.readFileSync('index.html','utf8');
@@ -240,7 +240,7 @@ test('the dashboard of 16 Nov: one alert per client and kind, a past meeting lea
  assert(hot.includes("const key=n.client_id+'|'+kind;if(once.has(key))return false;once.add(key);return true;"));
  assert(hot.indexOf('list.sort((a,b)=>String(b.created_at)')<hot.indexOf('once.has(key)'),'the newest of each client is the one kept');
  assert(ui.includes("if(callsToday&&['owner','manager'].includes(role())){")&&ui.includes('اتصالات اليوم:'));
- assert(index.includes('crm-hot-alerts.js?v=20261116-once1')&&index.includes('crm-calls-meetings.js?v=20261116-ccm3'));
+ assert(index.includes('crm-hot-alerts.js?v=20261116-once1')&&index.includes('crm-calls-meetings.js?v=20261117-dash1'));
 });
 
 // ---- R88 / SQL108 (Ahmed 16 Nov 2026): a study by the phone's WhatsApp, an owner we do not price, the priced leave the list ----
@@ -262,7 +262,7 @@ test('R88 / SQL108: the study goes by the phone, the pricing list drops what is 
  assert(ui.includes("'?text='+encodeURIComponent(String(s.owner_message||''))")&&ui.includes("supa.rpc('crm_price_study_sent_by_phone',{p_study_id:id})"));
  assert(ui.includes("window.crmPriceStudyChats=()=>new Set("));
  assert(home.includes("window.crmPriceStudyChats().has(i&&i.conversation_id));")&&home.includes("supa.rpc('crm_price_study_drop',{p_conversation_id:id,p_reason:why.trim()})"));
- assert(index.includes('crm-price-studies.js?v=20261116-ps3')&&index.includes('crm-owner-home.js?v=20261116-pr1'));
+ assert(index.includes('crm-price-studies.js?v=20261116-ps3')&&index.includes('crm-owner-home.js?v=20261117-dash1'));
 });
 
 // ---- R89 (Ahmed 16 Nov 2026, Jehan): the client confirmed a meeting time while the agent stays out → Ahmed's WhatsApp ----
