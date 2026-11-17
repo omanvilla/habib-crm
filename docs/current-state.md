@@ -79,7 +79,19 @@ live database: advisors, RLS, cron runs, 24 hours of Postgres and edge logs, `pg
   `crm_repair_private.property_alternative` finds one (available, not archived, same type, purpose and wilayat, 80-125% of
   the price, closest first), and never for the buyer of that property's deal. Nothing goes to the client. Tested rolled
   back: Hasna + «فيلا رضوان الصومحان 69 -3» reserved → alt «-2 · 69,000 ر.ع», notification to the owner, staff test account
-  sees 0; «استراحة الرميس 109» sold → no alternative, no notification. Rollback: `121-…rollback.sql`. Next SQL number **122**.
+  sees 0; «استراحة الرميس 109» sold → no alternative, no notification. Rollback: `121-…rollback.sql`.
+- **The nightly routine and handed-over clients (17 Nov):** the routine's job_config is ~200KB, so instead of rewriting its
+  prompt the planner doc `meta/rules` got `handoffs17nov` (handed-over clients only from `crm_owner_open_handoffs()`,
+  read-only, «🔥 بديل:» → a 5-minute task) and `clientNames17nov` (name from clients.name, else phone + last property).
+  Ran it by hand at 21:00: it used the function and listed the 5 named clients; حسناء / خالد / ايهاب stayed out. Three old
+  «💬 رد» tasks titled with chat phrases got real names and the stale meeting tasks for جادي حكيمة and جيهان النوفلي were
+  dropped (events deleted) at Ahmed's word.
+- **SQL122 applied (Ahmed: «إيوه، صلّحها»):** `public.crm_is_real_name(text)` — false for fewer than 2 letters (emoji, «ﷺ»,
+  «A»), names starting «يا », and names starting with a dhikr / dua (الحمد، سبحان، استغفر، اللهم، الله…، لا إله، بسم الله،
+  حسبي، يا رب، ما شاء الله…); «عبدالله», «الحمادي», «ياسر بن عبدالله» stay real. 172 client names count as not real (nothing
+  in clients changed). Used by `crm_owner_open_handoffs` and the SQL121 alert; `crm-hot-alerts.js` has the same rule and
+  list (a test checks they match). Applied as two migrations (the 2-letter condition was added after the first); the repo
+  file is the final state. Rollback: `122-real-client-names.rollback.sql`. Next SQL number **123**.
 - **Left as they are, on purpose:** the two SECURITY DEFINER views (`crm_properties_access`, `crm_deals_access`) hide money
   columns from staff by design; 346 «duplicate key» answers a day on `whatsapp_messages` and 95 on `activities` are the
   webhook's own duplicate guard; leaked-password protection is a switch in the Supabase dashboard (Ahmed).

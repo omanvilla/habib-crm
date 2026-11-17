@@ -29,9 +29,11 @@
   // 11 Nov 2026 (Ahmed): «تم» sticks (SQL88). 17 Nov 2026 (SQL120): after «تم» a chat comes back only when the client wrote again
   // after «تم» AND the agent handed it over again — the same rule as public.crm_hot_handoff_open / crm_owner_open_handoffs().
   const reopened=(doneAt,handoffAt,inboundAt)=>new Date(handoffAt||0)>new Date(doneAt)&&new Date(inboundAt||0)>new Date(doneAt);
-  // an emoji or empty name («👑💜») shows the phone instead
-  const hasLetters=t=>/\p{L}/u.test(String(t||''));
-  const hotName=w=>{const c=w.clients||{};return hasLetters(c.name)?String(c.name).trim():hasLetters(w.customer_name)?String(w.customer_name).trim():(c.phone_normalized||c.phone||w.customer_wa_id||'عميل');};
+  // an emoji, empty, one-letter or dhikr name («👑💜», «ﷺ», «الحمد لله», «يا جنة …») shows the phone instead — the same rule as
+  // public.crm_is_real_name (SQL122)
+  const DHIKR=/^(الحمد|سبحان|استغفر|اللهم|الله|لااله|لاالله|بسمالله|حسبي|يارب|ماشاءالله|ماشاالله|وماتوفيقي|نحنلا|حبيبيرسول|احبالله|صليعلي|لاحولولاقوه|توكلت|الصلاهعلي)/;
+  const realName=t=>{t=String(t||'');const k=t.replace(/[^\p{L}]/gu,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي');return k.length>=2&&!/^[^\p{L}\p{N}]*يا\s/u.test(t)&&!DHIKR.test(k);};
+  const hotName=w=>{const c=w.clients||{};return realName(c.name)?String(c.name).trim():realName(w.customer_name)?String(w.customer_name).trim():(c.phone_normalized||c.phone||w.customer_wa_id||'عميل');};
   const kindOf=t=>{t=String(t||'');return /^\s*(📞|طلب اتصال)/.test(t)?'call':/^\s*(📅|اجتماع|طلب اجتماع)/.test(t)?'meeting':/^\s*(🔥|مشتري جاد|تفاوض)/.test(t)?'hot':'other';};
   const ago=d=>typeof timeAgo==='function'?timeAgo(d):String(d||'').slice(0,16);
   function host(){

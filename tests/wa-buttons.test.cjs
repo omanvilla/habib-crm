@@ -77,7 +77,7 @@ test('handoffs close by themselves, crm_mark_handoff_done is service_role only, 
  assert(sql.includes('REVOKE ALL ON FUNCTION public.crm_mark_handoff_done(uuid, text) FROM PUBLIC, anon, authenticated;')&&sql.includes('GRANT EXECUTE ON FUNCTION public.crm_mark_handoff_done(uuid, text) TO service_role;'));
  assert(!/DELETE FROM/i.test(sql),'nothing is deleted');
  assert(sql.includes('SECURITY INVOKER'),'the list goes through RLS');
- assert(hot.includes("+': '+hotName(w)+' · '")&&hot.includes('const hasLetters=t=>/\\p{L}/u.test'),'emoji names show the phone');
+ assert(hot.includes("+': '+hotName(w)+' · '")&&hot.includes('return k.length>=2&&'),'emoji names show the phone');
 });
 test('a reserved / sold property suggests an alternative to Ahmed only when one exists (SQL121)',()=>{
  const sql=fs.readFileSync('db/changes/121-reserved-property-alternative.forward.sql','utf8'),hot=fs.readFileSync('crm-hot-alerts.js','utf8');
@@ -85,6 +85,18 @@ test('a reserved / sold property suggests an alternative to Ahmed only when one 
  assert(sql.includes("IF n > 0 AND alt IS NOT NULL")&&sql.includes("'🔥 بديل: '"),'only closed chats, only with an alternative');
  assert(sql.includes("pr.role = 'owner'")&&!/whatsapp-send|net\.http_post/.test(sql),'to the owner in the CRM, nothing goes to the client');
  assert(hot.includes("/^🔥 بديل:/.test(String(n.title||''))||!done.some("),'not hidden by the «تم» written in the same moment');
+});
+test('«الحمد لله», «يا …», «ﷺ» are not client names; the app and the database share one rule (SQL122)',()=>{
+ const sql=fs.readFileSync('db/changes/122-real-client-names.forward.sql','utf8'),hot=fs.readFileSync('crm-hot-alerts.js','utf8');
+ assert.equal(sql,fs.readFileSync('supabase/migrations/20261117220000_real_client_names_20261117.sql','utf8'));
+ const pg=sql.match(/!~ '\^\(([^)]+)\)'/)[1],js=hot.match(/const DHIKR=\/\^\(([^)]+)\)\//)[1];
+ assert.equal(js,pg,'same dhikr list in SQL and JS');
+ assert(sql.includes('CASE WHEN public.crm_is_real_name(cl.name) THEN btrim(cl.name)'));
+ // the JS rule itself
+ const DHIKR=new RegExp('^('+js+')');
+ const realName=t=>{t=String(t||'');const k=t.replace(/[^\p{L}]/gu,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي');return k.length>=2&&!/^[^\p{L}\p{N}]*يا\s/u.test(t)&&!DHIKR.test(k);};
+ for(const bad of ['الحمد لله','الحمدلله❤️','سبحان الله وبحمده','يا جنة امان وحنان يا ابي','👑💜','ﷺ','','اللهم إني أسألك العافية'])assert(!realName(bad),bad);
+ for(const ok of ['عبدالله','ام عبدالله','ياسر بن عبدالله','حسناء','Faisal Abdulaziz','الحمادي','عبد يا سين'])assert(realName(ok),ok);
 });
 // 11 Nov 2026 (Ahmed): price study report to his WhatsApp from the branch number, one block per client with separators
 test('price study report: details, number, owner offer, words, documents, separators; once per handoff (SQL89)',()=>{
