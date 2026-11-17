@@ -47,6 +47,10 @@ test('a client who only arrived is not asked his opinion (007be129 «هذا هو
  assert.deepEqual(r.texts,['السعر 59 الف','البيت مفتوح تفضل']);
  // dry run rows 777-816: «انا واصل»
  assert.deepEqual(decide(['حياك الله وايش انطباعك بعد ما شفتها ؟'],[OUT('البيت مفتوح'),IN('انا واصل')]).texts,['حياك الله خذ راحتك']);
+ // rows 930-969: «انا قريبه», a photo, «هذا البيت» after «الاستاذ احمد وصل وينتظرك هناك»
+ assert.deepEqual(decide(['حياك الله وايش انطباعك بعد ما شفتها ؟','اسمك الكريم ؟'],[OUT('الاستاذ احمد وصل وينتظرك هناك'),IN('انا قريبه'),IN('','image'),IN('هذا البيت')]).texts,['حياك الله','اسمك الكريم ؟']);
+ // «هذا البيت» with an ad picture and no visit on our side is not an arrival
+ assert.deepEqual(decide(['وايش انطباعك عنه ؟'],[OUT('مرحبتين تفضل'),IN('','image'),IN('هذا البيت')]).texts,['وايش انطباعك عنه ؟']);
  // after he saw it the question stays
  assert.deepEqual(decide(['وايش انطباعك ؟'],[OUT('حياك الله'),IN('وصلت وشفتها حلوة')]).texts,['وايش انطباعك ؟']);
  assert.deepEqual(decide(['كيف شفت فيلا الرميس ؟'],[OUT('حياك الله'),IN('خلصت الزيارة')]).texts,['كيف شفت فيلا الرميس ؟']);
@@ -121,6 +125,14 @@ test('dry run rows 817-852: «بروم» / «لبرووم» get the prompt line'
  assert.deepEqual(decide([],[OUT(P),IN('ماذا اقوول لشات جي بي تي')],{category:'general'}).texts,[]);
  // a word that only starts the same is not it
  assert.deepEqual(decide(['تفضل'],[IN('برومو العقار وصل ؟')],{category:'general'}).texts,['تفضل']);
+});
+test('rows 930-969: a location asked for a property nobody named gets the R23 question, not «تمام» alone',()=>{
+ const r=decide(['تمام'],[IN('','image'),OUT('بتزورها اليوم ؟'),IN('اشوف الموقع اخي اذا ناسبني بزورها')]);
+ assert.deepEqual(r.texts,['اكتب لي المنطقة او السعر اللي في الاعلان اذا ما عليك امر']);assert.equal(r.out.guard_location_which,true);
+ // with the property known, R74 sends the location
+ assert.equal(decide(['تمام'],[IN('اشوف الموقع اخي اذا ناسبني بزورها')],null,{prop:RUMAIS}).out.action,'send_location');
+ // a real answer is left alone
+ assert.deepEqual(decide(['ارسل لي رابط الفيديو'],[IN('ممكن الموقع')]).texts,['ارسل لي رابط الفيديو']);
 });
 test('the R11 check reads «ليوم» as a day too',()=>{
  assert(agent.includes('const TIME_SAID = /ا?ليوم|الحين'));

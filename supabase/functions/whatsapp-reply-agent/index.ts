@@ -358,7 +358,11 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   const OPINION_Q = /انطباع(ك|ج|كم)|كيف\s*(شفت|لقيت)(ها|ه|يها|يه)?|(ايش|وش)\s*ر[اأ]ي(ك|ج)\s*(فيها|فيه|بعد)/;
   const ARRIVING = /^\s*(هذا|هذي|هذه|هاذا)\s*(هو|هي)?\s*[.!]*\s*$|(^|\s)(وصلت|وصلنا|واصل|واصلين|واصله|واصلة|بدخل|ندخل|[اأ]دخل|تدخل|جالس\s*[اأ]شوف|موجود\s*(حالياً|حاليا|الحين)?\s*(جنب|عند|قدام|في)\s*(ال)?(فيلا|فل[ةه]|بيت|موقع))/;
   const SEEN_WORDS = /عجب|حلو|حلوه|ناسب|ما\s*ناسب|شفته|شفتها|شفناه|شفناها|خلصت|طلعت|زرت|غال(ي|يه)|صغير|ضيق|واسع|زين/;
-  if (texts.some((t) => t.length <= 200 && OPINION_Q.test(t)) && ARRIVING.test(String(c.burstSaid || "")) && !SEEN_WORDS.test(String(c.burstSaid || "")) && out.action !== "handoff") {
+  // (rows 930-969: «انا قريبه», then a photo and «هذا البيت» right after «الاستاذ احمد وصل وينتظرك هناك»: also an arrival)
+  const lastOuts = c.history.filter((h: any) => h.direction === "outbound").slice(-3).map(body).join(" ");
+  const arrivedAtOurs = (/^\s*(هذا|هذي|هذه)\s*(البيت|الفيلا|الفل[ةه])\s*$/.test(String(c.burstSaid || "").trim()) && /وصل|ينتظرك|مفتوح|تقدر\s*تشوف/.test(lastOuts))
+    || /(^|\s)[اأ]نا\s*قريب(ه|ة)?(\s|$)/.test(String(c.burstSaid || ""));
+  if (texts.some((t) => t.length <= 200 && OPINION_Q.test(t)) && (ARRIVING.test(String(c.burstSaid || "")) || arrivedAtOurs) && !SEEN_WORDS.test(String(c.burstSaid || "")) && out.action !== "handoff") {
     texts = texts.map((t) => (t.length <= 200 && OPINION_Q.test(t) ? t.replace(/\s*و?\s*(ايش|وش|كيف)?\s*(انطباع(ك|ج|كم)|ر[اأ]ي(ك|ج)|شفت(ها|ه)?|لقيت(ها|ه)?)[^؟?\n]*[؟?]?/g, "").trim() : t))
       .filter((t) => t.replace(/[^ء-ي]/g, "").length > 0);
     // (dry run on the branch, e06229f1 «إذا تأذن لي إني أدخل أشوف الفيلا»: he asked to go in, he is told the house is open)
@@ -368,6 +372,12 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   }
   // 4736075f: a video we could not read, then «السعر موجود في الفيديو اللي رسلته لك», then «انت ما تعرف تقرأ الرقم ؟؟»: the
   // same «اكتب لي السعر / المنطقة» went three times. Asked once; asked again, it goes to Ahmed with no reply (he can watch it).
+  // rows 930-969: «اشوف الموقع اخي اذا ناسبني بزورها» about an ad picture nobody recognised got «تمام» alone. A location asked
+  // for a property the agent cannot name gets the R23 question instead of a filler.
+  const FILLER_ONLY = /^\s*(تمام|طيب|اوكي|ان\s*شاء\s*الله|حياك\s*الله)(\s*(خذ\s*راحتك|ان\s*شاء\s*الله))?\s*$/;
+  if (out.action === "none" && ["buyer", "tenant"].includes(out.category) && !c.prop && !out.property_id && LOCATION_ASK.test(String(c.burstSaid || "")) && texts.length && texts.every((t) => FILLER_ONLY.test(t))) {
+    texts = ["اكتب لي المنطقة او السعر اللي في الاعلان اذا ما عليك امر"]; out.guard_location_which = true;
+  }
   const WHICH_ASK = /اكتب\s*(لي\s*)?(ال)?(رقم|سعر|منطق[ةه])|رابط\s*(ال)?(فيديو|اعلان|إعلان)|صور[ةه]\s*منه|احدد\s*العقار/;
   if (out.action === "none" && !c.prop && texts.some((t) => t.length <= 200 && WHICH_ASK.test(t))
     && c.history.slice(-8).some((h: any) => h.direction === "outbound" && WHICH_ASK.test(String(h.body || "")))) {
