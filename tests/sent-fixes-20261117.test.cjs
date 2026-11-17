@@ -112,6 +112,13 @@ test('dry run rows 777-816: no visit question after the ad when the reply says t
  assert.equal(goneOnly(['الفيلا متوفرة حالياً']),false);
  assert(agent.includes('!asksVisit && !goneOnly && out.action === "none"'));
 });
+test('dry run rows 817-852: «بروم» / «لبرووم» get the prompt line',()=>{
+ const P='ارسل على الفيديو نفسه في الانستجرام وراح يوصلك البرومبت';
+ assert.deepEqual(decide(['اكتب لي طلبك اذا ما عليك امر'],[IN('بروم')],{category:'general'}).texts,[P]);
+ assert.deepEqual(decide(['وعليكم السلام ورحمة الله وبركاته','تقصد البرومبت ولا عرض عقاري ؟','اسمك الكريم ؟'],[IN('سلام عليكم ممكن لبرووم')],{category:'general'}).texts,['وعليكم السلام ورحمة الله وبركاته',P]);
+ // a word that only starts the same is not it
+ assert.deepEqual(decide(['تفضل'],[IN('برومو العقار وصل ؟')],{category:'general'}).texts,['تفضل']);
+});
 test('the R11 check reads «ليوم» as a day too',()=>{
  assert(agent.includes('const TIME_SAID = /ا?ليوم|الحين'));
 });

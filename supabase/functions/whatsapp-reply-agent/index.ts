@@ -404,6 +404,16 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     texts = texts.map((t) => t.split("\n").filter((l) => !/^\s*اول\s*ما\s*يتوفر\s*بتواصل\s*معك\s*$/.test(l)).join("\n").trim()).filter(Boolean);
     out.guard_wait_and_offer = true;
   }
+  // dry run rows 817-852 (17 Nov): «بروم» got «اكتب لي طلبك» and «ممكن لبرووم» got «تقصد البرومبت ولا عرض عقاري ؟». A short
+  // message asking for the «برو…م» is the salary video's prompt (brain: «برو» / «برومت» = البرومبت): the fixed line answers it.
+  {
+    const said = String(c.burstSaid || "").replace(/\s+/g, " ").trim();
+    const PROMPT_LINE = "ارسل على الفيديو نفسه في الانستجرام وراح يوصلك البرومبت";
+    if (said.length <= 50 && /(^|\s|ل)(ال)?بر+و+م+(ت|بت|يت)?(\s|$|[؟?.!])/.test(said) && ["none", "handoff"].includes(out.action) && !c.hardHandoff && !texts.includes(PROMPT_LINE)) {
+      texts = [...texts.filter((t) => /^\s*(وعليكم\s*السلام(\s*ورحمة\s*الله(\s*وبركاته)?)?|مرحبتين)\s*$/.test(t)), PROMPT_LINE];
+      out.action = "none"; out.handoff_reason = null; out.guard_prompt_word = true;
+    }
+  }
   const NAME_LINE = /^\s*اسمك\s*الكريم\s*؟\s*$/;
   for (let i = 0; i < texts.length - 1; i++) {
     const ls = texts[i].split("\n");
