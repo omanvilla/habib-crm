@@ -6,6 +6,19 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 17 November 2026 — the month's call target is Ahmed's number: 100 for November (SQL113)
+
+- **Ahmed:** the week 30 / month 200 did not look right to him. Explained: this week is 30 because of the National Day (18–19 Nov); a normal
+  week is 50; the month was 10 × 20 working days. Asked, he chose **«10 باليوم، والشهر 100 بس»** (the daily 10 and the week as a sum stay).
+- **SQL113** (`db/changes/113-call-month-target.forward.sql`, md5-guarded on the SQL110 `crm_calls_today`): `crm_call_month_targets`
+  (one number per company and month, RLS on, no policy), `crm_set_call_month_target(p_month, p_target)` owner only (NULL removes it),
+  `crm_repair_private.call_month` = calls of the month with the saved target (`fixed: true`) or the SQL110 sum. `crm_calls_today` uses it for
+  the person and for each person. Checked in a rolled-back transaction (rollback gives back md5 `baebdf54…`; owner sets 100, مرام reads
+  month 4/100 fixed, مرام setting it is refused `owner_only`), applied from `4ab2bcd`, then **November 2026 = 100** set as the owner.
+- **Screen** (`crm-calls-meetings.js/.css?v=20261117-call2`): in «سجل الاتصالات» the owner has «هدف الشهر للموظف» with «حفظ» (empty = back
+  to 10 × working days); the note says «هدف الشهر حدده أحمد» when the number is his. December has no number yet (it would be 10 × its
+  working days until he writes one). Next SQL number **114**.
+
 ## 17 November 2026 — «مهام مجدولة متعطلة الحين» (SQL111) and the National Day holiday on the call targets
 
 - **Ahmed:** «صلّح عنوان مهام مجدولة فشلت اليوم». The «مشاكل» tile counted every failed cron run of the last 24 hours (12 on 17 Nov, all one
