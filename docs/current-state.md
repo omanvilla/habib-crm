@@ -33,6 +33,8 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
   her own busy reason, holiday for all refused for her, a three-day leave, week target 30 and month 200 with that leave, the log), unit tests
   `tests/call-targets-20261117.test.cjs` on CI, the window and the log on a local mock in the browser pane. **Not seen** in a signed-in browser.
 - Old calls keep their text (four of مرام on 16 and 17 Nov say «زيارة» as next step).
+- **Published 17 Nov:** SQL110 applied (`apply_migration` from commit `8378049`), the old signatures are gone, `crm_calls_today` as مرام
+  returned today 1/10, week 4/50, month 4/220; `main` = `8378049`, the site serves `crm-calls-meetings.js?v=20261117-call1`. Next SQL number **111**.
 
 ## 17 November 2026 — «لوحة العمل» checked and simplified (display only, no SQL)
 
