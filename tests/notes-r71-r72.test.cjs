@@ -51,7 +51,7 @@ test('an order not to answer closes the waiting draft at once; an empty rewrite 
  // the approval screen drops the card and keeps no lesson from that order
  const rw=approvals.slice(approvals.indexOf('async function rewrite('),approvals.indexOf('async function reject('));
  assert(rw.indexOf("if(data.status==='closed')")>0&&rw.indexOf("if(data.status==='closed')")<rw.indexOf("crm_owner_notes"));
- assert(index.includes('crm-reply-approvals.js?v=20261114-close1'));
+ assert(index.includes('crm-reply-approvals.js?v=20261118-extra1'));
 });
 
 const F=pickFrom(fu);

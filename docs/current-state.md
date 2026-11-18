@@ -105,6 +105,13 @@ live database: advisors, RLS, cron runs, 24 hours of Postgres and edge logs, `pg
   sibling seen); trigger in a rolled-back transaction (same price / −1 % nothing, −5 % queued). Note: v9 was deployed by
   mistake with an empty index.ts and broke the function 01:19–01:22 UTC; no call reached it (outside cron hours, no property
   change). Rollback: `123-listing-match.rollback.sql` + redeploy the previous index.ts. Next SQL number **124**.
+- **whatsapp-outreach v11 + «عملاء قريبين» (18 Nov, Ahmed: «كمل»):** the next 30 after the best 20 are written as
+  `skipped` / `over_cap` (never sent, counted by no rule; a client passed over for a negotiation or archive is not kept).
+  «ردود تنتظر موافقتك» shows them folded under «عملاء قريبين ما دخلوا أول 20» per property (last 14 days, property still
+  available); «أضف للموافقة» calls the function with `decision:"promote"` (owner JWT only), which moves the row to pending
+  with created_at = now. Checked: preview owner sees the block and the button reaches the function, staff (`/after/muscat/`)
+  sees nothing; RLS in a rolled-back transaction: owner reads/updates the row, staff reads 0 / updates 0 / the siblings RPC
+  is denied; live preview villa 69: 20 picked + 3 kept; promote without a JWT → 403.
 - **Left as they are, on purpose:** the two SECURITY DEFINER views (`crm_properties_access`, `crm_deals_access`) hide money
   columns from staff by design; 346 «duplicate key» answers a day on `whatsapp_messages` and 95 on `activities` are the
   webhook's own duplicate guard; leaked-password protection is a switch in the Supabase dashboard (Ahmed).

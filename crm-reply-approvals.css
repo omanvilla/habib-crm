@@ -86,3 +86,8 @@
 .rp-line .voice-btn{margin-top:0}
 label>.voice-btn{display:inline-flex}
 #crmAskText{z-index:3000}
+/* SQL123: clients a new listing fits, kept outside the best 20 */
+.rp-extras{margin:4px 0 14px}.rp-extras>summary{cursor:pointer}
+.rp-extras-title{font-size:13px;color:#3d4f46;margin:10px 0 6px}
+.rp-card.rp-extra{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 12px}
+.rp-card.rp-extra .rp-summary{margin:4px 0 0}

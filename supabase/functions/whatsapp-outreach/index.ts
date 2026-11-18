@@ -15,6 +15,7 @@
 //   approve         (owner JWT)     {ids, decision: approve|reject} → approve sends right away (within hours)
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { LISTING_CAP, priceMentioned, rankCandidates, scoreRequest } from "../_shared/listing-match.mjs";
+const EXTRA_CAP = 30;
 
 const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false, autoRefreshToken: false } });
 const META_APP_SECRET = Deno.env.get("META_APP_SECRET") ?? "";
@@ -245,8 +246,10 @@ async function queueListing(propertyId: string, dry: boolean, preview = false, p
   const rows: any[] = [], picked: any[] = [];
   const noun = NOUN[prop.type]?.[2] || "عقار";
   const label = `${noun} في ${prop.area || prop.wilayat || ""} بـ ${thousands(prop.price)}`.replace(/\s+/g, " ").trim();
+  let next = 0;
   for (const c of ranked) {
     if (picked.length >= LISTING_CAP) break;
+    next++;
     const cl = await db.from("clients").select("archived,followup_suppressed").eq("id", c.r.client_id).maybeSingle();
     if (!cl.data || cl.data.archived || cl.data.followup_suppressed) continue;
     if (await held(c.conv.id)) continue;
@@ -256,9 +259,22 @@ async function queueListing(propertyId: string, dry: boolean, preview = false, p
       step: "ask_still_searching", template_name: "new_listing_match_ar_v1", template_params: [label], messages: [`نزل عندنا ${label} ممكن يناسب طلبك`, "لين الحين تبحث ؟"],
       summary: short(`${why} · طلبه: ${requestSummary(c.r)}`, 200), dry_run: dry, status: "pending" });
   }
-  const result = { property: prop.title, price_drop: priceDrop, matched: ranked.length, over_cap: Math.max(0, ranked.length - picked.length), group_units: group.length };
-  if (preview) return { ...result, would_queue: picked };
-  return { ...result, queued: await upsertRows(rows) };
+  // the next ones (up to EXTRA_CAP) are kept as skipped / over_cap: nothing sends them and no rule counts them, Ahmed sees
+  // them under «عملاء قريبين» and can move any of them to the approval list (decision "promote")
+  // (only those after the last one looked at: a client passed over above, archived or in a negotiation, is not kept)
+  const rest = ranked.slice(next, next + EXTRA_CAP);
+  const restCl = rest.length ? ((await db.from("clients").select("id,archived,followup_suppressed").in("id", rest.map((c: any) => c.r.client_id))).data || []) : [];
+  const okIds = new Set(restCl.filter((x: any) => !x.archived && !x.followup_suppressed).map((x: any) => x.id));
+  const extras: any[] = [];
+  for (const c of rest) if (okIds.has(c.r.client_id) && !(await held(c.conv.id))) extras.push(c);
+  const extraRows = extras.map((c: any) => ({
+    company_id: prop.company_id, kind: "new_listing", property_id: prop.id, request_id: c.r.id, client_id: c.r.client_id, conversation_id: c.conv.id, route_key: c.conv.route_key,
+    step: "ask_still_searching", template_name: "new_listing_match_ar_v1", template_params: [label], messages: [`نزل عندنا ${label} ممكن يناسب طلبك`, "لين الحين تبحث ؟"],
+    summary: short(`${c.level === "exact" ? "مطابق" : "قريب (نفس الولاية)"}${priceDrop ? " · بعد نزول السعر" : ""} · طلبه: ${requestSummary(c.r)}`, 200),
+    dry_run: dry, status: "skipped", reason: "over_cap" }));
+  const result = { property: prop.title, price_drop: priceDrop, matched: ranked.length, over_cap: extraRows.length, group_units: group.length };
+  if (preview) return { ...result, would_queue: picked, extra: extraRows.map((x: any) => x.summary) };
+  return { ...result, queued: await upsertRows(rows), kept_extra: await upsertRows(extraRows) };
 }
 
 // ---- sending ---------------------------------------------------------------------------------------
@@ -371,8 +387,16 @@ Deno.serve(async (req) => {
     const prof = u?.data?.user ? await db.from("profiles").select("id,company_id,role,is_active").eq("id", u.data.user.id).maybeSingle() : null;
     if (!prof?.data || prof.data.role !== "owner" || prof.data.is_active === false) return json({ ok: false, error: "owner_only" }, 403);
     const ids: string[] = (Array.isArray(body?.ids) ? body.ids : []).map(String).slice(0, 50);
-    if (!ids.length || !["approve", "reject"].includes(body?.decision)) return json({ ok: false, error: "bad_request" }, 400);
+    if (!ids.length || !["approve", "reject", "promote"].includes(body?.decision)) return json({ ok: false, error: "bad_request" }, 400);
     const now = new Date().toISOString();
+    // SQL123: a client kept outside the best 20 (over_cap) goes to the approval list; created_at is now, so «the client wrote
+    // after this was prepared» counts from this moment
+    if (body.decision === "promote") {
+      const pr = await db.from("whatsapp_outreach_queue").update({ status: "pending", reason: null, created_at: now, reviewed_at: null })
+        .in("id", ids).eq("company_id", prof.data.company_id).eq("kind", "new_listing").eq("status", "skipped").eq("reason", "over_cap").eq("dry_run", false).select("id");
+      if (pr.error) return json({ ok: false, error: pr.error.message }, 500);
+      return json({ ok: true, promoted: (pr.data || []).length });
+    }
     const up = await db.from("whatsapp_outreach_queue").update({ status: body.decision === "approve" ? "approved" : "skipped", reason: body.decision === "reject" ? "owner_rejected" : null, approved_at: now, decided_by: prof.data.id })
       .in("id", ids).eq("company_id", prof.data.company_id).eq("status", "pending").eq("dry_run", false).select("id");
     if (up.error) return json({ ok: false, error: up.error.message }, 500);
