@@ -306,7 +306,7 @@ test('R66 / R67 / R68 / R18: the evening notes of 14 Nov are held by code after 
  r=eveningGuard(o({text:'السلام عليكم عندنا فيلا في الخوض بـ 120 الف تحب ارسلك تفاصيلها ؟',offer_no:3}),c({clientSaid:'الخوض'}));assert.equal(r.guard,undefined,'a listed property keeps its price');
  assert.deepEqual(figuresOf('من ٥٧,٠٠٠ لين 30 نوفمبر 2026'),['57000','30','2026']);
  // wiring and the words the review reads
- assert(fn.includes('eveningGuard(out, { group, route: String(x.route_key || ""), clientSaid, confirmUnanswered: !!out.confirm_unanswered, visitedDone, offerBranch, barkaAreas: l.barkaAreas, fallback, bookedClosed: !!out.booked_closed });'));
+ assert(fn.includes('eveningGuard(out, { group, route: String(x.route_key || ""), clientSaid, confirmUnanswered: !!out.confirm_unanswered, rebookAsked: !!out.rebook_asked, kind, name, visitedDone, offerBranch, barkaAreas: l.barkaAreas, fallback, bookedClosed: !!out.booked_closed });'));
  assert(fn.includes('out.confirm_unanswered = confirmUnanswered(chat, today);'));
  assert(fn.includes('rental_terms,branch_key")'));
  for(const k of ['- عرض بركاء على عميل رقم مسقط (R66','- سؤال عن السوق (R67','- ما رد على تأكيد الموعد (R68','- لغة العميل (R69','- جاوب سؤاله (R70','تملك الأجنبي أو غير العماني (R65)'])assert(fn.includes(k),k);
