@@ -32,3 +32,11 @@ test('price-study: another property of the same owner is not marked studied',()=
   assert.match(ps,/ownTask\.has\(x\.id\)/);
   assert.match(ps,/crm_price_study_buyers/);
 });
+test('SQL127 leaves job / visa / money chats out of the waiting buyers, never a client with a buyer request or a viewing',()=>{
+  const s127=read('db/changes/127-waiting-not-buyers.forward.sql');
+  copy('_waiting_not_buyers_20261118.sql',s127);
+  assert.match(s127,/request_type = 'buyer'/);
+  assert.match(s127,/from public\.viewings v where v\.client_id = p_client/);
+  assert.match(s127,/ویزا/);
+  assert.doesNotMatch(s127,/\|شاغر\|/);
+});
