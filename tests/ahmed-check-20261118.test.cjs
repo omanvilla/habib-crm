@@ -86,3 +86,9 @@ test('SQL132: no visit confirmation for a sold / reserved property; sold notices
   assert.match(s,/w\.last_inbound_at > now\(\) - interval '23 hours'/);
   assert.match(s,/'outreach_auto_sold_notice', '2-57\/5 \* \* \* \*'/);
 });
+test('SQL133: a sold notice goes by itself outside the window too (Ahmed: «إيوا، تلقائي»), only after the review',()=>{
+  const s=read('db/changes/133-sold-notice-template.forward.sql');
+  copy('_sold_notice_template_20261118.sql',s);
+  assert.match(s,/q\.reviewed_at IS NOT NULL/);
+  assert.doesNotMatch(s,/last_inbound_at > now\(\)/);
+});
