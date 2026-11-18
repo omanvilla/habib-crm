@@ -95,6 +95,21 @@
       }
       const need=[...new Set(list.filter(n=>!n.phone&&n.client_id).map(n=>n.client_id))];
       if(need.length){const p=await supa.from('clients').select('id,phone,phone_normalized').in('id',need);const m=new Map((p.data||[]).map(x=>[x.id,x.phone_normalized||x.phone]));list.forEach(n=>{if(!n.phone&&n.client_id)n.phone=m.get(n.client_id)||'';});}
+      // 18 Nov 2026 (Ahmed: «مشتري جاد… بدون اسم»): a notification keeps the name it was written with («🔥 مشتري جاد: .»,
+      // «👑💜»). The row shows the client's real name from the CRM, or the phone, like the chat rows (crm_is_real_name rule).
+      const named=[...new Set(list.filter(n=>n.kind==='n'&&n.client_id).map(n=>n.client_id))];
+      if(named.length){
+        const p=await supa.from('clients').select('id,name,phone,phone_normalized').in('id',named);
+        const cm=new Map((p.data||[]).map(x=>[x.id,x]));
+        list.forEach(n=>{
+          if(n.kind!=='n'||!n.client_id)return;
+          const c=cm.get(n.client_id);if(!c)return;
+          n.title=String(n.title||'').replace(/^((?:🔥|📞|📅)[^:]*:\s*)([^·\n]*)/,(all,head,nm)=>{
+            const was=String(nm).trim();if(realName(was))return all;
+            return head+(realName(c.name)?String(c.name).trim():(c.phone_normalized||c.phone||n.phone||'عميل'))+(String(nm).endsWith(' ')?' ':'');
+          });
+        });
+      }
       list.sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)));
       // 16 Nov 2026 (Ahmed: «اجتماع مع جيهان طالع لي 3 مرات… واجتماع مع ايهاب لحد الحين ظاهر»): one row per client and kind (the
       // newest; «تم» already closes every alert of that client), and a meeting whose written day has passed leaves the list.
