@@ -347,9 +347,16 @@
     box.innerHTML='<button type="button" class="ccm-head" data-ccm="toggle-unasked" aria-expanded="'+unaskedOpen+'">👀 معاينات أمس بدون متابعة من العقل <b dir="ltr">'+unasked.length+'</b></button>'
       +(unaskedOpen?unaskedList():'');
   }
-  async function loadUnasked(){
-    if(!staff())return;
-    try{const r=await supa.rpc('crm_visits_unasked',{p_day:null});if(!r.error){unasked=r.data||[];drawUnasked();}}catch(_){}
+  // 18 Nov 2026 (decision 64): the start timer and each loadDashboard hook read this at about the same time; one read
+  // still on its way, or answered less than 3 seconds ago for the same session, is shared
+  let unaskedRead=null,unaskedAt=0,unaskedKey='';
+  function loadUnasked(){
+    if(!staff())return Promise.resolve();
+    const key=(typeof crmSessionGeneration==='undefined'?'':crmSessionGeneration)+':'+(typeof currentUser!=='undefined'&&currentUser?currentUser.id:'');
+    if(unaskedRead&&unaskedKey===key&&(!unaskedAt||Date.now()-unaskedAt<3000))return unaskedRead;
+    const read=(async()=>{try{const r=await supa.rpc('crm_visits_unasked',{p_day:null});if(!r.error){unasked=r.data||[];drawUnasked();return true;}}catch(_){}return false;})()
+      .then(ok=>{if(unaskedRead===read){if(ok)unaskedAt=Date.now();else unaskedRead=null;}});
+    unaskedKey=key;unaskedAt=0;unaskedRead=read;return read;
   }
 
   document.addEventListener('click',e=>{
