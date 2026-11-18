@@ -152,7 +152,7 @@ test('visit results are the AI job: read from the chat, saved on the visit, a se
  const home=fs.readFileSync('crm-owner-home.js','utf8');
  assert(home.includes('زيارات يتابعها الذكاء الاصطناعي')&&home.includes("if(Number(d.overdue_total)||un0)"));
  const hot=fs.readFileSync('crm-hot-alerts.js','utf8');
- assert(hot.includes("/^(مشتري جاد|تفاوض|طلب اتصال)/")&&hot.includes("isOwner()"));
+ assert(hot.includes("/^(مشتري جاد|تفاوض|طلب اتصال)/")&&hot.includes("canSee()")); // SQL128: staff see the list too
  assert(index.includes('crm-hot-alerts.js?v='));
 });
 test('a saved visit result sends the visit follow-up back to review; property types read in Arabic',()=>{
