@@ -132,7 +132,10 @@ test('whatsapp-owner-hot-alert accepts what the trigger posts (until then it ski
  const m=fn.match(/^const HOT = \/(.+)\/;$/m);
  assert(m,'the HOT pattern of whatsapp-owner-hot-alert was not found');
  if(!m[1].includes('اجتماع')){t.skip('whatsapp-owner-hot-alert still answers skipped:not_hot for «اجتماع:»: no WhatsApp meeting alert until it is changed and re-pinned');return;}
- const edge=new RegExp(m[1]),trig=new RegExp(F[HOT].match(/~ '([^']+)'/)[1]);
+ const edge=new RegExp(m[1]);
+ // SQL129 (18 Nov 2026): the live trigger pattern is the one SQL129 writes (it adds «طلب اتصال»)
+ const s129=(fs.readFileSync('db/changes/129-hot-alerts-whatsapp.forward.sql','utf8').match(/replace\(d, a, '([^']+)'\)/)||[])[1];
+ const trig=new RegExp(s129||F[HOT].match(/~ '([^']+)'/)[1]);
  for(const s of ['اجتماع: عميل مكتب الموالح 2026-11-12 10:00',' اجتماع : عميل','مشتري جاد: عميل','تفاوض: عميل','دراسة سعر: عميل','طلب اتصال: عميل','عميل اجتماع: بعدين'])assert.equal(edge.test(s),trig.test(s),s);
 });
 
