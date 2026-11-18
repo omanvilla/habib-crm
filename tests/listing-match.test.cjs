@@ -67,3 +67,11 @@ test('clients outside the best 20 are kept (skipped / over_cap) and the owner ca
   assert(ui.includes("eq('reason','over_cap')")&&ui.includes("data-rp=\"out-promote\"")&&ui.includes("outreachAct([card.dataset.out],'promote'"));
   assert(index.includes('crm-reply-approvals.js?v=20261118-extra1'));
 });
+test('«غير محدد» / «اي مكان» say nothing; «اي مكان في بركا» keeps بركا; بركا = بركاء',async()=>{
+  const {cleanArea,scoreRequest}=await lib();
+  for(const x of ['غير محدد','غيرمحدد','غيرمحدز','غير محدود','لا محدود','.','J','موقع مميز','اي مكان','أي مكان','اي منطقه','اي مكان قريب'])assert.equal(cleanArea(x),'',x);
+  assert.equal(cleanArea('اي مكان في بركا'),'بركا');assert.equal(cleanArea('اي مكان ﻓي مسقط'),'مسقط');assert.equal(cleanArea('الصومحان'),'الصومحان');
+  assert.equal(scoreRequest(villa,{preferred_area:'اي مكان في بركا',budget_max:70000},daysAgo(3),now).level,'near');
+  assert.equal(scoreRequest(villa,{preferred_area:'غير محدد',budget_max:70000},daysAgo(3),now),null);
+  assert(out.includes('.map(cleanArea).find(Boolean)'),'the request summary leaves «غير محدد» out');
+});

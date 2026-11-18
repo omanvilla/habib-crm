@@ -14,7 +14,7 @@
 //   templates       {submit}        submits / refreshes the four templates on both numbers
 //   approve         (owner JWT)     {ids, decision: approve|reject} → approve sends right away (within hours)
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { LISTING_CAP, priceMentioned, rankCandidates, scoreRequest } from "../_shared/listing-match.mjs";
+import { cleanArea, LISTING_CAP, priceMentioned, rankCandidates, scoreRequest } from "../_shared/listing-match.mjs";
 const EXTRA_CAP = 30;
 
 const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false, autoRefreshToken: false } });
@@ -87,7 +87,8 @@ async function upsertRows(rows: any[]) {
 function requestSummary(r: any) {
   const t = (Array.isArray(r.property_types) && r.property_types[0]) || r.property_type || "";
   const type = NOUN[t]?.[2] || (/^[\u0600-\u06FF\s]+$/.test(t) ? t : "عقار");
-  const area = (Array.isArray(r.preferred_areas) && r.preferred_areas.length ? r.preferred_areas[0] : r.preferred_area) || "";
+  // the first area that says something («غير محدد» / «اي مكان» are left out: «فيلا بحدود 60 الف», not «فيلا في غير محدد»)
+  const area = [...(Array.isArray(r.preferred_areas) ? r.preferred_areas : []), r.preferred_area].map(cleanArea).find(Boolean) || "";
   const budget = r.budget_max ? ` بحدود ${thousands(r.budget_max)}` : "";
   return `${type}${area ? " في " + area : ""}${budget}`.trim();
 }

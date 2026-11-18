@@ -112,6 +112,10 @@ live database: advisors, RLS, cron runs, 24 hours of Postgres and edge logs, `pg
   with created_at = now. Checked: preview owner sees the block and the button reaches the function, staff (`/after/muscat/`)
   sees nothing; RLS in a rolled-back transaction: owner reads/updates the row, staff reads 0 / updates 0 / the siblings RPC
   is denied; live preview villa 69: 20 picked + 3 kept; promote without a JWT → 403.
+- **whatsapp-outreach v12 (18 Nov, «كمل»):** `cleanArea()` in listing-match.mjs: a request area that says nothing («غير
+  محدد» 54 requests, «غير محدود», «لا محدود», «.», «موقع مميز», «اي مكان») is empty in the matching and in
+  `requestSummary` (so «فيلا بحدود 60 الف», not «فيلا في غير محدد»; this summary is also the weekly follow-up's template
+  text); «اي مكان في بركا» keeps «بركا», and «بركا» counts as «بركاء». Live preview villa 69 unchanged in numbers.
 - **Left as they are, on purpose:** the two SECURITY DEFINER views (`crm_properties_access`, `crm_deals_access`) hide money
   columns from staff by design; 346 «duplicate key» answers a day on `whatsapp_messages` and 95 on `activities` are the
   webhook's own duplicate guard; leaked-password protection is a switch in the Supabase dashboard (Ahmed).
