@@ -90,6 +90,24 @@ const OWNER_TIME_LINE ="تواصل مع صاحب العقار مباشرة ون�
 const REASON_Q = /الاسباب|ليش\s*ما\s*ناسب/;
 const VISIT_Q = /(تزور|تزورون|تزورين)\s*؟/;
 // c: { history, burstSaid, prop, visitedProp, visitedAny, saidVisited, handoffOpen, hardHandoff }. Returns the reply lines; marks out.
+// R115 (18 Nov audit): a client who never visited answers our «… انحجزت» + «تحب تشوف خيارات ثانية ؟» with «نعم» / «صورة
+// وموقع». He wants the alternative, not «ايش اللي ناقصك» nor a silent handoff. Returns the two fixed lines naming the nearest
+// available home of this branch («تقدر تزيد شوي ؟» when it is over his budget by more than 15%), or null when the last
+// office message was not that notice or no home is available.
+function soldNoticeYes(out: any, c: any): string[] | null {
+  let lastOut = ""; for (const h of c.history) if (h.direction === "outbound") lastOut = String(h.transcript || h.body || "");
+  if (!/خيارات\s*ثاني/.test(lastOut)) return null;
+  const homes = ((c.available || []) as any[]).filter((p: any) => ["villa", "twin_villa", "house"].includes(String(p.type)) && p.listing_purpose !== "rent"
+    && (!c.route || !["muscat", "barka"].includes(String(p.branch_key)) || p.branch_key === c.route) && Number(p.price) > 0)
+    .sort((a: any, b: any) => Number(a.price) - Number(b.price));
+  const h0 = homes.find((p: any) => !c.budget || Number(p.price) >= Number(c.budget) * 0.85) || homes[homes.length - 1];
+  if (!h0) return null;
+  const k = Math.round(Number(h0.price) / 1000), label = c.typeLabel ? c.typeLabel(h0.type) : "فيلا";
+  out.action = "none"; out.handoff_reason = null; out.property_id = h0.id; out.guard_sold_notice_yes = true;
+  return c.budget && Number(h0.price) > Number(c.budget) * 1.15
+    ? [`حالياً ما عندنا ${label} بحدود ${Math.round(Number(c.budget) / 1000)} الف`, `اقرب شي عندنا في ${h0.area} ${label} بـ${k} الف تقدر تزيد شوي ؟`]
+    : [`اقرب شي عندنا في ${h0.area} ${label} بـ${k} الف`, "تحب ارسلك تفاصيلها ؟"];
+}
 function ownerDecisions(out: any, lines: string[], c: any) {
   let texts = [...lines];
   const body = (h: any) => String(h.transcript || h.body || "");
@@ -388,24 +406,17 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     // R115 (18 Nov audit, 99448993 «ارسل صورة وموقع ان امكن» after «… انحجزت» + «تحب تشوف خيارات ثانية ؟»): the yes to the
     // sold notice got «ايش اللي ناقصك» and then a silent «ما عرفنا» handoff (one dry run of two). He wants the alternative:
     // the nearest available home of this branch is named, with «تقدر تزيد شوي ؟» when it is over his budget by more than 15%.
-    let lastOutBody = ""; for (const h of c.history) if (h.direction === "outbound") lastOutBody = body(h);
-    if (!texts.some((t) => !/^\s*اسمك\s*الكريم\s*؟?\s*$/.test(t)) && /خيارات\s*ثاني/.test(lastOutBody)) {
-      const homes = ((c.available || []) as any[]).filter((p: any) => ["villa", "twin_villa", "house"].includes(String(p.type)) && p.listing_purpose !== "rent"
-        && (!c.route || !["muscat", "barka"].includes(String(p.branch_key)) || p.branch_key === c.route) && Number(p.price) > 0)
-        .sort((a: any, b: any) => Number(a.price) - Number(b.price));
-      const h0 = homes.find((p: any) => !c.budget || Number(p.price) >= Number(c.budget) * 0.85) || homes[homes.length - 1];
-      if (h0) {
-        const k = Math.round(Number(h0.price) / 1000), label = c.typeLabel ? c.typeLabel(h0.type) : "فيلا";
-        texts = c.budget && Number(h0.price) > Number(c.budget) * 1.15
-          ? [`حالياً ما عندنا ${label} بحدود ${Math.round(Number(c.budget) / 1000)} الف`, `اقرب شي عندنا في ${h0.area} ${label} بـ${k} الف تقدر تزيد شوي ؟`]
-          : [`اقرب شي عندنا في ${h0.area} ${label} بـ${k} الف`, "تحب ارسلك تفاصيلها ؟"];
-        out.action = "none"; out.handoff_reason = null; out.property_id = h0.id; out.guard_sold_notice_yes = true;
-      }
-    }
+    if (!texts.some((t) => !/^\s*اسمك\s*الكريم\s*؟?\s*$/.test(t))) texts = soldNoticeYes(out, c) || texts;
     if (!texts.some((t) => !/^\s*اسمك\s*الكريم\s*؟?\s*$/.test(t))) {
       texts = []; out.action = "handoff"; out.handoff_reason = `ما عرفنا: العميل ما زار وكتب «${String(c.burstSaid || "").slice(0, 120)}»`;
     }
     out.guard_seen_q = true;
+  }
+  // (live check of v100: the same yes got «ايش المواصفات اللي ناقصتك في الفيلا السابقة ؟», a wording SEEN_Q does not catch)
+  const MISSING_Q = /ناقص(ك|تك|ج|تج|كم)|ما\s*ناسب(ك|تك|ج|كم)/;
+  if (!c.visitedProp && !c.visitedSome && !c.saidVisited && texts.some((t) => MISSING_Q.test(t))) {
+    const alt = soldNoticeYes(out, c);
+    if (alt) texts = alt;
   }
   // dry run of 16 Nov (307af714, b387b2de, 2 more): «اسمك الكريم ؟» stuck inside «الفيلا اللي سألت عنها انباعت», before the
   // details of the other property, read as one message «انباعت / اسمك الكريم ؟ / بس عندنا…». It moves before the last question.
