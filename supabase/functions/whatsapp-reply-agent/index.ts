@@ -608,6 +608,38 @@ const DECLINE_RE = /ما\s*(نقدر\s*)?(نستلم|نقبل|نتعامل\s*م�
 // price study is opened (the lines match DECLINE_RE, so R37 closes the offer). The place is read from what the model wrote
 // in owner_offer: a wilayat name outside the two, never when a Muscat or Barka name stands beside it. Names that are also
 // plain words (نخل، صور، منح…) count only as the whole wilayat field.
+// Step F (decision 77, Ahmed 18 Nov 2026): the branch line towards the other number, as the brain (old or new wording), R9 for
+// owners or R48 write it, becomes «عقارات {area} يتابعها رقم فرع X {number} وبنرسلك منه» (an owner: «عقارك في {area} يتابعه …»).
+// The model's branch_transfer adds the line when it forgot it. Returns the reply and the transfer, or null.
+const BRANCH_OLD_RE = /^(هذا العقار|طلبك|عقارك)\s*تتابعه\s*معنا\s*على\s*رقم\s*(مسقط|بركاء)\s*(?:71770030|92344273)?\s*واتساب\s*$/;
+const BRANCH_NEW_RE = /^(عقارات|عقارك)\s*(?:في\s+)?(.*?)\s*يتابع(?:ها|ه)\s*رقم\s*فرع\s*(مسقط|بركاء)\s*(?:71770030|92344273)?\s*وبنرسلك\s*منه\s*$/;
+function transferArea(raw: unknown, branch: string) {
+  const s = String(raw ?? "").replace(/[^ء-ي0-9A-Za-z ]/g, " ").replace(/\s+/g, " ").trim().slice(0, 40).trim();
+  return s && !/^(غير محدد|اي مكان|أي مكان|null)$/.test(s) ? s : branch;
+}
+function branchTransferLines(out: any, here: unknown, prop: any, branchOf: (k: any) => { name: string; number: string } | null) {
+  if (!["muscat", "barka"].includes(String(here))) return null;
+  const hit: { to: string; area: string }[] = [];
+  const req: string[] = out.request && Array.isArray(out.request.areas) ? out.request.areas : [];
+  const make = (to: string, owner: boolean, named: unknown) => {
+    const b = branchOf(to)!;
+    const area = transferArea((out.branch_transfer?.to === to ? out.branch_transfer.area : "") || named || (prop?.branch_key === to ? prop.area : "")
+      || (owner ? out.owner_offer?.area || out.owner_offer?.wilayat : "") || req[0] || out.area, b.name);
+    hit.push({ to, area });
+    if (owner) return area === b.name ? `عقارك يتابعه رقم فرع ${b.name} ${b.number} وبنرسلك منه` : `عقارك في ${area} يتابعه رقم فرع ${b.name} ${b.number} وبنرسلك منه`;
+    return `عقارات ${area} يتابعها رقم فرع ${b.name} ${b.number} وبنرسلك منه`;
+  };
+  let lines = (out.reply_messages || []).map((t: any) => {
+    const s = String(t).trim();
+    const o = BRANCH_OLD_RE.exec(s), n = o ? null : BRANCH_NEW_RE.exec(s);
+    if (!o && !n) return t;
+    const to = (o ? o[2] : n![3]) === "مسقط" ? "muscat" : "barka";
+    return to === here ? t : make(to, (o ? o[1] : n![1]) === "عقارك", n ? n[2] : "");
+  });
+  const bt = out.branch_transfer;
+  if (!hit.length && bt && ["muscat", "barka"].includes(bt.to) && bt.to !== here) lines = [...lines.slice(0, 2), make(bt.to, out.category === "seller", "")];
+  return hit.length ? { lines, ...hit[hit.length - 1] } : null;
+}
 const OUT_OF_AREA_LINES = ["نعتذر منك احنا حالياً نشتغل في مسقط وبركاء فقط", "اذا عندك عقار في مسقط ارسله على رقم مسقط 71770030 واذا في بركاء على رقم بركاء 92344273"];
 const OUT_OF_AREA_SAID = /نشتغل\s*في\s*مسقط\s*وبركاء\s*فقط/;
 const areaNorm = (s: unknown) => String(s ?? "").replace(/[ً-ٰٟـ]/g, "").replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/[^ء-ي\s]/g, " ").replace(/\s+/g, " ").trim();
@@ -873,8 +905,15 @@ const schema = {
     }] },
     // R31 (Ahmed 11 Nov): the client asked about «المستحقين» units (stopped for now) and goes on the waiting list
     mustahiq_waitlist: { type: "boolean" },
+    // step F (decision 77, Ahmed 18 Nov): the client wrote to the wrong branch number about the other branch's area; the right
+    // number messages him (whatsapp-outreach kind branch_transfer, SQL140)
+    branch_transfer: { anyOf: [{ type: "null" }, {
+      type: "object", additionalProperties: false,
+      properties: { to: { type: "string", enum: ["muscat", "barka"] }, area: { type: "string" } },
+      required: ["to", "area"],
+    }] },
   },
-  required: ["reply_messages", "category", "ignore_kind", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives", "close_other_branch", "owner_offer", "request", "seriousness", "seriousness_reason", "meeting", "client_name_stated", "name_declined", "mustahiq_waitlist"],
+  required: ["reply_messages", "category", "ignore_kind", "source", "intent", "budget_asked_now", "budget", "area", "property_id", "action", "viewing_date", "viewing_time", "handoff_reason", "crm_note", "matched_rule_id", "alternatives", "close_other_branch", "owner_offer", "request", "seriousness", "seriousness_reason", "meeting", "branch_transfer", "client_name_stated", "name_declined", "mustahiq_waitlist"],
 };
 
 // The marketing text (property description, or the longest reel caption for it) is what the office
@@ -2378,7 +2417,7 @@ Deno.serve(async (req) => {
       const line = out.category === "investor" ? "الاستثمار والمشاريع تتابعها معنا على رقم مسقط 71770030 واتساب" : "عقارك تتابعه معنا على رقم مسقط 71770030 واتساب";
       // once per chat (10 Nov), counted from this line only: the brain's «طلبك / هذا العقار تتابعه معنا على رقم مسقط» lines are about a request
       // or a listing (most Barka chats that already have the Muscat number got one of those), so they never stand in for this line
-      const lineRe = out.category === "investor" ? /الاستثمار والمشاريع\s*تتابعها\s*معنا\s*على\s*رقم\s*مسقط/ : /عقارك\s*تتابعه\s*معنا\s*على\s*رقم\s*مسقط/;
+      const lineRe = out.category === "investor" ? /الاستثمار والمشاريع\s*تتابعها\s*معنا\s*على\s*رقم\s*مسقط/ : /عقارك\s*تتابعه\s*معنا\s*على\s*رقم\s*مسقط|عقارك\s.*يتابعه\s*رقم\s*فرع\s*مسقط/;
       const lineOut = history.filter((h: any) => h.direction === "outbound" && lineRe.test(String(h.body || "")));
       const redirectSent = lineOut.length > 0;
       const lineRecent = lineOut.some((h: any) => Date.now() - new Date(h.message_timestamp).getTime() < 15 * 60 * 1000);
@@ -2434,6 +2473,22 @@ Deno.serve(async (req) => {
     }
     // no English type codes reach the customer (links are left as they are)
     out.reply_messages = (out.reply_messages || []).map((r: string) => arabicOnly(r));
+    // Step F (decision 77, Ahmed 18 Nov 2026): a client (buyer or owner) who wrote to the wrong branch number about the other
+    // branch's area is moved there by us: the line «… تتابعه معنا على رقم X واتساب» (brain, R9 for owners, R48) becomes «عقارات
+    // {area} يتابعها رقم فرع X {number} وبنرسلك منه» (never «بيتواصل معك»), and the transfer is queued: the right number sends
+    // branch_transfer_ar_v1 (APPROVED + UTILITY only) or the same text inside its 24 hours, once its line here went out, and then
+    // closes what waited here for that topic (whatsapp-outreach, SQL140). The investor line (R9) stays as it is.
+    const stepF = branchTransferLines(out, conv.route_key, prop, branchOf);
+    if (stepF) {
+      out.reply_messages = stepF.lines;
+      analysis.branch_transfer = { to: stepF.to, area: stepF.area };
+      // nothing of the other branch is served here (no location, lockbox, owner number or visit); a handoff stays
+      if (["send_location", "send_lockbox", "send_owner_number", "book_viewing"].includes(out.action)) { out.action = "none"; out.viewing_date = null; out.viewing_time = null; actionMsgs.length = 0; analysis.viewing_date = null; analysis.viewing_time = null; }
+      if (!review) {
+        const bt = await db.rpc("crm_branch_transfer_queue", { p_conversation: conv.id, p_to_route: stepF.to, p_area: stepF.area });
+        analysis.branch_transfer_queue = bt.error ? short(bt.error.message, 200) : bt.data;
+      }
+    }
     // decision 30 (Ahmed 18 Nov 2026): humanize() strips commas from the model's lines, but lines the code adds after it (fixed
     // lines, pinned replies, the ad text) kept theirs; and «حياك» is banned always. Links and figures («59,000») are left alone.
     out.reply_messages = out.reply_messages.map((r: string) => {
