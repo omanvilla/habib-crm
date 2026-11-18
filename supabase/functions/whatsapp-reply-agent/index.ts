@@ -722,15 +722,24 @@ async function routeTokens(companyId: string, routeKey: string) {
   return out;
 }
 
+// 18 Nov audit (Mody, 10:10): Meta answered 500 #131000 «Something went wrong» (a passing error), the next token got 400
+// Authorization Error and the reply was lost. A passing error (5xx, 429, or codes 1, 2, 4, 80007, 130429, 131000, 131016)
+// is tried again on the same token after 1.5 s and 4 s before the next token.
+const META_PASSING = new Set([1, 2, 4, 80007, 130429, 131000, 131016]);
 async function metaSend(tokens: string[], phoneId: string, to: string, payload: any) {
   for (const t of tokens) {
-    const r = await fetch(`https://graph.facebook.com/${GRAPH}/${phoneId}/messages`, {
-      method: "POST", headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to, ...payload }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (r.ok) return d?.messages?.[0]?.id || null;
-    console.error("[reply-agent] meta", r.status, JSON.stringify(d).slice(0, 400));
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const r = await fetch(`https://graph.facebook.com/${GRAPH}/${phoneId}/messages`, {
+        method: "POST", headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to, ...payload }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) return d?.messages?.[0]?.id || null;
+      console.error("[reply-agent] meta", r.status, attempt, JSON.stringify(d).slice(0, 400));
+      const passing = r.status >= 500 || r.status === 429 || META_PASSING.has(Number(d?.error?.code));
+      if (!passing || attempt === 2) break;
+      await new Promise((ok) => setTimeout(ok, attempt === 0 ? 1500 : 4000));
+    }
   }
   throw new Error("meta_send_failed");
 }
@@ -2202,6 +2211,30 @@ Deno.serve(async (req) => {
       saidVisited: history.some((h: any) => h.direction === "inbound" && SAID_VISITED.test(String(h.transcript || h.body || ""))),
       handoffOpen: !!conv.human_handoff_required, hardHandoff: HARD_HANDOFF.test(String(out.handoff_reason || "")),
       gone: goneRows, available: props, route: String(conv.route_key || ""), typeLabel: typeAr, msgType: msg.message_type });
+    // R114 guard (18 Nov audit, Raiaheen «فلا الرميس قابله للتفاوض؟»): a question about a villa got the rest house ad (the rest
+    // house is the only available property in that area and its ad says «فيلا مصممة كاستراحة»). The brain rule alone did not
+    // hold in the dry run. A client who asks about a villa and never spoke of a rest house, with no budget that reaches the
+    // rest house, is not shown it: if a villa in that area is sold or reserved he hears that (the sold rule, the notice's own
+    // second line), otherwise the rest house lines are taken out and, if nothing is left, he is asked for the ad link.
+    {
+      const said = String(burstSaid || "");
+      const villaAsk = /(^|[\s،,])(ال)?(فيلا|ڤيلا|في?ل[ةه]|فلا|ڤل[ةه]|فلل)($|[\s،,؟?!.])/.test(said);
+      const restSaid = /استراح/.test(said) || history.some((h: any) => h.direction === "inbound" && /استراح/.test(String(h.transcript || h.body || "")));
+      const rest = props.find((p: any) => p.type === "resthouse" && (p.id === out.property_id || texts.some((t) => /استراح/.test(t))));
+      const budget = Number(out.request?.budget_max || client?.budget_max || 0);
+      if (villaAsk && !restSaid && rest && texts.some((t) => /استراح/.test(t)) && !(budget && budget >= Number(rest.price || 0) * 0.92)) {
+        const sameArea = (a: any) => { const x = String(a || ""), y = String(rest.area || ""); return !!x && !!y && (x.includes(y) || y.includes(x)); };
+        const goneVilla = soldRows.find((s: any) => ["villa", "twin_villa", "house"].includes(String(s.type)) && sameArea(s.area));
+        if (goneVilla) {
+          texts = [`الفيلا اللي سألت عنها ${goneVilla.status === "reserved" ? "انحجزت" : "انباعت"}`, "تحب تشوف خيارات ثانية ؟"];
+        } else {
+          texts = texts.map((t) => t.length > 200 && /استراح/.test(t) ? "" : t.split("\n").filter((l) => !/استراح/.test(l)).join("\n").trim()).filter(Boolean);
+          if (!texts.length) texts = ["ارسل لي رابط الاعلان او صورة منه عشان ارسلك التفاصيل والسعر بالضبط"];
+        }
+        if (out.property_id === rest.id) out.property_id = null;
+        out.action = "none"; out.handoff_reason = null; out.guard_no_resthouse_for_villa = true;
+      }
+    }
     let askedOnce = false;
     texts = texts.filter((t) => { const q = t.length < 90 && /(تزور|تزورون|تزورين)\s*؟/.test(t); if (!q) return true; if (askedOnce) return false; askedOnce = true; return true; });
     // keep the question even when there are two ads
