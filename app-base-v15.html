@@ -5978,7 +5978,7 @@ async function populatePropertySourceSelect(selectedId){
 function employeeTargetMonth(){return new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'}).slice(0,7)+'-01'}
 function employeeTargetMonthEnd(month){return new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),1)).toISOString().slice(0,10)}
 function employeeActiveProperty(p){return p.archived!==true&&!['sold','not_available'].includes(p.status)&&!String(p.title||'').startsWith('TEST')}
-function employeeInventoryDeficit(active){return Math.max(0,10-Number(active||0))}
+function employeeInventoryDeficit(active){return Math.max(0,25-Number(active||0))}
 let employeeTargetReminderLoadSeq=0;
 async function loadEmployeeTargetReminder(){
  const seq=++employeeTargetReminderLoadSeq;
@@ -5989,11 +5989,13 @@ async function loadEmployeeTargetReminder(){
  try{
   const result=await supa.rpc('crm_branch_target_snapshot');if(result.error)throw result.error;
   if(seq!==employeeTargetReminderLoadSeq||!crmSessionCurrent(generation,user))return;
-  const branches=crmReadBranchRows(result.data);if(branches.length!==1)throw new Error('لم تصل بيانات مخزون الفرع');const metric=branches[0];crmRememberBranchIdentity(result.data);
-  const required=metric.goals?.inventory??10,available=Number(metric.inventory||0),shortfall=Math.max(0,required-available);
+  crmReadBranchRows(result.data);crmRememberBranchIdentity(result.data);
+  // SQL138 (Ahmed's review [62], 18 Nov 2026): one company inventory number (25), no split between branches
+  const ci=result.data.company_inventory;if(!ci||!Number.isFinite(Number(ci.goal)))throw new Error('لم تصل بيانات مخزون الشركة');
+  const required=Number(ci.goal),available=Number(ci.count||0),shortfall=Math.max(0,required-available);
   window.employeeInventoryState={active:available,required,needed:shortfall};
   if(!shortfall){box.textContent='';card.style.display='none';return}
-  box.innerHTML='<strong>المطلوب إكمال '+shortfall+' عقارات متاحة</strong><div style="margin-top:6px">رصيد الفرع المتاح حاليًا '+available+' من '+required+'. هدف الإضافات الأسبوعية مستقل، وتفصيله في بطاقة الأهداف.</div><button class="btn-secondary" onclick="navigate(\'properties\',null)">فتح العقارات</button>';
+  box.innerHTML='<strong>المطلوب إكمال '+shortfall+' عقارات متاحة</strong><div style="margin-top:6px">المتاح للشركة حاليًا '+available+' من '+required+'. هدف الإضافات الأسبوعية مستقل، وتفصيله في بطاقة الأهداف.</div><button class="btn-secondary" onclick="navigate(\'properties\',null)">فتح العقارات</button>';
   card.style.display='';
  }catch(e){
   if(seq!==employeeTargetReminderLoadSeq||!crmSessionCurrent(generation,user))return;
@@ -6003,7 +6005,8 @@ async function loadEmployeeTargetReminder(){
   console.warn('Employee target reminder:',e);
  }
 }
-const employeeGoalFields=[['Inv','inventory_target','المخزون المتاح','inventory',10],['WeeklyNew','weekly_new_properties_target','إضافات أسبوعية','new_properties',2],['Daily','daily_followups_target','متابعات يومية','followups',10],['WeeklyVisits','weekly_viewings_target','معاينات أسبوعية','viewings',5],['Bookings','reservations_target','حجوزات شهرية','bookings',2],['BookingComm','booking_commission_target','عمولة متوقعة شهرية (ر.ع)','expected_commission',4000]];
+// SQL138 (Ahmed's review [3][62], 18 Nov 2026): no branch inventory number (the company has one, 25); 3 deals and OMR 5,400
+const employeeGoalFields=[['WeeklyNew','weekly_new_properties_target','إضافات أسبوعية','new_properties',2],['Daily','daily_followups_target','متابعات يومية','followups',10],['WeeklyVisits','weekly_viewings_target','معاينات أسبوعية','viewings',5],['Bookings','reservations_target','صفقات شهرية','bookings',3],['BookingComm','booking_commission_target','عمولة متوقعة شهرية (ر.ع)','expected_commission',5400]];
 let branchTargetLoadSeq=0;
 const branchTargetEditState=new Map();
 async function loadEmployeeTeamTargets(){
@@ -6014,7 +6017,7 @@ async function loadEmployeeTeamTargets(){
   if(seq!==branchTargetLoadSeq||!crmSessionCurrent(generation,user)||!isOwner())return;if(result.error)throw result.error;
   const branches=crmReadBranchRows(result.data);if(result.data.month_start!==month)throw new Error('لم تصل أهداف الشهر المطلوب');
   branches.forEach(row=>branchTargetEditState.set(row.branch,{month:result.data.month_start,updated_at:row.updated_at||null,generation,user}));
-  box.innerHTML='<p>أهداف '+escapeHtml(month)+'؛ تُحفظ لكل فرع وتستمر عند تغيير حسابات الفريق. المبيعات تتحقق بعدد الحجوزات أو عمولتها المسجلة. القيمة 0 توقف ذلك الهدف.</p><button type="button" class="btn-secondary" onclick="loadEmployeeTeamTargets()">تحديث الأهداف</button>'+branches.map(m=>'<div class="team-target-row" data-branch-target-form="'+m.branch+'" style="border:1px solid var(--cream-deeper);border-radius:9px;padding:10px;margin:8px 0"><strong>'+crmBranchName(m.branch)+'</strong><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:end">'+employeeGoalFields.map(([suffix,key,label,metric])=>'<label>'+label+'<input class="fi" type="number" min="0" '+(suffix==='BookingComm'?'step="0.001"':'step="1" max="1000"')+' id="et'+suffix+'_'+m.branch+'" value="'+escapeHtml(m.goals?.[metric]??'')+'" style="max-width:130px"></label>').join('')+'<button class="btn-secondary" data-branch-goal-save="'+m.branch+'">حفظ الأهداف</button></div></div>').join('');
+  box.innerHTML='<p>أهداف '+escapeHtml(month)+'؛ تُحفظ لكل فرع وتستمر عند تغيير حسابات الفريق. هدف الشهر يتحقق بعدد الصفقات وعمولتها المسجلة معًا. القيمة 0 توقف ذلك الهدف. المخزون رقم واحد للشركة ('+escapeHtml(String(result.data.company_inventory_goal??25))+' عقار متاح) بدون تقسيم على الفروع.</p><button type="button" class="btn-secondary" onclick="loadEmployeeTeamTargets()">تحديث الأهداف</button>'+branches.map(m=>'<div class="team-target-row" data-branch-target-form="'+m.branch+'" style="border:1px solid var(--cream-deeper);border-radius:9px;padding:10px;margin:8px 0"><strong>'+crmBranchName(m.branch)+'</strong><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:end">'+employeeGoalFields.map(([suffix,key,label,metric])=>'<label>'+label+'<input class="fi" type="number" min="0" '+(suffix==='BookingComm'?'step="0.001"':'step="1" max="1000"')+' id="et'+suffix+'_'+m.branch+'" value="'+escapeHtml(m.goals?.[metric]??'')+'" style="max-width:130px"></label>').join('')+'<button class="btn-secondary" data-branch-goal-save="'+m.branch+'">حفظ الأهداف</button></div></div>').join('');
  }catch(e){if(seq===branchTargetLoadSeq&&crmSessionCurrent(generation,user)&&isOwner())box.innerHTML='<div role="alert">تعذر تحميل أهداف الفروع: '+escapeHtml(e.message)+' <button type="button" class="btn-secondary" onclick="loadEmployeeTeamTargets()">إعادة المحاولة</button></div>'}
 }
 async function saveEmployeeTarget(branch){

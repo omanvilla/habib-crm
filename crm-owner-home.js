@@ -293,9 +293,9 @@
   function drawSummary(d){
     const p=d.properties||{},r=d.report||{},label={barka:'بركاء',muscat:'مسقط'};
     // 17 Nov 2026: the target is now 25 for the company by 12 Feb 2027 (Ahmed, 16 Nov; AGENTS.md). Display only: the saved
-    // branch targets and their per-branch default are unchanged until he says how the 25 splits.
+    // branch targets and their per-branch default are unchanged until he says how the 25 splits. SQL138 (18 Nov, [62]): no split, one company number; the goal comes from the snapshot (company_inventory.goal).
     const avail=(p.branches||[]).reduce((s,b)=>s+Number(b.available||0),0);
-    const props=[['متاح للشركة من '+INVENTORY_TARGET,avail]].concat((p.branches||[]).map(b=>['متاح '+(label[b.branch]||b.branch),b.available])).concat([['أضيفت هذا الأسبوع',p.added_week],['توفرها ما تأكد من شهر',p.unchecked]]);
+    const props=[['متاح للشركة من '+((goals&&goals.company_inventory&&goals.company_inventory.goal)||INVENTORY_TARGET),avail]].concat((p.branches||[]).map(b=>['متاح '+(label[b.branch]||b.branch),b.available])).concat([['أضيفت هذا الأسبوع',p.added_week],['توفرها ما تأكد من شهر',p.unchecked]]);
     // 17 Nov 2026: once the goals card is drawn it carries the visits and bookings, so they are not repeated here
     const rep=[['عملاء جدد',r.new_clients],['ردود الوكيل',r.agent_replies]].concat(goals?[]:[['زيارات تمت',r.visits_done],['حجوزات الشهر',r.bookings_month]]).concat([['مبيعات الشهر',r.sales_month]]).filter(([,v])=>v!=null);
     const cells=a=>a.map(([l,v])=>'<div class="coh-stat"><strong dir="ltr">'+num(v)+'</strong><small>'+esc(l)+'</small></div>').join('');
@@ -307,8 +307,8 @@
   }
   /* 17 Nov 2026 (Ahmed, after the full check: «سوّ الإضافات كلها»): the branch goals on the home, from the same snapshot as
    * the targets in Reports (crm_branch_target_snapshot): completed visits this week of 5, documented human follow-ups
-   * today of 10, new qualified properties this week of 2, paid bookings this month of 2 (the owner also sees the expected
-   * office commission of 4,000; staff never get money figures). Staff see their branch, the owner both. Display only. */
+   * today of 10, new qualified properties this week of 2, deals (paid bookings) this month of 3 (the owner also sees the expected
+   * office commission of 5,400, SQL138 [3]; staff never get money figures). Staff see their branch, the owner both. Display only. */
   let goals=null;
   function drawGoals(){
     const el=byId('cohGoals');if(!el)return;
@@ -320,7 +320,7 @@
     el.innerHTML='<h2 class="coh-h">الأهداف <small>الأسبوع من '+esc(goals.week_start||'')+'</small></h2>'+list.map(b=>{const g=b.goals||{};
       return '<div class="coh-goal-row">'+(list.length>1||owner?'<h3 class="coh-h3">'+esc(b.name||b.branch||'')+'</h3>':'')+'<div class="coh-goal-chips">'
         +chip('زيارات تمت هالأسبوع',b.viewings,g.viewings)+chip('متابعات اليوم',b.followups,g.followups)
-        +chip('عقارات جديدة هالأسبوع',b.new_properties,g.new_properties)+chip('حجوزات الشهر',b.bookings,g.bookings)
+        +chip('عقارات جديدة هالأسبوع',b.new_properties,g.new_properties)+chip('صفقات الشهر',b.bookings,g.bookings)
         +(owner&&b.expected_commission!=null?chip('عمولة متوقعة الشهر',b.expected_commission,g.expected_commission,true):'')+'</div></div>';}).join('');
     el.hidden=false;
   }
