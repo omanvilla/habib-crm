@@ -41,7 +41,7 @@ test('visit status breakdown uses one explicit appointment-date cohort, never bo
 test('bookings, active/cancelled details, closed sales and milli-OMR receipts remain separate',async()=>{
  const {html}=await render(employee());
  for(const [key,want] of Object.entries({reservations:'2',active_reservations:'1',cancelled_reservations:'1',sales:'1',visit_to_sale:'1',expected_commission:'4,500',company_commission:'2,500',commission_collected:'500.005'}))assert.equal(value(html,key),want);
- assert.match(html,/إتمام البيع أو التحصيل لاحقًا لا يُزيلهما من ذلك الشهر/);assert.match(html,/هدف الحجوزات الشهري متحقق/);assert.doesNotMatch(html,/7,500\.005/);
+ assert.match(html,/إتمام البيع أو التحصيل لاحقًا لا يُزيلهما من ذلك الشهر/);assert.match(html,/هدف الشهر متحقق/);assert.doesNotMatch(html,/7,500\.005/);
 });
 test('documented follow-up clients use their own count instead of raw activity rows',async()=>{
  const {html}=await render(employee());assert.equal(value(html,'followup_clients'),'6');assert.doesNotMatch(html,/data-performance-metric="activities"|>99</);assert.match(html,/تواصل بشري موثق بنتيجة/);
@@ -60,7 +60,7 @@ test('masked financial values stay absent while genuine zero counts and receipts
 });
 test('a completed sale missing its booking record is diagnosed and cannot satisfy a monthly booking goal through sales or cash',async()=>{
  const {html}=await render(employee({reservations:0,active_reservations:0,cancelled_reservations:0,expected_commission:0,sales:1,company_commission:2500,commission_collected:2500,sales_without_reservation:1}));
- assert.match(html,/1 من مبيعات الفترة تفتقد تاريخ حجز مؤكدًا/);assert.match(html,/هدف الحجوزات: 0 \/ 2/);assert.doesNotMatch(html,/هدف الحجوزات الشهري متحقق/);assert.equal(value(html,'commission_collected'),'2,500');
+ assert.match(html,/1 من مبيعات الفترة تفتقد تاريخ حجز مؤكدًا/);assert.match(html,/هدف الشهر: 0 \/ 2 صفقات/);assert.doesNotMatch(html,/هدف الشهر متحقق/);assert.equal(value(html,'commission_collected'),'2,500');
 });
 
 test('report journey uses the same real three-stage contract per branch without repeated finances or invalid conversion percentages',async()=>{

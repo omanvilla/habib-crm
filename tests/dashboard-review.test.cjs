@@ -39,12 +39,17 @@ test('one unavailable owner workspace preserves the successful branch work',asyn
   assert.doesNotMatch(f.html(),/aria-busy="true"/);assert.equal(f.timers.size,0);
 });
 
-test('older refresh results cannot replace newer workspace counts or rows',async()=>{
-  const f=fixture(),old=f.context.loadDashboard(),latest=f.context.loadDashboard();
-  for(const call of f.pending.slice(2))call.resolve(result(call.args.p_scope,'SYNTHETIC CURRENT '+call.args.p_scope));
-  await latest;assert.match(f.html(),/SYNTHETIC CURRENT branches/);
-  for(const call of f.pending.slice(0,2))call.resolve(result(call.args.p_scope,'SYNTHETIC STALE '+call.args.p_scope));
-  await old;assert.match(f.html(),/SYNTHETIC CURRENT branches/);assert.doesNotMatch(f.html(),/SYNTHETIC STALE/);
+// decision 64 (18 Nov): two loads at the same moment in one session join the read still on its way instead of reading twice;
+// a load after it finished (a save) reads again and its rows replace the earlier ones.
+test('a load at the same moment joins the read on its way; a later refresh replaces the counts and rows',async()=>{
+  const f=fixture(),first=f.context.loadDashboard(),second=f.context.loadDashboard();
+  assert.deepEqual(f.pending.map(x=>x.args.p_scope),['branches','investment'],'each scope read once');
+  for(const call of f.pending)call.resolve(result(call.args.p_scope,'SYNTHETIC CURRENT '+call.args.p_scope));
+  await first;await second;assert.match(f.html(),/SYNTHETIC CURRENT branches/);assert.doesNotMatch(f.html(),/aria-busy="true"/);
+  const later=f.context.loadDashboard();
+  assert.equal(f.pending.length,4,'a finished read is not reused');
+  for(const call of f.pending.slice(2))call.resolve(result(call.args.p_scope,'SYNTHETIC NEWER '+call.args.p_scope));
+  await later;assert.match(f.html(),/SYNTHETIC NEWER branches/);assert.doesNotMatch(f.html(),/SYNTHETIC CURRENT/);
 });
 
 test('owner replies arriving after an employee session starts cannot render private data',async()=>{

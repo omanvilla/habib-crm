@@ -66,7 +66,8 @@ test('pressing it finds the chat among the chats the account may see, and no car
 
 test('the look and the versions',()=>{
   assert(css.includes('.crm-wa-note{')&&/\.crm-wa-note\{[^}]*--crm-wa-svg:url\(/.test(css),'its own line icon, never an empty square');
-  for(const f of ['crm-claude-note.js','crm-followups-today.js'])assert(index.includes(f+'?v=20261114-note1'),f);
+  assert(index.includes('crm-claude-note.js?v=20261114-note1'),'crm-claude-note.js');
+  assert(index.includes('crm-followups-today.js?v=20261118-d36'),'crm-followups-today.js moved on with the 18 Nov decisions');
   for(const f of ['crm-wa-buttons.js','crm-wa-buttons.css'])assert(index.includes(f+'?v=20261114-note2'),f);
   // seen in the signed-in browser on 14 Nov: a sixth action made the visits table's fixed actions column cover the status
   // column on a medium screen, so there the table keeps its five actions

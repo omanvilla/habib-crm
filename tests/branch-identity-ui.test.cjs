@@ -50,7 +50,13 @@ test('private investment or unknown route entries fail closed instead of joining
  }
 });
 test('a current branch loading failure remains unavailable and stale successful results cannot restore old cards',async()=>{
- const f=fixture();f.targets();f.targets();f.calls[1].resolve({data:null,error:{message:'TEST unavailable'}});await f.flush();
+ // decision 64 (18 Nov): loads of the same session share one crm_branch_target_snapshot read; a new session reads again
+ const f=fixture();f.targets();f.targets();assert.equal(f.calls.length,1,'one shared read');
+ f.context.crmSessionGeneration++;f.targets();assert.equal(f.calls.length,2,'a new session does not reuse the old read');
+ f.calls[1].resolve({data:null,error:{message:'TEST unavailable'}});await f.flush();
  const latest=f.nodes.get('opsEmployeeTargets').innerHTML;assert.match(latest,/تعذر تحميل الأهداف/);
  f.calls[0].resolve(response([branch('muscat')]));await f.flush();assert.equal(f.nodes.get('opsEmployeeTargets').innerHTML,latest);
+ // a failed read is never kept: the retry reads again and recovers
+ f.targets();assert.equal(f.calls.length,3);f.calls[2].resolve(response([branch('muscat')]));await f.flush();
+ assert.match(f.nodes.get('opsEmployeeTargets').innerHTML,/data-target-branch-card="muscat"/);
 });

@@ -21,7 +21,7 @@ test('the property form saves and reopens the two fields, and the column lists c
   assert(base.includes("$('pElectricity').value=p.electricity_connected||'';")&&base.includes("$('pWater').value=p.water_connected||'';"));
   assert(base.includes("'pUnitLabel','pPriceNego','pElectricity','pWater']"),'a new property starts with both empty');
   assert.equal(base.split('"price_negotiable", "electricity_connected", "water_connected"]').length-1,2,'all and safe lists');
-  assert.match(read('index.html'),/app-base-v15\.html\?v=20261114-util1/);
+  assert.match(read('index.html'),/app-base-v15\.html\?v=20261118-tgt2/);
 });
 test('the agent tells a buyer only what is recorded, and keeps the owner\'s answer',()=>{
   const src=agent.slice(agent.indexOf('  const util = `'),agent.indexOf('\n',agent.indexOf('  const util = `')));

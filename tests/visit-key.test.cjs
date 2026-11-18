@@ -9,7 +9,7 @@ const cut=(from,to)=>vk.slice(vk.indexOf(from),vk.indexOf(to,vk.indexOf(from)));
 
 test('the module is loaded by the page, after the property modules, with the closing tag escaped',()=>{
   new vm.Script(vk);
-  assert(index.includes('<script src="crm-calls-meetings.js?v=20261117-goal1"><\\/script><script src="crm-quick-property.js?v=20261117-goal1"><\\/script><script src="crm-visit-key.js?v=20261114-vk2"><\\/script><script>window.APP_VERSION='));
+  assert(index.includes('<script src="crm-calls-meetings.js?v=20261118-d36"><\\/script><script src="crm-quick-property.js?v=20261117-goal1"><\\/script><script src="crm-visit-key.js?v=20261118-key2"><\\/script><script>window.APP_VERSION='));
   assert.match(index,/crm-voice-input\.js\?v=20261114-vk1/);
   assert.equal(index.split('</script>').length-1,1,'only the page\'s own closing tag is unescaped');
 });
@@ -36,17 +36,23 @@ test('nothing existing is changed: the columns are written only when the person 
   // the patch can only hold the three columns
   assert.deepEqual([...new Set([...vk.matchAll(/(?:changes|patch)\.([a-z_]+)=/g)].map(m=>m[1]))].sort(),['lockbox_image_url','visit_instructions','visit_method']);
 });
-test('the key box photo goes where the property photos go, and replacing it never removes a property photo',()=>{
-  assert(vk.includes("const BUCKET='property-images'")&&vk.includes("const path=cid+'/'+snap.id+'/'+crmNewId()+'.'+IMAGE_EXT[snap.file.type];"),'the path the storage policy accepts');
+// SQL137 (Ahmed's review [75], 18 Nov): the key box photo moved to the private bucket property-keys; the column holds the path
+// and the photo is shown through a short signed URL. Old public URLs are shown as they are and never deleted from here.
+test('the key box photo goes to the private bucket, and replacing it never removes a property photo',()=>{
+  assert(vk.includes("const BUCKET='property-keys',SIGN_SECONDS=600;")&&vk.includes("const path=cid+'/'+snap.id+'/'+crmNewId()+'.'+IMAGE_EXT[snap.file.type];"),'the path the storage policy accepts');
   assert(vk.includes("upload(path,snap.file,{contentType:snap.file.type,cacheControl:'3600',upsert:false})"));
   assert(vk.includes("if(uploaded)try{await supa.storage.from(BUCKET).remove([uploaded]);}catch(_e){}"),'a photo whose save failed is not left behind');
-  const ownPath=new Function('BUCKET','PUBLIC_MARK',cut('  function ownPath(','  const pause=')+';return ownPath;')('property-images','/storage/v1/object/public/property-images/');
-  const url=p=>'https://x.supabase.co/storage/v1/object/public/property-images/'+p;
-  assert.equal(ownPath(url('co/p1/a.jpg'),{id:'p1',images:null}),'co/p1/a.jpg');
-  assert.equal(ownPath(url('co/p2/a.jpg'),{id:'p1',images:null}),null,'another property');
-  assert.equal(ownPath('https://elsewhere.example/a.jpg',{id:'p1',images:null}),null,'a link from somewhere else');
-  assert.equal(ownPath(url('co/p1/a.jpg'),{id:'p1',images:[{path:'co/p1/a.jpg',url:url('co/p1/a.jpg')}]}),null,'one of the property\'s photos');
-  assert.equal(ownPath(url('co/p1/a.jpg'),{id:'p1',images:[url('co/p1/a.jpg')]}),null,'old photo lists are plain links');
+  assert(vk.includes('supa.storage.from(BUCKET).createSignedUrl(s,SIGN_SECONDS)'),'shown by signed URL only');
+  assert(!vk.includes('getPublicUrl'),'never a public link');
+  const KEY_PATH=new Function(vk.slice(vk.indexOf('  const KEY_PATH='),vk.indexOf('\n',vk.indexOf('  const KEY_PATH=')))+';return KEY_PATH;')();
+  const ownPath=new Function('KEY_PATH',cut('  function ownPath(','  const pause=')+';return ownPath;')(KEY_PATH);
+  const co='11111111-1111-1111-1111-111111111111',p1='22222222-2222-2222-2222-222222222222',p2='33333333-3333-3333-3333-333333333333',f='44444444-4444-4444-4444-444444444444';
+  assert.equal(ownPath(co+'/'+p1+'/'+f+'.jpg',{id:p1}),co+'/'+p1+'/'+f+'.jpg');
+  assert.equal(ownPath(co+'/'+p2+'/'+f+'.jpg',{id:p1}),null,'another property');
+  assert.equal(ownPath('https://x.supabase.co/storage/v1/object/public/property-images/'+co+'/'+p1+'/'+f+'.jpg',{id:p1}),null,'an old public link is never deleted from here');
+  assert.equal(ownPath('https://elsewhere.example/a.jpg',{id:p1}),null,'a link from somewhere else');
+  const sql=read('db/changes/137-lockbox-private-bucket.forward.sql');
+  assert(sql.includes("VALUES ('property-keys', 'property-keys', false,"),'the bucket is private');
 });
 test('the property page: location, Instagram links with views, the contract, and the warning',()=>{
   const detail=cut('  async function detail(){','  // ---- wiring');
@@ -73,9 +79,11 @@ test('the marketing contract is read from the dates on the property',()=>{
 test('the instructions and the key box photo stay inside the office',()=>{
   const draw=cut('  function draw(p,posts){','  async function detail(){');
   const inside=draw.slice(draw.indexOf('if(edit){'),draw.indexOf("h+='<div class=\"vk-block\"><div class=\"vk-label\">📱"));
-  assert(inside.includes('p.visit_instructions')&&inside.includes('p.lockbox_image_url'));
+  assert(inside.includes('p.visit_instructions')&&inside.includes('p.lockbox_shown'));
   assert.equal(draw.split('visit_instructions').length-1,inside.split('visit_instructions').length-1,'drawn only for an account that may edit a property');
-  assert.equal(draw.split('lockbox_image_url').length-1,inside.split('lockbox_image_url').length-1);
+  assert.equal(draw.split('lockbox').length-1,inside.split('lockbox').length-1);
+  // SQL137: the signed link is made only for an account that may edit a property
+  assert(vk.includes("row.lockbox_shown=mayEdit()?await photoUrl(row.lockbox_image_url):'';"));
   assert(vk.includes("const mayEdit=()=>typeof canEdit==='function'&&canEdit();"));
   // the screens that build a message or a file for a customer, and the export, never name the two columns
   for(const [name,src] of [['app-base-v15.html',base],['crm-v17-patch.js',v17],['crm-funnel.js',read('crm-funnel.js')]])

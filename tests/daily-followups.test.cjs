@@ -35,7 +35,7 @@ test('90 minutes after a visit: free text only, and nothing if someone already w
  assert(sql.includes("li.last_in <= v.visit_at + interval '30 minutes'"));
  assert(sql.includes("m.actor_type = 'human' AND m.message_timestamp > v.visit_at + interval '30 minutes'"));
  assert(fn.includes('if (freeOnly && !service) return "window_closed";'));
- assert(fn.includes('await sendOne(f.data, numbers, true)'));
+ assert(fn.includes('await sendOne(f.data, numbers, "after_visit")'));
  assert(fn.includes('if (rt.visit_followups_auto) await afterVisit('));
 });
 test('a visit confirmation goes only inside the window, once, when a reply would still cover the visit',()=>{
@@ -129,7 +129,7 @@ test('AI instruction on a follow-up: owner and staff (R28), rewrites from the wh
 });
 test('inside the 24 hour window the AI sends the review text at once, free text only, not over an unread voice note',()=>{
  const part=fn.slice(fn.indexOf('async function sendInWindow('),fn.indexOf('// "اليوم الساعة 4 العصر"'));
- assert(part.includes('await sendOne(f, numbers, true)'));
+ assert(part.includes('await sendOne(f, numbers, "in_window")'));
  assert(part.includes('type: "text"')&&!part.includes('type: "template"'));
  assert(part.includes('if (await unreadVoiceNearEnd('));
  assert(part.includes('numbers.includes(to)'));

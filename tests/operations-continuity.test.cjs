@@ -8,7 +8,8 @@ const serviceModule=import('../supabase/functions/_shared/property-inquiry-servi
 function calendar(now,company={created_at:'2026-05-06T15:00:00Z'}){
   class FixedDate extends Date { constructor(...args){super(...(args.length?args:[now]));} }
   const start=ops.indexOf('  const omanDate'),end=ops.indexOf('  function targetMetric');
-  return new Function('Date','currentCompany','n',ops.slice(start,end)+';return {period,targetScore};')(FixedDate,company,v=>Number(v||0).toLocaleString('en-US'));
+  // the shared crm_branch_target_snapshot read (decision 64, 18 Nov) sits in this slice and needs a window to attach to
+  return new Function('Date','currentCompany','n','window',ops.slice(start,end)+';return {period,targetScore};')(FixedDate,company,v=>Number(v||0).toLocaleString('en-US'),{});
 }
 function inquiryFixture(body,{inventory=candidates,reviewError=null}={}){
   const message={id:'msg1',company_id:'test-company',client_id:'client',conversation_id:'conv',
@@ -56,7 +57,7 @@ test('Oman monthly report boundaries and local midnight',()=>{
 
 test('Only monthly reservation results are compared against the monthly goal',()=>{
  const {targetScore}=calendar('2026-09-30T09:00:00Z');
- assert.match(targetScore({reservations:2},'month'),/متحقق/);
+ assert.match(targetScore({reservations:3,expected_commission:5400},'month'),/متحقق/);
  assert.match(targetScore({reservations:2},'year'),/لا تُقارن بهدف شهر واحد/);
 });
 
@@ -97,7 +98,7 @@ test('Review write failure is surfaced for webhook retry without reporting a suc
 
 test('Closing a sale or receiving commission cannot independently meet the booking target',()=>{
  const {targetScore}=calendar('2026-09-30T09:00:00Z');
- assert.match(targetScore({reservations:0,sales:20,company_commission:9000,commission_collected:9000},'month'),/0 \/ 2/);
+ assert.match(targetScore({reservations:0,sales:20,company_commission:9000,commission_collected:9000},'month'),/0 \/ 3/);
 });
 
 test('Multi-month report keeps target comparisons separate',()=>{
@@ -111,11 +112,16 @@ test('Lifetime asks the backend for earliest historical business evidence and do
  assert.match(targetScore({active_inventory:12,targets:{inventory_target:10}},'all'),/لا تُقارن بهدف شهر واحد/);
  assert(!targetScore({},'all').includes('%'));
 });
-test('Expected booking commission OR reservation count meets the monthly target',()=>{
+// SQL138 (Ahmed's review [3], 18 Nov 2026): 3 deals AND OMR 5,400 a month (was 2 bookings OR 4,000); a goal of 0 switches one off
+test('Deal count AND expected commission must both meet the monthly target',()=>{
  const score=calendar('2026-10-01T10:00:00Z').targetScore;
- assert.match(score({reservations:1,expected_commission:4000},'month'),/متحقق/);
- assert.match(score({reservations:2,expected_commission:null},'month'),/متحقق/);
- assert.match(score({reservations:1,expected_commission:null},'month'),/محجوبة/);
+ assert.match(score({reservations:3,expected_commission:5400},'month'),/متحقق/);
+ assert.doesNotMatch(score({reservations:1,expected_commission:9000},'month'),/متحقق/);
+ assert.match(score({reservations:1,expected_commission:9000},'month'),/1 \/ 3/);
+ assert.doesNotMatch(score({reservations:5,expected_commission:5399},'month'),/متحقق/);
+ assert.match(score({reservations:3,expected_commission:null},'month'),/محجوبة/);
+ assert.match(score({reservations:0,expected_commission:5400,targets:{reservations_target:0,booking_commission_target:5400}},'month'),/متحقق/);
+ assert.match(score({reservations:3,expected_commission:null,targets:{reservations_target:3,booking_commission_target:0}},'month'),/متحقق/);
 });
 
 test('Target-month end is exclusive and does not lose the last day in Oman',()=>{
@@ -130,9 +136,10 @@ test('Target-month end is exclusive and does not lose the last day in Oman',()=>
 test('Acquisition requirement follows current shortage, not monthly additions',()=>{
  const html=fs.readFileSync('app-base-v15.html','utf8');
  const body=html.match(/function employeeInventoryDeficit\(active\)\{([^\n]+)\}/)[1],needed=new Function('active',body);
- assert.equal(needed(7),3);assert.equal(needed(8),2);assert.equal(needed(10),0);assert.equal(needed(12),0);assert.equal(needed(9),1);
+ // SQL138 (Ahmed's review [62], 18 Nov): one company number, 25 good available properties, no split between branches
+ assert.equal(needed(7),18);assert.equal(needed(24),1);assert.equal(needed(25),0);assert.equal(needed(30),0);assert.equal(needed(0),25);
  const score=calendar('2026-10-01T10:00:00Z').targetScore;
- assert.match(score({active_inventory:7,new_properties:0,reservations:0,targets:{new_properties_target:999}},'month'),/0 \/ 2/);
+ assert.match(score({active_inventory:7,new_properties:0,reservations:0,targets:{new_properties_target:999}},'month'),/0 \/ 3/);
 });
 test('Arabic date labels retain Western numerals',()=>{
  const rendered=new Date('2026-10-01T10:25:00Z').toLocaleString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat'});

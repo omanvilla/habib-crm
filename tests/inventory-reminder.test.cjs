@@ -26,16 +26,16 @@ function fixture(){
   context.updateUserUI=()=>{};vm.createContext(context);vm.runInContext(source.slice(source.indexOf('function crmBranchName('),source.indexOf('function crmMemberChoiceLabel('))+'\n'+source.slice(start,end),context);
   return {context,pending,warnings,card,box,snapshot:()=>({state:context.employeeInventoryState&&{...context.employeeInventoryState},content,display:card.style.display,warnings:warnings.length})};
 }
-const response=(inventory,id='synthetic-muscat')=>{const branch=id==='synthetic-barka'?'barka':'muscat';return {data:{scope:'branch',branches:[{id:branch,branch,inventory,goals:{inventory:10},new_properties:0}]},error:null};};
+const response=(inventory,id='synthetic-muscat')=>{const branch=id==='synthetic-barka'?'barka':'muscat';return {data:{scope:'branch',branches:[{id:branch,branch,inventory:null,goals:{inventory:null},new_properties:0}],company_inventory:{count:inventory,goal:25,property_ids:[]}},error:null};};
 
-for(const inventory of [15,4])test('latest inventory '+inventory+' cannot be overwritten by an older zero response',async()=>{
+for(const inventory of [30,4])test('latest inventory '+inventory+' cannot be overwritten by an older zero response',async()=>{
   const f=fixture(),older=f.context.loadEmployeeTargetReminder(),latest=f.context.loadEmployeeTargetReminder();
   assert.deepEqual(f.pending.map(x=>x.name),['crm_branch_target_snapshot','crm_branch_target_snapshot']);
   f.pending[1].resolve(response(inventory));await latest;
   const expected=f.snapshot();
-  assert.deepEqual(expected.state,{active:inventory,required:10,needed:Math.max(0,10-inventory)});
-  assert.equal(expected.display,inventory>=10?'none':'');
-  if(inventory<10){assert.match(expected.content,/رصيد الفرع المتاح حاليًا 4 من 10/);assert.match(expected.content,/هدف الإضافات الأسبوعية مستقل/);}
+  assert.deepEqual(expected.state,{active:inventory,required:25,needed:Math.max(0,25-inventory)});
+  assert.equal(expected.display,inventory>=25?'none':'');
+  if(inventory<25){assert.match(expected.content,/المتاح للشركة حاليًا 4 من 25/);assert.match(expected.content,/هدف الإضافات الأسبوعية مستقل/);}
   f.pending[0].resolve(response(0));await older;
   assert.deepEqual(f.snapshot(),expected);
 });
@@ -49,7 +49,7 @@ test('an older RPC error cannot replace the latest shortage result',async()=>{
 
 test('an older network rejection cannot revive a satisfied inventory warning',async()=>{
   const f=fixture(),older=f.context.loadEmployeeTargetReminder(),latest=f.context.loadEmployeeTargetReminder();
-  f.pending[1].resolve(response(15));await latest;const expected=f.snapshot();
+  f.pending[1].resolve(response(30));await latest;const expected=f.snapshot();
   f.pending[0].reject(new Error('synthetic old network failure'));await older;
   assert.deepEqual(f.snapshot(),expected);
 });
@@ -61,8 +61,8 @@ test('a current failure remains unavailable and a retry recovers the actual coun
   assert.match(f.box.innerHTML,/تعذر التحقق من رصيد العقارات/);assert.match(f.box.innerHTML,/إعادة المحاولة/);
   assert.equal(f.warnings.length,1);
   const retry=f.context.loadEmployeeTargetReminder();f.pending[1].resolve(response(4));await retry;
-  assert.deepEqual({...f.context.employeeInventoryState},{active:4,required:10,needed:6});
-  assert.match(f.box.innerHTML,/رصيد الفرع المتاح حاليًا 4 من 10/);assert.doesNotMatch(f.box.innerHTML,/تعذر التحقق/);
+  assert.deepEqual({...f.context.employeeInventoryState},{active:4,required:25,needed:21});
+  assert.match(f.box.innerHTML,/المتاح للشركة حاليًا 4 من 25/);assert.doesNotMatch(f.box.innerHTML,/تعذر التحقق/);
 });
 
 test('success and failure from a previous session cannot render before the new session refresh',async()=>{
@@ -75,7 +75,7 @@ test('success and failure from a previous session cannot render before the new s
     else f.pending[0].resolve(response(0));
     await older;assert.deepEqual(f.snapshot(),expected);
     const latest=f.context.loadEmployeeTargetReminder();f.pending[1].resolve(response(4,'synthetic-barka'));await latest;
-    assert.deepEqual({...f.context.employeeInventoryState},{active:4,required:10,needed:6});
-    assert.match(f.box.innerHTML,/رصيد الفرع المتاح حاليًا 4 من 10/);
+    assert.deepEqual({...f.context.employeeInventoryState},{active:4,required:25,needed:21});
+    assert.match(f.box.innerHTML,/المتاح للشركة حاليًا 4 من 25/);
   }
 });

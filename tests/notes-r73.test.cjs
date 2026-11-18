@@ -27,7 +27,7 @@ test('R73: the real chat of 15 Nov. The client said he got busy, so «هل قد�
  const o=answeredGuard(opinion(),visit(chat));assert.equal(o.guard,'guard_answered_not_visited');assert.doesNotMatch(o.text,/كيف شفت/);
  // the after-visit path (R47) reads the mark and leaves the row for the office
  assert(fu.includes('if (/\\(R73\\)/.test(String(f.data?.review_reason || ""))) { out.after_visit_held_answered'));
- assert(fu.indexOf('out.after_visit_held_answered')<fu.indexOf('const s = await sendOne(f.data, numbers, true);'));
+ assert(fu.indexOf('out.after_visit_held_answered')<fu.indexOf('const s = await sendOne(f.data, numbers, "after_visit");'));
 });
 test('R73: ways of saying «I did not go» are read, and ordinary words are not',()=>{
  for(const s of ['ما قدرت اروح','والله ما رحت','انشغلت اليوم','للأسف نشغلت','ما حصلت وقت','تأجل الموعد','لسا ما زرت','بحاول هالاسبوع','احاول هذه الأيام','ما مريت عليه'])assert(R73_NOT_VISITED.test(normAr(s)),s);

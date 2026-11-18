@@ -266,7 +266,11 @@ test('R66 / R67 / R68 / R18: the evening notes of 14 Nov are held by code after 
  assert.equal(confirmUnanswered(chat+'\n[2026-11-12] العميل: تمام جاي','2026-11-14'),false);
  assert.equal(confirmUnanswered('[2026-11-11] العميل: السلام عليكم','2026-11-14'),false);
  let r=eveningGuard(o({stage:'visited_not_asked',text:'السلام عليكم كيف شفت بيت الحيل الجنوبية وايش انطباعك عنه ؟'}),c({confirmUnanswered:true}));
- assert.equal(r.decision,'skip');assert.equal(r.text,null);assert.equal(r.auto_ok,false);assert.equal(r.guard,'guard_no_confirm');assert(r.reason.startsWith('(R68)'));assert.equal(r.stage,'booked_no_show');
+ assert.equal(r.decision,'skip');assert.equal(r.text,null);assert.equal(r.auto_ok,false);assert.equal(r.guard,'guard_no_confirm');assert(r.reason.startsWith('(R50)'));assert.equal(r.stage,'booked_no_show');
+ // R50 (Ahmed 18 Nov, replaces R68's skip on a visit row): one «تحب نحدد لك موعد ثاني ؟», then nothing more
+ r=eveningGuard(o({stage:'visited_not_asked',text:'السلام عليكم كيف شفت بيت الحيل الجنوبية وايش انطباعك عنه ؟'}),c({confirmUnanswered:true,kind:'visit',name:'بيت الحيل الجنوبية'}));
+ assert.equal(r.decision,'followup');assert.equal(r.guard,'guard_rebook_once');assert.equal(r.text,'السلام عليكم بخصوص بيت الحيل الجنوبية تحب نحدد لك موعد ثاني ؟');assert(r.reason.startsWith('(R50)'));
+ r=eveningGuard(o({stage:'visited_not_asked'}),c({confirmUnanswered:true,kind:'visit',name:'x',rebookAsked:true}));assert.equal(r.decision,'skip');assert.equal(r.guard,'guard_no_confirm');
  r=eveningGuard(o({stage:'booked_no_show',text:'السلام عليكم بخصوص موعد زيارتك تحب نحدد لك موعد ثاني ؟'}),c({confirmUnanswered:true}));assert.equal(r.decision,'skip');
  r=eveningGuard(o({stage:'visited_not_asked'}),c({confirmUnanswered:true,visitedDone:true}));assert.equal(r.decision,'followup','a visit recorded done is still asked');
  r=eveningGuard(o({stage:'visited_no_fit'}),c({confirmUnanswered:true}));assert.equal(r.decision,'followup');

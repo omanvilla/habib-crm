@@ -25,14 +25,14 @@ test('the home page draws for staff from crm_staff_home and keeps the owner-only
  // 17 Nov 2026: the home has no reports link at all any more (it is in the side menu, owner-only there)
  assert(!js.includes('data-nav="reports"'),'reports (money) are never linked from the home');
  assert(js.includes('if(!owner){paused={items:[],total:0};autoNotes=[];}'),'a staff session never shows the owner\'s lists left in the tab');
- assert(/crm-owner-home\.js\?v=20261118-tiles2/.test(index));
+ assert(/crm-owner-home\.js\?v=20261118-tgt2/.test(index));
 });
 test('a staff account is greeted by its own name; the branch stays under the name (Ahmed 11 Nov)',()=>{
  const base=fs.readFileSync('app-base-v15.html','utf8');
  assert(base.includes("const label=currentProfile.full_name||branchLabel||currentProfile.email;"));
  assert(base.includes("$('userRole').textContent=roleAr(currentProfile.role)+(branchLabel?' · '+branchLabel:'');"));
  assert(base.includes("$('welcomeName').textContent=(currentProfile.full_name||'').split(' ')[0]||branchLabel||'بك';"));
- assert(/app-base-v15\.html\?v=20261114-util1/.test(index));
+ assert(/app-base-v15\.html\?v=20261118-tgt2/.test(index));
 });
 test('targets, performance, tasks and the responsible column name the person on the branch line (SQL83)',()=>{
  const base=fs.readFileSync('app-base-v15.html','utf8'),ops=fs.readFileSync('crm-operations-v6.js','utf8'),tasks=fs.readFileSync('crm-v18-task-priority-patch.js','utf8');
@@ -43,7 +43,7 @@ test('targets, performance, tasks and the responsible column name the person on 
  assert(ops.includes("const branchLabel=branch=>(window.crmBranchPeople&&window.crmBranchPeople[branch])||"));
  assert(tasks.includes('crmRecordPersonLabel(task)')&&tasks.includes('return crmBranchPersonName(branch);'));
  assert(tasks.includes('<th>المسؤول</th>'),'the task column says who is responsible');
- assert(/crm-v18-task-priority-patch\.js\?v=20261111-people2/.test(index)&&/crm-operations-v6\.js\?v=20261117-snap1/.test(index));
+ assert(/crm-v18-task-priority-patch\.js\?v=20261111-people2/.test(index)&&/crm-operations-v6\.js\?v=20261118-tgt2/.test(index));
 });
 test('member labels name the person on the branch line',()=>{const base=fs.readFileSync('app-base-v15.html','utf8');assert(base.includes("return branch?crmBranchPersonName(branch):'حساب فريق';"));});
 test('staff follow everyone like the owner, never the owner line (SQL85)',()=>{
@@ -51,7 +51,7 @@ test('staff follow everyone like the owner, never the owner line (SQL85)',()=>{
  assert(s85.includes("WHERE v_owner OR (public.my_role() IN ('manager','agent','viewer') AND i.route_key IS DISTINCT FROM 'owner')"));
  assert(s85.includes('CASE WHEN v_owner THEN i.owner_instruction END'),'the owner instructions stay his');
  assert(!s85.includes('staff_is_branch_member'));
- assert(/crm-followups-today\.js\?v=20261114-note1/.test(index));
+ assert(/crm-followups-today\.js\?v=20261118-d36/.test(index));
 });
 test('a follow-up naming a property that left the market goes back to review (SQL86)',()=>{
  const s=fs.readFileSync('db/changes/86-followups-reread-unavailable.forward.sql','utf8');

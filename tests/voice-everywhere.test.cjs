@@ -63,5 +63,5 @@ test('the follow-up reason is asked in a window that can hold the button, with t
   assert(voice.includes('window.crmAskText=function(o){'));
   assert(voice.includes("document.body.append(m);attach(box);box.focus();"));
   assert(index.includes('crm-reply-approvals.css?v=20261118-extra1')&&index.includes('crm-voice-input.js?v=20261114-vk1'));
-  assert(index.includes('app-base-v15.html?v=20261114-util1'),'the base page moved on with the WhatsApp buttons of 12 Nov');
+  assert(index.includes('app-base-v15.html?v=20261118-tgt2'),'the base page moved on with the WhatsApp buttons of 12 Nov');
 });
