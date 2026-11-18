@@ -2,8 +2,12 @@
 // and waits for the owner's approval in "ردود تنتظر موافقتك"; approved rows go out 9am–9pm Oman time,
 // as plain text inside the 24-hour window or as an approved template outside it.
 //   queue_requests  (hourly cron)  weekly follow-up of open requests: still searching ? / financing approved ?
-//                                   never when the client wrote in the last 7 days, max 2 unanswered, stop on "ما ابي"
-//   queue_sold      {property_id}   "بخصوص الفيلا اللي سألت عنها في … انحجزت" to everyone who asked, except the buyer.
+//                                   never when the client wrote in the last 7 days, max 2 unanswered (R43: 2 everywhere),
+//                                   stop on "ما ابي" as a word of its own (R47); a visit opt-out does not stop it (R45);
+//                                   no investor until 12 Feb 2027 (R46)
+//   queue_sold      {property_id}   "بخصوص الفيلا اللي سألت عنها في … انحجزت" to everyone who asked, except who booked or bought
+//                                   it (R41). Its own switch is the cron outreach_auto_sold_notice (SQL132/133), not
+//                                   visit_followups_auto (R39), and it is outside the daily limit of 20 (R71).
 //                                   R38 (Ahmed 12 Nov): when a unit of the same group is still available (SQL97,
 //                                   crm_unit_group_notice) the message is "… انحجزت وحدة منها والمتبقي الثانية والثالثة" +
 //                                   "تحب تشوفها ؟" instead (template property_unit_booked_ar_v1 outside the 24 hours)
@@ -48,7 +52,23 @@ const NOUN: Record<string, [string, string, string]> = { // label, "booked" verb
   building: ["المبنى", "انحجز", "مبنى"], penthouse: ["البنتهاوس", "انحجز", "بنتهاوس"], office: ["المكتب", "انحجز", "مكتب"], shop: ["المحل", "انحجز", "محل"],
   warehouse: ["المخزن", "انحجز", "مخزن"], other: ["العقار", "انحجز", "عقار"],
 };
-const STOP_RE = /ما\s*ابي|ماابي|ما\s*اريد|لا\s*شكرا|لاشكرا|ما\s*احتاج|وقف|توقف|stop/i;
+// R47 (Ahmed 18 Nov «إيوا صلحها»): a stop word counts only as a word of its own, so «موقف سيارات» or «الوقف» never stops the
+// follow-ups. Read on normalised Arabic (أ إ آ -> ا, ى -> ي, harakat dropped), so «ما أبي» is caught as well as «ما ابي».
+const AR_LETTER = "[\\u0621-\\u064AA-Za-z]";
+const STOP_RE = new RegExp(`(?<!${AR_LETTER})(ما\\s*ابي|ماابي|ما\\s*ابغي|ما\\s*اريد|لا\\s*شكرا|لاشكرا|ما\\s*احتاج|وقف|توقف|لا\\s*تراسلني|لا\\s*تراسلوني|لا\\s*ترسل(ي|و)?\\s*لي|stop|unsubscribe)(?!${AR_LETTER})`, "i");
+const normAr = (s: unknown) => String(s ?? "").replace(/[ً-ٰٟـ]/g, "").replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي").replace(/\s+/g, " ");
+const stopSaid = (s: unknown) => STOP_RE.test(normAr(s));
+// R41 (Ahmed 18 Nov «اللي حجز أو اشترى بس ينستثنى»): the buyer left out of a sold notice is a client whose deal on that property is
+// booked, the same test as crm_repair_private.deal_is_booked (SQL134): a confirmed reservation or a stage from the deposit on.
+const BOOKED_STAGES = ["deposit", "awaiting_finance", "finance_approved", "awaiting_clearance", "ownership_transfer", "closed", "commission_collected"];
+const dealIsBooked = (d: any) => !!d?.reservation_confirmed_at || BOOKED_STAGES.includes(String(d?.stage || ""));
+// R46 (Ahmed 18 Nov «نوقف متابعات المستثمرين»): no follow-up of ours to an investor until 12 Feb 2027; booked meetings stay.
+// The lane is SQL91's followup_lane, read through crm_followup_investor_paused (SQL136). An error counts as paused.
+async function investorPaused(clientId: string, conversationId: string | null, routeKey: string | null, text: string) {
+  const r = await db.rpc("crm_followup_investor_paused", { p_client: clientId, p_conversation: conversationId, p_route: routeKey, p_text: text });
+  return r.error ? true : r.data === true;
+}
+const INVESTOR_RESUME = "2027-02-12T09:00:00+04:00";
 const FOUND_RE = /حصلت|لقيت|اشتريت|خلاص\s*(اشتريت|حصلت|لقيت)/;
 
 async function routes() {
@@ -110,10 +130,12 @@ async function queueRequests(limit = 25) {
     // what did the client say last ? "ما ابي" stops everything, "حصلت" closes the search
     const ins = await db.from("whatsapp_messages").select("body").eq("conversation_id", conv.id).eq("direction", "inbound").order("message_timestamp", { ascending: false }).limit(5);
     const said = (ins.data || []).map((m: any) => String(m.body || "")).join(" ");
-    if (STOP_RE.test(said)) { await db.from("clients").update({ followup_suppressed: true }).eq("id", r.client_id); await db.from("client_requests").update({ next_followup: null, status: "paused", next_action: "العميل طلب ما نتابع" }).eq("id", r.id); continue; }
+    if (stopSaid(said)) { await db.from("clients").update({ followup_suppressed: true }).eq("id", r.client_id); await db.from("client_requests").update({ next_followup: null, status: "paused", next_action: "العميل طلب ما نتابع" }).eq("id", r.id); continue; }
     // "found" is not an allowed search_status (client_requests_search_status_check): the update failed every hour
     // and the request came back each run (10 Nov 2026). "stopped" (توقف عن البحث) + the reason in next_action.
     if (FOUND_RE.test(said)) { const up = await db.from("client_requests").update({ next_followup: null, status: "paused", search_status: "stopped", next_action: "العميل قال حصل" }).eq("id", r.id); if (up.error) out.push({ request: r.id, error: up.error.message }); continue; }
+    // R46: an investor's request is not followed up until 12 Feb 2027 (looked at again then)
+    if (await investorPaused(r.client_id, conv.id, conv.route_key, `${requestSummary(r)} ${r.followup_note || ""}`)) { await db.from("client_requests").update({ next_followup: INVESTOR_RESUME }).eq("id", r.id); out.push({ request: r.id, skip: "investor_paused" }); continue; }
     // a chat in a negotiation with Ahmed gets no follow-up prepared; looked at again tomorrow
     if (await held(conv.id)) { await db.from("client_requests").update({ next_followup: new Date(now + DAY).toISOString() }).eq("id", r.id); out.push({ request: r.id, skip: "chat_held" }); continue; }
     // one office message a week at most, and two unanswered follow-ups pause the request
@@ -143,12 +165,13 @@ async function queueSold(propertyId: string, dry: boolean) {
     db.from("instagram_media_catalog").select("link_key").eq("property_id", propertyId),
     db.from("viewings").select("client_id").eq("property_id", propertyId),
     db.from("client_requests").select("client_id").eq("subject_property_id", propertyId),
-    db.from("deals").select("client_id,stage").eq("property_id", propertyId),
+    db.from("deals").select("client_id,stage,reservation_confirmed_at,merged_into_deal_id").eq("property_id", propertyId),
     routes(),
   ]);
   const keys = (reels.data || []).map((r: any) => r.link_key).filter(Boolean);
   const reelMsgs = keys.length ? await db.from("whatsapp_messages").select("client_id").in("property_link_key", keys).eq("direction", "inbound").gte("message_timestamp", since) : { data: [] };
-  const buyers = new Set((deals.data || []).filter((d: any) => d.stage !== "lost").map((d: any) => d.client_id));
+  // R41: only who booked or bought this property is left out; an open card (new, visit, negotiation) still gets the notice
+  const buyers = new Set((deals.data || []).filter((d: any) => !d.merged_into_deal_id && dealIsBooked(d)).map((d: any) => d.client_id));
   const ids = new Set<string>();
   for (const r of [...(msgs.data || []), ...((reelMsgs as any).data || []), ...(views.data || []), ...(reqs.data || [])]) if (r.client_id && !buyers.has(r.client_id)) ids.add(r.client_id);
   const company = rts.map((r: any) => digits(r.whatsapp_number));
@@ -298,9 +321,12 @@ async function sendRows(ids?: string[]) {
       // R1/R3 (Ahmed 8 Nov): nothing goes to a chat Ahmed took or is negotiating in; the row waits until he hands it back
       const hold = await db.rpc("crm_chat_hold", { p_conversation: r.conversation_id });
       if (hold.error || hold.data) continue;
-      // the client wrote after this was queued: the reply agent / owner handles the live conversation instead
+      // the client wrote after this was queued: the reply agent / owner handles the live conversation instead.
+      // R42 (Ahmed 18 Nov «العقل يبلغه أكيد»): a sold notice skipped this way is marked sold_client_wrote_after, and the reply agent
+      // tells the client in its first answer that the property went (rows: kind property_sold, status skipped, that reason,
+      // conversation_id, property_id, summary = the property).
       if (cv.data?.last_inbound_at && new Date(cv.data.last_inbound_at).getTime() > new Date(r.created_at).getTime()) {
-        await db.from("whatsapp_outreach_queue").update({ status: "skipped", reason: "client_wrote_after" }).eq("id", r.id); continue;
+        await db.from("whatsapp_outreach_queue").update({ status: "skipped", reason: r.kind === "property_sold" ? "sold_client_wrote_after" : "client_wrote_after" }).eq("id", r.id); continue;
       }
       const t = await token(r.company_id, r.route_key);
       if (!t || !cv.data) throw new Error("route_not_ready");

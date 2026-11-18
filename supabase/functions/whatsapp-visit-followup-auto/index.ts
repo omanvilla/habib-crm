@@ -24,7 +24,13 @@
 // 9. R21 (Ahmed 10 Nov): a client who said «بشوف وبرد عليك» / «بشوف الأهل وأرجع لك» and went quiet gets ONE light question
 //    before his 24 hour window closes, then space (once per chat in 14 days). Free text only. It starts with «السلام عليكم»
 //    like every follow-up, never «هلا».
-// Stops when whatsapp_automation_runtime.visit_followups_auto is false. A failed send stays on the list.
+// Stops when whatsapp_automation_runtime.visit_followups_auto is false. A failed send stays on the list. Every feature keeps its
+// own switch (R39, Ahmed 18 Nov «كل شي بمفتاحه»): this flag does not stop the sold notice (cron outreach_auto_sold_notice) nor
+// the review and visit results.
+// 18 Nov review (SQL136): R37 an open handoff holds every follow-up (the opinion question too); a chat a person typed in gets
+// the opinion question only. R38 inside the window auto_ok is still not asked. R40 nothing about a property that is gone.
+// R43 two unanswered stop (SQL136). R46 no investor follow-up until 12 Feb 2027. R49 the chat is read before a visit
+// confirmation. R50 an unanswered confirmation gets «تحب نحدد لك موعد ثاني ؟» once. R72 one a week after the first week (SQL136).
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -95,8 +101,8 @@ const REVIEW_RULES = `أنت تراجع متابعة عميل لمكتب عقا�
 - العقار اللي سأل عنه العميل وانباع أو انحجز: إذا مكتوب تحت في "وحدات انحجزت ولها وحدة متاحة من نفس المجموعة" (R38، أحمد 12 نوفمبر): لا تقول انباع وخلاص ولا تعرض بديل ثاني. المتابعة تقول السطر المكتوب له بالحرف (مثل "انحجزت وحدة منها والمتبقي الثانية والثالثة") وتسأله "تحب تشوفها ؟". إذا مو مكتوب هناك: المتابعة تقول إنه انباع (أو انحجز) وتعرض الخيارات المتاحة في نفس المنطقة، وإذا ما في خيارات skip.
 - متابعة بعد زيارة لعقار مكتوب جنبه "(انباع)" أو "(انحجز)" أو "(ما عاد متوفر)" (R44، أحمد 12 نوفمبر: أمير الرحبي وعبدالله الحارثي): skip. لا تسأله "كيف شفت" عن عقار انباع، رسالة «انحجز/انباع» الجماعية هي اللي توصله. وكذلك أي عميل موضوعه مع أحمد خلص (زار وسأل السعر النهائي ورد عليه أحمد، أو مشتري جاد) وانباع العقار: skip.
 - "مشيت شفته" أو "رحت شفته" أو "مريت عليه" أو "شفته" = زار وشاف العقار (R44، مازن). إذا بعدها سأل "في عندك بيوت ثانية ؟" أو "غيره ؟" فهو visited_no_fit: لا تسأله عن انطباعه، اعرض الأقرب من القائمة غير اللي شافه (offer_no)، وإذا ما عرفنا وش يبي subject = "بيت ثاني في [المنطقة]".
-- إذا تواصلنا معه أكثر من مرة في نفس الموضوع وما رد (حتى لو من أشهر): skip، ولا تكتب له مرة ثانية. نفس الحال في أي متابعة ثانية بنفس الوضع، بدون ما ينتظر أحمد.
-- مواضيع الاستثمار والمشاريع (مدينة السلطان هيثم، وادي زها، الآيكونيك، عايدة، اليزن، المستحقين، التملك الحر، تملك الأجنبي أو غير العماني (R65)، الإقامة) (R35، أحمد 12 نوفمبر): ما تنترك، لها قائمة المستثمرين على رقم مسقط. المتابعة تكمل موضوعه: الأرقام المكتوبة في المعرفة بس (R18)، والعزيمة لاجتماع مع المطور في مكتبه (الأهلي صبور في العذيبة، دار جلوبال عند دار الأوبرا لعايدة) (R33). ممنوع أسئلة الاستبيان مثل "الشراء عندك للسكن ولا للاستثمار ؟" و"تفضل تبحث عن فيلا مستقلة ولا نوع ثاني". العمل بعد الشراء: skip.
+- إذا تواصلنا معه مرتين في نفس الموضوع وما رد (حتى لو من أشهر): skip، ولا تكتب له مرة ثالثة (R43، أحمد 18 نوفمبر: «2 للكل»). نفس الحال في أي متابعة ثانية بنفس الوضع، بدون ما ينتظر أحمد.
+- مواضيع الاستثمار والمشاريع (مدينة السلطان هيثم، وادي زها، الآيكونيك، عايدة، اليزن، المستحقين، التملك الحر، تملك الأجنبي أو غير العماني (R65)، الإقامة) (R35، أحمد 12 نوفمبر): ما تنترك، لها قائمة المستثمرين على رقم مسقط. المتابعة تكمل موضوعه: الأرقام المكتوبة في المعرفة بس (R18)، والعزيمة لاجتماع مع المطور في مكتبه (الأهلي صبور في العذيبة، دار جلوبال عند دار الأوبرا لعايدة) (R33). ممنوع أسئلة الاستبيان مثل "الشراء عندك للسكن ولا للاستثمار ؟" و"تفضل تبحث عن فيلا مستقلة ولا نوع ثاني". العمل بعد الشراء: skip. (R46، أحمد 18 نوفمبر: متابعات المستثمرين موقوفة لين 12 فبراير 2027، والكود يمسكها وما يرسلها؛ اكتب قرارك عادي.)
 - التبادل (عقار بعقار): skip، الموضوع غير مناسب.
 - ممنوع أي كلمة إنجليزية أو رمز برمجي (مثل twin_villa أو villa أو apartment) في النص لعميل يكتب بالعربي. اكتب العقار بالاسم اللي يعرفه العميل بالعربي (مثل "فيلا الشخاخيط") وبدون ذكر نوع غريب.
 - إذا ما في محادثة مسجلة للعميل (سجل قديم أو نموذج من الموقع وما كلمنا): decision=skip وreason "عميل بدون محادثة واتساب، يحتاج اتصال منك" بدون نص.
@@ -112,7 +118,7 @@ const REVIEW_RULES = `أنت تراجع متابعة عميل لمكتب عقا�
 - رقم صاحب العقار (R64، ملاحظة 14 نوفمبر): إذا المكتب أرسل له رقم صاحب العقار أو جهة الاتصال أو قال له "تواصل مع المالك مباشرة للزيارة"، الزيارة صارت بينه وبين المالك: لا تسأله "متى يناسبك تزور ؟". اسأله هل قدر يزور العقار، بالاسم.
 - عرض بركاء على عميل رقم مسقط (R66، أحمد 14 نوفمبر، يعدّل R22): حدد المنطقة اللي يبحث فيها أول. "اذا تقبل بركاء عندنا ..." بس لمن قال إنه يبحث في المعبيلة أو منطقة قريبة من بركاء. اللي يبحث في منطقة ثانية من مسقط (خاصة بميزانية عالية): wait_for_match، ننتظر له شي في مسقط قريب من ميزانيته. وإذا ما قال المنطقة: اسأله "في أي منطقة تبحث ؟".
 - سؤال عن السوق (R67، ملاحظة 14 نوفمبر): عميل آخر كلامه سؤال عام عن السوق (ليش الإيجارات أو الأسعار منخفضة أو مرتفعة في المنطقة، وش السبب) يحتاج دراسة سوق: skip، بدون "متى يناسبك تزور" وبدون "لين الحين تبحث".
-- ما رد على تأكيد الموعد (R68، أحمد 14 نوفمبر، يعدّل R39): عميل أرسلنا له "نأكد موعد زيارة ..." وما رد بعدها بأي شي وما في زيارة مسجلة تمت: ما زار وما هو مهتم. skip، لا "كيف شفت" ولا "تحب نحدد موعد ثاني".
+- ما رد على تأكيد الموعد (R50، أحمد 18 نوفمبر، يبدّل R68): عميل أرسلنا له "نأكد موعد زيارة ..." وما رد بعدها بأي شي وما في زيارة مسجلة تمت: لا "كيف شفت". followup بـ "تحب نحدد لك موعد ثاني ؟" بالاسم مرة وحدة بس، وإذا انسأل هالسؤال بعد التأكيد وما رد: skip.
 - لغة العميل (R69، أحمد 14 نوفمبر): إذا مكتوب تحت "العميل يكتب بالإنجليزي" اكتب text كله بالإنجليزي البسيط، يبدأ بـ "Hello" وبدون "السلام عليكم"، سطر أو سطرين وسؤال واحد ينتهي بـ "?". reason و subject يبقون بالعربي.
 - جاوب سؤاله (R70، ملاحظة 14 نوفمبر): عميل سأل سؤال وما وصله جواب، وجوابه مكتوب قدامك (تفاصيل العقار، أو "معرفة المشاريع" إذا موجودة تحت: أرقامها بس، R18): text يجاوب سؤاله أول وبعدها سؤال واحد يكمل. المتابعة ما تسأل "اسمك الكريم ؟" أبداً.
 - اقرأ المحادثة قبل السؤال (R73، ملاحظة أحمد 15 نوفمبر): لا تسأل العميل سؤال هو جاوبه، ولا سؤال المكتب سأله إياه وجاوب عليه. اللي قال إنه ما زار (انشغل، أجّل، ما قدر) ما ينسأل "قدرت تزور ؟" ولا "كيف شفت": سؤاله "تحب نحدد لك موعد ثاني ؟" و auto_ok=false.
@@ -288,6 +294,7 @@ async function review(item: any, companyId: string, available: string, fixed: st
   out.english = english;
   // R68: the visit confirmation of an earlier day that the client never answered
   out.confirm_unanswered = confirmUnanswered(chat, today);
+  out.rebook_asked = out.confirm_unanswered && rebookAfterConfirm(chat);
   out.booked_closed = bookedClosed(chat);
   // an unread voice note near the end means nobody knows what was said; he decides, never the automatic send
   if (chat.split("\n").slice(-6).some((l: string) => l.includes("[رسالة صوتية قديمة ما انقرت]"))) out.auto_ok = false;
@@ -403,6 +410,8 @@ function notesGuard(out: any, group: boolean, clientSaid: string, officeSaid: st
 // prepared for everyone.
 // R68: the office asked «نأكد موعد زيارة …» on an earlier day, the client never wrote again and no visit of his is recorded
 //      done: he did not come and is not interested. No follow-up at all (changes R39: no «تحب نحدد لك موعد ثاني ؟»).
+//      R50 (Ahmed 18 Nov) replaces this for a visit follow-up: «تحب نحدد لك موعد ثاني ؟» goes once (by itself; outside the
+//      window as the visit_missed_rebook_ar_v1 template), and only after it was asked and not answered nothing more goes.
 // R67: the client's last words are a general market question (why rents or prices are low or high in the area). That needs a
 //      market study; no follow-up.
 // R66: on the Muscat number a Barka property is offered («اذا تقبل بركاء…») only to a client who said he looks in المعبيلة or
@@ -414,6 +423,13 @@ function confirmUnanswered(chat: unknown, today: string) {
   let at = -1, day = "";
   lines.forEach((l, i) => { const m = l.match(R68_CONFIRM); if (m) { at = i; day = m[1]; } });
   return at >= 0 && day < today && !lines.slice(at + 1).some((l) => /^\[[^\]]*\] العميل: /.test(l));
+}
+// R50: after that unanswered confirmation the office already asked «تحب نحدد لك موعد ثاني ؟» once (and he did not answer either)
+function rebookAfterConfirm(chat: unknown) {
+  const lines = String(chat ?? "").split("\n");
+  let at = -1;
+  lines.forEach((l, i) => { if (R68_CONFIRM.test(l)) at = i; });
+  return at >= 0 && lines.slice(at + 1).some((l) => /^\[[^\]]*\] المكتب: .*نحدد\s*(لك|لج|لكم)\s*موعد\s*(ثاني|ثاني[هة]|آخر|اخر)/.test(l));
 }
 const R67_WHAT = "(ايجار|ايجارات|اسعار|السوق)", R67_HOW = "(منخفض|قليل|رخيص|نازل|طايح|مرتفع|غالي|عالي)", R67_WHY = "(ليش|ليه|السبب|سبب)";
 const R67_MARKET = new RegExp(`${R67_WHAT}[^\\n]{0,40}${R67_HOW}[^\\n]{0,40}${R67_WHY}|${R67_WHY}[^\\n]{0,40}${R67_WHAT}[^\\n]{0,40}${R67_HOW}`);
@@ -451,8 +467,16 @@ function eveningGuard(out: any, o: any) {
   if (o.group || out.decision === "skip") return out;
   const stage = String(out.stage || "");
   if (o.confirmUnanswered && !o.visitedDone && !["visited_liked", "visited_no_fit", "negotiating"].includes(stage)) {
-    out.reason = short(`(R68) أكدنا عليه موعد الزيارة وما رد بأي شي، فهو مو مهتم: ما يتابع. ${out.reason || ""}`, 300);
-    out.decision = "skip"; out.text = null; out.auto_ok = false; out.offer_no = null; out.stage = "booked_no_show"; out.guard = "guard_no_confirm";
+    // R50 (Ahmed 18 Nov «ينرسل له موعد ثاني مرة», replaces R68's skip): one «تحب نحدد لك موعد ثاني ؟», then nothing more
+    if (o.rebookAsked || o.kind !== "visit") {
+      out.reason = short(`(R50) أكدنا عليه موعد الزيارة وما رد${o.rebookAsked ? "، وانسأل «تحب نحدد لك موعد ثاني ؟» مرة وما رد" : ""}: ما يتابع. ${out.reason || ""}`, 300);
+      out.decision = "skip"; out.text = null; out.auto_ok = false; out.offer_no = null; out.stage = "booked_no_show"; out.guard = "guard_no_confirm";
+      return out;
+    }
+    const name = String(o.name || "").trim(), she = /(قدرتي|شفتي|تزورين|تشوفين|تحبين)/.test(String(out.text || ""));
+    out.decision = "followup"; out.text = `السلام عليكم ${name ? `بخصوص ${name} ` : ""}${she ? "تحبين" : "تحب"} نحدد لك موعد ثاني ؟`;
+    out.auto_ok = !!name; out.offer_no = null; out.stage = "booked_no_show"; out.guard = "guard_rebook_once"; out.rebook = name;
+    out.reason = short(`(R50) أكدنا عليه موعد الزيارة وما رد وزيارته ما انسجلت: نسأله مرة وحدة «تحب نحدد لك موعد ثاني ؟» وبعدها نوقف. ${out.reason || ""}`, 300);
     return out;
   }
   if (R67_STAGES.includes(stage) && R67_MARKET.test(normAr(String(o.clientSaid || "").split("\n").slice(-3).join(" ")))) {
@@ -573,6 +597,8 @@ function placeGuard(out: any, o: any) {
 // with auto_ok=false) stays on the list for the office.
 function heldForOffice(f: any) {
   if (/\((R73|R83)\)/.test(String(f?.review_reason || ""))) return "marked";
+  // R50: the one «تحب نحدد لك موعد ثاني ؟» after an unanswered confirmation goes by itself
+  if (/\(R50\)/.test(String(f?.review_reason || "")) && f?.auto_ok) return "";
   if (String(f?.client_stage || "") === "booked_no_show") return "no_show";
   const t = String(f?.owner_text || "");
   if (t && !(R73_OPINION_Q.test(normAr(t)) || t === EN_VISIT)) return "not_opinion";
@@ -583,10 +609,11 @@ function heldForOffice(f: any) {
 // out Arabic (the model, or a guard's Arabic wording) a fixed English line goes instead.
 const writesEnglish = (clientSaid: unknown) => { const s = String(clientSaid ?? "").replace(/https?:\/\/\S+/g, " "); return /[A-Za-z]{2,}/.test(s) && !/[ء-ي]/.test(s); };
 const EN_VISIT = "Hello what did you think of the property after your visit ?", EN_REQUEST = "Hello are you still looking for a property ?";
+const EN_REBOOK = "Hello would you like us to set another time for your visit ?";
 function languageGuard(out: any, english: boolean, kind: string, group: boolean) {
   if (!english || group || out.decision !== "followup") return out;
   const arabic = !out.text || /[ء-ي]/.test(out.text);
-  if (arabic) { out.text = kind === "visit" ? EN_VISIT : EN_REQUEST; out.guard = out.guard || "guard_language"; }
+  if (arabic) { out.text = out.guard === "guard_rebook_once" ? EN_REBOOK : kind === "visit" ? EN_VISIT : EN_REQUEST; out.guard = out.guard || "guard_language"; }
   out.auto_ok = false; out.lang = "en";
   out.reason = short(`(R69) العميل يكتب بالإنجليزي: النص بلغته${arabic ? " (النص طلع عربي فانبدل بسطر إنجليزي ثابت)" : ""}، والقالب العربي ما ينرسل له لحاله. ${out.reason || ""}`, 300);
   return out;
@@ -646,12 +673,14 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
     visitDay = String(v.data?.viewing_date || "").slice(0, 10); visitDone = v.data?.status === "done";
     about = `متابعة بعد زيارة ${name || "عقار"} يوم ${v.data?.viewing_date || "غير معروف"}. ${v.data?.status === "done" ? "الزيارة تمت" : "ما نعرف هل زار"}.`;
     if (name) about += ` اسم العقار للعميل: ${name}. إذا سؤالك عن الزيارة اسأله عن رأيه في ${name} بالاسم، مثل "كيف شفت ${name} وايش انطباعك عنها ؟" ("عنه" للبيت والمبنى والمحل). ممنوع سؤال عام مثل "قدرت تشوف العقار ؟" أو "شفت العقار ؟" أو "بخصوص الزيارة"، وممنوع "كيف لقيت" (تنفهم «لقيتوا مكانها ؟»، R29).`;
-    if (x.after_visit) about += " هذي متابعة بعد موعد الزيارة بساعة ونص، وهذا أهم وقت للبيع (R47، أحمد 14 نوفمبر: بدون استثناء). قرارك followup واسأله عن رأيه في العقار بالاسم، حتى لو أحمد أو الموظفة كتبوا له أو كلمنا بعد الزيارة في شي ثاني. skip بس في ثلاث حالات: قال رأيه في العقار بنفسه بعد الزيارة، أو العقار انباع أو انسحب (R44)، أو في تفاوض أو صفقة شغالة مع أحمد. اقرأ المحادثة أول (R73، أحمد 15 نوفمبر): إذا العميل قال بنفسه بعد الموعد إنه ما زار (انشغل، أجّل، ألغى، ما قدر) لا تسأله هل قدر يزور ولا عن رأيه، هو جاوب: اكتب \"تحب نحدد لك موعد ثاني ؟\" بالاسم و auto_ok=false. وإذا المكتب سأله عن رأيه أو عن الزيارة بعد الموعد وجاوب: skip، لا تعيد نفس السؤال.";
+    if (x.after_visit) about += " هذي متابعة بعد موعد الزيارة بساعة ونص، وهذا أهم وقت للبيع (R47، أحمد 14 نوفمبر: بدون استثناء). قرارك followup واسأله عن رأيه في العقار بالاسم، حتى لو أحمد أو الموظفة كتبوا له أو كلمنا بعد الزيارة في شي ثاني. skip بس في ثلاث حالات: قال رأيه في العقار بنفسه بعد الزيارة، أو العقار انباع أو انحجز أو انسحب (R44، R40)، أو في تفاوض أو صفقة شغالة مع أحمد. اقرأ المحادثة أول (R73، أحمد 15 نوفمبر): إذا العميل قال بنفسه بعد الموعد إنه ما زار (انشغل، أجّل، ألغى، ما قدر) لا تسأله هل قدر يزور ولا عن رأيه، هو جاوب: اكتب \"تحب نحدد لك موعد ثاني ؟\" بالاسم و auto_ok=false. وإذا المكتب سأله عن رأيه أو عن الزيارة بعد الموعد وجاوب: skip، لا تعيد نفس السؤال.";
   }
   const fixed = kind === "visit" ? String(x.body || "") : (x.messages || []).join(" ");
   // R39: a message prepared for everyone who asked about one property is read against each client's chat and file too.
   // Its wording is Ahmed's and stays; the review only says whether it fits this client.
-  if (kind === "request" && x.kind === "property_sold") about = `رسالة جماعية لكل من سأل عن عقار انحجز أو انباع (${short(x.summary, 150) || "عقار"}). النص اللي ينتظر موافقة أحمد وما يتغير: "${fixed}". قرارك followup إذا الرسالة تناسب وضع هذا العميل (واكتب text نفس النص)، و skip إذا ما تناسبه: اشترى أو حصل، قال ما يبغى، زار وقال ما ناسبه، موضوعه انتهى، مو عميل يبحث، أو في تفاوض. auto_ok=false.`;
+  // audit #22 / SQL132-133: a kept sold notice goes out by itself (inside the window as text, outside as its template); Ahmed
+  // does not see it first, so this review is the last check
+  if (kind === "request" && x.kind === "property_sold") about = `رسالة جماعية لكل من سأل عن عقار انحجز أو انباع (${short(x.summary, 150) || "عقار"}). نصها ثابت من أحمد وما يتغير: "${fixed}". إذا قررت followup الرسالة تنرسل لحالها على طول (SQL132/133، أحمد 18 نوفمبر: «إيوا، تلقائي») بدون ما يشوفها أحمد، فقرارك هو آخر حاجز. قرارك followup إذا الرسالة تناسب وضع هذا العميل (واكتب text نفس النص)، و skip إذا ما تناسبه: اشترى أو حجز هو نفسه، حصل، قال ما يبغى، زار وقال ما ناسبه، موضوعه انتهى، مو عميل يبحث، أو في تفاوض. auto_ok=false.`;
   if (kind === "request" && x.kind === "new_listing") about = `رسالة جماعية عن عقار جديد نزل ممكن يناسب طلبه (${short(x.summary, 150) || "طلبه"}). النص اللي ينتظر موافقة أحمد وما يتغير: "${fixed}". قرارك followup إذا لين الحين يبحث والعقار يناسب اللي قاله (واكتب text نفس النص)، و skip إذا ما يناسبه أو موضوعه انتهى أو في تفاوض. auto_ok=false.`;
   const out = await review(x, companyId, available, fixed, about, instruction, x.owner_text || fixed);
   // R55: the short-rent guard, before anything else reads the decision
@@ -683,14 +712,14 @@ async function judge(kind: "visit" | "request", x: any, companyId: string, avail
     const fallback = kind === "request" && subj && subj.length <= 60 && !/[A-Za-z]/.test(subj) ? `بخصوص طلبك ${subj} لين الحين تبحث ؟` : fixed;
     notesGuard(out, group, clientSaid, officeSaid, refusedAreas, offerLabel, kind === "request" && subj && subj.length <= 60 && !/[A-Za-z]/.test(subj) ? `بخصوص طلبك ${subj} لين الحين تبحث ؟` : fixed);
     // R66, R67, R68 and R18 in a follow-up (the notes of the evening of 14 Nov)
-    eveningGuard(out, { group, route: String(x.route_key || ""), clientSaid, confirmUnanswered: !!out.confirm_unanswered, visitedDone, offerBranch, barkaAreas: l.barkaAreas, fallback, bookedClosed: !!out.booked_closed });
+    eveningGuard(out, { group, route: String(x.route_key || ""), clientSaid, confirmUnanswered: !!out.confirm_unanswered, rebookAsked: !!out.rebook_asked, kind, name, visitedDone, offerBranch, barkaAreas: l.barkaAreas, fallback, bookedClosed: !!out.booked_closed });
     // R73: a question the client already answered is not asked again (the note of 15 Nov)
     answeredGuard(out, { group, kind, chat: chatRead, visitDay, visitDone, today: todayRead, name });
     // R83: no visit question when the place never reached the client
     placeGuard(out, { group, kind, chat: chatRead, visitDay, visitDone, name });
   }
   const english = !!out.english;
-  delete out.english; delete out.confirm_unanswered; delete out.booked_closed;
+  delete out.english; delete out.confirm_unanswered; delete out.rebook_asked; delete out.booked_closed;
   if (kind === "visit" && !english) out.text = namedVisitQuestion(out.text, name);
   // R39: a client who already gave his opinion is never asked the step-1 opinion question again by the fixed template
   if (kind === "visit" && Number(x.step) === 1 && ["visited_liked", "visited_no_fit"].includes(String(out.stage))) out.auto_ok = false;
@@ -815,7 +844,9 @@ async function applyDecision(kind: "visit" | "request", x: any, companyId: strin
     return (w.data || []).length ? "kept" : "not_pending";
   }
   if (out.decision === "followup" && out.text) {
-    const w = await db.from(table).update({ owner_text: short(out.text, 500), review_reason: reason, auto_ok: !!out.auto_ok, ...extra }).eq("id", x.id).eq("status", openStatus).select("id");
+    // R50: outside the 24 hours the one rebook question goes as its own UTILITY template, not the visit step's
+    const rebook = kind === "visit" && out.guard === "guard_rebook_once" && out.rebook ? { template_name: REBOOK_TPL, body: rebookBody(String(out.rebook)), variant_label: null } : {};
+    const w = await db.from(table).update({ owner_text: short(out.text, 500), review_reason: reason, auto_ok: !!out.auto_ok, ...rebook, ...extra }).eq("id", x.id).eq("status", openStatus).select("id");
     // R35 (12 Nov): past 24 hours the template «بخصوص طلبك {1} لين الحين تبحث ؟» goes, so {1} is what the client really asked about
     const subject = String(out.subject || "").replace(/^\s*(بخصوص\s+)?طلبك\s+/, "").replace(/[؟?،,.!]/g, " ").replace(/\s+/g, " ").trim();
     const subjectOk = !!subject && subject.length <= 60 && !/[A-Za-z]/.test(subject);
@@ -900,6 +931,10 @@ async function notInNegotiation(rows: any[], max: number, out: Record<string, nu
   for (const r of rows) {
     if (keep.length >= max) break;
     if (r.conversation_id && await negotiationHold(r.conversation_id)) { out.review_held = (out.review_held || 0) + 1; continue; }
+    // R46: an investor's follow-up is not read until 12 Feb 2027 (no model call); it is held, never closed here. A message
+    // prepared for everyone (sold notice, new listing) is not a follow-up.
+    const followup = !r.kind || r.kind === "request_followup";
+    if (followup && await investorPaused(r.client_id, r.conversation_id || null, r.route_key, rowText(r))) { out.review_held_investor = (out.review_held_investor || 0) + 1; continue; }
     keep.push(r);
   }
   return keep;
@@ -940,7 +975,7 @@ async function afterVisit(companyId: string, numbers: string[], out: Record<stri
       // R73: the client already answered about this visit, so the row waits for the office and nothing goes by itself
       if (/\(R73\)/.test(String(f.data?.review_reason || ""))) { out.after_visit_held_answered = (out.after_visit_held_answered || 0) + 1; continue; }
       { const why = heldForOffice(f.data); if (why) { const kh = `after_visit_held_${why}`; out[kh] = (out[kh] || 0) + 1; continue; } }
-      const s = await sendOne(f.data, numbers, true);
+      const s = await sendOne(f.data, numbers, "after_visit");
       const k2 = `after_visit_${s}`; out[k2] = (out[k2] || 0) + 1;
     } catch (e) { out.after_visit_failed = (out.after_visit_failed || 0) + 1; console.error("[followup-auto] after visit", String((e as any)?.message || e)); }
   }
@@ -957,6 +992,31 @@ async function chatHeld(conversationId: string) {
   const r = await db.rpc("crm_chat_hold", { p_conversation: conversationId });
   return r.error ? true : !!r.data;
 }
+// R40 (Ahmed 18 Nov «نوقفها كلها»): no follow-up of any kind about a property that is gone. Same test as
+// crm_repair_private.property_is_gone (SQL134): sold, reserved, withdrawn or archived. Such a row is held, never sent; the SQL
+// that prepares follow-ups (SQL136) no longer prepares one. An error counts as gone.
+const propertyGone = (p: any) => ["sold", "reserved", "withdrawn"].includes(String(p?.status || "")) || p?.archived === true;
+async function visitPropertyGone(viewingId: string | null) {
+  if (!viewingId) return false;
+  const v = await db.from("viewings").select("property_id,properties(status,archived)").eq("id", viewingId).maybeSingle();
+  if (v.error) return true;
+  return !!(v.data as any)?.properties && propertyGone((v.data as any).properties);
+}
+// R46 (Ahmed 18 Nov «نوقف متابعات المستثمرين»): no follow-up of ours to an investor (SQL91's investor lane) until 12 Feb 2027;
+// booked meetings and their confirmation stay. crm_followup_investor_paused (SQL136). Such a row is held, never sent or closed.
+// An error counts as paused.
+async function investorPaused(clientId: string, conversationId: string | null, routeKey: string | null, text: string) {
+  const r = await db.rpc("crm_followup_investor_paused", { p_client: clientId, p_conversation: conversationId, p_route: routeKey, p_text: short(text, 2000) });
+  return r.error ? true : r.data === true;
+}
+const rowText = (x: any) => `${x?.review_reason || ""} ${x?.owner_text || ""} ${x?.body || ""} ${Array.isArray(x?.messages) ? x.messages.join(" ") : ""}`;
+// R50 (Ahmed 18 Nov «ينرسل له موعد ثاني مرة»): the one «تحب نحدد لك موعد ثاني ؟» after an unanswered visit confirmation. Outside
+// the 24 hours it goes as the UTILITY template visit_missed_rebook_ar_v1 ({{1}} = the property), its body kept on the row.
+const REBOOK_TPL = "visit_missed_rebook_ar_v1";
+const rebookBody = (name: string) => `بخصوص موعد زيارتك ${name}\nتحب نحدد لك موعد ثاني ؟`;
+const rebookParam = (body: unknown) => String(body ?? "").split("\n")[0].replace(/^بخصوص موعد زيارتك\s*/, "").trim();
+// R37 / R47: what may go to a chat a person typed in (no handoff) is the after-visit opinion question only
+const isOpinionRow = (f: any) => !/\(R50\)/.test(String(f?.review_reason || "")) && (R73_OPINION_Q.test(normAr(f?.owner_text || f?.body || "")) || String(f?.owner_text || "") === EN_VISIT);
 
 async function lastInbound(conversationId: string) {
   const r = await db.from("whatsapp_messages").select("message_timestamp").eq("conversation_id", conversationId).eq("direction", "inbound").order("message_timestamp", { ascending: false }).limit(1).maybeSingle();
@@ -974,7 +1034,8 @@ async function sendInWindow(companyId: string, numbers: string[], out: Record<st
     if (await unreadVoiceNearEnd(f.conversation_id)) { out.in_window_voice_wait = (out.in_window_voice_wait || 0) + 1; continue; }
     // R73 / R83: a row the guards left for the office never goes by itself, in the open window either
     if (/\((R73|R83)\)/.test(String(f.review_reason || ""))) { out.in_window_held_marked = (out.in_window_held_marked || 0) + 1; continue; }
-    const r = await sendOne(f, numbers, true);
+    // R37: an open handoff holds every row; a chat a person typed in gets the opinion question only (sendOne, mode in_window)
+    const r = await sendOne(f, numbers, "in_window");
     const k = `in_window_${r}`; out[k] = (out[k] || 0) + 1;
   }
   const qs = await db.from("whatsapp_outreach_queue").select("*").eq("company_id", companyId).eq("status", "pending").eq("kind", "request_followup").eq("dry_run", false).not("reviewed_at", "is", null).not("owner_text", "is", null).in("conversation_id", ids).limit(AFTER_VISIT_PER_RUN);
@@ -1002,6 +1063,8 @@ async function sendQueueText(q: any, numbers: string[]) {
   if (!["barka", "muscat"].includes(conv.route_key) || conv.route_key !== q.route_key) return "route_blocked";
   if (client.followup_suppressed || client.archived || conv.agent_muted || conv.human_handoff_required) return "held";
   if (await chatHeld(conv.id)) return "held_owner_chat";
+  // R46: no investor until 12 Feb 2027 (the row waits, nothing closes it)
+  if (await investorPaused(q.client_id, conv.id, q.route_key, rowText(q))) return "held_investor";
   const lastIn = await lastInbound(conv.id);
   if (lastIn > new Date(q.created_at).getTime()) {
     await db.from("whatsapp_outreach_queue").update({ status: "skipped", reason: "client_wrote_after" }).eq("id", q.id).eq("status", "pending");
@@ -1166,6 +1229,7 @@ async function thinkingFollowups(companyId: string, numbers: string[], out: Reco
       if (!owners) owners = await listedOwnerPhones(companyId);
       if (owners.includes(to.slice(-8))) { skip("property_owner"); continue; }
       if (holdR.data) { skip("held_owner_chat"); continue; }
+      if (await investorPaused(c.client_id, c.id, c.route_key, "")) { skip("investor_paused"); continue; }
       if ((dealQ.data || []).length || (draftQ.data || []).some((d: any) => !d.analysis?.dry_run)) { skip("with_ahmed"); continue; }
       if ((visitQ.data || []).length || (queueQ.data || []).length) { skip("other_followup_queued"); continue; }
       // once per chat in 14 days, and this silence is read once
@@ -1489,6 +1553,39 @@ function visitWhen(date: string, time: string | null) {
   return `${day} الساعة ${h % 12 || 12}${mins} ${part}`;
 }
 
+// R49 (Ahmed 18 Nov: «لازم شي يقرأ المحادثة … إذا كنا ذاكرين موضوع الزيارة للشخص فما يرجع يسأله مرة ثانية … يمكن في المحادثة قال
+// خلاص ما أريد أزور او … عقار ثاني»): before the confirmation the chat is read. No confirmation when the appointment was already
+// confirmed in the chat, the client said he will not come (or postponed), or he moved to another property. A failed read sends
+// nothing (the next run, 15 minutes later, reads it again).
+const CONFIRM_RULES = `تقرأ محادثة واتساب بين مكتب عقاري في عمان وعميل عنده موعد زيارة عقار قريب، وتقرر هل نرسل له الحين رسالة "نأكد موعد زيارة العقار في <المنطقة> <الوقت> ؟".
+send=false إذا واحد من هذي:
+- الموعد نفسه (اليوم والوقت) اتأكد في المحادثة: العميل قال إنه جاي أو أكد الموعد أو قال "تمام" على الوقت، أو المكتب أكد عليه وهو رد بالموافقة، بعد ما تحدد الموعد. ما نسأله نفس السؤال مرة ثانية.
+- العميل قال إنه ما بيزور، أو ألغى، أو أجّل لوقت ثاني، أو قال ما يريد العقار.
+- العميل غيّر لعقار ثاني غير اللي موعده عليه، أو الكلام الأخير عن عقار ثاني.
+- العميل في الطريق أو وصل أو يسأل عن اللوكيشن الحين (الكلام شغال عن الزيارة نفسها).
+send=true إذا الموعد تحدد وما في تأكيد له في المحادثة بعدها، وما قال إنه غيّر رأيه.
+reason: سطر قصير بالعربي يشرح قرارك.`;
+const confirmSchema = { type: "object", additionalProperties: false, properties: { send: { type: "boolean" }, reason: { type: "string" } }, required: ["send", "reason"] };
+async function judgeConfirm(v: any, when: string) {
+  const chat = newestPart(await chatOf(v.conversation_id, 40), 12000);
+  if (!chat.trim()) return { send: true, reason: "ما في محادثة مسجلة" };
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
+  const ai = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST", headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: OPENAI_MODEL, store: false, reasoning: { effort: "low" }, instructions: CONFIRM_RULES,
+      input: `تاريخ اليوم: ${today}\nالموعد المسجل: زيارة العقار في ${v.area || "غير معروف"} ${when} (${v.viewing_date}${v.viewing_time ? ` ${String(v.viewing_time).slice(0, 5)}` : ""})\n\nالمحادثة:\n${chat}`,
+      text: { format: { type: "json_schema", name: "visit_confirm", strict: true, schema: confirmSchema } } }),
+  });
+  const p = await ai.json().catch(() => ({}));
+  if (!ai.ok) throw new Error(p?.error?.message || `openai_${ai.status}`);
+  const r = JSON.parse(p.output_text || p.output?.flatMap((x: any) => x?.content || []).find((x: any) => x?.type === "output_text")?.text || "{}");
+  return { send: r.send === true, reason: short(r.reason, 300) };
+}
+async function confirmWhen(v: any) {
+  const vn = await db.from("viewings").select("notes").eq("id", v.viewing_id).maybeSingle();
+  return visitWhen(v.viewing_date, HOUR_UNKNOWN.test(String(vn.data?.notes || "")) ? null : v.viewing_time);
+}
+
 // Free text inside the window. One per visit: the message itself is the record.
 async function confirmBeforeVisit(companyId: string, numbers: string[], out: Record<string, number>) {
   const c = await db.rpc("crm_visit_confirm_candidates");
@@ -1496,6 +1593,11 @@ async function confirmBeforeVisit(companyId: string, numbers: string[], out: Rec
   for (const v of (c.data || []).filter((x: any) => x.company_id === companyId).slice(0, AFTER_VISIT_PER_RUN)) {
     const to = digits(v.phone);
     if (!to || numbers.includes(to)) continue;
+    // R49: read the chat first
+    try {
+      const j = await judgeConfirm(v, await confirmWhen(v));
+      if (!j.send) { out.confirm_not_needed = (out.confirm_not_needed || 0) + 1; console.log("[followup-auto] confirm skipped", v.viewing_id, j.reason); continue; }
+    } catch (e) { out.confirm_read_failed = (out.confirm_read_failed || 0) + 1; console.error("[followup-auto] confirm read", String((e as any)?.message || e)); continue; }
     // R84 (Ahmed 16 Nov 2026): a visit saved with no hour said (its note carries «الساعة ما تحددت») is confirmed by its day only
     const vn = await db.from("viewings").select("notes").eq("id", v.viewing_id).maybeSingle();
     const body = `السلام عليكم نأكد موعد زيارة العقار في ${v.area || "الموقع"} ${visitWhen(v.viewing_date, HOUR_UNKNOWN.test(String(vn.data?.notes || "")) ? null : v.viewing_time)} ؟`;
@@ -1514,7 +1616,10 @@ async function confirmBeforeVisit(companyId: string, numbers: string[], out: Rec
   }
 }
 
-async function sendOne(f: any, numbers: string[], freeOnly = false) {
+// mode: "template" (the daily send after the wait), "after_visit" (90 minutes after the visit, R47) or "in_window" (a reviewed
+// row whose 24 hours are open). The last two send free text only.
+async function sendOne(f: any, numbers: string[], mode: "template" | "after_visit" | "in_window" = "template") {
+  const freeOnly = mode !== "template";
   const stop = async (status: string, why: string) => { await db.from("whatsapp_visit_followups").update({ status, error: why, updated_at: new Date().toISOString() }).eq("id", f.id).eq("status", "awaiting_approval"); return why; };
   const [convR, clientR, lastInR, tplR] = await Promise.all([
     db.from("whatsapp_conversations").select("*").eq("id", f.conversation_id).single(),
@@ -1528,17 +1633,23 @@ async function sendOne(f: any, numbers: string[], freeOnly = false) {
   // the two company numbers never message each other
   if (!to || numbers.includes(to)) return stop("rejected", "company_number");
   if (!["barka", "muscat"].includes(conv.route_key) || conv.route_key !== f.route_key) return "route_blocked";
-  // R47 (Ahmed 14 Nov): the question after a visit goes to every client within 90 minutes; the only exceptions are a client who
-  // already said his opinion or a property that left the market (the review decides those), and a negotiation or running deal
-  // with Ahmed. An open handoff or Ahmed / staff typing in the chat no longer hold it back.
+  // R47 (Ahmed 14 Nov): the question after a visit goes to every client within 90 minutes, also when Ahmed or staff typed in
+  // the chat. R37 (Ahmed 18 Nov): a chat handed to a person (open handoff) gets no follow-up at all, the opinion question
+  // included, until it is handed back; a chat a person only typed in gets the opinion question and nothing else, in the
+  // open window too (R38: inside the window auto_ok is still not asked).
   if (freeOnly) {
     if (client.followup_suppressed || client.archived || conv.agent_muted) return "held";
-    if (await negotiationHold(conv.id)) return "held_negotiation";
-    if (conv.human_handoff_required && /^\s*(تفاوض|مشتري جاد)\s*:/.test(String(conv.handoff_reason || ""))) return "held_negotiation";
+    if (conv.human_handoff_required) return "held_handoff";
+    const h = await db.rpc("crm_chat_hold", { p_conversation: conv.id });
+    if (h.error || ["negotiation", "muted"].includes(String(h.data || ""))) return "held_negotiation";
+    if (h.data && !isOpinionRow(f)) return "held_owner_chat";
   } else {
     if (client.followup_suppressed || client.archived || conv.agent_muted || conv.human_handoff_required) return "held";
     if (await chatHeld(conv.id)) return "held_owner_chat";
   }
+  // R40: nothing about a property that is gone; R46: no investor until 12 Feb 2027. Held, the row is not closed.
+  if (await visitPropertyGone(f.viewing_id)) return "held_property_gone";
+  if (await investorPaused(f.client_id, conv.id, f.route_key, rowText(f))) return "held_investor";
   const lastIn = lastInR.data?.message_timestamp ? new Date(lastInR.data.message_timestamp).getTime() : 0;
   // R47: after a visit the review read the chat when it decided, so only a message after that decision supersedes the question
   if (lastIn > new Date(freeOnly && f.reviewed_at ? f.reviewed_at : f.created_at).getTime()) return stop("superseded", "client_wrote_after");
@@ -1550,9 +1661,12 @@ async function sendOne(f: any, numbers: string[], freeOnly = false) {
   const claim = await db.from("whatsapp_visit_followups").update({ status: "sending" }).eq("id", f.id).eq("status", "awaiting_approval").select("id").maybeSingle();
   if (claim.error || !claim.data) return "taken";
   const body = service ? (f.owner_text || f.body) : f.body;
+  // R50: the rebook template carries the property as its one variable
+  const rebook = f.template_name === REBOOK_TPL ? rebookParam(f.body) : "";
+  if (!service && f.template_name === REBOOK_TPL && !rebook) { await db.from("whatsapp_visit_followups").update({ status: "awaiting_approval" }).eq("id", f.id).eq("status", "sending"); return "rebook_no_property"; }
   const payload = service
     ? { type: "text", text: { preview_url: false, body } }
-    : { type: "template", template: { name: f.template_name, language: { code: "ar" } } };
+    : { type: "template", template: { name: f.template_name, language: { code: "ar" }, ...(rebook ? { components: [{ type: "body", parameters: [{ type: "text", text: rebook }] }] } : {}) } };
   const now = new Date().toISOString();
   try {
     const wamid = await metaSend(await routeTokens(f.company_id, f.route_key), digits(conv.meta_phone_number_id), to, payload);
@@ -1560,7 +1674,7 @@ async function sendOne(f: any, numbers: string[], freeOnly = false) {
       company_id: f.company_id, conversation_id: conv.id, client_id: f.client_id, whatsapp_message_id: wamid,
       direction: "outbound", message_type: service ? "text" : "template", sender_wa_id: digits(conv.meta_phone_number_id), recipient_wa_id: to,
       body, message_timestamp: now, delivery_status: "sent", actor_type: "automated", channel_source: "crm_followup",
-      raw_payload: { source: "visit_followup", followup_id: f.id, step: f.step, viewing_id: f.viewing_id, template_name: service ? null : f.template_name, auto: true, after_visit: freeOnly },
+      raw_payload: { source: "visit_followup", followup_id: f.id, step: f.step, viewing_id: f.viewing_id, template_name: service ? null : f.template_name, auto: true, after_visit: mode === "after_visit", in_window: mode === "in_window" },
     });
     // R36: the results count this follow-up under the wording that really went
     const went = await sentVisitLabel(f, service, body).catch(() => undefined);
@@ -1650,6 +1764,29 @@ Deno.serve(async (req) => {
     const items = await thinkingFollowups(co.data?.company_id, (lines.data || []).map((r: any) => digits(r.whatsapp_number)).filter(Boolean), {}, true);
     return json({ ok: true, items });
   }
+  // a test of R49: reads the chat of chosen visits (viewing_ids, up to 12) or of today's confirmation candidates and says
+  // whether the confirmation would go; inserts and sends nothing
+  if (input?.preview_confirm) {
+    const co = await db.from("whatsapp_automation_runtime").select("company_id").eq("mode", "live").limit(1).maybeSingle();
+    const ids: string[] = (Array.isArray(input.preview_confirm.viewing_ids) ? input.preview_confirm.viewing_ids : []).map(String).slice(0, 12);
+    let vs: any[] = [];
+    if (ids.length) {
+      for (const id of ids) {
+        const v = await db.from("viewings").select("id,client_id,viewing_date,viewing_time,properties(area)").eq("id", id).eq("company_id", co.data?.company_id).maybeSingle();
+        if (!v.data) { vs.push({ viewing_id: id, missing: true }); continue; }
+        const cv = await db.from("whatsapp_conversations").select("id").eq("client_id", v.data.client_id).in("route_key", ["barka", "muscat"]).order("last_message_at", { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
+        vs.push({ viewing_id: id, conversation_id: cv.data?.id, area: (v.data as any).properties?.area, viewing_date: v.data.viewing_date, viewing_time: v.data.viewing_time });
+      }
+    } else {
+      const c = await db.rpc("crm_visit_confirm_candidates");
+      vs = (c.data || []).filter((x: any) => x.company_id === co.data?.company_id).slice(0, 12);
+    }
+    const items = await Promise.all(vs.map(async (v: any) => {
+      if (v.missing || !v.conversation_id) return { viewing_id: v.viewing_id, error: v.missing ? "viewing_not_found" : "no_conversation" };
+      try { return { viewing_id: v.viewing_id, ...(await judgeConfirm(v, await confirmWhen(v))) }; } catch (e) { return { viewing_id: v.viewing_id, error: String((e as any)?.message || e) }; }
+    }));
+    return json({ ok: true, items });
+  }
   // a test of the owner's instruction on one follow-up: reads and writes nothing
   if (input?.preview_instruction) {
     const pi = input.preview_instruction, kind = pi.kind === "request" ? "request" : "visit";
@@ -1727,10 +1864,12 @@ Deno.serve(async (req) => {
     // request follow-ups are sent by whatsapp-outreach once approved; only with an approved UTILITY template and a chat
     const reg = await db.from("whatsapp_template_registry").select("route_key,template_name,status,category").eq("company_id", rt.company_id);
     const usable = new Set((reg.data || []).filter((t: any) => String(t.status).toUpperCase() === "APPROVED" && String(t.category).toUpperCase() === "UTILITY").map((t: any) => `${t.route_key}|${t.template_name}`));
-    const qs = await db.from("whatsapp_outreach_queue").select("id,client_id,route_key,template_name,created_at,conversation_id,reviewed_at,auto_ok").eq("company_id", rt.company_id).eq("status", "pending").eq("kind", "request_followup").eq("dry_run", false).order("created_at").limit(60);
+    const qs = await db.from("whatsapp_outreach_queue").select("id,client_id,route_key,template_name,created_at,conversation_id,reviewed_at,auto_ok,review_reason,owner_text,messages").eq("company_id", rt.company_id).eq("status", "pending").eq("kind", "request_followup").eq("dry_run", false).order("created_at").limit(60);
     for (const q of qs.data || []) {
       if (room <= 0) break;
       if (!q.reviewed_at || !q.auto_ok || waiting.has(q.client_id) || !q.conversation_id || Date.now() < autoAfter(q.reviewed_at) || !usable.has(`${q.route_key}|${q.template_name}`)) continue;
+      // R46: no investor until 12 Feb 2027
+      if (await investorPaused(q.client_id, q.conversation_id, q.route_key, rowText(q))) { out.held_investor = (out.held_investor || 0) + 1; continue; }
       await db.from("whatsapp_outreach_queue").update({ status: "approved", approved_at: new Date().toISOString(), reason: "auto_after_wait" }).eq("id", q.id).eq("status", "pending");
       out.released = (out.released || 0) + 1; room--;
     }
