@@ -73,3 +73,9 @@ test('SQL130: staff read «مشترين واقفين» and «العقود» only
   assert.match(s,/staff_can_access_branch\(v_company, p\.branch_key\)/);
   assert.match(read('crm-owner-home.js'),/const ha=canResume\(\)&&window\.crmHomeAttention/);
 });
+test('SQL131 + hot alerts: a sold / reserved property clears its serious-buyer alerts; notification rows show the real name',()=>{
+  const s=read('db/changes/131-hot-buyer-property-gone.forward.sql');
+  copy('_hot_buyer_property_gone_20261118.sql',s);
+  assert.match(s,/d\.reservation_confirmed_at IS NOT NULL OR d\.stage IN \('closed', 'commission_collected', 'awaiting_finance'\)/);
+  assert.match(read('crm-hot-alerts.js'),/const named=\[\.\.\.new Set/);
+});
