@@ -1013,6 +1013,10 @@ const rowText = (x: any) => `${x?.review_reason || ""} ${x?.owner_text || ""} ${
 // R50 (Ahmed 18 Nov «ينرسل له موعد ثاني مرة»): the one «تحب نحدد لك موعد ثاني ؟» after an unanswered visit confirmation. Outside
 // the 24 hours it goes as the UTILITY template visit_missed_rebook_ar_v1 ({{1}} = the property), its body kept on the row.
 const REBOOK_TPL = "visit_missed_rebook_ar_v1";
+// decision 74 (SQL140): step 3 on Muscat, once Meta approved it there as UTILITY; its one variable is the visit day «15 أكتوبر»
+const STEP3_V3_TPL = "visit_followup_3_ar_v3";
+const AR_MONTHS = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+const arDayMonth = (d: unknown) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d ?? "")); return m ? `${Number(m[3])} ${AR_MONTHS[Number(m[2]) - 1]}` : ""; };
 const rebookBody = (name: string) => `بخصوص موعد زيارتك ${name}\nتحب نحدد لك موعد ثاني ؟`;
 const rebookParam = (body: unknown) => String(body ?? "").split("\n")[0].replace(/^بخصوص موعد زيارتك\s*/, "").trim();
 // R37 / R47: what may go to a chat a person typed in (no handoff) is the after-visit opinion question only
@@ -1664,9 +1668,13 @@ async function sendOne(f: any, numbers: string[], mode: "template" | "after_visi
   // R50: the rebook template carries the property as its one variable
   const rebook = f.template_name === REBOOK_TPL ? rebookParam(f.body) : "";
   if (!service && f.template_name === REBOOK_TPL && !rebook) { await db.from("whatsapp_visit_followups").update({ status: "awaiting_approval" }).eq("id", f.id).eq("status", "sending"); return "rebook_no_property"; }
+  // decision 74: the v3 step-3 template carries the visit day
+  const day = !service && f.template_name === STEP3_V3_TPL ? arDayMonth((await db.from("viewings").select("viewing_date").eq("id", f.viewing_id).maybeSingle()).data?.viewing_date) : "";
+  if (!service && f.template_name === STEP3_V3_TPL && !day) { await db.from("whatsapp_visit_followups").update({ status: "awaiting_approval" }).eq("id", f.id).eq("status", "sending"); return "step3_no_day"; }
+  const param = rebook || day;
   const payload = service
     ? { type: "text", text: { preview_url: false, body } }
-    : { type: "template", template: { name: f.template_name, language: { code: "ar" }, ...(rebook ? { components: [{ type: "body", parameters: [{ type: "text", text: rebook }] }] } : {}) } };
+    : { type: "template", template: { name: f.template_name, language: { code: "ar" }, ...(param ? { components: [{ type: "body", parameters: [{ type: "text", text: param }] }] } : {}) } };
   const now = new Date().toISOString();
   try {
     const wamid = await metaSend(await routeTokens(f.company_id, f.route_key), digits(conv.meta_phone_number_id), to, payload);

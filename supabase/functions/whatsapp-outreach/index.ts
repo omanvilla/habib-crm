@@ -15,6 +15,10 @@
 //                   {price_drop}    SQL123 (18 Nov): scored, the best 20 only, never a unit of a group already offered;
 //                   {preview}       also when the price of an available property drops; preview writes nothing
 //   send_approved   (cron)          sends approved rows
+//                   branch_transfer step F (decision 77, SQL140): the reply agent on the wrong number queued it
+//                                   (crm_branch_transfer_queue); it goes from the right number once the agent's line went
+//                                   out there, as text inside the 24 hours or as branch_transfer_ar_v1 only when Meta rated it
+//                                   APPROVED + UTILITY; then what waited on the wrong number for that topic is closed
 //   templates       {submit}        submits / refreshes the four templates on both numbers
 //   approve         (owner JWT)     {ids, decision: approve|reject} → approve sends right away (within hours)
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -308,11 +312,21 @@ async function sendRows(ids?: string[]) {
   let q = db.from("whatsapp_outreach_queue").select("*").eq("status", "approved").eq("dry_run", false).lte("scheduled_for", new Date().toISOString()).limit(20);
   if (ids?.length) q = q.in("id", ids);
   const rowsR = await q;
-  const reg = await db.from("whatsapp_template_registry").select("route_key,template_name,status");
+  const reg = await db.from("whatsapp_template_registry").select("route_key,template_name,status,category");
   const approvedTpl = new Set((reg.data || []).filter((t: any) => String(t.status).toUpperCase() === "APPROVED").map((t: any) => `${t.route_key}|${t.template_name}`));
+  const utilityTpl = new Set((reg.data || []).filter((t: any) => String(t.status).toUpperCase() === "APPROVED" && String(t.category).toUpperCase() === "UTILITY").map((t: any) => `${t.route_key}|${t.template_name}`));
+  // the two company numbers never message each other
+  const company = (await routes()).map((x: any) => digits(x.whatsapp_number)).filter(Boolean);
   let sent = 0;
   for (const r of rowsR.data || []) {
     try {
+      // step F: the chat on the right number (made when there is none); null = the agent's line on the wrong number has not
+      // gone out yet, so it waits (SQL140 skips it after 24 hours)
+      if (r.kind === "branch_transfer") {
+        const tg = await db.rpc("crm_branch_transfer_target", { p_queue: r.id });
+        if (tg.error || !tg.data) continue;
+        r.conversation_id = tg.data;
+      }
       const [cl, cv] = await Promise.all([
         db.from("clients").select("phone,phone_normalized,followup_suppressed").eq("id", r.client_id).single(),
         db.from("whatsapp_conversations").select("id,meta_phone_number_id,last_inbound_at,route_key").eq("id", r.conversation_id).single(),
@@ -331,8 +345,14 @@ async function sendRows(ids?: string[]) {
       const t = await token(r.company_id, r.route_key);
       if (!t || !cv.data) throw new Error("route_not_ready");
       const to = digits(cl.data?.phone_normalized || cl.data?.phone), phoneId = digits(cv.data.meta_phone_number_id);
+      if (!to || company.includes(to)) { await db.from("whatsapp_outreach_queue").update({ status: "skipped", reason: to ? "company_number" : "no_phone" }).eq("id", r.id); continue; }
       const service = !!cv.data.last_inbound_at && Date.now() - new Date(cv.data.last_inbound_at).getTime() < 23 * 3600000;
-      if (!service && !approvedTpl.has(`${r.route_key}|${r.template_name}`)) { await db.from("whatsapp_outreach_queue").update({ error: "template_pending" }).eq("id", r.id); continue; }
+      // step F goes as its template only when Meta rated it UTILITY; a week without that and it is dropped
+      const transfer = r.kind === "branch_transfer";
+      if (!service && !(transfer ? utilityTpl : approvedTpl).has(`${r.route_key}|${r.template_name}`)) {
+        const old = transfer && Date.now() - new Date(r.created_at).getTime() > 7 * DAY;
+        await db.from("whatsapp_outreach_queue").update(old ? { status: "skipped", reason: "template_not_utility" } : { error: "template_pending" }).eq("id", r.id); continue;
+      }
       const now = new Date().toISOString();
       const outs: { id: string | null; body: string; type: string }[] = [];
       if (service) for (const m of r.messages as string[]) outs.push({ id: await meta(t, phoneId, to, { type: "text", text: { preview_url: false, body: m } }), body: m, type: "text" });
@@ -350,6 +370,8 @@ async function sendRows(ids?: string[]) {
       await db.from("whatsapp_outreach_queue").update({ status: "sent", sent_at: now, send_mode: service ? "service" : "template", meta_message_id: outs[0]?.id || null, error: null }).eq("id", r.id);
       await db.from("whatsapp_conversations").update({ last_message_at: now, last_outbound_at: now, updated_at: now }).eq("id", r.conversation_id);
       if (r.request_id) await db.from("client_requests").update({ last_contact_at: now }).eq("id", r.request_id);
+      // step F: what waited on the wrong number for this topic is closed (as close_other_branch in the reply agent)
+      if (transfer) { const cs = await db.rpc("crm_branch_transfer_close_source", { p_queue: r.id }); if (cs.error) console.error("[outreach] close source", cs.error.message); }
       sent++;
     } catch (e) { await db.from("whatsapp_outreach_queue").update({ status: "failed", error: short((e as any)?.message || e, 500) }).eq("id", r.id); }
   }
