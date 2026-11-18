@@ -40,3 +40,15 @@ test('SQL127 leaves job / visa / money chats out of the waiting buyers, never a 
   assert.match(s127,/ویزا/);
   assert.doesNotMatch(s127,/\|شاغر\|/);
 });
+test('SQL128 and the screen: staff see «عملاء يحتاجونك الحين» and share one «تم»',()=>{
+  const s128=read('db/changes/128-hot-alerts-staff.forward.sql');
+  copy('_hot_alerts_staff_20261118.sql',s128);
+  assert.match(s128,/v_role NOT IN \('owner', 'manager', 'agent'\)/);
+  assert.match(s128,/can_access_whatsapp_conversation\(v_company, p_conversation_id\)/);
+  assert.match(read('crm-hot-alerts.js'),/if\(busy\|\|!canSee\(\)/);
+});
+test('brain: a call request with no topic is asked first, not handed over (Ahmed 18 Nov)',()=>{
+  const b=read('supabase/functions/whatsapp-reply-agent/brain.ts');
+  assert.match(b,/طلب الاتصال بدون موضوع واضح ما يتحوّل/);
+  assert.match(b,/تفضل وش استفسارك ؟/);
+});
