@@ -332,8 +332,9 @@ test('2: the R2 guard honours R16 (after-visit question, passed visit time, loca
  assert(agent.includes('viewing_time,status,properties(type,area,wilayat,price,listing_purpose)'));
 });
 
-test('3: owner_with_ahmed only after a typed office message since the hand-back (72 h) or an open price study; declines always go out',()=>{
- assert(agent.includes('const backAt = Math.max(conv.agent_returned_at ? new Date(conv.agent_returned_at).getTime() : 0, Date.now() - 72 * 3600 * 1000);'));
+test('3: owner_with_ahmed after any typed office message since the hand-back (decision 67: R1 wins, no 72 h) or an open price study; declines always go out',()=>{
+ assert(agent.includes('const backAt = conv.agent_returned_at ? new Date(conv.agent_returned_at).getTime() : 0;'));
+ assert(!agent.includes('72 * 3600 * 1000'),'the dead 72-hour limit is gone');
  assert(agent.includes('h.actor_type === "human" && new Date(h.message_timestamp).getTime() > backAt'));
  assert(agent.includes('const priceStudyOpen = !!conv.human_handoff_required && /^\\s*دراسة سعر\\s*:/.test(String(conv.handoff_reason || ""));'));
  assert(agent.includes('const ownerWithAhmed = out.category === "seller" && !declining && (ahmedTyped || priceStudyOpen);'));

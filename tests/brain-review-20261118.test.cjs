@@ -79,3 +79,29 @@ test('decisions 20, 21, 24, 27, 30, 69, 70: brain lines and code',()=>{
  assert(!brain.includes('الموضوع المحول "اجتماع:" وهو يسأل عن المشروع أو يغيّر الموعد: رد عادي'));
  assert(!brain.includes('وبيرد عليك واحد من الفريق'));
 });
+
+test('decision 42: a sold notice skipped because the client wrote opens the agent\'s first reply, once',()=>{
+ assert(agent.includes('.eq("status", "skipped").in("reason", ["sold_client_wrote_after", "client_wrote_after"])'));
+ assert(agent.includes('!props.some((p: any) => p.id === r.property_id)'),'only while the property is still gone');
+ const at=(s)=>{const i=agent.indexOf(s);assert(i>=0,s);return i;};
+ // added after the guards (the «never say sold about an available property» guard cannot drop it), before the send
+ const add=at('if (soldLine && out.reply_messages.length && !ignored) {');
+ assert(at('out.reply_messages = texts.slice(0, 3);')<add&&add<at('const wamid = await metaSend(tokens, phoneId, to, outgoing[i]);'));
+ assert(agent.includes('if (!out.reply_messages.some((t: string) => /انحجز|انباع|ابتاع/.test(t))) out.reply_messages = [soldLine, ...out.reply_messages];'));
+ // marked only after a real send, and only when the final reply still says it
+ const mark=at('update({ reason: "told_by_agent" })');
+ assert(mark>at('const wamid = await metaSend(tokens, phoneId, to, outgoing[i]);'));
+ assert(agent.includes('if (sentIds.length && !review && out.sold_told && out.reply_messages.some('));
+});
+
+test('decisions 67 and 68, and the private key-box photos (SQL137)',()=>{
+ assert(!agent.includes('72 * 3600 * 1000'));
+ assert(brain.includes('category=ignore و ignore_kind=not_real_estate (قرار 68: تنتجاهل بدون تنبيه)'));
+ assert(agent.includes('async function lockboxLink(v: unknown): Promise<string> {')&&agent.includes('db.storage.from("property-keys").createSignedUrl(s, 600)'));
+ assert(agent.includes('if (lockLink) actionMsgs.push({ type: "image", image: { link: lockLink } });'));
+ assert(agent.includes('if (/^https:\\/\\//.test(s)) return s;'),'old https values still work');
+ const f=fs.readFileSync('db/changes/139-zero-down-off.forward.sql','utf8').replace(/\r\n/g,'\n');
+ assert.equal(f,fs.readFileSync('supabase/migrations/20261118084111_zero_down_off_20261118.sql','utf8').replace(/\r\n/g,'\n'));
+ assert(f.includes("'5 20 30 11 *'")&&f.includes('SET active = false')&&f.includes("WHERE jobname = 'zero_down_pinned_off_20261201';\n$job$"));
+ assert(!/DELETE|DROP/i.test(f));
+});

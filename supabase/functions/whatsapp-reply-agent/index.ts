@@ -539,7 +539,7 @@ function ownerDecisions(out: any, lines: string[], c: any) {
 }
 const DEPOSIT_SAID = /عربون|مقدم\s*حجز|(ا|أ|ن)حجز\s*(ال)?(فيلا|فل[ةه]|بيت|شق[ةه]|منزل|عقار|[اأ]رض)|لحجز\s*(ال)?(فيلا|فل[ةه]|بيت|شق[ةه]|منزل|عقار|[اأ]رض)/;
 // R40 (Ahmed 12 Nov): people the office never answers; the chat leaves «العقل موقوف عندهم» for the ignored list
-const IGNORE_LABEL: Record<string, string> = { job: "طالب وظيفة", broker_signup: "يبي يتسجل وسيط عندنا", foreign_broker: "وسيط أو شركة من برا عمان", bank: "موظف بنك يعرض تعاون", service: "يعرض خدمة", contest: "يسأل عن مسابقة", stranger: "رسالة مشبوهة من رقم غريب" };
+const IGNORE_LABEL: Record<string, string> = { job: "طالب وظيفة", broker_signup: "يبي يتسجل وسيط عندنا", foreign_broker: "وسيط أو شركة من برا عمان", bank: "موظف بنك يعرض تعاون", service: "يعرض خدمة", contest: "يسأل عن مسابقة", stranger: "رسالة مشبوهة من رقم غريب", not_real_estate: "غريب يطلب شي مو عقاري (مساعدة، تبرع)" };
 // Ahmed's strict rule (6 Nov): never promise the customer a reply ("بشوف وارد عليك"). Silence is better than a promise nobody keeps.
 // R12 (9 Nov, in code 10 Nov): first-person call promises too ("بتصل عليك", "بكلمك"). The one allowed sentence is R12's third-person
 // "اول ما يفضى يتصل فيك", which none of these match; "اول ما يتوفر بتواصل معك" is not a call promise and stays.
@@ -625,6 +625,16 @@ function outsideArea(area: unknown, wilayat: unknown) {
 const ALLOWED_ORIGINS = ["https://omanvilla.github.io"]; // the approval screen asks for a rewrite from here
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+// SQL137: the key-box photo is a path in the private bucket property-keys; WhatsApp gets a 10-minute signed URL.
+// An old https value still works as it is.
+async function lockboxLink(v: unknown): Promise<string> {
+  const s = String(v ?? "").trim();
+  if (!s) return "";
+  if (/^https:\/\//.test(s)) return s;
+  if (!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|jpeg|png|webp)$/.test(s)) return "";
+  const r = await db.storage.from("property-keys").createSignedUrl(s, 600);
+  return r.error ? "" : (r.data?.signedUrl || "");
+}
 // the owner's order not to answer: the waiting draft leaves «ردود تنتظر موافقتك» as rejected, with his words kept
 async function closeDraft(draftId: string, analysis: any, instruction: string, by: string | null) {
   const u = await db.from("whatsapp_reply_drafts").update({ status: "rejected", decided_at: new Date().toISOString(), decided_by: by, reply_messages: [],
@@ -804,7 +814,7 @@ const schema = {
   properties: {
     reply_messages: { type: "array", items: { type: "string" } },
     category: { type: "string", enum: ["buyer", "tenant", "investor", "seller", "general", "broker", "active_deal", "unclear", "ignore"] },
-    ignore_kind: { type: ["string", "null"], enum: ["job", "broker_signup", "foreign_broker", "bank", "service", "contest", null] },
+    ignore_kind: { type: ["string", "null"], enum: ["job", "broker_signup", "foreign_broker", "bank", "service", "contest", "not_real_estate", null] },
     source: { type: "string", enum: ["reel", "property_link", "image", "video", "ad", "referral", "direct", "unknown"] },
     intent: { type: "string" },
     budget_asked_now: { type: "boolean" },
@@ -1270,6 +1280,18 @@ Deno.serve(async (req) => {
       const un = props.length ? await db.from("properties").select("id,utilities_note").in("id", props.map((p: any) => p.id)) : null;
       if (un && !un.error) for (const r of (un.data || []) as any[]) { const p: any = props.find((x: any) => x.id === r.id); if (p && r.utilities_note) p.utilities_note = r.utilities_note; }
     } catch (_) { /* no column yet */ }
+    // decision 42 (Ahmed 18 Nov 2026: «العقل يبلغه أكيد»): a sold / reserved notice that was skipped because the client wrote
+    // after it was queued (kind property_sold, status skipped, reason sold_client_wrote_after, older rows client_wrote_after) is
+    // said by the agent in its first reply, while the property is still gone (not in the available list). Then its reason
+    // becomes told_by_agent (the status stays skipped: the queue's status check has no other value for it).
+    let soldUntold: any[] = [];
+    try {
+      const sq = await db.from("whatsapp_outreach_queue").select("id,property_id,messages").eq("conversation_id", conv.id).eq("kind", "property_sold")
+        .eq("status", "skipped").in("reason", ["sold_client_wrote_after", "client_wrote_after"]).order("created_at", { ascending: false }).limit(5);
+      soldUntold = ((sq.data || []) as any[]).filter((r: any) => r.property_id && !props.some((p: any) => p.id === r.property_id)
+        && Array.isArray(r.messages) && /انحجز|انباع/.test(String(r.messages[0] || "")));
+    } catch (_) { /* the notice queue could not be read: nothing is added */ }
+    const soldLine = soldUntold.length ? String(soldUntold[0].messages[0]).trim() : "";
     // R2: the customer's visits, so the agent knows whether a price talk can start (only after a visit).
     // Listed by a neutral label (type, area, price): the office title carries the owner's name (10 Nov)
     const visR = await db.from("viewings").select("property_id,viewing_date,viewing_time,status,properties(type,area,wilayat,price,listing_purpose)").eq("client_id", msg.client_id).eq("archived", false)
@@ -1594,6 +1616,7 @@ Deno.serve(async (req) => {
       "",
       "زيارات العميل المسجلة في الـ CRM (التفاوض على السعر بس على عقار زاره فعلاً، هنا أو قال في المحادثة إنه زاره):",
       visitsText,
+      ...(soldLine ? ["", `عقار سأل عنه انحجز وما انقال له لين الحين (قرار 42): «${soldLine}». أول رد منك يبدأ بهذا السطر بس (بدون "تحب تشوف خيارات ثانية ؟")، وبعده جاوب على رسالته. لا تعرض عليه هذا العقار.`] : []),
       // R23 (10 Nov): an open soft handoff (a booked «اجتماع:» meeting, a photo or appointment request) never silences the agent by itself
       ...(conv.human_handoff_required && !hardHandoff ? [`موضوع محول لأحمد ولسا ما خلص (من ${String(conv.handoff_updated_at || "").slice(0, 16)}): ${conv.handoff_reason || ""}. أحمد بيكمل هذا الموضوع بنفسه وهو عنده في القائمة، وهذا التحويل ما يسكّتك (R23): رد على رسالة العميل عادي. إذا سأل عن نفس الموضوع اعطه اللي تقدر عليه بدون وعد (رد قصير، معلومة مكتوبة قدامك، أو سؤال يكمل مثل "متى يناسبك ؟"). إذا الموضوع "اجتماع:" فالموعد محجوز: أكد له اليوم والساعة إذا سأل وجاوب أسئلته البسيطة و action=none، وإذا غيّر الموعد book_meeting بالموعد الجديد. action=handoff بس إذا طلب شي جديد لازم أحمد يسويه. تسكت (reply_messages=[] و action=none) بس في حالات R23، أو إذا يستعجل أو يعيد طلب ما يقدر عليه غير أحمد (موعد ينتظر تأكيده، اتصال، معلومة مو مكتوبة قدامك) وانت رديت عليه فيه قبل`] : []),
       "",
@@ -2145,6 +2168,11 @@ Deno.serve(async (req) => {
     // keep the question even when there are two ads
     if (texts.length > 3) { const q = texts.find((t) => t.length < 90 && /تزور/.test(t)); texts = q ? [...texts.filter((t) => t !== q).slice(0, 2), q] : texts.slice(0, 3); }
     out.reply_messages = texts.slice(0, 3);
+    // decision 42: the skipped sold notice opens the first reply, once (not over silence, an ignored chat or a line that already says it)
+    if (soldLine && out.reply_messages.length && !ignored) {
+      if (!out.reply_messages.some((t: string) => /انحجز|انباع|ابتاع/.test(t))) out.reply_messages = [soldLine, ...out.reply_messages];
+      out.sold_told = true;
+    }
     // a pinned reply only counts when the id is real
     const rule = (rulesR.data || []).find((r: any) => r.id === out.matched_rule_id) || null;
     out.matched_rule_id = rule?.id || null;
@@ -2160,7 +2188,8 @@ Deno.serve(async (req) => {
       else { out.action = "handoff"; out.handoff_reason = "العميل يبي يزور واللوكيشن غير مسجل للعقار"; }
     }
     if (out.action === "send_lockbox") {
-      if (prop?.lockbox_image_url) actionMsgs.push({ type: "image", image: { link: prop.lockbox_image_url } });
+      const lockLink = prop?.lockbox_image_url ? await lockboxLink(prop.lockbox_image_url) : "";
+      if (lockLink) actionMsgs.push({ type: "image", image: { link: lockLink } });
       else { out.action = "handoff"; out.handoff_reason = "معاينة بصندوق مفتاح وصورة الرمز غير مرفوعة"; }
     }
     if (out.action === "send_owner_number") {
@@ -2297,10 +2326,10 @@ Deno.serve(async (req) => {
         }
       } catch (e) { console.error("[reply-agent] memory", String((e as any)?.message || e)); }
     }
-    // an owner Ahmed is handling himself: he typed in this chat after it was last handed back to the agent, within the last 72 hours,
-    // or a price study for him is open (10 Nov: an old typed message or an old price study silenced the chat for good, note f229cffe).
-    // The polite declines (heirs, occupied, mortgaged: R10 / R20) always go out.
-    const backAt = Math.max(conv.agent_returned_at ? new Date(conv.agent_returned_at).getTime() : 0, Date.now() - 72 * 3600 * 1000);
+    // an owner Ahmed is handling himself: he typed in this chat after it was last handed back to the agent, or a price study for
+    // him is open. Decision 67 (Ahmed 18 Nov 2026: «يسكت لين أرجعها»): R1 wins, so the old 72-hour limit (note f229cffe, 10 Nov)
+    // is gone; any typed office message since the hand-back counts. The polite declines (heirs, occupied, mortgaged: R10 / R20) always go out.
+    const backAt = conv.agent_returned_at ? new Date(conv.agent_returned_at).getTime() : 0;
     const ahmedTyped = history.some((h: any) => h.direction === "outbound" && h.actor_type === "human" && new Date(h.message_timestamp).getTime() > backAt);
     const priceStudyOpen = !!conv.human_handoff_required && /^\s*دراسة سعر\s*:/.test(String(conv.handoff_reason || ""));
     const declining = out.reply_messages.some((t: string) => DECLINE_RE.test(t));
@@ -2491,6 +2520,13 @@ Deno.serve(async (req) => {
     }
     const now = new Date().toISOString();
     await db.from("whatsapp_reply_drafts").update({ analysis, reply_messages: out.reply_messages, status: sentIds.length ? "sent" : "skipped", error: sentIds.length ? null : "no_reply_needed", sent_at: sentIds.length ? now : null }).eq("id", draftId);
+    // decision 42: the notice the client never got was said in this reply: its queue rows are marked so it is not said again
+    if (sentIds.length && !review && out.sold_told && out.reply_messages.some((t: string) => /انحجز|انباع|ابتاع/.test(t))) {
+      const ids = soldUntold.map((r: any) => r.id);
+      // (the status check allows no new value: the row stays skipped and its reason becomes told_by_agent)
+      const mk = await db.from("whatsapp_outreach_queue").update({ reason: "told_by_agent" }).in("id", ids).eq("status", "skipped");
+      if (mk.error) console.error("[reply-agent] sold told", mk.error.message);
+    }
 
     // a location (or the owner's number) went out: the client is going to see the property, so the visit is recorded even when
     // his time was vague ("الحين", "العصر") and the question after 1.5 h can follow (8 Nov, Ahmed)
@@ -2512,7 +2548,7 @@ Deno.serve(async (req) => {
     // R45: a meeting request is a hard handoff «اجتماع: …» (Ahmed is alerted and answers; the agent stays out of the chat)
     const meetingBooked = out.action === "book_meeting" && /^\s*اجتماع\s*:/.test(String(out.handoff_reason || ""));
     if (out.action === "handoff" || meetingBooked) Object.assign(convPatch, { human_handoff_required: true, handoff_reason: short(out.handoff_reason || out.intent, 500), handoff_updated_at: now });
-    if (ignored) Object.assign(convPatch, { agent_muted: true, agent_muted_reason: `متجاهل: ${IGNORE_LABEL[out.ignore_kind]}`, ignored_at: now, ignore_kind: ["contest", "stranger"].includes(out.ignore_kind) ? "other" : out.ignore_kind,
+    if (ignored) Object.assign(convPatch, { agent_muted: true, agent_muted_reason: `متجاهل: ${IGNORE_LABEL[out.ignore_kind]}`, ignored_at: now, ignore_kind: ["contest", "stranger", "not_real_estate"].includes(out.ignore_kind) ? "other" : out.ignore_kind,
       human_handoff_required: false, handoff_reason: null, handoff_updated_at: now });
     // a handoff that only said "which property ?" is closed by the agent itself once it answers normally (8 Nov, Ahmed: it must not wait for him)
     if (out.action !== "handoff" && !meetingBooked && sentIds.length && out.reply_messages.length && conv.human_handoff_required && /مو واضح|ما عرفنا|أي عقار|اي عقار|العقار.*(واضح|محدد)/.test(String(conv.handoff_reason || "")) && !HARD_HANDOFF.test(String(conv.handoff_reason || ""))) {
