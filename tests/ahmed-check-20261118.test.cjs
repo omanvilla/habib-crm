@@ -79,3 +79,10 @@ test('SQL131 + hot alerts: a sold / reserved property clears its serious-buyer a
   assert.match(s,/d\.reservation_confirmed_at IS NOT NULL OR d\.stage IN \('closed', 'commission_collected', 'awaiting_finance'\)/);
   assert.match(read('crm-hot-alerts.js'),/const named=\[\.\.\.new Set/);
 });
+test('SQL132: no visit confirmation for a sold / reserved property; sold notices go by themselves inside the 24-hour window',()=>{
+  const s=read('db/changes/132-sold-notice-auto.forward.sql');
+  copy('_sold_notice_auto_20261118.sql',s);
+  assert.match(s,/NOT IN \(''sold'', ''reserved''\)/);
+  assert.match(s,/w\.last_inbound_at > now\(\) - interval '23 hours'/);
+  assert.match(s,/'outreach_auto_sold_notice', '2-57\/5 \* \* \* \*'/);
+});
