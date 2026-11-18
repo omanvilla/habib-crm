@@ -227,6 +227,17 @@ function fixtureExtraRpc(name,args){
  switch(name){
   case 'crm_owner_home':return isOwner?ok({...home(),auto_visits:1}):ownerOnly();
   case 'crm_staff_home':return isOwner?ownerOnly():ok({...home(),scope:'staff'});
+  // SQL126 (18 Nov 2026): waiting buyers and contracts at the top of the owner home
+  case 'crm_home_attention':{
+   if(!isOwner)return ownerOnly();
+   const bs=clients.filter(c=>c.lead_route!=='investment').slice(0,2);
+   return ok({waiting:bs.map((c,i)=>({conversation_id:uuid(1500+Number(c.id.slice(-3))),client_id:c.id,route:c.lead_route,name:c.name,phone:c.phone,
+      question:i?'هل مفروشه؟':'كم سعر الفيلا وكم المساحة ؟',asked_at:relative(-1)+'T0'+(8+i)+':15:00Z'})),
+    expiring:properties.slice(0,1).map(p=>({id:p.id,name:p.title,branch:p.branch_key,end_date:relative(40),days_left:40})),
+    unchecked:properties.slice(1,2).map(p=>({id:p.id,name:p.title,branch:p.branch_key,status:p.status,checked_at:null})),
+    new_contracts:[{study_id:uuid(1700),client_id:clients[0].id,conversation_id:uuid(1701),name:'مالك اصطناعي',phone:'+96890000000',property:'أرض · النعمان',accepted_at:relative(-2)+'T08:00:00Z'}]});
+  }
+  case 'crm_waiting_buyer_done':case 'crm_property_confirm_available':return isOwner?ok(true):ownerOnly();
   case 'crm_paused_chats':{
    const items=clients.filter(c=>c.lead_route!=='investment'&&allowed(c,'clients')).slice(0,2).map((c,i)=>chat(c,i===0
     ?{kind:'negotiation',reason:'العميل يسأل عن خصم على السعر',summary:'يبي ينزل السعر 3 آلاف'}
