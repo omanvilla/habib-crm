@@ -59,3 +59,11 @@ test('SQL123: siblings for the service role only, trigger on a 2 percent price d
   assert(!/DELETE\s+FROM/i.test(sql));
   assert(rb.includes('UPDATE OF status ON'));
 });
+test('clients outside the best 20 are kept (skipped / over_cap) and the owner can move one to the approval list',()=>{
+  const ui=read('crm-reply-approvals.js'),index=read('index.html');
+  assert(out.includes('status: "skipped", reason: "over_cap"'));
+  assert(out.includes('["approve", "reject", "promote"]'));
+  assert(/eq\("status", "skipped"\)\.eq\("reason", "over_cap"\)/.test(out),'promote only moves over_cap rows');
+  assert(ui.includes("eq('reason','over_cap')")&&ui.includes("data-rp=\"out-promote\"")&&ui.includes("outreachAct([card.dataset.out],'promote'"));
+  assert(index.includes('crm-reply-approvals.js?v=20261118-extra1'));
+});

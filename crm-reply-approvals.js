@@ -125,6 +125,29 @@
     const cm=new Map((cl.data||[]).map(x=>[x.id,x]));
     rows.forEach(x=>{x.client=cm.get(x.client_id)||{};});
     state.outreach=rows;
+    await loadExtras();
+  }
+  // SQL123: clients a new listing fits who were kept outside the best 20 (skipped / over_cap, last 14 days, the property
+  // still available). Nothing sends them; «أضف للموافقة» moves one to the list above.
+  async function loadExtras(){
+    const q=await supa.from('whatsapp_outreach_queue').select('id,client_id,conversation_id,property_id,summary,created_at').eq('kind','new_listing').eq('status','skipped').eq('reason','over_cap').eq('dry_run',false)
+      .gte('created_at',new Date(Date.now()-14*864e5).toISOString()).order('created_at',{ascending:false}).limit(90);
+    const rows=q.error?[]:(q.data||[]);
+    const pIds=[...new Set(rows.map(x=>x.property_id))],cIds=[...new Set(rows.map(x=>x.client_id))];
+    const [p,cl]=await Promise.all([pIds.length?supa.from('properties').select('id,title,status,archived').in('id',pIds):{data:[]},cIds.length?supa.from('clients').select('id,name,phone').in('id',cIds):{data:[]}]);
+    const pm=new Map((p.data||[]).filter(x=>x.status==='available'&&!x.archived).map(x=>[x.id,x])),cm=new Map((cl.data||[]).map(x=>[x.id,x]));
+    state.extras=rows.filter(x=>pm.has(x.property_id)).map(x=>({...x,property:pm.get(x.property_id),client:cm.get(x.client_id)||{}}));
+  }
+  function extrasBlock(){
+    const xs=state.extras||[];if(!xs.length)return '';
+    const groups=new Map();xs.forEach(x=>{const k=x.property_id;if(!groups.has(k))groups.set(k,[]);groups.get(k).push(x);});
+    return '<details class="rp-extras"><summary class="rp-section">عملاء قريبين ما دخلوا أول 20 ('+xs.length+')</summary>'
+      +'<p class="rp-muted">العقار يناسبهم بس درجتهم أقل. ما ينرسل لهم شي إلا إذا ضفتهم للموافقة.</p>'
+      +[...groups.values()].map(g=>'<h4 class="rp-extras-title">'+esc(g[0].property.title||'عقار')+' ('+g.length+')</h4>'
+        +g.map(x=>'<article class="rp-card rp-extra" data-out="'+esc(x.id)+'"><div><strong><bdi>'+esc(x.client.name||'عميل')+'</bdi></strong>'
+          +(x.client.phone?' <small dir="ltr">'+esc(x.client.phone)+'</small>':'')+'<p class="rp-summary">'+esc(x.summary||'')+'</p></div>'
+          +'<div class="rp-actions"><button type="button" class="btn-secondary" data-rp="out-promote">أضف للموافقة</button></div><div class="rp-error" role="alert"></div></article>').join('')).join('')
+      +'</details>';
   }
   async function loadRules(){
     const r=await supa.from('whatsapp_reply_rules').select('id,situation,approved_reply,category,intent,active,created_at,updated_at').order('created_at',{ascending:false});
@@ -362,6 +385,7 @@
     const real=state.drafts.filter(d=>!(d.analysis&&d.analysis.dry_run)).length,fus=state.followups||[],outs=state.outreach||[];
     byId('rpSub').textContent=real+' رد ينتظر موافقتك'+(fus.length?' · '+fus.length+' متابعة زيارة':'')+(state.showTrials?' · مع ردود التجربة':'');
     list.innerHTML=(outs.length?'<h3 class="rp-section">رسائل نبدأها نحن ('+outs.length+') <button type="button" class="btn-secondary" data-rp-bulk="out-all">موافقة على المحدد</button></h3>'+outs.map(outreachCard).join(''):'')
+      +extrasBlock()
       +(fus.length?'<h3 class="rp-section">متابعات بعد الزيارة</h3>'+fus.map(followupCard).join(''):'')
       +(fus.length&&state.drafts.length?'<h3 class="rp-section">ردود على رسائل العملاء</h3>':'')
       +(state.drafts.length||fus.length||outs.length?state.drafts.map(draftCard).join(''):'<div class="empty"><div class="empty-ico">✉</div><div class="empty-title">ما في ردود تنتظرك</div><div class="empty-desc">أول ما يكتب المحرك رد جديد يظهر هنا ويوصلك تنبيه.</div></div>');
@@ -468,7 +492,7 @@
     if(btn)btn.disabled=false;
     if(e){if(err)err.textContent=errText(e);else toast(errText(e),'error');return;}
     const d=r.data||{};
-    toast(decision==='reject'?'تم التخطي':(d.reason==='outside_sending_hours'?'انحفظت الموافقة وبتنرسل الساعة 9 الصبح':'انرسلت '+(d.sent||0)+' رسالة'),'success');refresh();updateBadge();
+    toast(decision==='promote'?'انضاف لقائمة الموافقة':decision==='reject'?'تم التخطي':(d.reason==='outside_sending_hours'?'انحفظت الموافقة وبتنرسل الساعة 9 الصبح':'انرسلت '+(d.sent||0)+' رسالة'),'success');refresh();updateBadge();
   }
   document.addEventListener('click',e=>{
     const bulk=e.target.closest('[data-rp-bulk]');
@@ -482,6 +506,7 @@
     if(a==='lead-open'){const c=b.closest('[data-lead]'),x=(state.leads||[]).find(y=>y.id===(c&&c.dataset.lead));if(x&&x.conversation_id&&typeof openDashboardWhatsAppConversation==='function')openDashboardWhatsAppConversation(x.conversation_id);return;}
     if(a==='coach-ok'||a==='coach-no'){const c=b.closest('[data-coach]');if(c)coachAct(c,b,a==='coach-ok');return;}
     if(a==='out-send'){outreachAct([card.dataset.out],'approve',card,b);return;}
+    if(a==='out-promote'){outreachAct([card.dataset.out],'promote',card,b);return;}
     if(a==='out-skip'){if(confirm('تتخطى هذي الرسالة؟'))outreachAct([card.dataset.out],'reject',card,b);return;}
     if(a==='out-open'){const o=(state.outreach||[]).find(x=>x.id===card.dataset.out);if(o&&typeof openDashboardWhatsAppConversation==='function')openDashboardWhatsAppConversation(o.conversation_id);return;}
     if(a==='send')send(card,b);

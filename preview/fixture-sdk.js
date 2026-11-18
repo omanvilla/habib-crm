@@ -50,6 +50,8 @@ const visits=[
 ].map(v=>({...v,company_id:company,created_by:v.agent_id,created_at:now,archived:false,row_version:1,duration_minutes:60,pipeline_outcome:v.status==='done'?'followup':null}));
 const db={profiles,companies:[{id:company,name:'أبناء حبيب · شركة اختبار',created_at:'2026-05-06T15:00:00Z',default_company_commission:0}],clients,client_requests:requests,properties,viewings:visits,
 owners:[{id:uuid(901),company_id:company,added_by:muscat,name:'مالك مسقط الاصطناعي',phone:'+96800000011',owner_type:'owner',archived:false},{id:uuid(902),company_id:company,added_by:barka,name:'مالك بركاء الاصطناعي',phone:'+96800000012',owner_type:'owner',archived:false}],
+// SQL123: one new-listing client kept outside the best 20 (owner-only table, like the real RLS)
+whatsapp_outreach_queue:[{id:uuid(1501),company_id:company,kind:'new_listing',status:'skipped',reason:'over_cap',dry_run:false,property_id:uuid(305),client_id:uuid(103),conversation_id:uuid(1601),route_key:'barka',summary:'قريب (نفس الولاية) · طلبه: فيلا في بركاء بحدود 80 الف',messages:['نزل عندنا فيلا في حي عاصم بـ 75 الف ممكن يناسب طلبك','لين الحين تبحث ؟'],created_at:now}],
 company_lead_routes:[{id:uuid(1301),company_id:company,route_key:'muscat',label:'مسقط',assigned_to:muscat,is_active:true},{id:uuid(1302),company_id:company,route_key:'barka',label:'بركاء',assigned_to:barka,is_active:true}],
 rejection_reasons:[{id:uuid(1401),company_id:null,code:'price_high',label_ar:'السعر أعلى من الميزانية',category:'price',is_active:true,sort_order:1},{id:uuid(1402),company_id:null,code:'location',label_ar:'الموقع غير مناسب',category:'property',is_active:true,sort_order:2}],
 tasks:[
@@ -78,6 +80,7 @@ function privateProperty(id){
 }
 function allowed(row,table){
  if(!row)return false;
+ if(table==='whatsapp_outreach_queue'&&profile.role!=='owner')return false;
  // Model owner-only investment reads for UI tests; real RLS is tested separately in SQL.
  if(profile.role!=='owner'){
   if(table==='properties'&&privateProperty(row.id))return false;
