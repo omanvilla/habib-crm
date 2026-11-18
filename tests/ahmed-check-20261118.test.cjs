@@ -64,5 +64,5 @@ test('SQL129 + whatsapp-owner-hot-alert: «طلب اتصال» and CRM-only hot 
   copy('_hot_alerts_whatsapp_20261118.sql',s);
   assert.match(s,/'hot_notification:' \|\| NEW\.id::text/);
   assert.match(s,/interval '5 minutes'/);
-  assert.match(read('supabase/functions/whatsapp-owner-hot-alert/index.ts'),/const HOT = \/\^\s\*\(مشتري جاد\|تفاوض\|اجتماع\|طلب اتصال\)\s\*:\//);
+  assert(read('supabase/functions/whatsapp-owner-hot-alert/index.ts').includes('(مشتري جاد|تفاوض|اجتماع|طلب اتصال)\\s*:/;'));
 });
