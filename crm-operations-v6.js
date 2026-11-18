@@ -5,6 +5,17 @@
   const n=v=>Number(v||0).toLocaleString('en-US');
   const omanDate=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'});
   const dateText=d=>d?new Date(d).toLocaleDateString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat'}):'—';
+  /* 18 Nov 2026 (decision 64): one shared crm_branch_target_snapshot read for this file's target card and the home's goals
+   * card (crm-owner-home.js): a read still on its way, or answered less than 3 seconds ago, for the same session. It lives
+   * here because this file's own first reads (at load and the first loadDashboard) run before crm-owner-home.js exists.
+   * A failed read is never kept. */
+  let snapKey='',snapDone=0,snapRead=null;
+  window.crmBranchSnapshot=function(){
+    const key=(typeof crmSessionGeneration==='undefined'?'':crmSessionGeneration)+':'+(typeof currentUser!=='undefined'&&currentUser?currentUser.id:'');
+    if(snapRead&&snapKey===key&&(!snapDone||Date.now()-snapDone<3000))return snapRead;
+    const read=Promise.resolve(supa.rpc('crm_branch_target_snapshot')).then(r=>{if(snapRead===read){if(!r||r.error)snapRead=null;else snapDone=Date.now();}return r;},e=>{if(snapRead===read)snapRead=null;throw e;});
+    snapKey=key;snapDone=0;snapRead=read;return read;
+  };
   // 11 Nov 2026 (SQL83): the person on the branch line («مرام») when known, else the branch
   const branchLabel=branch=>(window.crmBranchPeople&&window.crmBranchPeople[branch])||({muscat:'مسقط',barka:'بركاء'}[branch]||'الفرع');
   function branchRows(data){
@@ -208,9 +219,20 @@
     window.dashboardContactQueue=state.data?.contactQueue||[];
     window.dashboardWorkSnapshot=state.data||null;
   }
-  async function loadDashboardScope(scope){
+  // 18 Nov 2026 (decision 64): the boot calls loadDashboard twice and both wait for the home's gate, so each scope was read
+  // twice at the same moment. A scope still being read for the same session is joined instead of read again; a call
+  // after it finished (a save) reads again as before.
+  const dashboardInflight=new Map();
+  function loadDashboardScope(scope){
+    const key=crmSessionGeneration+':'+(currentUser&&currentUser.id),busy=dashboardInflight.get(scope);
+    if(busy&&busy.key===key){dashboardScopes.set(scope,busy.request);return busy.promise;}
+    const entry={key,request:{status:'loading'}};
+    entry.promise=readDashboardScope(scope,entry.request).finally(()=>{if(dashboardInflight.get(scope)===entry)dashboardInflight.delete(scope);});
+    dashboardInflight.set(scope,entry);return entry.promise;
+  }
+  async function readDashboardScope(scope,request){
     if(scope==='investment'&&currentProfile?.role!=='owner')return;
-    const generation=crmSessionGeneration,user=currentUser&&currentUser.id,request={status:'loading'};
+    const generation=crmSessionGeneration,user=currentUser&&currentUser.id;
     dashboardScopes.set(scope,request);renderDashboard();
     const current=()=>dashboardScopes.get(scope)===request&&crmSessionCurrent(generation,user);
     try{

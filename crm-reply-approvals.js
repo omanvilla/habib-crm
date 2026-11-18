@@ -409,7 +409,7 @@
     else{const r=await supa.rpc('crm_visit_followup_reject',{p_id:id});e=r.error;}
     btn.disabled=false;
     if(e){err.textContent=errText(e);return;}
-    toast(doSend?'انرسلت المتابعة':'تم التخطي','success');refresh();updateBadge();
+    toast(doSend?'انرسلت المتابعة':'تم التخطي','success');refresh();updateBadge(true);
   }
   async function send(card,btn){
     const id=card.dataset.draft,err=card.querySelector('.rp-error');err.textContent='';
@@ -424,7 +424,7 @@
       if(pin){const d=state.drafts.find(x=>x.id===id)||{},a=d.analysis||{};
         const p=await supa.rpc('crm_reply_rule_save',{p_rule_id:null,p_situation:situation,p_reply:messages.join('\n'),p_category:a.category||null,p_intent:a.intent||null,p_property_id:a.property_id||null,p_source_draft_id:id,p_active:true});
         if(p.error)toast('انرسل الرد لكن ما انحفظ كرد مثبت: '+p.error.message,'error');}
-      toast('انرسل الرد'+(pin?' وانثبت':''),'success');refresh();updateBadge();
+      toast('انرسل الرد'+(pin?' وانثبت':''),'success');refresh();updateBadge(true);
     }catch(e){err.textContent=errText(e);btn.disabled=false;btn.textContent='موافقة وإرسال';}
   }
   // the owner tells the agent what to do differently; it rewrites this draft from the same
@@ -438,7 +438,7 @@
       const r=await supa.functions.invoke('whatsapp-reply-agent',{body:{draft_id:id,instruction}});
       const data=r.data||{};if(r.error||data.ok!==true){let detail=data;try{if(r.error&&r.error.context)detail=await r.error.context.json();}catch(_){}throw detail&&detail.error?detail:(r.error||data);}
       // 14 Nov (Ahmed): an order not to answer closes the draft; it leaves the list and teaches nothing
-      if(data.status==='closed'){toast('انشال الرد، ما في رد لهالعميل','success');refresh();updateBadge();return;}
+      if(data.status==='closed'){toast('انشال الرد، ما في رد لهالعميل','success');refresh();updateBadge(true);return;}
       const d=state.drafts.find(x=>x.id===id);
       if(d){d.reply_messages=data.reply_messages||[];d.analysis=data.analysis||d.analysis;card.outerHTML=draftCard(d);}
       // the same instruction teaches the agent for the next replies (crm_owner_notes → lessons in the brain)
@@ -452,7 +452,7 @@
     btn.disabled=true;const err=card.querySelector('.rp-error');
     const r=await supa.rpc('crm_reply_draft_reject',{p_draft_id:card.dataset.draft,p_note:null});
     if(r.error){err.textContent=errText(r.error);btn.disabled=false;return;}
-    toast('انرفض الرد','success');refresh();updateBadge();
+    toast('انرفض الرد','success');refresh();updateBadge(true);
   }
   async function saveRule(card,btn,del){
     const err=card.querySelector('.rp-error');err.textContent='';btn.disabled=true;
@@ -492,7 +492,7 @@
     if(btn)btn.disabled=false;
     if(e){if(err)err.textContent=errText(e);else toast(errText(e),'error');return;}
     const d=r.data||{};
-    toast(decision==='promote'?'انضاف لقائمة الموافقة':decision==='reject'?'تم التخطي':(d.reason==='outside_sending_hours'?'انحفظت الموافقة وبتنرسل الساعة 9 الصبح':'انرسلت '+(d.sent||0)+' رسالة'),'success');refresh();updateBadge();
+    toast(decision==='promote'?'انضاف لقائمة الموافقة':decision==='reject'?'تم التخطي':(d.reason==='outside_sending_hours'?'انحفظت الموافقة وبتنرسل الساعة 9 الصبح':'انرسلت '+(d.sent||0)+' رسالة'),'success');refresh();updateBadge(true);
   }
   document.addEventListener('click',e=>{
     const bulk=e.target.closest('[data-rp-bulk]');
@@ -540,10 +540,20 @@
   });
 
   // ---- badge and browser notification ----------------------------------------------
-  window.crmPendingReplies=countPending;
-  async function updateBadge(){
+  /* 18 Nov 2026 (decision 64): the menu badge and the home tile each counted on every load (the same two reads twice).
+   * They share one count now: one still on its way, or answered less than 3 seconds ago, for the same session. A failed
+   * count is never kept; the page itself (refresh) and the minute timer still read fresh. */
+  let pendKey='',pendDone=0,pendRead=null;
+  function sharedPending(force){
+    const key=(typeof crmSessionGeneration==='undefined'?'':crmSessionGeneration)+':'+(typeof currentUser!=='undefined'&&currentUser?currentUser.id:'');
+    if(!force&&pendRead&&pendKey===key&&(!pendDone||Date.now()-pendDone<3000))return pendRead;
+    const read=countPending().then(n=>{if(pendRead===read){if(n==null)pendRead=null;else pendDone=Date.now();}return n;},e=>{if(pendRead===read)pendRead=null;throw e;});
+    pendKey=key;pendDone=0;pendRead=read;return read;
+  }
+  window.crmPendingReplies=sharedPending;
+  async function updateBadge(force){
     if(!isOwnerNow())return;
-    const n=await countPending();if(n==null)return;
+    const n=await sharedPending(force===true);if(n==null)return;
     const b=byId('navRepliesCount'),c=byId('rpCount');
     if(b){b.textContent=n>99?'99+':String(n);b.style.display=n?'':'none';}
     if(c)c.textContent=String(n);

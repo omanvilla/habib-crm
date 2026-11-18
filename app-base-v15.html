@@ -5987,7 +5987,7 @@ async function loadEmployeeTargetReminder(){
  const generation=crmSessionGeneration,user=currentUser.id,company=currentProfile.company_id;
  card.style.display='none';
  try{
-  const result=await supa.rpc('crm_branch_target_snapshot');if(result.error)throw result.error;
+  const result=await (typeof window.crmBranchSnapshot==='function'?window.crmBranchSnapshot():supa.rpc('crm_branch_target_snapshot'));if(result.error)throw result.error; // 18 Nov 2026 (decision 64): the read shared with the target card and the home (crm-operations-v6.js)
   if(seq!==employeeTargetReminderLoadSeq||!crmSessionCurrent(generation,user))return;
   const branches=crmReadBranchRows(result.data);if(branches.length!==1)throw new Error('لم تصل بيانات مخزون الفرع');const metric=branches[0];crmRememberBranchIdentity(result.data);
   const required=metric.goals?.inventory??10,available=Number(metric.inventory||0),shortfall=Math.max(0,required-available);

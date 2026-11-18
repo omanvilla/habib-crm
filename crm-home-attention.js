@@ -46,12 +46,18 @@
     sub:()=>{const c=counts();return [c.expiring?c.expiring+' تنتهي':'',c.unchecked?c.unchecked+' تأكيد توفر':'',c.contracts?c.contracts+' عقد جديد':''].filter(Boolean).join(' · ');},
     html:kind=>kind==='waiting'?waitingHtml():contractsHtml()
   };
-  async function load(){
+  // 18 Nov 2026 (decision 64): the boot runs loadDashboard more than once; a read answered less than 3 seconds ago for the
+  // same session is kept instead of reading again (the 90-second timer, coming back to the tab and the refresh still read)
+  let doneAt=0,doneKey='';
+  const sessionKey=()=>(typeof crmSessionGeneration==='undefined'?'':crmSessionGeneration)+':'+(typeof currentUser!=='undefined'&&currentUser?currentUser.id:'');
+  async function load(force){
     if(busy||!isOwner()||typeof supa==='undefined')return;
+    if(force!==true&&data&&doneKey===sessionKey()&&Date.now()-doneAt<3000)return;
     busy=true;
     try{
       const r=await supa.rpc('crm_home_attention');
       data=r.error?null:(r.data||null);
+      if(data){doneAt=Date.now();doneKey=sessionKey();}
       changed();
     }catch(_){/* no tile */}finally{busy=false;}
   }
@@ -72,9 +78,9 @@
       changed();toast(act==='avail'?'انحفظ: العقار متوفر':'تم','success');
     }).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});
   });
-  window.crmHomeAttentionRefresh=()=>load();
-  setInterval(()=>{if(document.visibilityState==='visible')load();},90000);
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)load();});
+  window.crmHomeAttentionRefresh=()=>load(true);
+  setInterval(()=>{if(document.visibilityState==='visible')load(true);},90000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)load(true);});
   const loadDash=window.loadDashboard;
   if(typeof loadDash==='function')window.loadDashboard=function(){const r=loadDash.apply(this,arguments);setTimeout(load,900);return r;};
 })();
