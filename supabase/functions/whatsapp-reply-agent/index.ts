@@ -136,9 +136,18 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   // reply says is gone, nor one whose status is not available)
   // (18 Nov, Blessed «اريد اشوفه بعد بينه وبين الخوض»: the distance question became a silent «سؤال ما عندي جوابه»; the location answers it)
   const distanceUnknown = out.action === "handoff" && UNKNOWN_Q.test(String(out.handoff_reason || "")) && /مساف|بعيد|يبعد|بين[^\n]{0,30}وبين|قريب/.test(String(out.handoff_reason || ""));
-  if (locationForArea(recentIn) && (out.action === "none" || distanceUnknown) && c.prop?.map_url && ["buyer", "tenant"].includes(out.category) && !sentBefore(String(c.prop.map_url))
-    && !texts.some((t) => t.length <= 200 && /ما\s*متوفر|انباع|انحجز(ت)?\s*(ال|$)/.test(t)) && (!c.prop.status || c.prop.status === "available")) {
+  // (same review: «اهم شي الموقع» and the distance question came with no property_id, so the location never went. The
+  // property is then the available one whose area our last messages named, when exactly one map fits.)
+  let areaProp = c.prop;
+  if (!areaProp && locationForArea(recentIn)) {
+    const recentOut = c.history.filter((h: any) => h.direction === "outbound").slice(-8).map(body).join(" ");
+    const fits = ((c.available || []) as any[]).filter((p: any) => p.map_url && p.area && recentOut.includes(String(p.area)));
+    if (fits.length && new Set(fits.map((p: any) => String(p.map_url).split("?")[0])).size === 1) areaProp = fits[0];
+  }
+  if (locationForArea(recentIn) && (out.action === "none" || distanceUnknown) && areaProp?.map_url && ["buyer", "tenant"].includes(out.category) && !sentBefore(String(areaProp.map_url))
+    && !texts.some((t) => t.length <= 200 && /ما\s*متوفر|انباع|انحجز(ت)?\s*(ال|$)/.test(t)) && (!areaProp.status || areaProp.status === "available")) {
     if (distanceUnknown) { out.handoff_reason = null; delete out.soft_handoff_no_reply; }
+    if (!c.prop) { out.property_id = areaProp.id; c.prop = areaProp; }
     out.action = "send_location"; out.location_for_area = true; out.guard_location_for_area = true;
     // (17 Nov: «تمام شوف الموقع اول واذا ناسبك خبرني» before «تفضل هذا الموقع / شوف اذا المنطقة تناسبك» said it twice)
     texts = texts.filter((t) => !(t.length <= 200 && (LOCATION_HELD.test(t) || FAREWELL.test(t) || /شوف\s*(ال)?(موقع|لوكيشن|منطق)|ناسب(ك|تك)\s*خبرني/.test(t))) && !VISIT_Q.test(t)).slice(0, 1);
@@ -2296,7 +2305,9 @@ Deno.serve(async (req) => {
     const actionMsgs: any[] = [];
 
     if (out.action === "send_location" || out.action === "send_lockbox") {
-      if (prop?.map_url) actionMsgs.push({ type: "text", text: { preview_url: true, body: prop.map_url } });
+      // (R74 may pick the property by area when the model gave none: then it is out.property_id)
+      const mapProp = prop || props.find((p: any) => p.id === out.property_id);
+      if (mapProp?.map_url) actionMsgs.push({ type: "text", text: { preview_url: true, body: mapProp.map_url } });
       else { out.action = "handoff"; out.handoff_reason = "العميل يبي يزور واللوكيشن غير مسجل للعقار"; }
     }
     if (out.action === "send_lockbox") {
