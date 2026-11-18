@@ -20,7 +20,7 @@
   const OWNER_KIND={unknown_q:'سؤال ما يعرف جوابه',negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرارك',muted:'مكتوم عنهم',manual_reply:'رديت بنفسك'};
   const STAFF_KIND={unknown_q:'سؤال ما يعرف جوابه',negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرار',muted:'مكتوم عنهم',manual_reply:'انرد عليها من المكتب'};
   const KIND=new Proxy({},{get:(_,k)=>(isOwner()?OWNER_KIND:STAFF_KIND)[k],ownKeys:()=>Object.keys(OWNER_KIND),getOwnPropertyDescriptor:()=>({enumerable:true,configurable:true})});
-  const TITLES={followups:'متابعة اليوم',paused:'العقل موقوف عندهم',pricing:'دراسة سعر: ملاك ينتظرون تسعيرك',studies:'دراسات سعر تنتظر موافقتك',visits:'زيارات يتابعها الذكاء الاصطناعي',problems:'مشاكل تحتاج انتباه'};
+  const TITLES={waiting:'مشترين واقفين، سألوا وما انرد عليهم',contracts:'العقود',followups:'متابعة اليوم',paused:'العقل موقوف عندهم',pricing:'دراسة سعر: ملاك ينتظرون تسعيرك',studies:'دراسات سعر تنتظر موافقتك',visits:'زيارات يتابعها الذكاء الاصطناعي',problems:'مشاكل تحتاج انتباه'};
   let sequence=0,sheetKind=null,pausedFilter='all',pricingBranch='all',paused={items:[],total:0},last=null,ignoredOpen=false,ignoredList=null;
   /* «دراسة سعر:» handoffs (11 Nov 2026, Ahmed): owners waiting for a price have their own tile and list, so the
    * paused list keeps only chats that need another decision. Display only: the hold, the reason text and
@@ -107,6 +107,12 @@
     const pr0=pricingItems().length,pa0=otherPaused().length;
     if(pa0){todo+=pa0;t.push(tile('العقل موقوف عندهم',pa0,'data-coh="sheet" data-kind="paused"','شوف السبب وكمّل',true));}
     if(pr0){todo+=pr0;t.push(tile('دراسة سعر',pr0,'data-coh="sheet" data-kind="pricing"','ملاك ينتظرون تسعيرك',true));}
+    // 18 Nov 2026 (Ahmed: «لوحة العمل ما أريدها تكون ربشة… يكون في عدد أضغط عليه أشوف»): «مشترين واقفين» and «العقود» (SQL126,
+    // crm-home-attention.js) are tiles that open a sheet like the rest, never open lists on the page. Owner only.
+    const ha=isOwner()&&window.crmHomeAttention;
+    if(ha){const w=ha.count('waiting'),c=ha.count('contracts');
+      if(w){todo+=w;t.push(tile('مشترين واقفين',w,'data-coh="sheet" data-kind="waiting"','سألوا وما انرد عليهم',true));}
+      if(c)t.push(tile('العقود',c,'data-coh="sheet" data-kind="contracts"',ha.sub('contracts'),false));}
     if(d.owner_leads_new)t.push(tile('عروض ملاك جديدة',d.owner_leads_new,'data-coh="nav" data-nav="owner-leads"','يفتح صفحة العروض',false));
     // 17 Nov 2026: «معاينات أمس بدون متابعة من العقل» (crm-calls-meetings.js) was its own card above the greeting; it is the
     // same subject, so it now opens from this tile, at the top of the same sheet, and makes the tile urgent
@@ -215,6 +221,7 @@
     const body=byId('cohSheetBody');if(!body)return;
     // SQL96: the studies sheet draws itself, so a refresh of the home never wipes an inspection note being written or recorded
     if(sheetKind==='studies'){if(typeof window.crmPriceStudiesDraw==='function')window.crmPriceStudiesDraw(body);else body.innerHTML=typeof window.crmPriceStudiesHtml==='function'?window.crmPriceStudiesHtml():'';return;}
+    if((sheetKind==='waiting'||sheetKind==='contracts')&&window.crmHomeAttention){body.innerHTML=window.crmHomeAttention.html(sheetKind);return;}
     body.innerHTML=sheetKind==='paused'?pausedHtml():sheetKind==='pricing'?pricingHtml():sheetKind==='visits'?visitsHtml():problemsHtml();
   }
   function openSheet(kind){
@@ -374,6 +381,7 @@
   }
   document.addEventListener('crm-followups-updated',()=>{if(last)drawTiles(last.data,last.pending);});
   document.addEventListener('crm-price-studies-updated',()=>{if(last)drawTiles(last.data,last.pending);});
+  document.addEventListener('crm-home-attention-updated',()=>{if(last)drawTiles(last.data,last.pending);if(sheetKind==='waiting'||sheetKind==='contracts')drawSheet();});
   document.addEventListener('crm-visits-unasked-updated',()=>{if(last)drawTiles(last.data,last.pending);if(sheetKind==='visits')drawSheet();});
   window.crmOwnerHomeOpenSheet=kind=>{if(hasHome())openSheet(kind);};
   document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();});

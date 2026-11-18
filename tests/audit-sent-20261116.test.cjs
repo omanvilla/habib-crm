@@ -262,7 +262,7 @@ test('R88 / SQL108: the study goes by the phone, the pricing list drops what is 
  assert(ui.includes("'?text='+encodeURIComponent(String(s.owner_message||''))")&&ui.includes("supa.rpc('crm_price_study_sent_by_phone',{p_study_id:id})"));
  assert(ui.includes("window.crmPriceStudyChats=()=>new Set("));
  assert(home.includes("window.crmPriceStudyChats().has(i&&i.conversation_id));")&&home.includes("supa.rpc('crm_price_study_drop',{p_conversation_id:id,p_reason:why.trim()})"));
- assert(index.includes('crm-price-studies.js?v=20261116-ps3')&&index.includes('crm-owner-home.js?v=20261117-snap1'));
+ assert(index.includes('crm-price-studies.js?v=20261116-ps3')&&index.includes('crm-owner-home.js?v=20261118-tiles1'));
 });
 
 // ---- R89 (Ahmed 16 Nov 2026, Jehan): the client confirmed a meeting time while the agent stays out → Ahmed's WhatsApp ----

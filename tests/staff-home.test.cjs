@@ -25,7 +25,7 @@ test('the home page draws for staff from crm_staff_home and keeps the owner-only
  // 17 Nov 2026: the home has no reports link at all any more (it is in the side menu, owner-only there)
  assert(!js.includes('data-nav="reports"'),'reports (money) are never linked from the home');
  assert(js.includes('if(!owner){paused={items:[],total:0};autoNotes=[];}'),'a staff session never shows the owner\'s lists left in the tab');
- assert(/crm-owner-home\.js\?v=20261117-snap1/.test(index));
+ assert(/crm-owner-home\.js\?v=20261118-tiles1/.test(index));
 });
 test('a staff account is greeted by its own name; the branch stays under the name (Ahmed 11 Nov)',()=>{
  const base=fs.readFileSync('app-base-v15.html','utf8');
@@ -43,7 +43,7 @@ test('targets, performance, tasks and the responsible column name the person on 
  assert(ops.includes("const branchLabel=branch=>(window.crmBranchPeople&&window.crmBranchPeople[branch])||"));
  assert(tasks.includes('crmRecordPersonLabel(task)')&&tasks.includes('return crmBranchPersonName(branch);'));
  assert(tasks.includes('<th>المسؤول</th>'),'the task column says who is responsible');
- assert(/crm-v18-task-priority-patch\.js\?v=20261111-people2/.test(index)&&/crm-operations-v6\.js\?v=20261117-snap1/.test(index));
+ assert(/crm-v18-task-priority-patch\.js\?v=20261111-people2/.test(index)&&/crm-operations-v6\.js\?v=20261118-tiles1/.test(index));
 });
 test('member labels name the person on the branch line',()=>{const base=fs.readFileSync('app-base-v15.html','utf8');assert(base.includes("return branch?crmBranchPersonName(branch):'حساب فريق';"));});
 test('staff follow everyone like the owner, never the owner line (SQL85)',()=>{

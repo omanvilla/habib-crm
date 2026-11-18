@@ -52,3 +52,10 @@ test('brain: a call request with no topic is asked first, not handed over (Ahmed
   assert.match(b,/أي طلب اتصال ما فيه موضوع واضح .* ما يتحوّل أبداً/);
   assert.match(b,/تفضل وش استفسارك ؟/);
 });
+test('home rule (Ahmed 18 Nov): waiting buyers and contracts are tiles that open a sheet, never open boxes',()=>{
+  const home=read('crm-owner-home.js'),att=read('crm-home-attention.js');
+  assert.match(home,/data-kind="waiting"/);assert.match(home,/data-kind="contracts"/);
+  assert.match(home,/crm-home-attention-updated/);
+  assert.doesNotMatch(att,/crmHomeAttention'\)|getElementById\('crmHomeAttention'\)|page-header/);
+  assert.match(read('AGENTS.md'),/لوحة العمل ما أريدها تكون ربشة/);
+});
