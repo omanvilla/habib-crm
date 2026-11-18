@@ -385,6 +385,23 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     texts = texts.filter((t) => !SEEN_Q.test(t));
     const linkSent = tail.some((h: any) => /instagram\.com|facebook\.com|fb\.watch/.test(body(h)));
     if (linkSent && !out.property_id) texts.push("اكتب لي المنطقة او السعر اللي في الاعلان اذا ما عليك امر");
+    // R115 (18 Nov audit, 99448993 «ارسل صورة وموقع ان امكن» after «… انحجزت» + «تحب تشوف خيارات ثانية ؟»): the yes to the
+    // sold notice got «ايش اللي ناقصك» and then a silent «ما عرفنا» handoff (one dry run of two). He wants the alternative:
+    // the nearest available home of this branch is named, with «تقدر تزيد شوي ؟» when it is over his budget by more than 15%.
+    let lastOutBody = ""; for (const h of c.history) if (h.direction === "outbound") lastOutBody = body(h);
+    if (!texts.some((t) => !/^\s*اسمك\s*الكريم\s*؟?\s*$/.test(t)) && /خيارات\s*ثاني/.test(lastOutBody)) {
+      const homes = ((c.available || []) as any[]).filter((p: any) => ["villa", "twin_villa", "house"].includes(String(p.type)) && p.listing_purpose !== "rent"
+        && (!c.route || !["muscat", "barka"].includes(String(p.branch_key)) || p.branch_key === c.route) && Number(p.price) > 0)
+        .sort((a: any, b: any) => Number(a.price) - Number(b.price));
+      const h0 = homes.find((p: any) => !c.budget || Number(p.price) >= Number(c.budget) * 0.85) || homes[homes.length - 1];
+      if (h0) {
+        const k = Math.round(Number(h0.price) / 1000), label = c.typeLabel ? c.typeLabel(h0.type) : "فيلا";
+        texts = c.budget && Number(h0.price) > Number(c.budget) * 1.15
+          ? [`حالياً ما عندنا ${label} بحدود ${Math.round(Number(c.budget) / 1000)} الف`, `اقرب شي عندنا في ${h0.area} ${label} بـ${k} الف تقدر تزيد شوي ؟`]
+          : [`اقرب شي عندنا في ${h0.area} ${label} بـ${k} الف`, "تحب ارسلك تفاصيلها ؟"];
+        out.action = "none"; out.handoff_reason = null; out.property_id = h0.id; out.guard_sold_notice_yes = true;
+      }
+    }
     if (!texts.some((t) => !/^\s*اسمك\s*الكريم\s*؟?\s*$/.test(t))) {
       texts = []; out.action = "handoff"; out.handoff_reason = `ما عرفنا: العميل ما زار وكتب «${String(c.burstSaid || "").slice(0, 120)}»`;
     }
@@ -2210,7 +2227,8 @@ Deno.serve(async (req) => {
     texts = ownerDecisions(out, texts, { history, burstSaid, prop, visitedProp: !!prop && visitedIds.has(prop.id), visitedAny: !out.property_id && visitedIds.size > 0, visitedSome: visitedIds.size > 0,
       saidVisited: history.some((h: any) => h.direction === "inbound" && SAID_VISITED.test(String(h.transcript || h.body || ""))),
       handoffOpen: !!conv.human_handoff_required, hardHandoff: HARD_HANDOFF.test(String(out.handoff_reason || "")),
-      gone: goneRows, available: props, route: String(conv.route_key || ""), typeLabel: typeAr, msgType: msg.message_type });
+      gone: goneRows, available: props, route: String(conv.route_key || ""), typeLabel: typeAr, msgType: msg.message_type,
+      budget: Number(out.request?.budget_max || client?.budget_max || 0) || null });
     // R114 guard (18 Nov audit, Raiaheen «فلا الرميس قابله للتفاوض؟»): a question about a villa got the rest house ad (the rest
     // house is the only available property in that area and its ad says «فيلا مصممة كاستراحة»). The brain rule alone did not
     // hold in the dry run. A client who asks about a villa and never spoke of a rest house, with no budget that reaches the
