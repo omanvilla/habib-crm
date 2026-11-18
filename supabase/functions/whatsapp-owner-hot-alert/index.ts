@@ -12,7 +12,9 @@ const META_APP_SECRET = Deno.env.get("META_APP_SECRET") ?? "";
 const WHATSAPP_ACCESS_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN") ?? "";
 const GRAPH = Deno.env.get("META_GRAPH_VERSION") || "v25.0";
 // R19 (10 Nov) / R45 (14 Nov): a meeting request («اجتماع:») reaches Ahmed; since R45 it is a hard handoff, the agent stays out.
-const HOT = /^\s*(مشتري جاد|تفاوض|اجتماع)\s*:/;
+// 18 Nov 2026 (Ahmed: «كل تنبيه لازم يوصلني على الواتساب»): a call request («طلب اتصال:») is in «عملاء يحتاجونك الحين»
+// too, so it reaches his WhatsApp the same way (SQL129 adds it to the trigger).
+const HOT = /^\s*(مشتري جاد|تفاوض|اجتماع|طلب اتصال)\s*:/;
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const enc = new TextEncoder();
@@ -345,11 +347,12 @@ Deno.serve(async (req) => {
   const phone = digits(cl.data?.phone_normalized || cl.data?.phone || conv.customer_phone || conv.customer_wa_id);
   const name = cl.data?.name || conv.customer_name || "عميل";
   const branch = conv.route_key === "barka" ? "بركاء" : "مسقط";
-  const reason = String(conv.handoff_reason || "").replace(/^\s*(مشتري جاد|تفاوض|اجتماع)\s*:\s*/, "");
+  const reason = String(conv.handoff_reason || "").replace(/^\s*(مشتري جاد|تفاوض|اجتماع|طلب اتصال)\s*:\s*/, "");
   const meeting = /^\s*اجتماع/.test(String(conv.handoff_reason || ""));
-  const kind = meeting ? "اجتماع" : /^\s*تفاوض/.test(String(conv.handoff_reason || "")) ? "يبي يتفاوض" : "مشتري جاد";
+  const callAsk = /^\s*طلب اتصال/.test(String(conv.handoff_reason || ""));
+  const kind = meeting ? "اجتماع" : callAsk ? "طلب اتصال" : /^\s*تفاوض/.test(String(conv.handoff_reason || "")) ? "يبي يتفاوض" : "مشتري جاد";
   const text = [
-    `${test ? "🧪 تجربة تنبيه\n" : ""}${meeting ? "📅 طلب اجتماع ينتظر تأكيدك" : `🔥 عميل ساخن (${kind})`} · ${branch}`,
+    `${test ? "🧪 تجربة تنبيه\n" : ""}${meeting ? "📅 طلب اجتماع ينتظر تأكيدك" : callAsk ? "📞 طلب اتصال" : `🔥 عميل ساخن (${kind})`} · ${branch}`,
     `الاسم: ${name}`,
     `الرقم: ${phone}`,
     reason ? `${meeting ? "الموعد اللي طلبه" : "الموضوع"}: ${short(reason, 300)}` : "",

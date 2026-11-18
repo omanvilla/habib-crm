@@ -59,3 +59,10 @@ test('home rule (Ahmed 18 Nov): waiting buyers and contracts are tiles that open
   assert.doesNotMatch(att,/crmHomeAttention'\)|getElementById\('crmHomeAttention'\)|page-header/);
   assert.match(read('AGENTS.md'),/لوحة العمل ما أريدها تكون ربشة/);
 });
+test('SQL129 + whatsapp-owner-hot-alert: «طلب اتصال» and CRM-only hot notifications reach Ahmed on WhatsApp, once',()=>{
+  const s=read('db/changes/129-hot-alerts-whatsapp.forward.sql');
+  copy('_hot_alerts_whatsapp_20261118.sql',s);
+  assert.match(s,/'hot_notification:' \|\| NEW\.id::text/);
+  assert.match(s,/interval '5 minutes'/);
+  assert.match(read('supabase/functions/whatsapp-owner-hot-alert/index.ts'),/const HOT = \/\^\s\*\(مشتري جاد\|تفاوض\|اجتماع\|طلب اتصال\)\s\*:\//);
+});
