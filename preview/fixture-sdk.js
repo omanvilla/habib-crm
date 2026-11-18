@@ -81,12 +81,13 @@ function privateProperty(id){
 function allowed(row,table){
  if(!row)return false;
  if(table==='whatsapp_outreach_queue'&&profile.role!=='owner')return false;
- // Model owner-only investment reads for UI tests; real RLS is tested separately in SQL.
+ // SQL79/82/85 (11 Nov 2026, decision 6 of 18 Nov: «مفتوح للموظف مثل الحين»): staff read investors, their requests,
+ // chats and the projects like any client; only the owner's private WhatsApp line (route 'owner') stays owner-only
+ // (owner_line_is_private). Branch targets and performance still leave investment out (privateProperty, branchMember).
+ // Real RLS is tested separately in SQL.
  if(profile.role!=='owner'){
-  if(table==='properties'&&privateProperty(row.id))return false;
-  const privateClient=id=>clients.some(c=>c.id===id&&c.lead_route==='investment');
-  const request=requests.find(r=>r.id===row.request_id);
-  if(row.lead_route==='investment'||row.route_key==='investment'||row.branch_key==='investment'||privateClient(row.client_id)||request&&(request.route_key==='investment'||request.branch_key==='investment'||privateClient(request.client_id)))return false;
+  const ownerConversation=id=>!!id&&(db.whatsapp_conversations||[]).some(c=>c.id===id&&c.route_key==='owner');
+  if(row.route_key==='owner'||row.transport_route_key==='owner'||ownerConversation(row.conversation_id)||ownerConversation(row.source_conversation_id))return false;
  }
  if(profile.role!=='agent')return true;
  // SQL79 (Ahmed): Muscat and Barka staff read each other's properties, owners, clients, requests, visits, deals and
@@ -298,7 +299,7 @@ rpc:async(name,args={})=>{
  if(state.failNext===name){state.failNext=null;return {data:null,error:{message:'TEST simulated RPC failure'}};}
  if(name==='crm_client_first_contacts'){
   const wanted=new Set(args.p_client_ids||[]),allowed=(await query('clients').select('*')).data||[];
-  return {data:allowed.filter(c=>wanted.has(c.id)).map(c=>{const contacts=[...(db.whatsapp_messages||[]).map(m=>({...m,source:'whatsapp'})),...(db.instagram_messages||[]).map(m=>({...m,source:'instagram'}))].filter(m=>m.client_id===c.id&&m.direction==='inbound'&&m.message_timestamp&&(profile.role==='owner'||db.whatsapp_conversations.find(w=>w.id===m.conversation_id)?.route_key!=='investment')).sort((a,b)=>Date.parse(a.message_timestamp)-Date.parse(b.message_timestamp));return {client_id:c.id,first_contact_at:contacts[0]?.message_timestamp||null,first_contact_source:contacts[0]?.source||null};}),error:null};
+  return {data:allowed.filter(c=>wanted.has(c.id)).map(c=>{const contacts=[...(db.whatsapp_messages||[]).map(m=>({...m,source:'whatsapp'})),...(db.instagram_messages||[]).map(m=>({...m,source:'instagram'}))].filter(m=>m.client_id===c.id&&m.direction==='inbound'&&m.message_timestamp&&(profile.role==='owner'||db.whatsapp_conversations.find(w=>w.id===m.conversation_id)?.route_key!=='owner')).sort((a,b)=>Date.parse(a.message_timestamp)-Date.parse(b.message_timestamp));return {client_id:c.id,first_contact_at:contacts[0]?.message_timestamp||null,first_contact_source:contacts[0]?.source||null};}),error:null};
  }
  if(name==='normalize_property_marketing_link')return {data:marketingLinkKey(args.p_url),error:null};
  if(['crm_branch_target_snapshot','crm_branch_performance','crm_branch_monthly_targets','crm_save_branch_monthly_targets'].includes(name)){
