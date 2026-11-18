@@ -21,7 +21,21 @@ const TEMPLATES: Record<string, string> = {
   visit_followup_4_ar_v2: "نراجع طلبك المسجل عندنا هل طلبك لين الحين قائم ؟",
   // 12 Nov (Ahmed, R29): «كيف لقيته» was read as «did you find the place»; step 1 asks the opinion in plain words (SQL90)
   visit_followup_1_ar_v2: "السلام عليكم كيف شفت العقار وايش انطباعك عنه ؟",
+  // 18 Nov (Ahmed, decision 74): v2 of step 3 was rated MARKETING on Muscat; v3 names the visit day ({{1}} = «15 أكتوبر»), SQL140
+  visit_followup_3_ar_v3: "السلام عليكم بخصوص زيارتك للعقار يوم {{1}} لين الحين تدور على عقار ؟",
+  // 18 Nov (Ahmed, decision 77, step F): sent from the right branch number to a client who wrote to the other one about its
+  // area ({{1}} = the area, {{2}} = the branch); whatsapp-outreach kind branch_transfer sends it (SQL140)
+  branch_transfer_ar_v1: "السلام عليكم بخصوص استفسارك عن عقار في {{1}} هذا رقم فرع {{2}} المسؤول عن المنطقة تقدر تكمل معنا هنا",
 };
+// the example Meta asks for with each variable, and the quick-reply buttons Ahmed approved with the two texts (18 Nov)
+const EXAMPLES: Record<string, string[]> = { visit_followup_3_ar_v3: ["15 أكتوبر"], branch_transfer_ar_v1: ["الرميس", "بركاء"] };
+const BUTTONS: Record<string, string[]> = { visit_followup_3_ar_v3: ["نعم", "لا"], branch_transfer_ar_v1: ["تمام"] };
+function templateComponents(name: string, text: string, example: string[] | null) {
+  const ex = example || EXAMPLES[name] || null;
+  const c: any[] = [{ type: "BODY", text, ...(ex ? { example: { body_text: [ex] } } : {}) }];
+  if (BUTTONS[name]) c.push({ type: "BUTTONS", buttons: BUTTONS[name].map((t) => ({ type: "QUICK_REPLY", text: t })) });
+  return c;
+}
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const enc = new TextEncoder();
@@ -68,10 +82,12 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ ok: false }, 405);
   const ok = await db.rpc("crm_reply_agent_secret_ok", { p_secret: req.headers.get("x-crm-agent") || "" });
   if (ok.error || ok.data !== true) return json({ ok: false, error: "forbidden" }, 403);
-  const { action } = await req.json().catch(() => ({}));
+  const { action, names } = await req.json().catch(() => ({}));
   if (!["create", "status"].includes(action)) return json({ ok: false, error: "action_must_be_create_or_status" }, 400);
   const out: any[] = [];
-  const wanted: { name: string; text: string; example: string[] | null }[] = [...Object.entries(TEMPLATES).map(([name, text]) => ({ name, text, example: null })), ...(await variantTemplates())];
+  const wanted: { name: string; text: string; example: string[] | null }[] = [...Object.entries(TEMPLATES).map(([name, text]) => ({ name, text, example: null })), ...(await variantTemplates())]
+    // optional {names: [...]}: only these (18 Nov: the two new templates are submitted without touching the others)
+    .filter((t) => !Array.isArray(names) || !names.length || names.includes(t.name));
   for (const rk of ["barka", "muscat"]) {
     let r: any = null;
     try { r = await route(rk); } catch (e) { out.push({ route: rk, error: short((e as any)?.message || e) }); continue; }
@@ -83,7 +99,7 @@ Deno.serve(async (req) => {
         if (!t && action === "create") {
           const q = await fetch(`https://graph.facebook.com/${GRAPH}/${r.waba}/message_templates`, {
             method: "POST", headers: { Authorization: `Bearer ${r.token}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ name, language: "ar", category: "UTILITY", components: [{ type: "BODY", text, ...(example ? { example: { body_text: [example] } } : {}) }] }),
+            body: JSON.stringify({ name, language: "ar", category: "UTILITY", components: templateComponents(name, text, example) }),
           });
           const p = await q.json().catch(() => ({}));
           if (q.ok) t = { id: p.id, status: p.status || "PENDING", category: p.category || "UTILITY" };
