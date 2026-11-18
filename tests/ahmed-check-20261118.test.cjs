@@ -49,6 +49,6 @@ test('SQL128 and the screen: staff see «عملاء يحتاجونك الحين�
 });
 test('brain: a call request with no topic is asked first, not handed over (Ahmed 18 Nov)',()=>{
   const b=read('supabase/functions/whatsapp-reply-agent/brain.ts');
-  assert.match(b,/طلب الاتصال بدون موضوع واضح ما يتحوّل/);
+  assert.match(b,/أي طلب اتصال ما فيه موضوع واضح .* ما يتحوّل أبداً/);
   assert.match(b,/تفضل وش استفسارك ؟/);
 });
