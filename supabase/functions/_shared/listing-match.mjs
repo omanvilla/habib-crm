@@ -14,7 +14,17 @@ const DAY = 86400000;
 export function areaKey(v) {
   return String(v ?? "").trim().toLowerCase()
     .replace(/[ةأإآى]/g, (c) => ({ "ة": "ه", "أ": "ا", "إ": "ا", "آ": "ا", "ى": "ي" })[c])
-    .replace(/^(بركاء|بركا|مسقط)\s+/, "").replace(/(^|\s)ال/g, "$1").replace(/\s+/g, " ").trim();
+    .replace(/^(بركاء|بركا|مسقط)\s+/, "").replace(/(^|\s)ال/g, "$1").replace(/\s+/g, " ").trim()
+    .replace(/^بركا$/, "بركاء");
+}
+
+// a request area that says nothing («غير محدد», «لا محدود», «.», «موقع مميز») is empty; «اي مكان في بركا» keeps «بركا»
+export function cleanArea(v) {
+  const s = String(v ?? "").replace(/ﻓ/g, "ف").trim()
+    .replace(/^(اي|أي)\s*(مكان|منطقه|منطقة)(\s+قريب)?\s*(في\s+)?/, "").trim();
+  if (s.replace(/[^\p{L}]/gu, "").length < 2) return "";
+  if (/^(غير\s*محد|لا\s*محد|موقع\s*مميز|قريب$)/.test(s)) return "";
+  return s;
 }
 
 const TYPE_WORDS = {
@@ -38,7 +48,7 @@ export function priceMentioned(body, price) {
 // the score of one request for one property; null = not sent
 export function scoreRequest(prop, r, lastInboundAt, now = Date.now()) {
   const pArea = areaKey(prop.area), pWil = areaKey(prop.wilayat);
-  const wanted = [...(Array.isArray(r.preferred_areas) ? r.preferred_areas : []), r.preferred_area].map(areaKey)
+  const wanted = [...(Array.isArray(r.preferred_areas) ? r.preferred_areas : []), r.preferred_area].map((a) => areaKey(cleanArea(a)))
     .filter((a) => a.length >= 3 && !/^(جنوبي|جنوبيه|شمالي|شماليه|شرقي|شرقيه|غربي|غربيه|مدينه|حي|منطقه|قريب|اي مكان)$/.test(a));
   const rWil = areaKey(r.wilayat);
   let level = null;
