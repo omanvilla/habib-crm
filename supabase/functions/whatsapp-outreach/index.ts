@@ -7,11 +7,14 @@
 //                                   R38 (Ahmed 12 Nov): when a unit of the same group is still available (SQL97,
 //                                   crm_unit_group_notice) the message is "… انحجزت وحدة منها والمتبقي الثانية والثالثة" +
 //                                   "تحب تشوفها ؟" instead (template property_unit_booked_ar_v1 outside the 24 hours)
-//   queue_listing   {property_id}   a new listing to open requests that match it, asking first if they still search
+//   queue_listing   {property_id}   a new listing to open requests that match it, asking first if they still search.
+//                   {price_drop}    SQL123 (18 Nov): scored, the best 20 only, never a unit of a group already offered;
+//                   {preview}       also when the price of an available property drops; preview writes nothing
 //   send_approved   (cron)          sends approved rows
 //   templates       {submit}        submits / refreshes the four templates on both numbers
 //   approve         (owner JWT)     {ids, decision: approve|reject} → approve sends right away (within hours)
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { LISTING_CAP, priceMentioned, rankCandidates, scoreRequest } from "../_shared/listing-match.mjs";
 
 const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false, autoRefreshToken: false } });
 const META_APP_SECRET = Deno.env.get("META_APP_SECRET") ?? "";
@@ -43,10 +46,6 @@ const NOUN: Record<string, [string, string, string]> = { // label, "booked" verb
   apartment: ["الشقة", "انحجزت", "شقة"], resthouse: ["الاستراحة", "انحجزت", "استراحة"], chalet: ["الشاليه", "انحجز", "شاليه"], farm: ["المزرعة", "انحجزت", "مزرعة"],
   building: ["المبنى", "انحجز", "مبنى"], penthouse: ["البنتهاوس", "انحجز", "بنتهاوس"], office: ["المكتب", "انحجز", "مكتب"], shop: ["المحل", "انحجز", "محل"],
   warehouse: ["المخزن", "انحجز", "مخزن"], other: ["العقار", "انحجز", "عقار"],
-};
-const TYPE_WORDS: Record<string, string[]> = {
-  villa: ["فيلا", "فله", "فلة", "villa"], twin_villa: ["توين", "فيلا", "villa"], house: ["بيت", "منزل", "house"], apartment: ["شقة", "شقه", "apartment"],
-  land: ["ارض", "أرض", "land"], land_residential: ["ارض", "أرض", "land"], land_commercial: ["ارض", "أرض", "land"], resthouse: ["استراحة", "استراحه"], chalet: ["شاليه"], townhouse: ["تاون"],
 };
 const STOP_RE = /ما\s*ابي|ماابي|ما\s*اريد|لا\s*شكرا|لاشكرا|ما\s*احتاج|وقف|توقف|stop/i;
 const FOUND_RE = /حصلت|لقيت|اشتريت|خلاص\s*(اشتريت|حصلت|لقيت)/;
@@ -180,22 +179,47 @@ async function queueSold(propertyId: string, dry: boolean) {
 }
 
 // ---- new listing: open requests that match it ---------------------------------------------------
-async function queueListing(propertyId: string, dry: boolean) {
+// SQL123 (18 Nov): scored and capped (../_shared/listing-match.mjs); a unit of a group whose sibling was already offered
+// is not news for the same clients; a price drop (trigger) runs the same, and reaches only clients the new price now fits.
+// preview=true returns who would get it without writing anything.
+async function activeRequests(companyId: string, wantType: string) {
+  const out: any[] = [];
+  for (let from = 0; ; from += 1000) {
+    const r = await db.from("client_requests").select("id,client_id,request_type,property_type,property_types,preferred_area,preferred_areas,wilayat,budget_max,search_status")
+      .eq("company_id", companyId).eq("status", "active").eq("request_type", wantType).order("id").range(from, from + 999);
+    if (r.error) throw new Error(r.error.message);
+    out.push(...(r.data || []));
+    if ((r.data || []).length < 1000) return out;
+  }
+}
+async function lastInbound(clientIds: string[]) {
+  const m = new Map<string, any>();
+  for (let i = 0; i < clientIds.length; i += 200) {
+    const c = await db.from("whatsapp_conversations").select("id,client_id,route_key,last_inbound_at").in("client_id", clientIds.slice(i, i + 200));
+    for (const x of c.data || []) {
+      const cur = m.get(x.client_id);
+      if (!cur || new Date(x.last_inbound_at || 0).getTime() > new Date(cur.last_inbound_at || 0).getTime()) m.set(x.client_id, x);
+    }
+  }
+  return m;
+}
+async function queueListing(propertyId: string, dry: boolean, preview = false, priceDrop = false) {
   const p = await db.from("properties").select("id,company_id,type,area,wilayat,price,listing_purpose,status,archived,title").eq("id", propertyId).single();
   if (p.error) throw new Error("property_not_found");
   const prop = p.data;
   if (prop.status !== "available" || prop.archived) return { property: prop.title, queued: 0, reason: "not_available" };
   const wantType = prop.listing_purpose === "rent" ? "tenant" : "buyer";
-  const reqs = await db.from("client_requests").select("id,client_id,request_type,property_type,property_types,preferred_area,preferred_areas,wilayat,budget_max,last_contact_at,search_status,updated_at")
-    .eq("company_id", prop.company_id).eq("status", "active").eq("request_type", wantType).gte("updated_at", new Date(Date.now() - 120 * DAY).toISOString()).limit(500);
-  const placeWords = [prop.area, prop.wilayat].filter(Boolean).map((x: string) => x.replace(/^ال/, ""));
-  const typeWords = TYPE_WORDS[prop.type] || [];
-  const done = await db.from("whatsapp_outreach_queue").select("client_id").eq("kind", "new_listing").eq("property_id", prop.id);
-  const already = new Set((done.data || []).map((d: any) => d.client_id));
-  // people who already asked about this very property got it in their conversation; and one office message a week
-  const reelKeys = ((await db.from("instagram_media_catalog").select("link_key").eq("property_id", prop.id)).data || []).map((r: any) => r.link_key).filter(Boolean);
+  const reqs = { data: await activeRequests(prop.company_id, wantType) };
+  // the available units of the same group (SQL97): a client offered one of them is not offered the other as news
+  const sib = await db.rpc("crm_unit_sibling_ids", { p_property: prop.id });
+  if (sib.error) console.error("[outreach] siblings", sib.error.message);
+  const group = [prop.id, ...((!sib.error && Array.isArray(sib.data)) ? sib.data : [])];
+  const done = await db.from("whatsapp_outreach_queue").select("client_id,property_id,status").eq("kind", "new_listing").in("property_id", group);
+  const already = new Set((done.data || []).filter((d: any) => d.property_id === prop.id || ["pending", "approved", "sent"].includes(d.status)).map((d: any) => d.client_id));
+  // people who already asked about this very property (or a unit of its group) got it in their conversation; and one office message a week
+  const reelKeys = ((await db.from("instagram_media_catalog").select("link_key").in("property_id", group)).data || []).map((r: any) => r.link_key).filter(Boolean);
   const asked = new Set<string>([
-    ...(((await db.from("whatsapp_messages").select("client_id").eq("matched_property_id", prop.id)).data || []).map((m: any) => m.client_id)),
+    ...(((await db.from("whatsapp_messages").select("client_id").in("matched_property_id", group)).data || []).map((m: any) => m.client_id)),
     ...(reelKeys.length ? ((await db.from("whatsapp_messages").select("client_id").in("property_link_key", reelKeys)).data || []).map((m: any) => m.client_id) : []),
   ]);
   // and people the office already wrote to about this area (the ad, the details, "متوفر"): for them it is not news.
@@ -203,34 +227,38 @@ async function queueListing(propertyId: string, dry: boolean) {
   const tok = String(prop.area || prop.wilayat || "").replace(/^(بركاء|بركا|مسقط)\s+/, "").split(/\s+/)
     .filter((w: string) => w.length >= 3 && !/^(الجنوبي|الجنوبية|الجنوبيه|الشمالي|الشمالية|الشماليه|مدينة|حي|منطقة)$/.test(w))
     .sort((x: string, y: string) => y.length - x.length)[0];
-  const priceKeys = prop.price ? [String(Math.round(Number(prop.price) / 1000)), Number(prop.price).toLocaleString("en-US"), String(Math.round(Number(prop.price)))] : [];
   if (tok) for (const m of ((await db.from("whatsapp_messages").select("client_id,body").eq("company_id", prop.company_id).eq("direction", "outbound")
     .ilike("body", `%${tok}%`).gte("message_timestamp", new Date(Date.now() - 150 * DAY).toISOString()).limit(5000)).data || []))
-    if (!priceKeys.length || priceKeys.some((k) => String(m.body || "").includes(k))) asked.add(m.client_id);
+    if (!prop.price || priceMentioned(m.body, prop.price)) asked.add(m.client_id);
   const busy = new Set<string>(((await db.from("whatsapp_outreach_queue").select("client_id").in("status", ["pending", "approved", "sent"]).gte("created_at", new Date(Date.now() - 7 * DAY).toISOString())).data || []).map((m: any) => m.client_id));
-  const rows: any[] = [], seen = new Set<string>();
+  const open = (reqs.data || []).filter((r: any) => r.client_id && !already.has(r.client_id) && !asked.has(r.client_id) && !busy.has(r.client_id) && !["found", "stopped"].includes(r.search_status));
+  const convs = await lastInbound([...new Set(open.map((r: any) => r.client_id as string))]);
+  // the best request of each client
+  const best = new Map<string, any>();
+  for (const r of open) {
+    const conv = convs.get(r.client_id);
+    if (!conv) continue;
+    const s = scoreRequest(prop, r, conv.last_inbound_at);
+    if (s && (!best.has(r.client_id) || s.score > best.get(r.client_id).score)) best.set(r.client_id, { ...s, r, conv, lastInboundAt: conv.last_inbound_at });
+  }
+  const ranked = rankCandidates([...best.values()]);
+  const rows: any[] = [], picked: any[] = [];
   const noun = NOUN[prop.type]?.[2] || "عقار";
   const label = `${noun} في ${prop.area || prop.wilayat || ""} بـ ${thousands(prop.price)}`.replace(/\s+/g, " ").trim();
-  for (const r of reqs.data || []) {
-    if (seen.has(r.client_id) || already.has(r.client_id) || asked.has(r.client_id) || busy.has(r.client_id) || r.search_status === "found") continue;
-    // without a budget we only trust a recent request
-    if (!r.budget_max && new Date(r.updated_at).getTime() < Date.now() - 30 * DAY) continue;
-    const areas = [...(Array.isArray(r.preferred_areas) ? r.preferred_areas : []), r.preferred_area, r.wilayat].filter(Boolean).map(String);
-    const areaOk = areas.length > 0 && areas.some((a) => placeWords.some((w) => w && (a.includes(w) || w.includes(a.replace(/^ال/, "")))));
-    const types = [...(Array.isArray(r.property_types) ? r.property_types : []), r.property_type].filter(Boolean).map(String);
-    const typeOk = !types.length || types.some((t) => t === prop.type || typeWords.some((w) => t.includes(w)));
-    const budgetOk = !r.budget_max || !prop.price || Number(prop.price) <= Number(r.budget_max) * 1.15;
-    if (!areaOk || !typeOk || !budgetOk) continue;
-    const cl = await db.from("clients").select("archived,followup_suppressed").eq("id", r.client_id).maybeSingle();
+  for (const c of ranked) {
+    if (picked.length >= LISTING_CAP) break;
+    const cl = await db.from("clients").select("archived,followup_suppressed").eq("id", c.r.client_id).maybeSingle();
     if (!cl.data || cl.data.archived || cl.data.followup_suppressed) continue;
-    const conv = await latestConv(r.client_id);
-    if (!conv || await held(conv.id)) continue;
-    seen.add(r.client_id);
-    rows.push({ company_id: prop.company_id, kind: "new_listing", property_id: prop.id, request_id: r.id, client_id: r.client_id, conversation_id: conv.id, route_key: conv.route_key,
+    if (await held(c.conv.id)) continue;
+    const why = `${c.level === "exact" ? "مطابق" : "قريب (نفس الولاية)"}${priceDrop ? " · بعد نزول السعر" : ""}`;
+    picked.push({ client_id: c.r.client_id, request_id: c.r.id, score: c.score, level: c.level, request: requestSummary(c.r) });
+    rows.push({ company_id: prop.company_id, kind: "new_listing", property_id: prop.id, request_id: c.r.id, client_id: c.r.client_id, conversation_id: c.conv.id, route_key: c.conv.route_key,
       step: "ask_still_searching", template_name: "new_listing_match_ar_v1", template_params: [label], messages: [`نزل عندنا ${label} ممكن يناسب طلبك`, "لين الحين تبحث ؟"],
-      summary: `طلبه: ${requestSummary(r)}`, dry_run: dry, status: "pending" });
+      summary: short(`${why} · طلبه: ${requestSummary(c.r)}`, 200), dry_run: dry, status: "pending" });
   }
-  return { property: prop.title, queued: await upsertRows(rows) };
+  const result = { property: prop.title, price_drop: priceDrop, matched: ranked.length, over_cap: Math.max(0, ranked.length - picked.length), group_units: group.length };
+  if (preview) return { ...result, would_queue: picked };
+  return { ...result, queued: await upsertRows(rows) };
 }
 
 // ---- sending ---------------------------------------------------------------------------------------
@@ -331,7 +359,7 @@ Deno.serve(async (req) => {
       switch (body?.action) {
         case "queue_requests": return json({ ok: true, ...(await queueRequests()) });
         case "queue_sold": return json({ ok: true, ...(await queueSold(String(body.property_id), body.dry_run !== false)) });
-        case "queue_listing": return json({ ok: true, ...(await queueListing(String(body.property_id), body.dry_run !== false)) });
+        case "queue_listing": return json({ ok: true, ...(await queueListing(String(body.property_id), body.dry_run !== false, body.preview === true, body.price_drop === true)) });
         case "send_approved": return json({ ok: true, ...(await sendRows()) });
         case "templates": return json({ ok: true, ...(await templates(body.submit === true)) });
       }
