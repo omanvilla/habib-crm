@@ -81,12 +81,13 @@ function privateProperty(id){
 function allowed(row,table){
  if(!row)return false;
  if(table==='whatsapp_outreach_queue'&&profile.role!=='owner')return false;
- // Model owner-only investment reads for UI tests; real RLS is tested separately in SQL.
+ // SQL79/82/85 (11 Nov 2026, decision 6 of 18 Nov: «مفتوح للموظف مثل الحين»): staff read investors, their requests,
+ // chats and the projects like any client; only the owner's private WhatsApp line (route 'owner') stays owner-only
+ // (owner_line_is_private). Branch targets and performance still leave investment out (privateProperty, branchMember).
+ // Real RLS is tested separately in SQL.
  if(profile.role!=='owner'){
-  if(table==='properties'&&privateProperty(row.id))return false;
-  const privateClient=id=>clients.some(c=>c.id===id&&c.lead_route==='investment');
-  const request=requests.find(r=>r.id===row.request_id);
-  if(row.lead_route==='investment'||row.route_key==='investment'||row.branch_key==='investment'||privateClient(row.client_id)||request&&(request.route_key==='investment'||request.branch_key==='investment'||privateClient(request.client_id)))return false;
+  const ownerConversation=id=>!!id&&(db.whatsapp_conversations||[]).some(c=>c.id===id&&c.route_key==='owner');
+  if(row.route_key==='owner'||row.transport_route_key==='owner'||ownerConversation(row.conversation_id)||ownerConversation(row.source_conversation_id))return false;
  }
  if(profile.role!=='agent')return true;
  // SQL79 (Ahmed): Muscat and Barka staff read each other's properties, owners, clients, requests, visits, deals and
@@ -196,12 +197,14 @@ function query(name){
 }
 // Branch API contracts are modeled separately from historical employee APIs.
 // SQL acceptance tests prove their accounting and real authorization predicates.
-const fixtureGoalFields={inventory_target:10,weekly_new_properties_target:2,daily_followups_target:10,weekly_viewings_target:5,reservations_target:2,booking_commission_target:4000};
+// SQL138: no branch inventory goal (one company number, 25); 3 deals and OMR 5,400 a month
+const fixtureGoalFields={inventory_target:null,weekly_new_properties_target:2,daily_followups_target:10,weekly_viewings_target:5,reservations_target:3,booking_commission_target:5400};
+const fixtureSavedGoalKeys=Object.keys(fixtureGoalFields).filter(k=>k!=='inventory_target');
 const fixtureGoalKeys={inventory:'inventory_target',new_properties:'weekly_new_properties_target',followups:'daily_followups_target',viewings:'weekly_viewings_target',bookings:'reservations_target',expected_commission:'booking_commission_target'};
 function fixtureBranchKeys(){return ['barka','muscat'].filter(branch=>profile.role!=='agent'||db.company_lead_routes.some(r=>r.route_key===branch&&r.is_active&&r.assigned_to===profile.id));}
 function fixtureBranchGoal(branch,month){
  const stored=(db.branch_monthly_targets||[]).find(row=>row.branch_key===branch&&row.month_start===month),targets={...fixtureGoalFields};
- if(stored)for(const key of Object.keys(targets))targets[key]=stored[key];
+ if(stored)for(const key of fixtureSavedGoalKeys)targets[key]=stored[key];
  return {id:branch,branch,branch_key:branch,name:branch==='muscat'?'مسقط':'بركاء',month_start:month,goals:Object.fromEntries(Object.entries(fixtureGoalKeys).map(([key,column])=>[key,targets[column]])),targets,updated_at:stored?.updated_at||null,configured:!!stored};
 }
 // 17 Nov 2026: home, calls, follow-up and owner-tool RPCs added since 30 Sep. Shapes copied from the live functions
@@ -296,7 +299,7 @@ rpc:async(name,args={})=>{
  if(state.failNext===name){state.failNext=null;return {data:null,error:{message:'TEST simulated RPC failure'}};}
  if(name==='crm_client_first_contacts'){
   const wanted=new Set(args.p_client_ids||[]),allowed=(await query('clients').select('*')).data||[];
-  return {data:allowed.filter(c=>wanted.has(c.id)).map(c=>{const contacts=[...(db.whatsapp_messages||[]).map(m=>({...m,source:'whatsapp'})),...(db.instagram_messages||[]).map(m=>({...m,source:'instagram'}))].filter(m=>m.client_id===c.id&&m.direction==='inbound'&&m.message_timestamp&&(profile.role==='owner'||db.whatsapp_conversations.find(w=>w.id===m.conversation_id)?.route_key!=='investment')).sort((a,b)=>Date.parse(a.message_timestamp)-Date.parse(b.message_timestamp));return {client_id:c.id,first_contact_at:contacts[0]?.message_timestamp||null,first_contact_source:contacts[0]?.source||null};}),error:null};
+  return {data:allowed.filter(c=>wanted.has(c.id)).map(c=>{const contacts=[...(db.whatsapp_messages||[]).map(m=>({...m,source:'whatsapp'})),...(db.instagram_messages||[]).map(m=>({...m,source:'instagram'}))].filter(m=>m.client_id===c.id&&m.direction==='inbound'&&m.message_timestamp&&(profile.role==='owner'||db.whatsapp_conversations.find(w=>w.id===m.conversation_id)?.route_key!=='owner')).sort((a,b)=>Date.parse(a.message_timestamp)-Date.parse(b.message_timestamp));return {client_id:c.id,first_contact_at:contacts[0]?.message_timestamp||null,first_contact_source:contacts[0]?.source||null};}),error:null};
  }
  if(name==='normalize_property_marketing_link')return {data:marketingLinkKey(args.p_url),error:null};
  if(['crm_branch_target_snapshot','crm_branch_performance','crm_branch_monthly_targets','crm_save_branch_monthly_targets'].includes(name)){
@@ -305,16 +308,16 @@ rpc:async(name,args={})=>{
   if(name==='crm_save_branch_monthly_targets'){
    if(profile.role!=='owner')return {data:null,error:{message:'TEST branch target save owner-only',code:'42501'}};
    const branch=args.p_branch,targets=args.p_targets;
-   if(!['muscat','barka'].includes(branch)||!/^\d{4}-\d{2}-01$/.test(month)||!targets||Object.keys(targets).sort().join('|')!==Object.keys(fixtureGoalFields).sort().join('|')||Object.entries(targets).some(([key,value])=>!Number.isFinite(value)||value<0||(key!=='booking_commission_target'&&(!Number.isInteger(value)||value>1000))||(key==='booking_commission_target'&&Math.abs(value*1000-Math.round(value*1000))>0.000001)))return {data:null,error:{message:'TEST invalid branch targets',code:'22023'}};
+   if(!['muscat','barka'].includes(branch)||!/^\d{4}-\d{2}-01$/.test(month)||!targets||Object.keys(targets).filter(k=>k!=='inventory_target').sort().join('|')!==fixtureSavedGoalKeys.slice().sort().join('|')||Object.entries(targets).some(([key,value])=>!Number.isFinite(value)||value<0||(key!=='booking_commission_target'&&(!Number.isInteger(value)||value>1000))||(key==='booking_commission_target'&&Math.abs(value*1000-Math.round(value*1000))>0.000001)))return {data:null,error:{message:'TEST invalid branch targets',code:'22023'}};
    db.branch_monthly_targets=db.branch_monthly_targets||[];
    let row=db.branch_monthly_targets.find(r=>r.branch_key===branch&&r.month_start===month);
-   const unchanged=row&&Object.keys(fixtureGoalFields).every(key=>row[key]===targets[key]);
+   const unchanged=row&&fixtureSavedGoalKeys.every(key=>row[key]===targets[key]);
    if(!unchanged&&(row?.updated_at||null)!==(args.p_expected_updated_at||null))return {data:null,error:{message:'TEST branch targets changed; reload before editing',code:'40001'}};
    if(!row){row={company_id:company,branch_key:branch,month_start:month};db.branch_monthly_targets.push(row);}
    if(!unchanged)Object.assign(row,targets,{updated_at:new Date().toISOString()});
    return {data:{scope:'branch',...fixtureBranchGoal(branch,month),replayed:!!unchanged},error:null};
   }
-  if(name==='crm_branch_monthly_targets')return {data:{scope:'branch',month_start:month,branches:fixtureBranchKeys().map(branch=>fixtureBranchGoal(branch,month))},error:null};
+  if(name==='crm_branch_monthly_targets')return {data:{scope:'branch',month_start:month,branches:fixtureBranchKeys().map(branch=>fixtureBranchGoal(branch,month)),company_inventory_goal:25},error:null};
   if(name==='crm_branch_target_snapshot'){
    const week=new Date(today+'T12:00:00Z');week.setUTCDate(week.getUTCDate()-week.getUTCDay());const weekStart=week.toISOString().slice(0,10);
    const branches=fixtureBranchKeys().map(branch=>{
@@ -323,7 +326,8 @@ rpc:async(name,args={})=>{
     const followups=new Set((db.activities||[]).filter(a=>a.actor_type==='human'&&a.outcome&&a.type!=='note'&&(requests.find(r=>r.id===a.request_id)?.route_key||clients.find(c=>c.id===a.client_id)?.lead_route)===branch).map(a=>a.client_id)).size;
     return {...fixtureBranchGoal(branch,month),inventory:inventoryIds.length,inventory_property_ids:inventoryIds,new_properties:newIds.length,new_property_ids:newIds,followups,viewings:0,bookings:0,live_bookings:0,cancelled_bookings:0,expected_commission:profile.role==='owner'?0:null,collected_commission:profile.role==='owner'?0:null,sales_goal_met:false};
    });
-   return {data:{scope:'branch',today,week_start:weekStart,week_end:new Date(week.getTime()+6*86400000).toISOString().slice(0,10),month_start:month,month_end:new Date(Date.UTC(Number(today.slice(0,4)),Number(today.slice(5,7)),0)).toISOString().slice(0,10),branches,employees:branches},error:null};
+   return {data:{scope:'branch',today,week_start:weekStart,week_end:new Date(week.getTime()+6*86400000).toISOString().slice(0,10),month_start:month,month_end:new Date(Date.UTC(Number(today.slice(0,4)),Number(today.slice(5,7)),0)).toISOString().slice(0,10),branches,employees:branches,
+    company_inventory:(()=>{const ids=db.properties.filter(p=>p.status==='available'&&!p.archived&&!privateProperty(p.id)).map(p=>p.id).sort();return {count:ids.length,goal:25,property_ids:ids};})()},error:null};
   }
   const branches=fixtureBranchKeys().map(branch=>({...fixtureBranchGoal(branch,month),employee_id:branch,active_inventory:properties.filter(p=>p.branch_key===branch&&!p.archived&&p.status==='available').length,new_properties:0,inquiries:branch==='muscat'?6:3,inquiry_property_pairs:branch==='muscat'?6:3,inquiry_pair_to_visit:0,inquiry_clients:branch==='muscat'?4:2,replied_inquiry_clients:branch==='muscat'?3:1,successful_staff_messages:branch==='muscat'?7:5,visits_booked:0,visits_done:0,sales:0,activities:0,outbound_messages:0,company_commission:20}));
   return {data:{scope:'branch',from:args.p_from,to:args.p_to,branches,employees:branches},error:null};
@@ -335,7 +339,7 @@ rpc:async(name,args={})=>{
    const row=(db.employee_monthly_targets||[]).find(t=>t.employee_id===p.id&&t.month_start===month),branch=p.id===muscat?'muscat':'barka';
    const eligible=db.properties.filter(x=>x.branch_key===branch&&!x.archived&&!privateProperty(x.id));
    const inventoryIds=eligible.filter(x=>x.status==='available').map(x=>x.id).sort(),newIds=eligible.filter(x=>{const date=new Date(x.created_at).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'});return Number(x.price)>0&&date>=weekStart&&date<=today;}).map(x=>x.id).sort();
-   return {id:p.id,name:p.full_name,branch,inventory:inventoryIds.length,inventory_property_ids:inventoryIds,new_properties:newIds.length,new_property_ids:newIds,followups:new Set((db.activities||[]).filter(a=>a.user_id===p.id&&a.actor_type==='human'&&a.outcome&&a.type!=='note').map(a=>a.client_id)).size,viewings:0,bookings:0,live_bookings:0,cancelled_bookings:0,expected_commission:0,collected_commission:0,sales_goal_met:false,goals:row?{inventory:row.inventory_target,new_properties:row.weekly_new_properties_target,followups:row.daily_followups_target,viewings:row.weekly_viewings_target,bookings:row.reservations_target,expected_commission:row.booking_commission_target}:{inventory:10,new_properties:2,followups:10,viewings:5,bookings:2,expected_commission:4000}};
+   return {id:p.id,name:p.full_name,branch,inventory:inventoryIds.length,inventory_property_ids:inventoryIds,new_properties:newIds.length,new_property_ids:newIds,followups:new Set((db.activities||[]).filter(a=>a.user_id===p.id&&a.actor_type==='human'&&a.outcome&&a.type!=='note').map(a=>a.client_id)).size,viewings:0,bookings:0,live_bookings:0,cancelled_bookings:0,expected_commission:0,collected_commission:0,sales_goal_met:false,goals:row?{inventory:row.inventory_target,new_properties:row.weekly_new_properties_target,followups:row.daily_followups_target,viewings:row.weekly_viewings_target,bookings:row.reservations_target,expected_commission:row.booking_commission_target}:{inventory:null,new_properties:2,followups:10,viewings:5,bookings:3,expected_commission:5400}};
   })},error:null};
  }
  if(name==='crm_log_human_activity'){
@@ -403,7 +407,7 @@ functions:{invoke:async(name,params)=>{
  if(name==='instagram-api'&&action==='status')return {data:{ok:true,connected:false},error:null};
  return {data:null,error:{message:'TEST outbound, media download, AI and automation disabled'}};
 }},
-storage:{from:()=>({upload:async()=>({error:{message:'TEST uploads need an isolated Storage backend'}}),remove:async()=>({error:{message:'TEST delete disabled'}}),getPublicUrl:()=>({data:{publicUrl:''}})})},
+storage:{from:()=>({upload:async()=>({error:{message:'TEST uploads need an isolated Storage backend'}}),remove:async()=>({error:{message:'TEST delete disabled'}}),getPublicUrl:()=>({data:{publicUrl:''}}),createSignedUrl:async()=>({data:null,error:{message:'TEST signed URLs need an isolated Storage backend'}})})},
 channel(){const channel={on(){return channel},subscribe(){return channel},unsubscribe(){}};return channel;},removeChannel(){}
 };
 window.supabase={createClient:()=>client};

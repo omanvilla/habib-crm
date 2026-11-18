@@ -5,6 +5,17 @@
   const n=v=>Number(v||0).toLocaleString('en-US');
   const omanDate=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Asia/Muscat'});
   const dateText=d=>d?new Date(d).toLocaleDateString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat'}):'—';
+  /* 18 Nov 2026 (decision 64): one shared crm_branch_target_snapshot read for this file's target card and the home's goals
+   * card (crm-owner-home.js): a read still on its way, or answered less than 3 seconds ago, for the same session. It lives
+   * here because this file's own first reads (at load and the first loadDashboard) run before crm-owner-home.js exists.
+   * A failed read is never kept. */
+  let snapKey='',snapDone=0,snapRead=null;
+  window.crmBranchSnapshot=function(){
+    const key=(typeof crmSessionGeneration==='undefined'?'':crmSessionGeneration)+':'+(typeof currentUser!=='undefined'&&currentUser?currentUser.id:'');
+    if(snapRead&&snapKey===key&&(!snapDone||Date.now()-snapDone<3000))return snapRead;
+    const read=Promise.resolve(supa.rpc('crm_branch_target_snapshot')).then(r=>{if(snapRead===read){if(!r||r.error)snapRead=null;else snapDone=Date.now();}return r;},e=>{if(snapRead===read)snapRead=null;throw e;});
+    snapKey=key;snapDone=0;snapRead=read;return read;
+  };
   // 11 Nov 2026 (SQL83): the person on the branch line («مرام») when known, else the branch
   const branchLabel=branch=>(window.crmBranchPeople&&window.crmBranchPeople[branch])||({muscat:'مسقط',barka:'بركاء'}[branch]||'الفرع');
   function branchRows(data){
@@ -43,8 +54,10 @@
   function targetScore(row,kind){
     if(kind!=='month')return 'نتائج الفترة المختارة؛ لا تُقارن بهدف شهر واحد';
     const bookings=Number(row.reservations||0),expected=Number(row.expected_commission||0),goals=row.targets||{};
-    const bg='reservations_target' in goals?goals.reservations_target:2,cg='booking_commission_target' in goals?goals.booking_commission_target:4000;
-    return bg>0&&bookings>=bg||cg>0&&expected>=cg?'هدف الحجوزات الشهري متحقق':'هدف الحجوزات: '+n(bookings)+' / '+(bg>0?n(bg):'غير مفعّل')+' أو '+(row.expected_commission==null?'عمولة متوقعة محجوبة':n(expected)+' / '+(cg>0?n(cg):'غير مفعّل')+' ر.ع');
+    // SQL138 (Ahmed's review [3], 18 Nov 2026): 3 deals AND OMR 5,400 a month (was 2 bookings OR 4,000); 0 switches one off
+    const bg='reservations_target' in goals?goals.reservations_target:3,cg='booking_commission_target' in goals?goals.booking_commission_target:5400;
+    const met=(bg>0||cg>0)&&(!(bg>0)||bookings>=bg)&&(!(cg>0)||(row.expected_commission!=null&&expected>=cg));
+    return met?'هدف الشهر متحقق':'هدف الشهر: '+n(bookings)+' / '+(bg>0?n(bg):'غير مفعّل')+' صفقات و'+(row.expected_commission==null?'العمولة محجوبة':n(expected)+' / '+(cg>0?n(cg):'غير مفعّل')+' ر.ع');
   }
 
   function targetMetric(label,value,goal,action,propertyTarget){
@@ -69,11 +82,14 @@
       const data=result.data,branches=branchRows(data);
       if(typeof crmRememberBranchIdentity==='function')crmRememberBranchIdentity(data);
       branches.forEach(x=>targetPropertyScopes.set(x.branch,{branch:x.branch,user,generation,week_start:data.week_start,week_end:data.week_end,today:data.today}));
+      // SQL138 (Ahmed's review [62]): inventory is one company number (25), no split between branches
+      const ci=data.company_inventory||null;
       host.innerHTML='<div class="ops-performance-caption"><strong>أهداف العمل المعتمدة</strong><small>اليوم '+safe(data.today||'')+' · الأسبوع من '+safe(data.week_start||'')+' إلى '+safe(data.week_end||'')+' · الشهر من '+safe(data.month_start||'')+' إلى '+safe(data.month_end||'')+'</small></div>'+
-      (branches.map(x=>'<article class="ops-person" data-target-branch-card="'+x.branch+'"><div class="ops-person-title"><strong>'+branchLabel(x.branch)+'</strong><span>'+(x.sales_goal_met?'هدف الحجوزات الشهري متحقق':'هدف الحجوزات الشهري لم يتحقق بعد')+'</span></div><div class="ops-metrics">'+
-      targetMetric('المخزون المتاح حاليًا',x.inventory,x.goals?x.goals.inventory:10,'properties',{kind:'inventory',branch:x.branch})+targetMetric('عقارات أُضيفت هذا الأسبوع',x.new_properties,x.goals?x.goals.new_properties:2,'properties',{kind:'weekly',branch:x.branch})+targetMetric('عملاء تمت متابعتهم بنتيجة اليوم',x.followups,x.goals?x.goals.followups:10,'daily')+targetMetric('المعاينات المكتملة أسبوعيًا',x.viewings,x.goals?x.goals.viewings:5,'viewings')+
-      targetMetric('الحجوزات المؤكدة هذا الشهر',x.bookings,x.goals?x.goals.bookings:2,'deals')+
-      (x.expected_commission==null?'<span class="ops-metric"><small>عمولات المكتب المتوقعة محجوبة لهذا الدور</small></span>':targetMetric('عمولات حجوزات هذا الشهر (ر.ع)',x.expected_commission,x.goals?x.goals.expected_commission:4000,'deals'))+'</div><p class="ops-note">المخزون هو كل المتاح الآن في الفرع، مهما كان تاريخ إضافته؛ هدفه مستقل عن إضافات الأسبوع.</p><p class="ops-note">عمولات الهدف هي القيمة المسجلة للحجوزات، وتشمل ما تم بيعه أو تحصيله لاحقًا. يبقى الحجز وعمولته في شهر دفع العربون ولا يتكرران عند البيع أو التحصيل.</p><p class="ops-note">الحجوزات السارية: '+n(x.live_bookings)+' · الملغاة لاحقًا: '+n(x.cancelled_bookings)+' · لا يُحتسب التفاوض أو العربون غير المدفوع حجزًا.</p></article>').join('')||'<p class="ops-state">لا توجد فروع متاحة لهذا الحساب.</p>');
+      (ci?'<article class="ops-person" data-target-company-inventory><div class="ops-person-title"><strong>مخزون الشركة</strong><span>رقم واحد للشركة، بدون تقسيم على الفروع</span></div><div class="ops-metrics">'+targetMetric('عقارات متاحة للشركة',ci.count,ci.goal,'properties')+'</div></article>':'')+
+      (branches.map(x=>'<article class="ops-person" data-target-branch-card="'+x.branch+'"><div class="ops-person-title"><strong>'+branchLabel(x.branch)+'</strong><span>'+(x.sales_goal_met?'هدف الشهر متحقق':'هدف الشهر لم يتحقق بعد')+'</span></div><div class="ops-metrics">'+
+      (x.goals&&x.goals.inventory>0?targetMetric('المخزون المتاح حاليًا',x.inventory,x.goals.inventory,'properties',{kind:'inventory',branch:x.branch}):'<button type="button" class="ops-metric ops-target-action" data-target-go="properties" data-target-property="inventory" data-target-branch="'+safe(x.branch)+'" title="فتح السجلات المرتبطة"><strong>'+n(x.inventory)+'</strong><small>متاح في الفرع الآن</small><span class="ops-metric-help">ضمن هدف الشركة'+(ci?' '+n(ci.goal):'')+'</span></button>')+targetMetric('عقارات أُضيفت هذا الأسبوع',x.new_properties,x.goals?x.goals.new_properties:2,'properties',{kind:'weekly',branch:x.branch})+targetMetric('عملاء تمت متابعتهم بنتيجة اليوم',x.followups,x.goals?x.goals.followups:10,'daily')+targetMetric('المعاينات المكتملة أسبوعيًا',x.viewings,x.goals?x.goals.viewings:5,'viewings')+
+      targetMetric('صفقات الشهر (حجوزات مدفوعة)',x.bookings,x.goals?x.goals.bookings:3,'deals')+
+      (x.expected_commission==null?'<span class="ops-metric"><small>عمولات المكتب المتوقعة محجوبة لهذا الدور</small></span>':targetMetric('عمولات حجوزات هذا الشهر (ر.ع)',x.expected_commission,x.goals?x.goals.expected_commission:5400,'deals'))+'</div><p class="ops-note">هدف الشهر: عدد الصفقات والعمولة معًا. المخزون هو كل المتاح الآن، مهما كان تاريخ إضافته؛ هدفه رقم واحد للشركة ومستقل عن إضافات الأسبوع.</p><p class="ops-note">عمولات الهدف هي القيمة المسجلة للحجوزات، وتشمل ما تم بيعه أو تحصيله لاحقًا. يبقى الحجز وعمولته في شهر دفع العربون ولا يتكرران عند البيع أو التحصيل.</p><p class="ops-note">الحجوزات السارية: '+n(x.live_bookings)+' · الملغاة لاحقًا: '+n(x.cancelled_bookings)+' · لا يُحتسب التفاوض أو العربون غير المدفوع حجزًا.</p></article>').join('')||'<p class="ops-state">لا توجد فروع متاحة لهذا الحساب.</p>');
     }catch(e){if(seq===targetLoadSeq&&crmSessionCurrent(generation,user))host.innerHTML='<div class="ops-error" role="alert">تعذر تحميل الأهداف: '+safe(e.message)+' <button type="button" class="ops-action" data-target-retry>إعادة المحاولة</button></div>';}
   }
   document.addEventListener('click',e=>{const b=e.target.closest('[data-target-go]');if(b){if(b.dataset.targetProperty){openPropertyTarget(b.dataset.targetBranch,b.dataset.targetProperty);return;}const page=b.dataset.targetGo;if(typeof navigate==='function')navigate(page,null);}if(e.target.closest('[data-target-retry]'))loadTargetDashboard()});
@@ -208,9 +224,20 @@
     window.dashboardContactQueue=state.data?.contactQueue||[];
     window.dashboardWorkSnapshot=state.data||null;
   }
-  async function loadDashboardScope(scope){
+  // 18 Nov 2026 (decision 64): the boot calls loadDashboard twice and both wait for the home's gate, so each scope was read
+  // twice at the same moment. A scope still being read for the same session is joined instead of read again; a call
+  // after it finished (a save) reads again as before.
+  const dashboardInflight=new Map();
+  function loadDashboardScope(scope){
+    const key=crmSessionGeneration+':'+(currentUser&&currentUser.id),busy=dashboardInflight.get(scope);
+    if(busy&&busy.key===key){dashboardScopes.set(scope,busy.request);return busy.promise;}
+    const entry={key,request:{status:'loading'}};
+    entry.promise=readDashboardScope(scope,entry.request).finally(()=>{if(dashboardInflight.get(scope)===entry)dashboardInflight.delete(scope);});
+    dashboardInflight.set(scope,entry);return entry.promise;
+  }
+  async function readDashboardScope(scope,request){
     if(scope==='investment'&&currentProfile?.role!=='owner')return;
-    const generation=crmSessionGeneration,user=currentUser&&currentUser.id,request={status:'loading'};
+    const generation=crmSessionGeneration,user=currentUser&&currentUser.id;
     dashboardScopes.set(scope,request);renderDashboard();
     const current=()=>dashboardScopes.get(scope)===request&&crmSessionCurrent(generation,user);
     try{

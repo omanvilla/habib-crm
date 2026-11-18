@@ -78,13 +78,24 @@
         +'<div class="cfu-actions">'+(url?'<a class="crm-wa-btn crm-wa-phone crm-wa-main cfu-open" href="'+esc(url)+'" rel="noopener noreferrer">فتح في واتساب الجوال</a><a class="cfu-other" href="'+esc(other)+'" target="_blank" rel="noopener noreferrer">رابط عادي</a>':'<span class="cfu-auto">ما له رقم</span>')+(i.conversation_id&&typeof openWhatsAppConversation==='function'?'<button type="button" class="crm-wa-btn crm-wa-crm cfu-crm" data-cfu="crm" data-id="'+esc(i.conversation_id)+'">فتح في النظام</button>':'')+'<button type="button" class="btn-secondary" data-cfu="done" data-id="'+esc(i.client_id)+'">أرسلتها</button>'+(canInstruct()?'<button type="button" class="btn-secondary" data-cfu="instr" data-k="'+esc(key(i))+'" aria-expanded="'+openInstr.has(key(i))+'">أمر للذكاء الاصطناعي</button>':'')+(typeof window.crmClaudeNoteBtn==='function'?window.crmClaudeNoteBtn({conv:i.conversation_id,client:i.client_id,phone:i.phone,name:i.client}):'')+'</div>'+instrBox(i)+'</li>';}).join('')+'</ul>':'<p class="cfu-hint">ما في متابعات لهذا الفرع</p>');
   }
   let startedAt=0;
-  async function load(){
-    if(typeof supa==='undefined'||typeof currentProfile==='undefined'||!currentProfile)return;
+  /* 18 Nov 2026 (decision 64, the audit counted this read about 2.4 times per home load): the home, this file's own
+   * dashboard hook and the return from WhatsApp share one read: one still on its way, or answered less than 3 seconds
+   * ago, for the same session. After «تم» or a rewrite the list is read again (force). */
+  let shareKey='',shareDone=0,shareRead=null;
+  function load(force){
+    const key=(typeof crmSessionGeneration==='undefined'?'':crmSessionGeneration)+':'+(typeof currentUser!=='undefined'&&currentUser?currentUser.id:'');
+    if(force!==true&&shareRead&&shareKey===key&&(!shareDone||Date.now()-shareDone<3000))return shareRead;
+    const read=readOnce().then(v=>{if(shareRead===read){if(v)shareDone=Date.now();else shareRead=null;}return v;},e=>{if(shareRead===read)shareRead=null;throw e;});
+    shareKey=key;shareDone=0;shareRead=read;return read;
+  }
+  async function readOnce(){
+    if(typeof supa==='undefined'||typeof currentProfile==='undefined'||!currentProfile)return false;
     startedAt=Date.now();
     const n=++seq,r=await supa.rpc('crm_followups_today');
-    if(n!==seq||r.error||!r.data)return;
+    if(n!==seq||r.error||!r.data)return false;
     data=r.data;render();
     document.dispatchEvent(new Event('crm-followups-updated'));
+    return true;
   }
   async function rewrite(b){
     const k=b.dataset.k,box=b.closest('.cfu-instr'),err=box.querySelector('.cfu-err'),ta=box.querySelector('.cfu-instr-text');
@@ -97,7 +108,7 @@
       let d=r.data||{};if(r.error||d.ok!==true){try{if(r.error&&r.error.context)d=await r.error.context.json();}catch(_){}throw d&&d.error?d:(r.error||d);}
       openInstr.delete(k);drafts.delete(k);
       if(d.result==='kept'){Object.assign(item,{text:d.text,reason:d.reason,owner_instruction:instruction});render();toast('انكتبت حسب أمرك. راجعها قبل ما ترسل','success');}
-      else{toast((d.result==='waiting_match'?'انشال من القائمة وانحفظ طلبه: ':'انشال من القائمة: ')+(d.reason||''),'success');await load();}
+      else{toast((d.result==='waiting_match'?'انشال من القائمة وانحفظ طلبه: ':'انشال من القائمة: ')+(d.reason||''),'success');await load(true);}
     }catch(e){err.textContent=errText(e);b.disabled=false;b.textContent='اكتبها من جديد';}
   }
   document.addEventListener('click',e=>{
@@ -109,7 +120,7 @@
     if(b.dataset.cfu==='tab'){branch=b.dataset.v;try{localStorage.setItem('crmFollowupsBranch',branch);}catch{}render();}
     // 11 Nov 2026 (Ahmed): «فتح في النظام» opens the same chat in the CRM WhatsApp page (the sheet over the home closes first)
     if(b.dataset.cfu==='crm'&&typeof navigate==='function'&&typeof openWhatsAppConversation==='function'){const id=b.dataset.id;const x=document.querySelector('#cohSheet:not([hidden]) .coh-sheet-x');if(x)x.click();navigate('whatsapp',null);setTimeout(()=>openWhatsAppConversation(id),300);return;}
-    if(b.dataset.cfu==='done'){b.disabled=true;supa.rpc('crm_followup_mark_sent',{p_client:b.dataset.id}).then(r=>{if(r.error)throw r.error;return load();}).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});}
+    if(b.dataset.cfu==='done'){b.disabled=true;supa.rpc('crm_followup_mark_sent',{p_client:b.dataset.id}).then(r=>{if(r.error)throw r.error;return load(true);}).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});}
   });
   document.addEventListener('input',e=>{const t=e.target;if(t&&t.classList&&t.classList.contains('cfu-instr-text'))drafts.set(t.dataset.k,t.value);});
   // Back from WhatsApp: the sent message has reached the system, so the list shrinks.

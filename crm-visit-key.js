@@ -1,7 +1,7 @@
 /* «الزيارة والمفتاح» (Ahmed, 14 Nov 2026): how the office gets into a property.
  * The property form gets one more section that reads and saves three columns that already exist on `properties`:
  * visit_method (open / lockbox / owner_lives / office), visit_instructions (free text, with the 🎤 of crm-voice-input.js)
- * and lockbox_image_url (a photo of the key box, uploaded the way the property photos are).
+ * and lockbox_image_url (a photo of the key box; since SQL137 a path in the private bucket property-keys, shown by signed URL).
  * The property page shows the location link, the linked Instagram posts with their views, the state of the marketing
  * contract, and «حدد طريقة الزيارة» when the property is available and no visit method is recorded.
  *
@@ -14,7 +14,24 @@
   'use strict';
   const METHODS=[['open','مفتوح'],['lockbox','مفتاح في صندوق'],['owner_lives','المالك ساكن'],['office','عن طريق المكتب']];
   const METHOD_AR=Object.fromEntries(METHODS);
-  const BUCKET='property-images',PUBLIC_MARK='/storage/v1/object/public/'+BUCKET+'/';
+  /* SQL137 (Ahmed's review [75], 18 Nov 2026): the key-box photo lives in the PRIVATE bucket property-keys under
+   * <company>/<property>/<uuid>.<ext>, and lockbox_image_url holds that path. It is shown through a signed URL that
+   * works for 10 minutes. A value that is still an old public https URL is shown as it is; old public files are never
+   * deleted from here (that needs Ahmed's yes). */
+  const BUCKET='property-keys',SIGN_SECONDS=600;
+  const KEY_PATH=/^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|jpeg|png|webp)$/;
+  const signed=new Map();   // path -> {url, until}
+  async function photoUrl(v){
+    const s=String(v||'').trim();if(!s)return '';
+    if(/^https:\/\//.test(s))return httpsUrl(s);
+    if(!KEY_PATH.test(s))return '';
+    const hit=signed.get(s);if(hit&&hit.until>Date.now())return hit.url;
+    try{
+      const r=await supa.storage.from(BUCKET).createSignedUrl(s,SIGN_SECONDS);
+      const url=httpsUrl(r&&r.data&&r.data.signedUrl);if(r.error||!url)return '';
+      signed.set(s,{url,until:Date.now()+(SIGN_SECONDS-60)*1000});return url;
+    }catch(_e){return '';}
+  }
   const IMAGE_EXT={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'},MAX_BYTES=5*1024*1024;
   const WARN='حدد طريقة الزيارة';
   const byId=id=>document.getElementById(id);
@@ -72,7 +89,7 @@
     if(!byId('pVisitKey'))return;
     const status=byId('pStatus'),method=byId('pVisitMethod').value;
     byId('pVisitWarn').hidden=!(state&&status&&status.value==='available'&&!method);
-    const shown=pending?pending.previewUrl:(!removeImage&&state?httpsUrl(state.lockbox_image_url):'');
+    const shown=pending?pending.previewUrl:(!removeImage&&state?(state.lockbox_shown||''):'');
     const wrap=byId('pLockboxWrap');wrap.textContent='';
     if(shown){
       const img=document.createElement('img');img.src=shown;img.alt='صورة صندوق المفتاح';
@@ -91,6 +108,8 @@
     if(mine!==seq)return;
     if(r.error||!r.data){note('تعذر تحميل بيانات الزيارة لهذا العقار؛ ما راح يتغير فيها شي. سكّر النافذة وافتحها مرة ثانية.');paint();return;}
     state=r.data;
+    const shownUrl=await photoUrl(state.lockbox_image_url);if(mine!==seq)return;
+    state.lockbox_shown=shownUrl;
     byId('pVisitMethod').value=METHOD_AR[state.visit_method]?state.visit_method:'';
     byId('pVisitInstructions').value=state.visit_instructions||'';
     lock(false);paint();opened();
@@ -116,13 +135,9 @@
     return id?{id,changes,file,remove,old:state.lockbox_image_url||null,images:state.images}:null;
   }
   function ownPath(url,snap){
-    // only a file of this property in the photos bucket, and never one of the property's own photos
-    const i=String(url||'').indexOf(PUBLIC_MARK);if(i<0)return null;
-    let path;try{path=decodeURIComponent(String(url).slice(i+PUBLIC_MARK.length).split('?')[0]);}catch(_e){return null;}
-    if(path.split('/')[1]!==snap.id)return null;
-    let photos=snap.images;try{if(typeof photos==='string')photos=JSON.parse(photos);}catch(_e){photos=[];}
-    const used=(Array.isArray(photos)?photos:[]).some(x=>typeof x==='string'?x.includes(path):(x&&(x.path===path||String(x.url||'').includes(path))));
-    return used?null:path;
+    // only a replaced key photo of this property in the private bucket; an old public URL is never deleted from here
+    const path=String(url||'');
+    return KEY_PATH.test(path)&&path.split('/')[1]===snap.id?path:null;
   }
   const pause=ms=>new Promise(r=>setTimeout(r,ms));
   // one row, one update; a busy database right after the property's own save gets a second and a third try
@@ -156,9 +171,8 @@
         const patch={};
         if(snap.file){
           uploaded=await upload(snap);
-          const pub=supa.storage.from(BUCKET).getPublicUrl(uploaded);
-          patch.lockbox_image_url=httpsUrl(pub.data&&pub.data.publicUrl)||null;
-          if(!patch.lockbox_image_url)throw new Error('رابط الصورة غير صالح');
+          if(!KEY_PATH.test(uploaded))throw new Error('مسار الصورة غير صالح');
+          patch.lockbox_image_url=uploaded;
         }else patch.lockbox_image_url=null;
         await write(snap.id,patch);
         uploaded=null;
@@ -195,7 +209,7 @@
     h+=field('🤝 عقد التسويق','<span class="vk-tone '+contract.tone+'">'+esc(contract.text)+'</span>');
     h+='</div>';
     if(edit){
-      const img=httpsUrl(p.lockbox_image_url);
+      const img=p.lockbox_shown||'';
       h+='<div class="vk-block"><div class="vk-label">📝 تعليمات الزيارة <span class="vk-muted">(داخلية للمكتب)</span></div><div class="vk-text" dir="auto">'+(p.visit_instructions?esc(p.visit_instructions):'<span class="vk-muted">ما في تعليمات</span>')+'</div></div>';
       if(img)h+='<div class="vk-block"><div class="vk-label">📦 صورة صندوق المفتاح <span class="vk-muted">(داخلية للمكتب)</span></div><img class="vk-lockbox" data-vk-img src="'+esc(img)+'" alt="صورة صندوق المفتاح"></div>';
     }
@@ -223,6 +237,8 @@
     if(!window.viewingProperty||window.viewingProperty.id!==id||!host.isConnected)return;
     if(rr[0].error||!rr[0].data)return;
     const row=rr[0].data,posts=rr[1].error?[]:(rr[1].data||[]);
+    row.lockbox_shown=mayEdit()?await photoUrl(row.lockbox_image_url):'';
+    if(!window.viewingProperty||window.viewingProperty.id!==id||!host.isConnected)return;
     let warn=byId('pdVisitWarn'),box=byId('pdVisitKey');
     if(!warn||!host.contains(warn)){warn=document.createElement('div');warn.id='pdVisitWarn';host.prepend(warn);}
     if(!box||!host.contains(box)){

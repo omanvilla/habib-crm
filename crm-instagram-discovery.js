@@ -18,7 +18,8 @@
  }
  const projectOptions=near=>projects.length?'<optgroup label="المشاريع الاستثمارية">'+projects.map(p=>'<option value="project:'+escape(p.id)+'"'+(near&&near.id===p.id?' selected':'')+'>'+escape(p.name)+(near&&near.id===p.id?' · الأقرب':'')+'</option>').join('')+'</optgroup>':'';
  async function loadProjects(){const r=await supa.from('investment_projects').select('id,name,aliases').eq('archived',false).order('created_at');if(!r.error)projects=r.data||[];
-  const t=await supa.rpc('crm_property_twins');twins=t.error?[]:(t.data||[]);}
+  // 18 Nov 2026 (decision 64): one read shared with the home (crm-owner-home.js) on the same load
+  const t=await (typeof window.crmPropertyTwins==='function'?window.crmPropertyTwins():supa.rpc('crm_property_twins'));twins=t&&!t.error?(t.data||[]):[];}
  let twins=[];
  const twinsOf=id=>{const g=twins.find(x=>x.properties.some(p=>p.id===id));return g?g.properties:null;};
  const fold=v=>String(v||'').replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').toLowerCase();
@@ -49,7 +50,21 @@
   const banner=document.createElement('div');banner.id='igDiscoveryAlert';banner.className='ig-discovery-alert';banner.hidden=true;
   $('page-dash')?.querySelector('.page-header')?.after(banner);
  }
- async function overview(){
+ /* 18 Nov 2026 (decision 64): on a home load the overview starts from the dashboard navigation, the app screen observer and
+  * the install at once; a second call while one is still reading for the same session waits for it instead of reading
+  * the same 13 tables again. A call after it finished (a review decision) reads again as before. */
+ let overviewRead=null,overviewKey='';
+ function overview(){
+  const key=scope();
+  if(overviewRead&&key&&overviewKey===key)return overviewRead;
+  const read=overviewOnce().finally(()=>{if(overviewRead===read)overviewRead=null;});
+  overviewKey=key;overviewRead=read;return read;
+ }
+ // The home tile count (crm-owner-home.js): new videos that did not link, plus one when the sync needs a look
+ let igCount=0;
+ window.crmIgAlertCount=()=>scope()?igCount:0;
+ const igChanged=n=>{if(n===igCount)return;igCount=n;document.dispatchEvent(new CustomEvent('crm-ig-alert-updated'));};
+ async function overviewOnce(){
   const identity=scope();mount();if(!identity)return null;
   const company=currentProfile.company_id;
   const state=await supa.from('instagram_discovery_state').select('enabled,auto_link_enabled,backfill_complete,last_success_at,last_error_code').eq('company_id',company);
@@ -89,6 +104,7 @@
   // available first, then sold / reserved / archived
   list.sort((a,b)=>((a.status==='available'&&!a.archived)?0:1)-((b.status==='available'&&!b.archived)?0:1)||String(a.title||'').localeCompare(String(b.title||''),'ar'));
   banner.hidden=!failed&&!homeRows.length&&!noVideo.length;
+  igChanged(homeRows.length+(failed?1:0));
   banner.innerHTML=(failed?'<div class="ig-home-line"><span>مزامنة Instagram تحتاج المراجعة</span><button class="btn-secondary" data-igd="open">فتح</button></div>':'')
    +homeRows.map(row=>{
     const nearProject=suggestProject(row.caption),url=safeLink(row.permalink),thumb=safeThumb(row.thumbnail_url),near=nearProject?null:suggest(row.caption,list,withVideo);
@@ -144,7 +160,7 @@
  }
  function install(){
   mount();const nav=window.navigate;window.navigate=function(id,node){const result=nav.apply(this,arguments);if(id==='instagram')load();if(id==='dash'&&scope())overview().catch(()=>{});return result;};
-  const reset=window.crmResetOperations;window.crmResetOperations=function(){resetEpoch++;sequence++;rows=[];homeRows=[];properties=[];offset=0;filter='recent';if($('igDiscoveryFilter'))$('igDiscoveryFilter').value=filter;busy.clear();['igDiscoveryRows','igDiscoveryStatus','igDiscoveryPages','igDiscoveryAlert'].forEach(id=>{if($(id))$(id).textContent='';});if($('igDiscovery'))$('igDiscovery').hidden=true;if($('igDiscoveryAlert'))$('igDiscoveryAlert').hidden=true;/* Clear the dynamic branch source too: later layout observers must not resurrect old-session options. Its original renderer rebuilds it after the next authorized load. */$('opsClientBranches')?.replaceChildren();return reset.apply(this,arguments);};
+  const reset=window.crmResetOperations;window.crmResetOperations=function(){resetEpoch++;sequence++;overviewRead=null;igChanged(0);rows=[];homeRows=[];properties=[];offset=0;filter='recent';if($('igDiscoveryFilter'))$('igDiscoveryFilter').value=filter;busy.clear();['igDiscoveryRows','igDiscoveryStatus','igDiscoveryPages','igDiscoveryAlert'].forEach(id=>{if($(id))$(id).textContent='';});if($('igDiscovery'))$('igDiscovery').hidden=true;if($('igDiscoveryAlert'))$('igDiscoveryAlert').hidden=true;/* Clear the dynamic branch source too: later layout observers must not resurrect old-session options. Its original renderer rebuilds it after the next authorized load. */$('opsClientBranches')?.replaceChildren();return reset.apply(this,arguments);};
   const notifications=window.loadNotifications;window.loadNotifications=async function(){const identity=scope();await notifications.apply(this,arguments);if(!identity||identity!==scope())return;
    try{const result=await supa.from('notifications').select('id,title,body,created_at').eq('user_id',currentUser.id).eq('type','instagram_discovery').order('created_at',{ascending:false}).limit(20);if(result.error)throw result.error;if(identity!==scope())return;
     const read=readNotificationReceipts();const additional=(result.data||[]).map(n=>({id:'ig-'+n.id,type:'task',icon:window.CRMDesign?.icon('property')||'↗',text:'<strong>'+escape(n.title)+'</strong><br>'+escape(n.body),time:n.created_at,onclick:"navigate('instagram',null)"})).filter(n=>!read.has(notificationReceiptId(n)));
@@ -153,7 +169,7 @@
   };
   document.addEventListener('change',event=>{if(event.target.id==='igDiscoveryFilter'){filter=event.target.value;offset=0;load();}});
   document.addEventListener('click',async event=>{const b=event.target.closest('[data-igd]');if(!b||!scope())return;event.preventDefault();const action=b.dataset.igd;
-   if(action==='open')navigate('instagram',null);
+   if(action==='open'){const x=document.querySelector('#cohSheet:not([hidden]) .coh-sheet-x');if(x)x.click();navigate('instagram',null);}
    if(action==='refresh')load();if(action==='next'){offset+=20;load();}if(action==='previous'){offset=Math.max(0,offset-20);load();}
    if(action==='link'||action==='general')decide(b.dataset.id,action==='link'?'link':'non_property',b);
    if(action==='scan'&&!busy.has('scan')){busy.add('scan');b.disabled=true;const identity=scope();try{const r=await supa.rpc('crm_request_instagram_scan');if(identity!==scope())return;if(r.error)throw r.error;showToast(r.data?.queued?'أُرسل طلب الفحص. النتائج تظهر بعد اكتمال المعالجة.':'الفحص طُلب مؤخرًا أو غير مفعّل؛ راجع الحالة.','info');}catch{if(identity===scope())showToast('تعذر طلب الفحص؛ المحاولة الدورية مستقلة.','error');}finally{busy.delete('scan');b.disabled=false;}}
