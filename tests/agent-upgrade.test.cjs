@@ -318,9 +318,12 @@ test('2: the R2 guard honours R16 (after-visit question, passed visit time, loca
  assert.equal(passed({status:'postponed',viewing_date:'2026-11-01',viewing_time:null}),false,'a postponed visit is not seen');
  const guard=agent.slice(at('const r16Seen = async'),at('// the ad text goes once per conversation'));
  assert(guard.includes('AFTER_VISIT_Q.test(lastBody) && !NOT_A_VISIT_Q.test(lastBody)'));
- assert(guard.includes('visitPassed(v)'));
- assert(guard.includes('b.includes(p.map_url)'));
- assert(guard.includes('.from("owners").select("phone").in("id", ownerIds)'));
+ // decision 24 (Ahmed 18 Nov 2026): a sent location, the owner's number or a passed booked time no longer count as a visit
+ assert(!guard.includes('visitPassed(v)'));
+ assert(!guard.includes('b.includes(p.map_url)'));
+ assert(!guard.includes('.from("owners").select("phone").in("id", ownerIds)'));
+ assert(guard.includes('!NOT_SEEN.test(answer)'),'«ما رحت» after our after-visit question is not a visit');
+ const SV=re('SAID_VISITED');assert(SV.test('زرت البيت امس'));assert(!SV.test('ما زرت البيت'));assert(!SV.test('لسا ما زرناها'.replace('ما ','ما  ')));
  assert(guard.includes('const r16 = visitedThis || saidVisited ? null : await r16Seen(out.property_id || null);'));
  assert(guard.includes('if (!visitedThis && !saidVisited && !r16) {'));
  assert(guard.includes('"شوف العقار أول واذا ناسبك نتكلم في السعر"'),'R2 still books the visit when nothing says he saw it');
@@ -329,8 +332,9 @@ test('2: the R2 guard honours R16 (after-visit question, passed visit time, loca
  assert(agent.includes('viewing_time,status,properties(type,area,wilayat,price,listing_purpose)'));
 });
 
-test('3: owner_with_ahmed only after a typed office message since the hand-back (72 h) or an open price study; declines always go out',()=>{
- assert(agent.includes('const backAt = Math.max(conv.agent_returned_at ? new Date(conv.agent_returned_at).getTime() : 0, Date.now() - 72 * 3600 * 1000);'));
+test('3: owner_with_ahmed after any typed office message since the hand-back (decision 67: R1 wins, no 72 h) or an open price study; declines always go out',()=>{
+ assert(agent.includes('const backAt = conv.agent_returned_at ? new Date(conv.agent_returned_at).getTime() : 0;'));
+ assert(!agent.includes('72 * 3600 * 1000'),'the dead 72-hour limit is gone');
  assert(agent.includes('h.actor_type === "human" && new Date(h.message_timestamp).getTime() > backAt'));
  assert(agent.includes('const priceStudyOpen = !!conv.human_handoff_required && /^\\s*دراسة سعر\\s*:/.test(String(conv.handoff_reason || ""));'));
  assert(agent.includes('const ownerWithAhmed = out.category === "seller" && !declining && (ahmedTyped || priceStudyOpen);'));
@@ -569,7 +573,8 @@ test('R29: a congratulation needs the customer to say they bought, reserved or p
  for(const s of ['ايوه لقيناها الفيلا','وعليكم السلام','شفناها','الله يرزقك'])assert(!B.test(s),s);
  for(const s of ['حجزنا الفيلا الحمدلله','اشترينا بيت','دفعت العربون'])assert(B.test(s),s);
  assert(A.test('السلام عليكم كيف شفتي فيلا الشخاخيط وايش انطباعك عنها ؟')&&A.test('السلام عليكم كيف لقيتي فيلا الشخاخيط ؟'));
- assert(agent.includes('texts = ["حياك الله، وايش انطباعك بعد الزيارة ؟"]'));
+ // decision 30 (Ahmed 18 Nov 2026): «حياك» is banned always, and no comma in a line the code adds
+ assert(agent.includes('texts = ["وايش انطباعك بعد الزيارة ؟"]'));assert(!agent.includes('حياك الله، وايش'));
  const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
  assert(brain.includes('قاعدة ثابتة (R29، أحمد 11 نوفمبر)')&&brain.includes('ممنوع "مبروك" أو "الله يبارك لك"'));
 });

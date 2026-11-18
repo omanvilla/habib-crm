@@ -47,10 +47,12 @@ test('SQL128 and the screen: staff see «عملاء يحتاجونك الحين�
   assert.match(s128,/can_access_whatsapp_conversation\(v_company, p_conversation_id\)/);
   assert.match(read('crm-hot-alerts.js'),/if\(busy\|\|!canSee\(\)/);
 });
-test('brain: a call request with no topic is asked first, not handed over (Ahmed 18 Nov)',()=>{
+test('brain: vague call talk is asked first; a clear call request stays a silent handoff (decision 9, Ahmed 18 Nov)',()=>{
   const b=read('supabase/functions/whatsapp-reply-agent/brain.ts');
-  assert.match(b,/أي طلب اتصال ما فيه موضوع واضح .* ما يتحوّل أبداً/);
+  assert.match(b,/كلام غامض عن اتصال بدون طلب صريح ولا موضوع .* ما يتحوّل/);
   assert.match(b,/تفضل وش استفسارك ؟/);
+  assert.match(b,/الطلب الصريح \("اتصل علي"، "ممكن رقمك"، "متى تتصلون"\) تحويل ساكت/);
+  assert.doesNotMatch(b,/"كلمني"، "ابي اتصال"\)/,'«ابي اتصال» is a clear request, not a vague example');
 });
 test('home rule (Ahmed 18 Nov): waiting buyers and contracts are tiles that open a sheet, never open boxes',()=>{
   const home=read('crm-owner-home.js'),att=read('crm-home-attention.js');
