@@ -91,7 +91,20 @@ live database: advisors, RLS, cron runs, 24 hours of Postgres and edge logs, `pg
   حسبي، يا رب، ما شاء الله…); «عبدالله», «الحمادي», «ياسر بن عبدالله» stay real. 172 client names count as not real (nothing
   in clients changed). Used by `crm_owner_open_handoffs` and the SQL121 alert; `crm-hot-alerts.js` has the same rule and
   list (a test checks they match). Applied as two migrations (the 2-letter condition was added after the first); the repo
-  file is the final state. Rollback: `122-real-client-names.rollback.sql`. Next SQL number **123**.
+  file is the final state. Rollback: `122-real-client-names.rollback.sql`.
+- **SQL123 applied + whatsapp-outreach v10 (18 Nov, Ahmed: «نعم سوي اقتراحك»):** «نزل عندنا … ممكن يناسب طلبك»
+  (queue_listing) had sent nothing since 4 Nov and matched far too wide (فيلا الصومحان 69 → 138 Barka buyers, no order, no
+  limit; only the first 500 requests read; a bare «69» in any office message excluded a client). Now
+  `supabase/functions/_shared/listing-match.mjs` scores each request (same area 40 «مطابق» / same wilayat 10 «قريب», which
+  needs a fitting budget; type; budget closeness; the client's last message) and only the best 20 per property are queued;
+  the approval card says «مطابق» or «قريب (نفس الولاية)». A unit of a group (SQL97) is not offered to clients already
+  offered its available sibling (`public.crm_unit_sibling_ids`, service role only). The property trigger also fires on a
+  price drop of 2 percent or more on an available property (`price_drop`, only clients the new price now fits; same
+  approved template). `preview:true` returns the picks without writing. The 21 stale dry-run rows of 4 Nov → skipped
+  `stale_dry_run` (nothing deleted). Checked live: preview on the 5 available properties (villa 69: 24 matches, 20 picked,
+  sibling seen); trigger in a rolled-back transaction (same price / −1 % nothing, −5 % queued). Note: v9 was deployed by
+  mistake with an empty index.ts and broke the function 01:19–01:22 UTC; no call reached it (outside cron hours, no property
+  change). Rollback: `123-listing-match.rollback.sql` + redeploy the previous index.ts. Next SQL number **124**.
 - **Left as they are, on purpose:** the two SECURITY DEFINER views (`crm_properties_access`, `crm_deals_access`) hide money
   columns from staff by design; 346 «duplicate key» answers a day on `whatsapp_messages` and 95 on `activities` are the
   webhook's own duplicate guard; leaked-password protection is a switch in the Supabase dashboard (Ahmed).
