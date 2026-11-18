@@ -11,7 +11,8 @@
 (function(){
   'use strict';
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
-  const isOwner=()=>typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.role==='owner';
+  // SQL130 (18 Nov 2026, Ahmed: «افتح المشترين والعقود للموظف»): staff (manager, agent) read them too, each row where they can go
+  const isOwner=()=>typeof currentProfile!=='undefined'&&currentProfile&&['owner','manager','agent'].includes(currentProfile.role);
   const toast=(m,t)=>{if(typeof showToast==='function')showToast(m,t);};
   const BR={barka:'بركاء',muscat:'مسقط'};
   const ago=d=>typeof timeAgo==='function'?timeAgo(d):String(d||'').slice(0,16).replace('T',' ');

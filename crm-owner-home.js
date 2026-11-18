@@ -109,7 +109,7 @@
     if(pr0){todo+=pr0;t.push(tile('دراسة سعر',pr0,'data-coh="sheet" data-kind="pricing"','ملاك ينتظرون تسعيرك',true));}
     // 18 Nov 2026 (Ahmed: «لوحة العمل ما أريدها تكون ربشة… يكون في عدد أضغط عليه أشوف»): «مشترين واقفين» and «العقود» (SQL126,
     // crm-home-attention.js) are tiles that open a sheet like the rest, never open lists on the page. Owner only.
-    const ha=isOwner()&&window.crmHomeAttention;
+    const ha=canResume()&&window.crmHomeAttention; // SQL130: staff too (manager, agent)
     if(ha){const w=ha.count('waiting'),c=ha.count('contracts');
       if(w){todo+=w;t.push(tile('مشترين واقفين',w,'data-coh="sheet" data-kind="waiting"','سألوا وما انرد عليهم',true));}
       if(c)t.push(tile('العقود',c,'data-coh="sheet" data-kind="contracts"',ha.sub('contracts'),false));}

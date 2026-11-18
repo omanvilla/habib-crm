@@ -25,7 +25,7 @@ test('SQL125 never closes a price study on a message or a call',()=>{
 test('SQL126 is owner only and the screen is loaded',()=>{
   assert.equal((s126.match(/RAISE EXCEPTION 'owner_only'/g)||[]).length,3);
   assert.match(read('index.html'),/crm-home-attention\.js\?v=/);
-  assert.match(read('crm-home-attention.js'),/currentProfile\.role==='owner'/);
+  assert(read('crm-home-attention.js').includes("['owner','manager','agent'].includes(currentProfile.role)")); // SQL130: staff too
 });
 test('price-study: another property of the same owner is not marked studied',()=>{
   const ps=read('supabase/functions/price-study/index.ts');
@@ -65,4 +65,11 @@ test('SQL129 + whatsapp-owner-hot-alert: «طلب اتصال» and CRM-only hot 
   assert.match(s,/'hot_notification:' \|\| NEW\.id::text/);
   assert.match(s,/interval '5 minutes'/);
   assert(read('supabase/functions/whatsapp-owner-hot-alert/index.ts').includes('(مشتري جاد|تفاوض|اجتماع|طلب اتصال)\\s*:/;'));
+});
+test('SQL130: staff read «مشترين واقفين» and «العقود» only where they can go',()=>{
+  const s=read('db/changes/130-home-attention-staff.forward.sql');
+  copy('_home_attention_staff_20261118.sql',s);
+  assert.match(s,/can_access_whatsapp_conversation\(v_company, w\.id\)/);
+  assert.match(s,/staff_can_access_branch\(v_company, p\.branch_key\)/);
+  assert.match(read('crm-owner-home.js'),/const ha=canResume\(\)&&window\.crmHomeAttention/);
 });
