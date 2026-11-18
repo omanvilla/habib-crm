@@ -14,7 +14,8 @@
   const BR={barka:'بركاء',muscat:'مسقط'};
   const ago=d=>typeof timeAgo==='function'?timeAgo(d):String(d||'').slice(0,16).replace('T',' ');
   const day=d=>d?new Date(d).toLocaleDateString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat',day:'numeric',month:'long'}):'';
-  let data=null,busy=false;
+  let data=null,busy=false,showAll=false;
+  const FIRST=5; // the home stays short: the newest five, the rest behind «عرض الكل»
   function host(){
     const head=document.querySelector('#page-dash .page-header');if(!head)return null;
     let box=byId('crmHomeAttention');
@@ -27,9 +28,10 @@
   function waitingHtml(list){
     if(!list.length)return '';
     return '<section class="cat-box cat-wait" aria-label="مشترين واقفين"><p class="cat-title">🙋 مشترين واقفين، سألوا وما انرد عليهم <b dir="ltr">'+list.length+'</b></p><ul class="cat-list">'
-      +list.map(w=>'<li class="cat-row"><div class="cat-info"><strong dir="auto">'+esc(w.name||'عميل')+(w.route?' · '+esc(BR[w.route]||''):'')+'</strong>'
+      +(showAll?list:list.slice(0,FIRST)).map(w=>'<li class="cat-row"><div class="cat-info"><strong dir="auto">'+esc(w.name||'عميل')+(w.route?' · '+esc(BR[w.route]||''):'')+'</strong>'
         +'<small class="cat-q" dir="auto">«'+esc(w.question||'')+'»</small><small class="cat-time">'+esc(ago(w.asked_at))+'</small></div>'
-        +'<div class="cat-actions">'+btns(w.phone,w.conversation_id,w.client_id)+'<button type="button" class="btn-secondary" data-cat="wait-done" data-id="'+esc(w.conversation_id)+'">تم</button></div></li>').join('')+'</ul></section>';
+        +'<div class="cat-actions">'+btns(w.phone,w.conversation_id,w.client_id)+'<button type="button" class="btn-secondary" data-cat="wait-done" data-id="'+esc(w.conversation_id)+'">تم</button></div></li>').join('')+'</ul>'
+      +(list.length>FIRST?'<button type="button" class="btn-secondary cat-more" data-cat="more">'+(showAll?'عرض أقل':'عرض الكل ('+list.length+')')+'</button>':'')+'</section>';
   }
   function contractsHtml(d){
     const ex=d.expiring||[],un=d.unchecked||[],nc=d.new_contracts||[];
@@ -62,6 +64,7 @@
   document.addEventListener('click',e=>{
     const b=e.target.closest('[data-cat]');if(!b||!data)return;
     const id=b.dataset.id,act=b.dataset.cat;
+    if(act==='more'){showAll=!showAll;render();return;}
     if(act==='prop'){if(typeof viewProperty==='function')viewProperty(id);else if(typeof navigate==='function')navigate('properties',null);return;}
     b.disabled=true;
     const call=act==='wait-done'?supa.rpc('crm_waiting_buyer_done',{p_conversation:id}):act==='avail'?supa.rpc('crm_property_confirm_available',{p_property:id}):null;
