@@ -14,6 +14,9 @@
   const byId=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
   const isOwner=()=>typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.role==='owner';
+  // SQL128 (18 Nov 2026, Ahmed: «اريد قائمة عملاء يحتاجونك الحين تظهر للموظفه او الموظف ايضا»): staff (manager, agent) see the same
+  // list with the chats they can open (RLS) and their own notifications; one shared «تم» (crm_hot_alert_done) clears it for everyone.
+  const canSee=()=>typeof currentProfile!=='undefined'&&currentProfile&&['owner','manager','agent'].includes(currentProfile.role);
   const toast=(m,t)=>{if(typeof showToast==='function')showToast(m,t);};
   let seen=null,items=[],busy=false,hidden={};
   try{hidden=JSON.parse(localStorage.getItem('crmHotHidden')||'{}')||{};}catch{}
@@ -61,7 +64,7 @@
     else if(Notification.permission==='default')Notification.requestPermission().then(p=>{if(p==='granted')send();}).catch(()=>{});
   }
   async function load(){
-    if(busy||!isOwner()||typeof supa==='undefined'||typeof currentUser==='undefined'||!currentUser)return;
+    if(busy||!canSee()||typeof supa==='undefined'||typeof currentUser==='undefined'||!currentUser)return;
     busy=true;
     try{
       const since=new Date(Date.now()-7*86400000).toISOString();
