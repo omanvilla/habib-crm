@@ -1,0 +1,19 @@
+/* Owner home, top: «مشترين واقفين» and «العقود» (crm-home-attention.js, SQL126). */
+.cat{display:grid;gap:10px;margin:10px 0 0;min-width:0}
+.cat[hidden]{display:none}
+.cat-box{padding:10px 12px;border:1px solid var(--border,#e2e5ea);border-radius:10px;background:var(--card,#fff);min-width:0}
+.cat-wait{border-color:#b9cfe9;background:#f3f8fe}
+.cat-contracts{border-color:#e3d7b0;background:#fffbef}
+.cat-title{margin:0 0 6px;font-size:14px;font-weight:700}
+.cat-sub{margin:8px 0 4px;font-size:13px;font-weight:700;color:#6b5a2a}
+.cat-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.cat-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding-top:8px;border-top:1px solid rgba(0,0,0,.07);min-width:0}
+.cat-row:first-child{border-top:0;padding-top:0}
+.cat-info{display:grid;gap:2px;min-width:0;flex:1 1 220px}
+.cat-info strong{font-size:14px;overflow-wrap:anywhere}
+.cat-info small{font-size:12px;color:#5d6570;overflow-wrap:anywhere}
+.cat-q{color:#24324a!important;font-size:13px!important}
+.cat-time{color:#8a929c!important}
+.cat-actions{display:flex;flex-wrap:wrap;gap:6px}
+.cat-actions>*{width:auto!important;min-height:40px}
+@media(max-width:600px){.cat-actions{flex:1 1 100%}.cat-actions>*{flex:1}}

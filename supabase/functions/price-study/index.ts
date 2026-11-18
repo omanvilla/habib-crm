@@ -247,10 +247,22 @@ async function pullFiles(studyId: string, secret: string) {
     .eq("id", s.id).eq("status", "submitted").select("id");
   if (!(done.data || []).length) return { study_id: studyId, skipped: "changed_meanwhile" };
   const { name, property } = await studyContext(s);
+  // SQL124 (Ahmed 18 Nov 2026: «بعد الدراسة يتطابق مع المشترين ويتبلغ أحمد»): the active buyers whose budget fits the asking price
+  // (names only, no number of the study), so he knows who to call once he approves
+  let buyersLine = "";
+  try {
+    const b = await db.rpc("crm_price_study_buyers", { p_study_id: s.id });
+    const rows: any[] = b.data || [];
+    if (rows.length) {
+      const names = rows.slice(0, 8).map((r) => `${short(r.name, 25)}${r.budget ? ` (${Math.round(Number(r.budget) / 1000)} الف)` : ""}`).join("، ");
+      buyersLine = `مشترين يناسبهم السعر المقترح: ${rows.length}\n${names}${rows.length > 8 ? " …" : ""}`;
+    } else if (!b.error) buyersLine = "مشترين يناسبهم السعر المقترح: ما في للحين";
+  } catch (_) { /* the message goes without the buyers line */ }
   const told = await tellAhmed(secret, s.company_id, s.route_key === "barka" ? "barka" : "muscat", [
     `📊 دراسة سعر جاهزة لموافقتك · ${branchAr(s.route_key)}`,
     `الاسم: ${name}`,
     property ? `العقار: ${property}` : "",
+    buyersLine,
     "راجع الأرقام والتقريرين ووافق من هنا:",
     `${CRM_URL}?study=${s.id}`,
     "ما ينرسل شي للمالك قبل موافقتك",
@@ -354,8 +366,15 @@ async function afterSent(s: any, conv: any, now: string) {
     const after: string[] = [];
     if (s.task_id) { const t = await db.from("tasks").update({ done: true, completed_at: now }).eq("id", s.task_id); if (t.error) after.push("task"); }
     const leads = await db.from("owner_leads").select("id,notes,status,conversation_id").eq("company_id", s.company_id).eq("status", "open").or(`id.eq.${s.owner_lead_id || "00000000-0000-0000-0000-000000000000"},conversation_id.eq.${conv.id}`);
+    // SQL124: another property of the same owner (its own open price task) is not marked studied by this study
+    const ids = (leads.data || []).map((l: any) => l.id).filter((id: string) => id !== s.owner_lead_id);
+    const ownTask = new Set<string>();
+    if (ids.length) {
+      const ot = await db.from("tasks").select("owner_lead_id").in("owner_lead_id", ids).eq("done", false).neq("id", s.task_id || "00000000-0000-0000-0000-000000000000").ilike("title", "دراسة سعر%");
+      for (const t of ot.data || []) ownTask.add(String((t as any).owner_lead_id));
+    }
     const line = `تمت دراسة السعر ${dayAr()}: القيمة السوقية ${money(s.market_value)} وسعر العرض ${money(s.asking_price)}، وانرسلت للمالك`;
-    for (const l of leads.data || []) {
+    for (const l of (leads.data || []).filter((x: any) => !ownTask.has(x.id))) {
       const u = await db.from("owner_leads").update({ status: "studied", notes: [l.notes, line].filter(Boolean).join("\n").slice(0, 4000), updated_at: now }).eq("id", l.id);
       if (u.error) after.push("owner_lead");
     }
