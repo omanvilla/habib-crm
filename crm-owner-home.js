@@ -20,7 +20,7 @@
   const OWNER_KIND={unknown_q:'سؤال ما يعرف جوابه',negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرارك',muted:'مكتوم عنهم',manual_reply:'رديت بنفسك'};
   const STAFF_KIND={unknown_q:'سؤال ما يعرف جوابه',negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرار',muted:'مكتوم عنهم',manual_reply:'انرد عليها من المكتب'};
   const KIND=new Proxy({},{get:(_,k)=>(isOwner()?OWNER_KIND:STAFF_KIND)[k],ownKeys:()=>Object.keys(OWNER_KIND),getOwnPropertyDescriptor:()=>({enumerable:true,configurable:true})});
-  const TITLES={waiting:'مشترين واقفين، سألوا وما انرد عليهم',contracts:'العقود',followups:'متابعة اليوم',paused:'العقل موقوف عندهم',pricing:'دراسة سعر: ملاك ينتظرون تسعيرك',studies:'دراسات سعر تنتظر موافقتك',visits:'زيارات يتابعها الذكاء الاصطناعي',problems:'مشاكل تحتاج انتباه'};
+  const TITLES={waiting:'مشترين واقفين، سألوا وما انرد عليهم',contracts:'العقود',followups:'متابعة اليوم',paused:'العقل موقوف عندهم',pricing:'دراسة سعر: ملاك ينتظرون تسعيرك',studies:'دراسات سعر تنتظر موافقتك',visits:'زيارات يتابعها الذكاء الاصطناعي',problems:'مشاكل تحتاج انتباه',twins:'قرار سريع: عقارات بنفس المواصفات',ig:'فيديوهات إنستقرام تحتاج ربط'};
   let sequence=0,sheetKind=null,pausedFilter='all',pricingBranch='all',paused={items:[],total:0},last=null,ignoredOpen=false,ignoredList=null;
   /* «دراسة سعر:» handoffs (11 Nov 2026, Ahmed): owners waiting for a price have their own tile and list, so the
    * paused list keeps only chats that need another decision. Display only: the hold, the reason text and
@@ -71,7 +71,9 @@
     box.innerHTML='<section class="coh-hello" id="cohHello"></section>'
       +'<section class="coh-now" aria-labelledby="cohNowTitle"><h2 class="coh-h" id="cohNowTitle">المطلوب منك الآن</h2><div id="cohTiles" class="coh-tiles"></div></section>'
       +'<section class="card coh-sec coh-goals" id="cohGoals" hidden></section>'
-      +'<section class="coh-quick" id="cohQuick"><div id="cohAuto"></div><div id="cohTwins"></div><div id="cohIg"></div><div id="cohUsage"></div></section>'
+      // 18 Nov 2026 (decision 36): the twins decision and the Instagram videos are tiles that open a sheet; #cohIg only
+      // parks the Instagram card (crm-instagram-discovery.js) while its sheet is closed, it is never shown on the page
+      +'<section class="coh-quick" id="cohQuick"><div id="cohAuto"></div><div id="cohIg" hidden></div><div id="cohUsage"></div></section>'
       +'<section class="card coh-sec" id="cohSummary"></section>'
       +'<button type="button" class="btn-secondary coh-full" data-coh="full" aria-expanded="false">قائمة العمل الكاملة</button>';
     const header=page.querySelector('.page-header');if(header)header.after(box);else page.prepend(box);
@@ -120,9 +122,40 @@
     if(Number(d.overdue_total)||un0){if(un0)todo+=un0;t.push(tile('زيارات يتابعها الذكاء الاصطناعي',Number(d.overdue_total||0)+un0,'data-coh="sheet" data-kind="visits"',un0?un0+' معاينة أمس بدون سؤال، شيكها':'للاطلاع، العقل يسأل العميل',!!un0));}
     const pr=(d.problems||[]).length;
     if(pr)t.push(tile('مشاكل',pr,'data-coh="sheet" data-kind="problems"','تحتاج انتباه',false));
+    // 18 Nov 2026 (decision 36): the two quick decisions that were open cards are tiles too. Owner only, as before.
+    if(isOwner()){
+      const tw=twinsOpen().length;
+      if(tw){todo+=tw;t.push(tile('عقارات بنفس المواصفات',tw,'data-coh="sheet" data-kind="twins"','قرار سريع: تربط الفيديوهات؟',false));}
+      const ig=igCount();
+      if(ig){todo+=ig;t.push(tile('فيديوهات إنستقرام',ig,'data-coh="sheet" data-kind="ig"','تحتاج ربط بعقار',false));}
+    }
     byId('cohTiles').innerHTML=t.length?t.join(''):'<p class="coh-empty">'+(isOwner()?'ما في شي يحتاج قرارك الحين ✓':'ما في شي متأخر الحين ✓')+'</p>';
     drawHello(todo);
-    const ig=byId('igDiscoveryAlert'),slot=byId('cohIg');if(ig&&slot&&ig.parentNode!==slot)slot.append(ig);
+    parkIg();
+  }
+  // The Instagram card (crm-instagram-discovery.js) waits in the hidden #cohIg and moves into the sheet while it is open
+  const igCount=()=>typeof window.crmIgAlertCount==='function'?Number(window.crmIgAlertCount()||0):0;
+  function parkIg(){
+    const ig=byId('igDiscoveryAlert'),slot=byId('cohIg');
+    if(ig&&slot&&ig.parentNode!==slot&&!ig.closest('#cohSheetBody'))slot.append(ig);
+  }
+  function parkIgOut(){
+    const ig=byId('igDiscoveryAlert'),slot=byId('cohIg');
+    if(ig&&slot&&ig.closest('#cohSheetBody'))slot.append(ig);
+  }
+  function drawIgSheet(){
+    const body=byId('cohSheetBody'),ig=byId('igDiscoveryAlert');if(!body)return;
+    let none=body.querySelector('.coh-ig-empty');
+    if(ig&&ig.parentNode!==body)body.prepend(ig);
+    const count=igCount();
+    if(ig)ig.hidden=!count;
+    if(!count&&!none){none=document.createElement('p');none.className='coh-empty coh-ig-empty';none.textContent='ما في فيديو جديد يحتاج ربط ✓';body.append(none);}
+    else if(count&&none)none.remove();
+  }
+  function twinsHtml(){
+    const open=twinsOpen();
+    if(!open.length)return '<p class="coh-empty">ما في عقارات تحتاج قرار ✓</p>';
+    return '<ul class="coh-list">'+open.map(g=>'<li class="coh-twin"><strong>'+g.properties.map(p=>esc(p.title)).join(' · ')+'</strong><small>'+g.properties.map(p=>num(p.videos)+' فيديو').join(' · ')+'</small><p>تربط كل الفيديوهات على الكل ؟ أداء الفيديو واستفساراته تنحسب لكل عقار</p><div class="coh-twin-actions"><button type="button" class="btn-primary" data-coh="twin-yes" data-key="'+esc(g.key)+'">نعم اربطهم</button><button type="button" class="btn-secondary" data-coh="twin-no" data-key="'+esc(g.key)+'">لا مختلفين</button></div></li>').join('')+'</ul>';
   }
   function visitRow(v){
     return '<li class="coh-row"><div class="coh-info"><strong>'+esc(v.property||'عقار')+'</strong><small>'+esc(v.client||'—')+' · <span class="coh-late">فات موعدها '+esc(v.viewing_date)+'</span></small>'+(v.notes?'<small class="coh-note">'+esc(v.notes)+'</small>':'')+'</div>'
@@ -222,10 +255,13 @@
     // SQL96: the studies sheet draws itself, so a refresh of the home never wipes an inspection note being written or recorded
     if(sheetKind==='studies'){if(typeof window.crmPriceStudiesDraw==='function')window.crmPriceStudiesDraw(body);else body.innerHTML=typeof window.crmPriceStudiesHtml==='function'?window.crmPriceStudiesHtml():'';return;}
     if((sheetKind==='waiting'||sheetKind==='contracts')&&window.crmHomeAttention){body.innerHTML=window.crmHomeAttention.html(sheetKind);return;}
-    body.innerHTML=sheetKind==='paused'?pausedHtml():sheetKind==='pricing'?pricingHtml():sheetKind==='visits'?visitsHtml():problemsHtml();
+    if(sheetKind==='ig'){drawIgSheet();return;}
+    body.innerHTML=sheetKind==='twins'?twinsHtml():sheetKind==='paused'?pausedHtml():sheetKind==='pricing'?pricingHtml():sheetKind==='visits'?visitsHtml():problemsHtml();
   }
   function openSheet(kind){
-    const s=sheetEl();sheetKind=kind;byId('cohSheetTitle').textContent=TITLES[kind]||'';
+    const s=sheetEl();
+    if(sheetKind==='ig')parkIgOut();
+    sheetKind=kind;byId('cohSheetTitle').textContent=TITLES[kind]||'';
     const body=byId('cohSheetBody');body.innerHTML='';
     if(kind!=='studies'&&typeof window.crmPriceStudiesLeave==='function')window.crmPriceStudiesLeave();
     if(kind==='followups'){
@@ -239,6 +275,7 @@
     const s=byId('cohSheet');if(!s||s.hidden)return;
     const fu=byId('crmFollowups'),home=byId('crmOwnerHome');
     if(fu&&fu.closest('#cohSheetBody')&&home)home.append(fu);
+    parkIgOut();
     s.hidden=true;sheetKind=null;document.body.classList.remove('coh-lock');
     if(typeof window.crmPriceStudiesLeave==='function')window.crmPriceStudiesLeave();
   }
@@ -286,16 +323,27 @@
         +(n.body?'<details class="coh-novideo"><summary>'+esc(String(n.body).slice(0,90))+(String(n.body).length>90?'…':'')+'</summary><p>'+esc(n.body)+'</p></details>':'')
         +'<small>'+esc(when(n.created_at))+'</small></div><button type="button" class="btn-secondary coh-go" data-coh="auto-done" data-id="'+esc(n.id)+'">تم</button></li>').join('')+'</ul></details>';
   }
+  // Twins still waiting for a decision (the same rule as the card it replaced); drawn by twinsHtml in the «twins» sheet
   function drawTwins(groups){
-    const open=(groups||[]).filter(g=>!g.dismissed&&g.properties.some(p=>Number(p.videos)<Number(g.videos)));
-    byId('cohTwins').innerHTML=open.length?'<div class="card coh-sec"><div class="coh-subhead"><h3>قرار سريع: عقارات بنفس المواصفات <b dir="ltr">'+num(open.length)+'</b></h3></div><ul class="coh-list">'+open.map(g=>'<li class="coh-twin"><strong>'+g.properties.map(p=>esc(p.title)).join(' · ')+'</strong><small>'+g.properties.map(p=>num(p.videos)+' فيديو').join(' · ')+'</small><p>تربط كل الفيديوهات على الكل ؟ أداء الفيديو واستفساراته تنحسب لكل عقار</p><div class="coh-twin-actions"><button type="button" class="btn-primary" data-coh="twin-yes" data-key="'+esc(g.key)+'">نعم اربطهم</button><button type="button" class="btn-secondary" data-coh="twin-no" data-key="'+esc(g.key)+'">لا مختلفين</button></div></li>').join('')+'</ul></div>':'';
+    return (Array.isArray(groups)?groups:[]).filter(g=>g&&!g.dismissed&&(g.properties||[]).some(p=>Number(p.videos)<Number(g.videos)));
   }
+  const twinsOpen=()=>last&&isOwner()?drawTwins(last.twins):[];
+  /* 18 Nov 2026 (decision 64): the home and the Instagram review (crm-instagram-discovery.js) each read crm_property_twins
+   * on every load. They share one read now: one still on its way, or answered less than 3 seconds ago, for the same
+   * session. A twin decision reads it again (force). A failed read is never kept. */
+  let twinKey='',twinDone=0,twinRead=null,forceTwins=false;
+  window.crmPropertyTwins=function(force){
+    const key=(typeof crmSessionGeneration==='undefined'?'':crmSessionGeneration)+':'+(typeof currentUser!=='undefined'&&currentUser?currentUser.id:'');
+    if(!force&&twinRead&&twinKey===key&&(!twinDone||Date.now()-twinDone<3000))return twinRead;
+    const read=Promise.resolve(supa.rpc('crm_property_twins')).then(r=>{if(twinRead===read){if(!r||r.error)twinRead=null;else twinDone=Date.now();}return r;},e=>{if(twinRead===read)twinRead=null;throw e;});
+    twinKey=key;twinDone=0;twinRead=read;return read;
+  };
   function drawSummary(d){
     const p=d.properties||{},r=d.report||{},label={barka:'بركاء',muscat:'مسقط'};
     // 17 Nov 2026: the target is now 25 for the company by 12 Feb 2027 (Ahmed, 16 Nov; AGENTS.md). Display only: the saved
-    // branch targets and their per-branch default are unchanged until he says how the 25 splits.
+    // branch targets and their per-branch default are unchanged until he says how the 25 splits. SQL138 (18 Nov, [62]): no split, one company number; the goal comes from the snapshot (company_inventory.goal).
     const avail=(p.branches||[]).reduce((s,b)=>s+Number(b.available||0),0);
-    const props=[['متاح للشركة من '+INVENTORY_TARGET,avail]].concat((p.branches||[]).map(b=>['متاح '+(label[b.branch]||b.branch),b.available])).concat([['أضيفت هذا الأسبوع',p.added_week],['توفرها ما تأكد من شهر',p.unchecked]]);
+    const props=[['متاح للشركة من '+((goals&&goals.company_inventory&&goals.company_inventory.goal)||INVENTORY_TARGET),avail]].concat((p.branches||[]).map(b=>['متاح '+(label[b.branch]||b.branch),b.available])).concat([['أضيفت هذا الأسبوع',p.added_week],['توفرها ما تأكد من شهر',p.unchecked]]);
     // 17 Nov 2026: once the goals card is drawn it carries the visits and bookings, so they are not repeated here
     const rep=[['عملاء جدد',r.new_clients],['ردود الوكيل',r.agent_replies]].concat(goals?[]:[['زيارات تمت',r.visits_done],['حجوزات الشهر',r.bookings_month]]).concat([['مبيعات الشهر',r.sales_month]]).filter(([,v])=>v!=null);
     const cells=a=>a.map(([l,v])=>'<div class="coh-stat"><strong dir="ltr">'+num(v)+'</strong><small>'+esc(l)+'</small></div>').join('');
@@ -307,8 +355,8 @@
   }
   /* 17 Nov 2026 (Ahmed, after the full check: «سوّ الإضافات كلها»): the branch goals on the home, from the same snapshot as
    * the targets in Reports (crm_branch_target_snapshot): completed visits this week of 5, documented human follow-ups
-   * today of 10, new qualified properties this week of 2, paid bookings this month of 2 (the owner also sees the expected
-   * office commission of 4,000; staff never get money figures). Staff see their branch, the owner both. Display only. */
+   * today of 10, new qualified properties this week of 2, deals (paid bookings) this month of 3 (the owner also sees the expected
+   * office commission of 5,400, SQL138 [3]; staff never get money figures). Staff see their branch, the owner both. Display only. */
   let goals=null;
   function drawGoals(){
     const el=byId('cohGoals');if(!el)return;
@@ -320,21 +368,21 @@
     el.innerHTML='<h2 class="coh-h">الأهداف <small>الأسبوع من '+esc(goals.week_start||'')+'</small></h2>'+list.map(b=>{const g=b.goals||{};
       return '<div class="coh-goal-row">'+(list.length>1||owner?'<h3 class="coh-h3">'+esc(b.name||b.branch||'')+'</h3>':'')+'<div class="coh-goal-chips">'
         +chip('زيارات تمت هالأسبوع',b.viewings,g.viewings)+chip('متابعات اليوم',b.followups,g.followups)
-        +chip('عقارات جديدة هالأسبوع',b.new_properties,g.new_properties)+chip('حجوزات الشهر',b.bookings,g.bookings)
+        +chip('عقارات جديدة هالأسبوع',b.new_properties,g.new_properties)+chip('صفقات الشهر',b.bookings,g.bookings)
         +(owner&&b.expected_commission!=null?chip('عمولة متوقعة الشهر',b.expected_commission,g.expected_commission,true):'')+'</div></div>';}).join('');
     el.hidden=false;
   }
   async function load(){
     const page=byId('page-dash'),box=mount();if(!page||!box){releaseGate();return;}
     if(!hasHome()||typeof supa==='undefined'){box.hidden=true;page.classList.remove('coh-on');releaseGate();return;}
-    const seq=++sequence,owner=isOwner();let ok=false;
+    const seq=++sequence,owner=isOwner(),twinForce=forceTwins;let ok=false;forceTwins=false;
     try{
       // The follow-up count is read together with the rest (it is lighter), so its tile is there on the first draw.
       const fu=typeof window.crmFollowupsRefresh==='function'?Promise.race([window.crmFollowupsRefresh(),new Promise(r=>setTimeout(r,1500))]):null;
       // SQL94: the price studies waiting for approval are read with the rest, so their tile is there on the first draw (R59, SQL104: staff too)
       const ps=(owner||canResume())&&typeof window.crmPriceStudiesRefresh==='function'?Promise.race([window.crmPriceStudiesRefresh().catch(()=>0),new Promise(r=>setTimeout(r,2500))]):null;
       const [home,pending,twinGroups,pz]=await Promise.all(owner
-        ?[supa.rpc('crm_owner_home'),typeof window.crmPendingReplies==='function'?window.crmPendingReplies().catch(()=>0):0,supa.rpc('crm_property_twins'),supa.rpc('crm_paused_chats'),fu,ps]
+        ?[supa.rpc('crm_owner_home'),typeof window.crmPendingReplies==='function'?window.crmPendingReplies().catch(()=>0):0,window.crmPropertyTwins(twinForce),supa.rpc('crm_paused_chats'),fu,ps]
         :[supa.rpc('crm_staff_home'),0,null,canResume()?supa.rpc('crm_paused_chats'):null,fu].concat(ps));
       if(seq!==sequence)return;
       // a staff session never keeps the owner's lists from an earlier session in the same tab
@@ -355,8 +403,10 @@
   /* 17 Nov 2026 (full check, Ahmed: «صلّح تكرار طلبات الرئيسية»): since the goals card, the home and the old target card
    * (crm-operations-v6.js) each read crm_branch_target_snapshot on every load. They now share one read: a request still
    * on its way, or one answered less than 3 seconds ago, for the same signed-in session. A failed read is never kept. */
+  // 18 Nov 2026 (decision 64): crm-operations-v6.js loads first and defines the same shared read (its own first reads run
+  // before this file is there); this copy only stands in if that file is missing
   let snapKey='',snapDone=0,snapRead=null;
-  window.crmBranchSnapshot=function(){
+  if(typeof window.crmBranchSnapshot!=='function')window.crmBranchSnapshot=function(){
     const key=(typeof crmSessionGeneration==='undefined'?'':crmSessionGeneration)+':'+(typeof currentUser!=='undefined'&&currentUser?currentUser.id:'');
     if(snapRead&&snapKey===key&&(!snapDone||Date.now()-snapDone<3000))return snapRead;
     const read=Promise.resolve(supa.rpc('crm_branch_target_snapshot')).then(r=>{if(snapRead===read){if(!r||r.error)snapRead=null;else snapDone=Date.now();}return r;},e=>{if(snapRead===read)snapRead=null;throw e;});
@@ -377,11 +427,12 @@
   function render(){
     if(!last)return;
     const d=last.data;
-    drawTiles(d,last.pending);drawTwins(last.twins);drawSummary(d);drawSheet();
+    drawTiles(d,last.pending);drawSummary(d);drawSheet();
   }
   document.addEventListener('crm-followups-updated',()=>{if(last)drawTiles(last.data,last.pending);});
   document.addEventListener('crm-price-studies-updated',()=>{if(last)drawTiles(last.data,last.pending);});
   document.addEventListener('crm-home-attention-updated',()=>{if(last)drawTiles(last.data,last.pending);if(sheetKind==='waiting'||sheetKind==='contracts')drawSheet();});
+  document.addEventListener('crm-ig-alert-updated',()=>{if(last)drawTiles(last.data,last.pending);if(sheetKind==='ig')drawSheet();});
   document.addEventListener('crm-visits-unasked-updated',()=>{if(last)drawTiles(last.data,last.pending);if(sheetKind==='visits')drawSheet();});
   window.crmOwnerHomeOpenSheet=kind=>{if(hasHome())openSheet(kind);};
   document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();});
@@ -459,7 +510,7 @@
     else if(act==='twin-yes'||act==='twin-no'){
       b.disabled=true;
       const call=act==='twin-yes'?supa.rpc('crm_link_twin_group',{p_properties:b.dataset.key.split(',')}):supa.rpc('crm_dismiss_twin_group',{p_key:b.dataset.key});
-      call.then(r=>{if(r.error)throw r.error;toast(act==='twin-yes'?'انربطت الفيديوهات على الكل':'تمام ما راح أسأل عنهم مرة ثانية','success');return window.crmOwnerHomeRefresh();}).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});
+      call.then(r=>{if(r.error)throw r.error;toast(act==='twin-yes'?'انربطت الفيديوهات على الكل':'تمام ما راح أسأل عنهم مرة ثانية','success');forceTwins=true;return window.crmOwnerHomeRefresh();}).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});
     }
     else if(act==='nav'&&typeof navigate==='function'){
       const nav=b.dataset.nav;closeSheet();navigate(nav,{replies:byId('navReplies'),'owner-leads':byId('navOwnerLeads')}[nav]||null);

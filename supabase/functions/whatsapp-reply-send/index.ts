@@ -17,6 +17,17 @@ const enc = new TextEncoder();
 const digits = (v: unknown) => String(v ?? "").replace(/\D/g, "");
 const short = (v: unknown, n = 1500) => { const s = String(v ?? "").trim(); return s.length > n ? s.slice(0, n) + "…" : s; };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// SQL137 (Ahmed's review [75]): the key-box photo lives in the private bucket property-keys and the column holds its
+// path. WhatsApp gets a signed URL that works for 10 minutes (Meta fetches the image right away). An old public https
+// URL that was not copied yet is sent as it is (it is already public).
+async function lockboxLink(v: unknown): Promise<string> {
+  const s = String(v ?? "").trim();
+  if (!s) return "";
+  if (/^https:\/\//.test(s)) return s;
+  if (!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|jpeg|png|webp)$/.test(s)) return "";
+  const r = await db.storage.from("property-keys").createSignedUrl(s, 600);
+  return r.error ? "" : (r.data?.signedUrl || "");
+}
 function b64(s: string) { const b = atob(s); const o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return o; }
 function cors(req: Request) {
   const origin = req.headers.get("origin") || "";
@@ -175,7 +186,10 @@ Deno.serve(async (req) => {
     prop = p.data || null;
   }
   if ((analysis.action === "send_location" || analysis.action === "send_lockbox") && prop?.map_url) outgoing.push({ type: "text", text: { preview_url: true, body: prop.map_url } });
-  if (analysis.action === "send_lockbox" && prop?.lockbox_image_url) outgoing.push({ type: "image", image: { link: prop.lockbox_image_url } });
+  if (analysis.action === "send_lockbox" && prop?.lockbox_image_url) {
+    const link = await lockboxLink(prop.lockbox_image_url);
+    if (link) outgoing.push({ type: "image", image: { link } });
+  }
   if (analysis.action === "send_owner_number" && prop?.visit_method === "owner_lives" && prop.owner_id) {
     const o = await db.from("owners").select("phone").eq("id", prop.owner_id).maybeSingle();
     // the location goes with the owner's number: the customer arranges the visit with him directly

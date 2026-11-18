@@ -47,6 +47,9 @@ html.coh-boot #page-dash:not(.coh-on)::after{content:'';display:block;height:234
 #cohIg .ig-discovery-alert{margin:12px 0 0;padding:0;background:none;border:0;box-shadow:none;display:block}
 #cohIg .ig-discovery-alert[hidden]{display:none}
 #cohIg .ig-home-novideo{display:none}
+#cohSheetBody .ig-discovery-alert{margin:0;padding:0;background:none;border:0;box-shadow:none;display:block}
+#cohSheetBody .ig-discovery-alert[hidden]{display:none}
+#cohSheetBody .ig-home-novideo{display:none}
 @media(max-width:600px){.coh-sec{padding:12px!important}.coh-row{flex-wrap:wrap}.coh-info{flex:1 1 100%}.coh-go{width:100%!important}}
 
 /* Paused chats panel (9 Nov 2026) */
