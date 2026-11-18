@@ -20,7 +20,8 @@ test('passed visits are limited to the last 30 days, and none while a new visit 
  assert(sql.includes("::date - 30"));assert(sql.includes('NOT EXISTS (SELECT 1 FROM public.viewings nx'));
 });
 test('negotiation gets no reply and goes to Ahmed',()=>{
- assert(brain.includes('التفاوض لأحمد بس. لا ترد عليه بأي شي'));
+ // decision 18 (Ahmed 18 Nov 2026): a visited client on a fixed price is answered «ثابت»; anything else is the silent «مشتري جاد:» (R42)
+ assert(brain.includes('غيره التفاوض لأحمد بس: بدون رد و"مشتري جاد:"'));assert(!brain.includes('التفاوض لأحمد بس. لا ترد عليه بأي شي'));
  assert(!brain.includes('"تمام بشوف مع المالك وارد عليك"، و action=handoff'));
 });
 test('interior photos of an occupied home get the fixed reply after checking the property',()=>{

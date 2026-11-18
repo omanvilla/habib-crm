@@ -155,7 +155,9 @@ test('R84: a day with no hour gets «كم الساعة تقريباً ؟», not 
  r=decide(['تمام بكره 4 العصر البيت مفتوح تقدر تشوفه'],[IN('بكره الاحد')],loc,{prop});assert.deepEqual(r.texts,['تمام بكره البيت مفتوح تقدر تشوفه','كم الساعة تقريباً ؟']);
  // he said the hour or the part of the day himself, he is on his way, the owner arranges it, the location is for the area: untouched
  const keep=['البيت مفتوح تقدر تشوفه بكره الساعة 4 العصر'];
- for(const said of ['بكرة العصر','بكره الساعة 5','باكر العصر، أن شاء الله على ساعة ٥ مناسب','بروح الحين','انا في الطريق']){r=decide(keep,[IN(said)],loc,{prop});assert.deepEqual(r.texts,keep,said);}
+ // decision 17 (Ahmed 18 Nov 2026): a part of the day with no hour gets the location, then «كم الساعة تقريباً ؟» after it
+ r=decide(keep,[IN('بكرة العصر')],loc,{prop});assert.deepEqual(r.texts,['البيت مفتوح تقدر تشوفه بكره','كم الساعة تقريباً ؟']);assert.equal(r.out.action,'send_location');assert.equal(r.out.guard_period_hour,true);
+ for(const said of ['بكره الساعة 5','باكر العصر، أن شاء الله على ساعة ٥ مناسب','بروح الحين','انا في الطريق']){r=decide(keep,[IN(said)],loc,{prop});assert.deepEqual(r.texts,keep,said);}
  r=decide(keep,[IN('بكره')],{...loc,location_for_area:true},{prop});assert.deepEqual(r.texts,keep);
  r=decide(keep,[IN('بكره')],loc,{prop:{id:'H1',visit_method:'owner_lives'}});assert.deepEqual(r.texts,keep);
  r=decide(keep,[IN('بكره')],{action:'none',category:'seller'},{prop});assert.deepEqual(r.texts,keep);

@@ -82,8 +82,8 @@ const ASK_HOUR = /كم\s*الساع[ةه]/;
 const NEEDS_AHMED = /(يحتاج|تحتاج|ينتظر|تنتظر)\s*رد\s*(من\s*)?(الاستاذ\s*|الأستاذ\s*)?[اأ]حمد/;
 const FIXED_PRICE_LINE ="الاسعار تختلف حسب الوحدة والمساحة والمرحلة";
 const IG_CODE = /instagram\.com\/(?:reels?|p|tv)\/([A-Za-z0-9_-]+)/i;
-const LAYOUT_ASK = /تقسيم|توزيع\s*(ال)?غرف|مساح(ة|ه|ات)\s*(كل\s*)?(ال)?غرف|مخطط|خرا[ئي]ط/;
-const LAYOUT_LINES = ["بخصوص التقسيم الافضل تزور الموقع وتشوفه على الطبيعة لان الخرائط تختلف عن الواقع", "متى يناسبك تزور ؟"];
+const LAYOUT_ASK = /تقسيم|توزيع\s*(ال)?غرف|مساح(ة|ه|ات)\s*(كل\s*)?(ال)?غرف|مقاس(ات)?\s*(كل\s*)?(ال)?غرف|مخطط|خرا[ئي]ط/;
+const LAYOUT_LINES = ["الافضل تشوف العقار على الطبيعة وتطلع على الخرائط وكل شي هناك مرة وحدة", "متى يناسبك تزور ؟"];
 const OUR_HOUR = /الساع[ةه]\s*[0-9٠-٩]|[0-9٠-٩]\s*(العصر|الصبح|الصباح|المغرب|المسا|المساء|الظهر|الليل)/;
 const HOUR_SAID = /(الساع[ةه]|على)\s*[0-9٠-٩]|[0-9٠-٩]\s*(ونص|العصر|الصبح|الصباح|المغرب|المسا|الظهر|الليل|م(\s|$)|ص(\s|$)|pm|am)|(^|\n)\s*[0-9٠-٩]{1,2}([:.][0-9٠-٩]{2})?\s*(\n|$)|العصر|الصبح|الصباح|الفجر|الضحى|المغرب|العشا|الظهر|الليل|المسا|الحين|ال[اآ]ن|ذلحين|هالحين|(^|\s)تو(\s|$)|طالع|في\s*الطريق|جاي/;
 const OWNER_TIME_LINE ="تواصل مع صاحب العقار مباشرة ونسق معه وقت الزيارة";
@@ -179,7 +179,10 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   if (texts.includes(FIXED_PRICE_LINE)) texts = texts.map((t) => (t === FIXED_PRICE_LINE ? t : t.replace(new RegExp(`\\s*و?${FIXED_PRICE_LINE}`), "").trim())).filter(Boolean);
   // R76 (Ahmed: «اللي يسأل عن التقسيم يفضل يزور الموقع لان الخرائط تختلف عن الواقع»; changes R41 for this question only)
   if (out.action === "handoff" && UNKNOWN_Q.test(String(out.handoff_reason || "")) && LAYOUT_ASK.test(`${c.burstSaid} ${out.handoff_reason}`)
-    && ["buyer", "tenant"].includes(out.category) && !c.visitedProp) {
+    && ["buyer", "tenant"].includes(out.category) && !c.visitedProp
+    // decision 21 (Ahmed 18 Nov 2026, a fixed rule): invited to the visit once; if he insists on the sizes, the agent stays
+    // silent and the chat goes to the office (the R41 handoff is kept)
+    && !c.history.some((h: any) => h.direction === "outbound" && /على\s*الطبيع[ةه]/.test(body(h)) && /الخرائط/.test(body(h)))) {
     out.action = "none"; out.handoff_reason = null; out.guard_layout = true;
     texts = [...texts.filter((t) => !VISIT_Q.test(t)).slice(0, 1), ...LAYOUT_LINES];
   }
@@ -312,6 +315,32 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     if (!texts.some((t) => ASK_HOUR.test(t))) texts.push("كم الساعة تقريباً ؟");
     out.viewing_time = null; out.guard_hour_asked = true;
   }
+  // decision 17 (Ahmed 18 Nov 2026: «يرسل له لوكيشن حق العصر… بعد ما يرسل له لوكيشن يسأله الساعة كم تقريبا إذا كان ما محدد»,
+  // changes the «العصر» exception of R84): a part of the day with no hour («بكره العصر», «المغرب») gets the location, then
+  // «كم الساعة تقريباً ؟» after it. Not «الحين» or «في الطريق» (the time is now), not when he said a clock hour, not where the
+  // owner arranges the visit (R77), not for the R74 area location.
+  {
+    const PERIOD = /(^|[^ء-ي])(ال|بال|في\s*ال)?(عصر|مغرب|صبح|صباح|ظهر|ضحى|فجر|عشا|عشاء|ليل|مسا|مساء)(?![ء-ي])/;
+    const NOW_OR_CLOCK = /[0-9٠-٩]|الساع[ةه]\s*(وحد[ةه]|ثنت|ثلاث|[اأ]ربع|خمس|ست|سبع|ثمان|تسع|عشر)|الحين|ال[اآ]ن|ذلحين|هالحين|(^|\s)تو(\s|$)|طالع|في\s*الطريق|جاي|واصل|وصلت/;
+    const lastSaid = inbound.slice(-3).map(body).join(" \n ");
+    const methodOk = c.prop && ["open", "lockbox"].includes(String(c.prop.visit_method || ""));
+    if (PERIOD.test(lastSaid) && !NOW_OR_CLOCK.test(lastSaid) && methodOk && !out.location_for_area && ["buyer", "tenant"].includes(out.category) && !c.hardHandoff) {
+      // the model held the location back and only asked the hour: the location goes now
+      if (out.action === "none" && c.prop.map_url && !sentBefore(String(c.prop.map_url)) && texts.some((t) => t.length <= 200 && ASK_HOUR.test(t))) {
+        out.action = c.prop.visit_method === "lockbox" ? "send_lockbox" : "send_location";
+        texts = texts.filter((t) => !(t.length <= 200 && (ASK_HOUR.test(t) || LOCATION_HELD.test(t))));
+        if (!texts.length) texts = [c.prop.visit_method === "lockbox" ? "تفضل هذا الموقع" : "البيت مفتوح تقدر تشوفه"];
+      }
+      if (["send_location", "send_lockbox"].includes(out.action)) {
+        const PART = "(العصر|الصبح|الصباح|المغرب|المسا|المساء|الظهر|الليل)";
+        texts = texts.map((t) => (t.length <= 200 && OUR_HOUR.test(t)
+          ? t.replace(new RegExp(`\\s*(على\\s*)?الساع[ةه]\\s*[0-9٠-٩]+(\\s*ونص)?(\\s*${PART})?`, "g"), "").replace(new RegExp(`\\s*[0-9٠-٩]+(\\s*ونص)?\\s*${PART}`, "g"), "").replace(/\s+/g, " ").trim() : t))
+          .filter((t) => !(t.length <= 200 && ASK_HOUR.test(t))).filter(Boolean);
+        texts.push("كم الساعة تقريباً ؟");
+        out.viewing_time = null; out.guard_period_hour = true;
+      }
+    }
+  }
   // Audit of the replies really sent (11 to 15 Nov 2026), three wordings the code itself produced or let through:
   // R44: «حي عاصم» becomes «الرميس», which left «الرميس ولا الرميس ؟» and «… قريب الشارع العام او الرميس» in two sent replies.
   // The second mention in the same line is taken out.
@@ -390,7 +419,10 @@ function ownerDecisions(out: any, lines: string[], c: any) {
       .filter((t) => t.replace(/[^ء-ي]/g, "").length > 0);
     // (dry run on the branch, e06229f1 «إذا تأذن لي إني أدخل أشوف الفيلا»: he asked to go in, he is told the house is open)
     if (/[اأ]دخل/.test(String(c.burstSaid || "")) && c.prop?.visit_method === "open" && !texts.some((t) => /مفتوح/.test(t))) texts.push("البيت مفتوح تفضل");
-    if (!texts.some((t) => t.replace(/حياك\s*الله|[^ء-ي]/g, "").length > 2)) texts = ["حياك الله خذ راحتك"];
+    // decision 30 (Ahmed 18 Nov 2026: «حياك» is banned always): «حياك الله» is taken out, and a reply left with nothing but the
+    // name question gets «تمام خذ راحتك» first
+    texts = texts.map((t) => t.replace(/^\s*حياك(\s*الله)?\s*/, "").trim()).filter((t) => t.replace(/[^ء-ي]/g, "").length > 0);
+    if (!texts.some((t) => !/^\s*و?اسمك\s*الكريم\s*؟?\s*$/.test(t) && t.replace(/[^ء-ي]/g, "").length > 2)) texts = ["تمام خذ راحتك", ...texts.filter((t) => /اسمك\s*الكريم/.test(t))];
     out.guard_arrived = true;
   }
   // rows 1201-1240: «عاينت الفيلا ؟» → «ايوا» got «وايش انطباعك عن الفيلا بعد ما شفتها ؟» and «متى يناسبك تزور ؟» together. Asking
@@ -530,7 +562,7 @@ const RESIDENCY_WORK_RE = /حق\s*العمل|الشغل|وزارة\s*العمل|
 const promisesResidency = (t: string) => RESIDENCY_WORD_RE.test(t) && RESIDENCY_PROMISE_RE.test(t) && !RESIDENCY_WORK_RE.test(t);
 // R17: a residency answer that opens with a denial («ما في عقار يضمن إقامة», «ما في إقامة», «ما في قيمة عقار تضمن...»)
 const NEG_RESIDENCY_RE = /^\s*(ما\s*(في|فيه)\s*(عقار|قيمة|شي)[^\n]{0,30}(يضمن|تضمن|يعطي|تعطي)[^\n]{0,20}(إقامة|اقامة)|ما\s*(في|فيه)\s*(إقامة|اقامة)|(لا\s*يوجد|ما\s*عندنا)\s*(عقار)?[^\n]{0,20}(يضمن|تضمن)[^\n]{0,20}(إقامة|اقامة))/;
-const SAID_VISITED = /(مشيت شفت|مريت عليه|مريت عليها|زرت|زرنا|زرناه|زرناها|عاينت|عاينا|شفت البيت|شفت الفيلا|شفنا البيت|شفنا الفيلا|شفناه|شفناها|رحت شفت|رحنا شفنا|دخلت البيت|دخلنا)/;
+const SAID_VISITED = /(?<!(?:ما|مب|مو|لسا|لسه|بعدني|بعدنا)\s{0,2})(مشيت شفت|مريت عليه|مريت عليها|زرت|زرنا|زرناه|زرناها|عاينت|عاينا|شفت البيت|شفت الفيلا|شفنا البيت|شفنا الفيلا|شفناه|شفناها|رحت شفت|رحنا شفنا|دخلت البيت|دخلنا)/;
 // R16 (9 Nov): our after-visit question («كيف لقيت…» / «قدرت تشوفه ؟» / «قدرتي تشوفينه ؟»), not a question about a video or photos
 const AFTER_VISIT_Q = /كيف\s*لقي|كيف\s*شفت|قدرت[يوا]*\s*تشوف/;
 // R29 (Ahmed 11 Nov): «مبروك» only when the customer says they bought, reserved or paid. «ايوه لقيناها الفيلا» after our
@@ -887,7 +919,7 @@ function propLine(p: any) {
   // R42 (Ahmed 12 Nov): a fixed price is answered after the visit; negotiable or not set goes to Ahmed (R16)
   const nego = p.listing_purpose === "rent" ? "" : p.price_negotiable === "fixed" ? " | السعر: ثابت" : p.price_negotiable === "negotiable" ? " | السعر: قابل للتفاوض" : " | السعر: ما حدده أحمد";
   // SQL101 / R52 (Ahmed 14 Nov): electricity and water, said only when the office or the owner recorded them
-  const util = `${p.electricity_connected === "yes" ? " | الكهرباء: موصلة" : p.electricity_connected === "no" ? " | الكهرباء: غير موصلة" : ""}${p.water_connected === "yes" ? " | الماء: موصل" : p.water_connected === "no" ? " | الماء: غير موصل" : ""}`;
+  const util = `${p.electricity_connected === "yes" ? " | الكهرباء: موصلة" : p.electricity_connected === "no" ? " | الكهرباء: غير موصلة" : ""}${p.water_connected === "yes" ? " | الماء: موصل" : p.water_connected === "no" ? " | الماء: غير موصل" : ""}${p.utilities_note ? ` | الماي والكهرباء (جواب أحمد): ${String(p.utilities_note).replace(/\s+/g, " ").slice(0, 200)}` : ""}`;
   return `- id=${p.id} | ${name} | ${bits}${terms}${rented}${nego}${util} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? " | اللوكيشن متوفر (action=send_location)" : " | اللوكيشن غير متوفر"} | الفرع: ${p.branch_key === "muscat" ? "مسقط (رقم 71770030)" : p.branch_key === "barka" ? "بركاء (رقم 92344273)" : "غير محدد"}${p.video ? ` | رابط الفيديو (ترسله إذا طلب فيديو): ${p.video}` : ""}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}${p.marketing ? `\n  وصف الإعلان: ${short(p.marketing, 1600)}` : ""}`;
 }
 // The same neutral label (type, area, price) for visits, deals and properties no longer available: never the office title
@@ -1232,6 +1264,12 @@ Deno.serve(async (req) => {
     // branch line count as already sent and the customer is left without them.
     const history = (histR.data || []).reverse().filter((h: any) => !(h.direction === "outbound" && h.delivery_status === "failed"));
     const props = propsR.data || [];
+    // decision 20 (Ahmed 18 Nov 2026): Ahmed's answer about water and electricity is kept on the property (utilities_note, SQL134)
+    // so the agent answers it to this client and every one after. Read on its own: before the column exists the error is ignored.
+    try {
+      const un = props.length ? await db.from("properties").select("id,utilities_note").in("id", props.map((p: any) => p.id)) : null;
+      if (un && !un.error) for (const r of (un.data || []) as any[]) { const p: any = props.find((x: any) => x.id === r.id); if (p && r.utilities_note) p.utilities_note = r.utilities_note; }
+    } catch (_) { /* no column yet */ }
     // R2: the customer's visits, so the agent knows whether a price talk can start (only after a visit).
     // Listed by a neutral label (type, area, price): the office title carries the owner's name (10 Nov)
     const visR = await db.from("viewings").select("property_id,viewing_date,viewing_time,status,properties(type,area,wilayat,price,listing_purpose)").eq("client_id", msg.client_id).eq("archived", false)
@@ -1303,6 +1341,16 @@ Deno.serve(async (req) => {
       const rk = await fetch(`https://raw.githubusercontent.com/omanvilla/habib-crm/${body.brain_sha}/supabase/functions/whatsapp-reply-agent/knowledge.ts`);
       const mk = rk.ok ? (await rk.text()).match(/=\s*`([\s\S]*)`;?\s*$/) : null;
       if (mk && mk[1].length > 1000) INVESTOR_KNOWLEDGE = mk[1];
+    }
+    // decision 15 (Ahmed 18 Nov 2026: «يوقف لحاله 30 نوفمبر»): the zero-down offer of Sultan Haitham City ends 30 Nov 2026. From
+    // 1 Dec its lines (each written on a line of its own in brain.ts and knowledge.ts) leave the prompt, and the reply guard below
+    // takes out any line that still names it. The three pinned replies about it are switched off in the CRM on 1 Dec.
+    const ZERO_DOWN = /بدون\s*دفع[ةه]\s*مقدم[ةه]|صفر\s*(ال)?مقدم|دفع[ةه]\s*صفر|zero\s*down/i;
+    const zeroDownOver = dayM >= "2026-12-01";
+    if (zeroDownOver) {
+      BRAIN = BRAIN.split("\n").filter((l: string) => !ZERO_DOWN.test(l)).join("\n")
+        + "\n- عرض مدينة السلطان هيثم بدون مقدم انتهى 30 نوفمبر 2026: لا تعرضه، واللي يسأل عنه قل إن العرض انتهى وكمل بسطر الاسعار والاجتماع (R18، R19).";
+      INVESTOR_KNOWLEDGE = INVESTOR_KNOWLEDGE.split("\n").filter((l: string) => !ZERO_DOWN.test(l)).join("\n");
     }
     if (BRAIN.length < 2000) return fail("prompt_missing", "failed");
 
@@ -1633,9 +1681,34 @@ Deno.serve(async (req) => {
     if (ignored) { out.reply_messages = []; out.action = "none"; out.handoff_reason = null; }
     // R41: «سؤال ما عندي جوابه: …» = silence and a hard handoff (the agent stays quiet in that chat until it is given back)
     if (out.action === "handoff" && UNKNOWN_Q.test(String(out.handoff_reason || ""))) out.reply_messages = [];
-    // R19 (Ahmed 10 Nov): a meeting is booked only once the client fixed both the day and the hour (and not in the past); then the
-    // agent answers and Ahmed gets a soft handoff «اجتماع: …» with a task for that day. Without both it keeps asking (action none).
-    // A plain handoff the model labelled «اجتماع:» is read the same way, so Ahmed never gets a meeting alert without a day and an hour.
+    // decisions 16 and 46 (Ahmed 18 Nov 2026: «ما نلحقهم بس نرد»): investors are answered and their meetings booked, but no
+    // follow-up of ours is set for them until 12 Feb 2027
+    if (out.category === "investor" && dayM < "2027-02-12" && out.request) { out.request.followup_in_days = null; out.request.followup_note = null; }
+    // decisions 10 and 11 (Ahmed 18 Nov 2026: «حاجز في الكود»): in a Sultan Haitham City chat (Al Ahli Sabour: Wadi Zaha, the
+    // Iconic Tower) where a price or budget under 57,000 was mentioned and the office has not said since that the available
+    // units start from 57,000, the meeting is not booked, even when the client agreed (this beats R45). He is told and asked.
+    if (conv.route_key === "muscat" && (out.action === "book_meeting" || (out.action === "handoff" && /^\s*(اجتماع|طلب اجتماع|طلب موعد)\s*:/.test(String(out.handoff_reason || ""))))) {
+      const HAITHAM = /هيثم|وادي\s*زها|زها\s*ريزيدنس|[اآأ]?ل?[اآأ]يكونيك|icon(ic)?\s*tower|صبور/i;
+      const said = (h: any) => String(h.transcript || h.body || "");
+      const wn = (s: string) => s.replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
+      // a figure in rials under 57,000: «20,800», «25000», «30 الف»; not a residency line («50 الف وفوق يعطي إقامة»), a date or a phone
+      const lowPrice = (s: string) => !/[اإ]قام[ةه]/.test(s) && [...wn(s).matchAll(/(\d[\d,٬.]*)\s*(الف|ألف|آلاف|k|م²|م2|متر|m2|sqm|م(?![ء-ي]))?/gi)].some((m) => {
+        if (m[2] && !/الف|ألف|آلاف|k/i.test(m[2])) return false; // a size, not a price
+        const n = Number(m[1].replace(/[,٬]/g, "")) * (m[2] ? 1000 : 1);
+        return n >= 5000 && n < 57000;
+      });
+      const rows = history.filter((h: any) => ["inbound", "outbound"].includes(h.direction));
+      let lastLow = -1; rows.forEach((h: any, i: number) => { if (lowPrice(said(h))) lastLow = i; });
+      const told = lastLow >= 0 && rows.slice(lastLow + 1).some((h: any) => h.direction === "outbound" && /57/.test(wn(said(h))) && /يبد[اأ]|المتوفر|خلص/.test(said(h)));
+      const project = HAITHAM.test(rows.map(said).join(" ")) || out.meeting?.place === "developer";
+      if (lastLow >= 0 && !told && project) {
+        out.action = "none"; out.handoff_reason = null; out.meeting = null;
+        out.reply_messages = ["المتوفر الحين في مدينة السلطان هيثم يبدأ من 57 الف", "يناسبك ؟"];
+        out.guard_under_57 = true;
+      }
+    }
+    // R19 / R30 / R33 / R45: any meeting request (the model's book_meeting, or a handoff it labelled «اجتماع:» / «طلب موعد:»)
+    // becomes the silent hard handoff «اجتماع: …» with whatever day and hour the client said; Ahmed confirms the time himself.
     // R30 (Ahmed 11 Nov): a project meeting (Al Ahli Sabour) is at the developer's office in Al Udhaybah, not ours in Mawaleh;
     // the time is only a request until Ahmed confirms it (it must not clash with his day), and never the same day.
     // R33 (Ahmed 12 Nov): a project meeting is at that project's developer: Al Ahli Sabour in Al Udhaybah, Aida (Dar Global) at
@@ -1666,6 +1739,8 @@ Deno.serve(async (req) => {
     const prop = props.find((p: any) => p.id === out.property_id) || null;
     let texts: string[] = (out.reply_messages || []).map((t: string) => humanize(t)).filter(Boolean);
     if (budgetAskedBefore) texts = texts.filter((t) => !/ميزاني|في حدود كم|كم تقريب/.test(t));
+    // decision 15: from 1 Dec 2026 no line offers the ended zero-down offer
+    if (zeroDownOver && texts.some((t) => t.length <= 250 && ZERO_DOWN.test(t))) { texts = texts.filter((t) => !(t.length <= 250 && ZERO_DOWN.test(t))); out.guard_zero_down_over = true; }
     texts = texts.filter((t) => !/(الموظف|موظف)\s*(بيتواصل|يتواصل|بيرد|يرد)|بيتواصل معك الموظف|تم تحويل/.test(t));
     // R12: a call promise is taken out like any promise, and Ahmed gets the call request (below, after the pinned reply)
     const callPromised = texts.some((t) => CALL_PROMISE_RE.test(t));
@@ -1689,7 +1764,7 @@ Deno.serve(async (req) => {
       if (!BOUGHT_RE.test(saidSince)) {
         texts = texts.filter((t) => !CONGRATS_RE.test(t));
         const lastOutBody = lastOutIdx >= 0 ? String(history[lastOutIdx]?.body || "") : "";
-        if (!texts.length && out.action !== "book_meeting" && AFTER_VISIT_Q.test(lastOutBody) && !NOT_A_VISIT_Q.test(lastOutBody)) texts = ["حياك الله، وايش انطباعك بعد الزيارة ؟"];
+        if (!texts.length && out.action !== "book_meeting" && AFTER_VISIT_Q.test(lastOutBody) && !NOT_A_VISIT_Q.test(lastOutBody)) texts = ["وايش انطباعك بعد الزيارة ؟"];
       }
     }
     // R14 (9 Nov): never send a line we already sent to this customer in the last 15 minutes (Amer Ali got "ارسل الكروكي" twice)
@@ -1723,27 +1798,17 @@ Deno.serve(async (req) => {
     // R16 (9 Nov, in code 10 Nov): he has seen it when our last message was the after-visit question («كيف لقيت…» / «قدرت تشوف…»),
     // or its booked visit time has passed, or its location or its owner's number went out in this chat. Then the model's
     // تفاوض / مشتري جاد handoff stays as written (Abdullah, 9 Nov: told "see it first" after his visit).
-    const r16Seen = async (pid: string | null): Promise<string | null> => {
-      let lastOut: any = null;
-      for (const h of history) if (h.direction === "outbound") lastOut = h;
-      const lastBody = String(lastOut?.body || "");
-      if (AFTER_VISIT_Q.test(lastBody) && !NOT_A_VISIT_Q.test(lastBody)) return "رد على سؤال بعد الزيارة";
-      if (visits.some((v: any) => (!pid || v.property_id === pid) && visitPassed(v))) return "موعد زيارته فات";
-      const sent = history.filter((h: any) => h.direction === "outbound").map((h: any) => String(h.body || ""));
-      if (!sent.length) return null;
-      let cands: any[] = pid ? props.filter((p: any) => p.id === pid) : props;
-      if (pid && !cands.length) {
-        const one = await db.from("properties").select("id,map_url,owner_id").eq("company_id", msg.company_id).eq("id", pid).maybeSingle();
-        if (one.data) cands = [one.data];
-      }
-      if (cands.some((p: any) => p.map_url && sent.some((b) => b.includes(p.map_url)))) return "انرسل له اللوكيشن";
-      const ownerIds = [...new Set(cands.map((p: any) => p.owner_id).filter(Boolean))];
-      if (ownerIds.length) {
-        const ow = await db.from("owners").select("phone").in("id", ownerIds);
-        const nums = (ow.data || []).map((o: any) => digits(o.phone).slice(-8)).filter((x: string) => x.length === 8);
-        const runs = sent.flatMap((b) => b.replace(/[\s-]/g, "").match(/\d{8,}/g) || []);
-        if (nums.some((n: string) => runs.some((r: string) => r.endsWith(n)))) return "انرسل له رقم صاحب العقار";
-      }
+    // decision 24 (Ahmed 18 Nov 2026: «لازم نتأكد نحنا هل العميل هذا شاف العقار»): «visited» needs a recorded visit (visitedIds)
+    // or the client's own words. A location that went out (the area location of R74, the day location of R11), the owner's
+    // number or a booked time that passed are no proof any more. His answer to our after-visit question counts, unless it says
+    // he did not go.
+    const r16Seen = async (_pid: string | null): Promise<string | null> => {
+      let lastOutAt = -1;
+      history.forEach((h: any, i: number) => { if (h.direction === "outbound") lastOutAt = i; });
+      const lastBody = lastOutAt >= 0 ? String(history[lastOutAt]?.body || "") : "";
+      const answer = history.slice(lastOutAt + 1).filter((h: any) => h.direction === "inbound").map((h: any) => String(h.transcript || h.body || "")).join(" ");
+      const NOT_SEEN = /(ما|مب|مو|لسا|لسه|بعدني|بعدنا|للحين\s*ما)\s*(زرت|زرنا|رحت|رحنا|شفت|شفنا|قدرت|قدرنا|مريت|عاينت|لحقت|وصلت)/;
+      if (AFTER_VISIT_Q.test(lastBody) && !NOT_A_VISIT_Q.test(lastBody) && !NOT_SEEN.test(answer)) return "رد على سؤال بعد الزيارة";
       return null;
     };
     if (out.action === "handoff" && NEGOTIATION_HANDOFF.test(String(out.handoff_reason || ""))) {
@@ -1752,6 +1817,10 @@ Deno.serve(async (req) => {
       const r16 = visitedThis || saidVisited ? null : await r16Seen(out.property_id || null);
       if (!visitedThis && !saidVisited && !r16) {
         texts = ["شوف العقار أول واذا ناسبك نتكلم في السعر", "متى يناسبك تزور ؟"];
+        // decision 24: a fixed price is said to be fixed from the start. Decision 27: a buyer still sorting out his bank is not
+        // asked when he visits (Tasnim, «بنك الاسكان معطيينا سقف»).
+        if (prop?.price_negotiable === "fixed") texts[0] = "بالنسبة للسعر نعم ثابت";
+        if (/بنك|تمويل|قرض|سقف/.test(history.filter((h: any) => h.direction === "inbound").slice(-6).map((h: any) => String(h.transcript || h.body || "")).join(" "))) texts = texts.slice(0, 1);
         // crm_note is the agent's memory now (agent_note): the marker goes on top, the running note stays
         out.crm_note = short(`مهتم بالسعر قبل الزيارة: ${out.handoff_reason}${out.crm_note ? `\n${out.crm_note}` : ""}`, 1500);
         out.action = "none"; out.handoff_reason = null; out.visit_first = true;
@@ -1819,7 +1888,18 @@ Deno.serve(async (req) => {
     // «شوف العقار أول» + the visit question. The price itself stays; only the negotiation words are taken out.
     const NEGO_SAID = /قابل\s*للتفاوض|غير\s*قابل|يتفاوض|نتفاوض|ننزل|ينزل\s*(السعر|شوي)|نخصم|خصم|(آخر|اخر)\s*سعر|السعر\s*النهائي|(السعر\s*)?(وهو\s*|وهي\s*)?ثابت/;
     const NEGO_ASK = /قابل\s*للتفاوض|تفاوض|ينزل|تنزل|خصم|(آخر|اخر)\s*سعر|السعر\s*النهائي|نهائي|في(ه)?\s*مجال/;
-    if (!out.visit_first && !out.guard_see_first && ["buyer", "tenant"].includes(out.category) && out.action !== "handoff"
+    // decision 27 (Ahmed 18 Nov 2026): a buyer still sorting out his bank is not asked when he visits
+    const bankWait = /بنك|تمويل|قرض|سقف/.test(history.filter((h: any) => h.direction === "inbound").slice(-6).map((h: any) => String(h.transcript || h.body || "")).join(" "));
+    // decision 24 (Ahmed 18 Nov 2026: «إلا إذا كان العقار غير قابل للتفاوض نقوله من بداية السعر ثابت»): a client who has not
+    // visited and asks about the price of a property whose price is fixed is told it is fixed, not «شوف العقار أول».
+    if (prop?.price_negotiable === "fixed" && !out.visit_first && !out.guard_see_first && ["buyer", "tenant"].includes(out.category) && out.action === "none"
+      && NEGO_ASK.test(burstSaid) && !visitedIds.has(prop.id) && !history.some((h: any) => h.direction === "inbound" && SAID_VISITED.test(String(h.transcript || h.body || "")))) {
+      const nego = (t: string) => t.length <= 250 && (SEE_FIRST.test(t) || /ثابت|قابل\s*للتفاوض|نتكلم\s*(في|ب)\s*?ال?سعر/.test(t));
+      const visitQ = texts.filter((t) => t.length < 90 && /(تزور|تزورون|تزورين)\s*؟/.test(t));
+      texts = [...texts.filter((t) => !nego(t) && !visitQ.includes(t)), "بالنسبة للسعر نعم ثابت", ...(bankWait ? [] : visitQ.length ? visitQ.slice(0, 1) : ["متى يناسبك تزور ؟"])];
+      out.guard_fixed_from_start = true;
+    }
+    if (!out.visit_first && !out.guard_see_first && !out.guard_fixed_from_start && ["buyer", "tenant"].includes(out.category) && out.action !== "handoff"
       && texts.some((t) => t.length <= 250 && NEGO_SAID.test(t) && !SEE_FIRST.test(t))) {
       const visitedThis = out.property_id ? visitedIds.has(out.property_id) : visitedIds.size > 0;
       const saidVisited = history.some((h: any) => h.direction === "inbound" && SAID_VISITED.test(String(h.transcript || h.body || "")));
@@ -1830,7 +1910,7 @@ Deno.serve(async (req) => {
           return kept && !NEGO_SAID.test(kept) ? [kept] : [];
         });
         if (NEGO_ASK.test(burstSaid) && !texts.some((t) => SEE_FIRST.test(t))) texts.push("شوف العقار أول واذا ناسبك نتكلم في السعر");
-        if (!texts.some((t) => /(تزور|تزورون|تزورين)\s*؟/.test(t)) && !["send_location", "send_owner_number", "send_lockbox", "book_viewing"].includes(out.action)) texts.push("متى يناسبك تزور ؟");
+        if (!bankWait && !texts.some((t) => /(تزور|تزورون|تزورين)\s*؟/.test(t)) && !["send_location", "send_owner_number", "send_lockbox", "book_viewing"].includes(out.action)) texts.push("متى يناسبك تزور ؟");
         out.guard_price_before_visit = true;
       }
     }
@@ -1942,7 +2022,7 @@ Deno.serve(async (req) => {
       const FUTURE_LIVE = /(^|\s)(بسكن|بنسكن|بسكنها|بنسكنها|راح\s*(اسكن|نسكن)|ناوي\s*(اسكن|نسكن)|ننوي\s*نسكن|بنتقل\s*(فيه|فيها|له|لها))/;
       const NOW_LIVE = /ساكنين\s*(فيه|فيها|في\s*البيت)|(انا|أنا|احنا|نحن|اهلي|أهلي|عيالي|عائلتي|الاهل|الأهل)\s*(ساكن|ساكنين)|حاليا\s*ساكن/;
       const nowLives = said2.split("\n").some((l: string) => NOW_LIVE.test(l) || (/مسكون/.test(l) && !LIVED_AGE2.test(l) && !/مستأجر|مستاجر|مؤجر|موجر|ايجار|إيجار/.test(l)));
-      const FUTURE_LINE = "اذا تبي تعرضه معانا لازم يظل البيت فاضي فترة التسويق، واذا ما انباع بعدين لك الحرية تسكن فيه";
+      const FUTURE_LINE = "اذا تبي تعرضه معانا لازم يظل البيت فاضي فترة التسويق واذا ما انباع بعدين لك الحرية تسكن فيه";
       if (!mortgaged2 && !heirs2 && !nowLives) {
         if (FUTURE_LIVE.test(said2)) {
           const told = history.some((h: any) => h.direction === "outbound" && String(h.body || "").includes("لازم يظل البيت فاضي"));
@@ -1968,7 +2048,8 @@ Deno.serve(async (req) => {
     const FOLLOWUP_SAID = /لين الحين (تبحث|تدور)|خيارات ثاني[ةه]|انحجزت وحد[ةه]|ما متوفر[ةه] حالياً|[اأ]رسلك تفاصيل|عندنا (فيلا|بيت|شق[ةه]|[اأ]رض|منزل)/;
     const FOUND_THING_RE = /(^|\s)((حصل(ت|نا)?|لقي(ت|نا)|اشتري(ت|نا)|شري(ت|نا)|وجد(ت|نا)|[اأ]خذ(ت|نا)|خذي(ت|نا))\s*(لي\s*|لنا\s*)?(خيار|بيت|فيلا|فل[ةه]|شق[ةه]|[اأ]رض|منزل|عقار)|(متوقف(ين)?|وقف(ت|نا))\s*(عن\s*)?(ال)?(شراء|بحث))/;
     if (!NOT_FOUND_RE.test(burstSaid) && !/[؟?]/.test(burstSaid) && out.action !== "handoff"
-      && ((/لين الحين تبحث/.test(lastOutBody) && FOUND_RE.test(burstSaid)) || (FOLLOWUP_SAID.test(lastOutBody) && FOUND_THING_RE.test(burstSaid)))) {
+      // decision 70 (Ahmed 18 Nov 2026): a bare «حصلت» after «نزل عندنا … ممكن يناسب طلبك» is the same R50 (no «الله يسعدك»)
+      && ((/لين الحين تبحث|نزل عندنا/.test(lastOutBody) && FOUND_RE.test(burstSaid)) || (FOLLOWUP_SAID.test(lastOutBody) && FOUND_THING_RE.test(burstSaid)))) {
       texts = []; out.action = "none"; out.search_stopped = true;
     }
     // R71 (Ahmed 14 Nov 2026): she booked or bought, we congratulated, and she only closes the talk: no reply, no draft, the search ends
@@ -2319,6 +2400,14 @@ Deno.serve(async (req) => {
     }
     // no English type codes reach the customer (links are left as they are)
     out.reply_messages = (out.reply_messages || []).map((r: string) => arabicOnly(r));
+    // decision 30 (Ahmed 18 Nov 2026): humanize() strips commas from the model's lines, but lines the code adds after it (fixed
+    // lines, pinned replies, the ad text) kept theirs; and «حياك» is banned always. Links and figures («59,000») are left alone.
+    out.reply_messages = out.reply_messages.map((r: string) => {
+      const urls: string[] = [];
+      const s = String(r || "").replace(/https?:\/\/[^\s]+/gi, (u) => { urls.push(u); return `\u0001${urls.length - 1}\u0001`; })
+        .replace(/^\s*حياك(\s*الله)?(\s+|$)/, "").replace(/[ \t]*[،,][ \t]*(?!\d)/g, " ").replace(/[ \t]+/g, " ");
+      return s.replace(/\u0001(\d+)\u0001/g, (_, i) => urls[Number(i)] || "").trim();
+    }).filter((r: string) => r.replace(/[^ء-يA-Za-z0-9]/g, "").length > 0);
     // the draft records the final reply, action and category: whatsapp-reply-send adds the location / owner number from
     // analysis.action when a held draft is approved, so a redirected customer must not get the property location after it
     Object.assign(analysis, { reply_messages: out.reply_messages, action: out.action, category: out.category });
@@ -2329,6 +2418,11 @@ Deno.serve(async (req) => {
     // R54 (Ahmed 14 Nov 2026: «ادمج الفقاعات في رسالة وحدة»): Meta counts every bubble as one service message against the 1,000 free a
     // month per number, so the whole reply goes as ONE text message: the reply lines, then the location link or the owner's number,
     // each part on its own paragraph. Only an image (the lockbox photo) stays a message of its own.
+    // decision 17: «كم الساعة تقريباً ؟» goes after the location link, not before it
+    if (out.guard_period_hour && !redirectToMuscat) {
+      const qi = outgoingParts.findIndex((m: any) => m.type === "text" && /كم\s*الساع[ةه]\s*تقريب/.test(String(m.text.body || "")));
+      if (qi >= 0) outgoingParts.push(...outgoingParts.splice(qi, 1));
+    }
     const textParts = outgoingParts.filter((m: any) => m.type === "text");
     const outgoing: any[] = [
       ...(textParts.length ? [{ type: "text", text: { preview_url: textParts.some((m: any) => m.text.preview_url), body: textParts.map((m: any) => String(m.text.body)).join("\n\n") } }] : []),

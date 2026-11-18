@@ -64,7 +64,10 @@ test('R76: a layout question handed over as unknown gets «الخرائط تخت
  for(const s of ['ممكن مساحات و تقسيمات الفلا قبل ازور الموقع','توزيع الغرف كيف','عندكم مخطط البيت','سؤال ما عندي جوابه: مساحات كل غرفة في الاستراحة'])assert(D.LAYOUT_ASK.test(s),s);
  assert(!D.LAYOUT_ASK.test('كم مساحة الارض'));
  let r=decide([],[IN('ممكن تفاصيل الغرف والمساحات قبل ما نقرر الزيارة')],{action:'handoff',handoff_reason:'سؤال ما عندي جوابه: مساحات كل غرفة في استراحة VVIP بالرميس'});
- assert.equal(r.out.action,'none');assert.equal(r.out.handoff_reason,null);assert.deepEqual(r.texts,D.LAYOUT_LINES);assert.match(D.LAYOUT_LINES[0],/الخرائط تختلف عن الواقع/);
+ assert.equal(r.out.action,'none');assert.equal(r.out.handoff_reason,null);assert.deepEqual(r.texts,D.LAYOUT_LINES);assert.match(D.LAYOUT_LINES[0],/على الطبيعة وتطلع على الخرائط وكل شي هناك/,'decision 21 (Ahmed 18 Nov 2026)');
+ // decision 21: asked again after the invitation, he insists: silent, the R41 handoff stays
+ r=decide([],[OUT(D.LAYOUT_LINES.join('\n')),IN('بس ابي اعرف مقاسات الغرف')],{action:'handoff',handoff_reason:'سؤال ما عندي جوابه: مقاسات الغرف'});assert.equal(r.out.action,'handoff');assert.equal(r.out.guard_layout,undefined);
+ assert(D.LAYOUT_ASK.test('كم مقاس الغرف'));
  r=decide([],[IN('كم عمولة الاسكان')],{action:'handoff',handoff_reason:'سؤال ما عندي جوابه: كم عمولة الاسكان'});assert.equal(r.out.action,'handoff','another unknown question still goes to Ahmed');
  r=decide([],[IN('ممكن التقسيم')],{action:'handoff',handoff_reason:'سؤال ما عندي جوابه: تقسيم الفيلا'},{visitedProp:true});assert.equal(r.out.action,'handoff');
 });

@@ -318,9 +318,12 @@ test('2: the R2 guard honours R16 (after-visit question, passed visit time, loca
  assert.equal(passed({status:'postponed',viewing_date:'2026-11-01',viewing_time:null}),false,'a postponed visit is not seen');
  const guard=agent.slice(at('const r16Seen = async'),at('// the ad text goes once per conversation'));
  assert(guard.includes('AFTER_VISIT_Q.test(lastBody) && !NOT_A_VISIT_Q.test(lastBody)'));
- assert(guard.includes('visitPassed(v)'));
- assert(guard.includes('b.includes(p.map_url)'));
- assert(guard.includes('.from("owners").select("phone").in("id", ownerIds)'));
+ // decision 24 (Ahmed 18 Nov 2026): a sent location, the owner's number or a passed booked time no longer count as a visit
+ assert(!guard.includes('visitPassed(v)'));
+ assert(!guard.includes('b.includes(p.map_url)'));
+ assert(!guard.includes('.from("owners").select("phone").in("id", ownerIds)'));
+ assert(guard.includes('!NOT_SEEN.test(answer)'),'«ما رحت» after our after-visit question is not a visit');
+ const SV=re('SAID_VISITED');assert(SV.test('زرت البيت امس'));assert(!SV.test('ما زرت البيت'));assert(!SV.test('لسا ما زرناها'.replace('ما ','ما  ')));
  assert(guard.includes('const r16 = visitedThis || saidVisited ? null : await r16Seen(out.property_id || null);'));
  assert(guard.includes('if (!visitedThis && !saidVisited && !r16) {'));
  assert(guard.includes('"شوف العقار أول واذا ناسبك نتكلم في السعر"'),'R2 still books the visit when nothing says he saw it');
@@ -569,7 +572,8 @@ test('R29: a congratulation needs the customer to say they bought, reserved or p
  for(const s of ['ايوه لقيناها الفيلا','وعليكم السلام','شفناها','الله يرزقك'])assert(!B.test(s),s);
  for(const s of ['حجزنا الفيلا الحمدلله','اشترينا بيت','دفعت العربون'])assert(B.test(s),s);
  assert(A.test('السلام عليكم كيف شفتي فيلا الشخاخيط وايش انطباعك عنها ؟')&&A.test('السلام عليكم كيف لقيتي فيلا الشخاخيط ؟'));
- assert(agent.includes('texts = ["حياك الله، وايش انطباعك بعد الزيارة ؟"]'));
+ // decision 30 (Ahmed 18 Nov 2026): «حياك» is banned always, and no comma in a line the code adds
+ assert(agent.includes('texts = ["وايش انطباعك بعد الزيارة ؟"]'));assert(!agent.includes('حياك الله، وايش'));
  const brain=fs.readFileSync('supabase/functions/whatsapp-reply-agent/brain.ts','utf8');
  assert(brain.includes('قاعدة ثابتة (R29، أحمد 11 نوفمبر)')&&brain.includes('ممنوع "مبروك" أو "الله يبارك لك"'));
 });

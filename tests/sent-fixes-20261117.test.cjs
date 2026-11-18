@@ -39,16 +39,17 @@ test('R74: «أبغى أشوف وين عن الشارع، وإذا ناسبني 
 });
 test('a client who only arrived is not asked his opinion (007be129 «هذا هو», e06229f1 «جالس أشوفها»)',()=>{
  let r=decide(['حياك الله وايش انطباعك بعد ما شفتها ؟'],[OUT('تمام ان شاء الله'),IN('','image'),IN('هذا هو')]);
- assert.deepEqual(r.texts,['حياك الله خذ راحتك']);assert.equal(r.out.guard_arrived,true);
+ // decision 30 (Ahmed 18 Nov 2026): «حياك» is banned always; the arrival gets «تمام خذ راحتك»
+ assert.deepEqual(r.texts,['تمام خذ راحتك']);assert.equal(r.out.guard_arrived,true);
  r=decide(['كيف شفتها ؟'],[OUT('البيت مفتوح'),IN('أنا موجود حالياً في الفيلا. جالس أشوفها')]);
- assert.deepEqual(r.texts,['حياك الله خذ راحتك']);
+ assert.deepEqual(r.texts,['تمام خذ راحتك']);
  // he asks to go in: the open house is said (dry run on the branch)
  r=decide(['السعر 59 الف','وايش انطباعك ؟'],[IN('أنا موجود جنب الفيلا. إذا تأذن لي إني أدخل أشوف الفيلا')],null,{prop:RUMAIS});
  assert.deepEqual(r.texts,['السعر 59 الف','البيت مفتوح تفضل']);
  // dry run rows 777-816: «انا واصل»
- assert.deepEqual(decide(['حياك الله وايش انطباعك بعد ما شفتها ؟'],[OUT('البيت مفتوح'),IN('انا واصل')]).texts,['حياك الله خذ راحتك']);
+ assert.deepEqual(decide(['حياك الله وايش انطباعك بعد ما شفتها ؟'],[OUT('البيت مفتوح'),IN('انا واصل')]).texts,['تمام خذ راحتك']);
  // rows 930-969: «انا قريبه», a photo, «هذا البيت» after «الاستاذ احمد وصل وينتظرك هناك»
- assert.deepEqual(decide(['حياك الله وايش انطباعك بعد ما شفتها ؟','اسمك الكريم ؟'],[OUT('الاستاذ احمد وصل وينتظرك هناك'),IN('انا قريبه'),IN('','image'),IN('هذا البيت')]).texts,['حياك الله','اسمك الكريم ؟']);
+ assert.deepEqual(decide(['حياك الله وايش انطباعك بعد ما شفتها ؟','اسمك الكريم ؟'],[OUT('الاستاذ احمد وصل وينتظرك هناك'),IN('انا قريبه'),IN('','image'),IN('هذا البيت')]).texts,['تمام خذ راحتك','اسمك الكريم ؟']);
  // «هذا البيت» with an ad picture and no visit on our side is not an arrival
  assert.deepEqual(decide(['وايش انطباعك عنه ؟'],[OUT('مرحبتين تفضل'),IN('','image'),IN('هذا البيت')]).texts,['وايش انطباعك عنه ؟']);
  // after he saw it the question stays
@@ -188,7 +189,7 @@ test('R92: an owner who will move in later if it does not sell is taken, with th
  const run=(texts,said,o={})=>{const out={category:'seller',action:'none',...(o.out||{})};const history=[...(o.before||[]),...said.map((b)=>({direction:'inbound',body:b}))];
   const r=new Function('out','texts','history','review',src+';return {out,texts};')(out,texts,history,false);return r;};
  const APOL=['نعتذر منك احنا ما نستلم عقارات مرهونة او ساكن فيها صاحبها','الله يسعدك 🌷'];
- const LINE='اذا تبي تعرضه معانا لازم يظل البيت فاضي فترة التسويق، واذا ما انباع بعدين لك الحرية تسكن فيه';
+ const LINE='اذا تبي تعرضه معانا لازم يظل البيت فاضي فترة التسويق واذا ما انباع بعدين لك الحرية تسكن فيه'; // no comma (decision 30)
  // 060fadae without the mortgage: «محصلت حد صراحه وقلت بسكن فيها من بداية شهر ١٢»
  let r=run([...APOL],['امس مغسلنهن بالكامل','محصلت حد صراحه وقلت بسكن فيها من بداية شهر ١٢']);
  assert.deepEqual(r.texts,[LINE,'يناسبك ؟']);assert.equal(r.out.guard_future_live,true);
