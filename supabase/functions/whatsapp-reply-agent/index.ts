@@ -2171,6 +2171,11 @@ Deno.serve(async (req) => {
     // decision 42: the skipped sold notice opens the first reply, once (not over silence, an ignored chat or a line that already says it)
     if (soldLine && out.reply_messages.length && !ignored) {
       if (!out.reply_messages.some((t: string) => /انحجز|انباع|ابتاع/.test(t))) out.reply_messages = [soldLine, ...out.reply_messages];
+      // (dry run 18 Nov, 0e02cf11: the notice said «انحجزت» and the model wrote «انباعت»: the notice's own line is used)
+      else {
+        const i = out.reply_messages.findIndex((t: string) => t.length <= 120 && /انحجز|انباع|ابتاع/.test(t));
+        if (i >= 0 && out.reply_messages[i] !== soldLine) out.reply_messages[i] = soldLine;
+      }
       out.sold_told = true;
     }
     // a pinned reply only counts when the id is real

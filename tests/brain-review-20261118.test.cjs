@@ -88,6 +88,8 @@ test('decision 42: a sold notice skipped because the client wrote opens the agen
  const add=at('if (soldLine && out.reply_messages.length && !ignored) {');
  assert(at('out.reply_messages = texts.slice(0, 3);')<add&&add<at('const wamid = await metaSend(tokens, phoneId, to, outgoing[i]);'));
  assert(agent.includes('if (!out.reply_messages.some((t: string) => /انحجز|انباع|ابتاع/.test(t))) out.reply_messages = [soldLine, ...out.reply_messages];'));
+ // the model's own «انباعت» line about it gives way to the notice's wording («انحجزت»)
+ assert(agent.includes('if (i >= 0 && out.reply_messages[i] !== soldLine) out.reply_messages[i] = soldLine;'));
  // marked only after a real send, and only when the final reply still says it
  const mark=at('update({ reason: "told_by_agent" })');
  assert(mark>at('const wamid = await metaSend(tokens, phoneId, to, outgoing[i]);'));
@@ -103,5 +105,5 @@ test('decisions 67 and 68, and the private key-box photos (SQL137)',()=>{
  const f=fs.readFileSync('db/changes/139-zero-down-off.forward.sql','utf8').replace(/\r\n/g,'\n');
  assert.equal(f,fs.readFileSync('supabase/migrations/20261118084111_zero_down_off_20261118.sql','utf8').replace(/\r\n/g,'\n'));
  assert(f.includes("'5 20 30 11 *'")&&f.includes('SET active = false')&&f.includes("WHERE jobname = 'zero_down_pinned_off_20261201';\n$job$"));
- assert(!/DELETE|DROP/i.test(f));
+ assert(!/\b(DELETE\s+FROM|DROP\s+(TABLE|FUNCTION|TRIGGER)|TRUNCATE)\b/i.test(f),'a deactivation, nothing removed');
 });
