@@ -19,8 +19,10 @@ test('the studies screen is the owner\'s and the staff\'s: same list, same numbe
 });
 
 test('each branch on its own: tabs الكل / بركاء / مسقط in the ready studies and in the owners waiting for a price',()=>{
-  assert(ui.includes("[['all','الكل',data.items.length],['barka','بركاء',n('barka')],['muscat','مسقط',n('muscat')]]"));
-  assert(ui.includes("data.items.filter(i=>branch==='all'||i.route_key===branch).map(card)")&&ui.includes("else if(act==='tab'){branch=b.dataset.v||'all';redraw(true);}"));
+  // 19 Nov 2026 (Ahmed: «مكتوب 8 … الكل 14»): the tabs count the studies waiting for approval, like the home tile
+  assert(ui.includes("[['all','الكل'],['barka','بركاء'],['muscat','مسقط']]")&&ui.includes("const n=k=>waiting().filter(i=>k==='all'||i.route_key===k).length;"));
+  assert(ui.includes("const inBranch=i=>branch==='all'||i.route_key===branch;")&&ui.includes("else if(act==='tab'){branch=b.dataset.v||'all';redraw(true);}"));
+  assert(ui.includes("window.crmPriceStudiesCount=()=>canSee()?waiting().length:0;"),'the tile counts the same');
   assert(home.includes("[['all','الكل',items.length],['barka','بركاء',n('barka')],['muscat','مسقط',n('muscat')]]"));
   assert(home.includes("pausedRows(items.filter(i=>pricingBranch==='all'||i.route_key===pricingBranch),true)")&&home.includes("else if(act==='prbranch'){pricingBranch=b.dataset.v||'all';drawSheet();}"));
   assert(ui.includes("esc(ROUTE[i.route_key]||'')"),'the branch is written on every card');
@@ -58,5 +60,5 @@ test('R59 is written down, and R37 says what it changed',()=>{
   const rules=read('docs/agent-rules.md');
   assert(/\| R59 \| \*\*دراسات السعر للموظف/.test(rules));
   assert(rules.includes('(تعدلت بـ R59، 14 نوفمبر'));
-  assert(index.includes('crm-price-studies.js?v=20261116-ps3')&&index.includes('crm-owner-home.js?v=20261119-audit1'));
+  assert(index.includes('crm-price-studies.js?v=20261119-phone1')&&index.includes('crm-owner-home.js?v=20261119-audit1'));
 });

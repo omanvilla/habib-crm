@@ -277,7 +277,16 @@ function fixtureExtraRpc(name,args){
     days:list.map((d,i)=>{const wd=new Date(d+'T12:00:00Z').getUTCDay(),off=wd===5||wd===6;return {day:d,calls:off?0:(3+i+j)%11,target:off?0:10,note:off?null:(i===2?'اجتماع في المكتب':null),list:[]};})}))});
   }
   case 'crm_visits_unasked':return ok([]);
-  case 'crm_price_studies_pending':return ok({items:[],send_mode:'manual'});
+  // synthetic studies (19 Nov 2026): three waiting for approval, one waiting for the owner, one sent from the phone
+  case 'crm_price_studies_pending':{
+   const st=(n,status,route,extra)=>({id:uuid(1800+n),task_id:uuid(1850+n),version:1,status,route_key:route,conversation_id:uuid(1900+n),client_id:null,waiting:status==='awaiting_approval',
+    owner_name:'مالك اصطناعي '+n,phone:'+9680000081'+n,property_kind:'مبنى',kind_raw:'villa',area:route==='barka'?'الرميس':'الخوض',wilayat:route==='barka'?'بركاء':'السيب',owner_price:60000,land_size:300,built_size:250,
+    market_value:58000,asking_price:61000,negotiation_margin:3000,owner_net:57000,commission:1500,owner_message:'السلام عليكم، دراسة سعر مبدئية لعقارك في '+(route==='barka'?'الرميس':'الخوض')+' (نص اصطناعي للمعاينة)',
+    owner_report_path:'reports/x/owner.pdf',internal_report_path:'reports/x/internal.pdf',submitted_at:now,sent_at:null,send_error:null,...extra});
+   return ok({items:[st(1,'awaiting_approval','barka'),st(2,'awaiting_approval','barka'),st(3,'awaiting_approval','muscat'),st(4,'waiting_owner','barka'),
+    st(5,'sent','muscat',{sent_at:now,send_error:'sent_by_phone:'+muscat,sent_by_name:'موظفة مسقط التجريبية'})],send_mode:'live'});
+  }
+  case 'crm_price_study_sent_by_phone':return ok({ok:true,study_id:args.p_study_id});
   // Staff read projects too (SQL82); Muscat investors are ordinary Muscat clients shared with staff (SQL79).
   case 'crm_investment_projects':return ok([{id:uuid(1701),name:'مشروع اصطناعي على البحر',developer:'مطور اختبار',area:null,notes:null,aliases:['المشروع الاصطناعي'],videos:[],clients:[{id:uuid(106),name:'مستثمر مسقط الاصطناعي',at:now}]}]);
   case 'crm_branch_people':return ok(['muscat','barka'].map(b=>({branch:b,name:profiles.find(p=>p.id===(b==='muscat'?muscat:barka)).full_name})));

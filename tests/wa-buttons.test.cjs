@@ -8,7 +8,7 @@ test('crmWaButtons gives «فتح في واتساب الجوال» and «فتح 
  const k=ctx.window.crmWaButtons({clientId:'x'});
  assert(k.includes('data-wa-phone="1"')&&k.includes('data-client="x"'),'no number at hand: looked up on tap');
  assert.equal(ctx.window.crmWaButtons({}),'');
- assert(index.includes('crm-wa-buttons.js?v=20261114-note2"><'+String.fromCharCode(92)+'/script>'),'loaded inside the boot script with an escaped closing tag');
+ assert(index.includes('crm-wa-buttons.js?v=20261119-text1"><'+String.fromCharCode(92)+'/script>'),'loaded inside the boot script with an escaped closing tag');
 });
 // 12 Nov 2026 (Ahmed: «ما جاي مرتب»): one look for the two buttons everywhere, and nothing cut on the narrow deal cards
 test('the two buttons carry their own look, not the page button classes',()=>{

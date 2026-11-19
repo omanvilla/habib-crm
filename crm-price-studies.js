@@ -226,10 +226,12 @@
     if(i.status==='sending')return '<span class="cps-chip">جاري الإرسال للمالك…</span>';
     if(i.status==='waiting_owner')return '<span class="cps-chip">انرسلت له «دراسة سعر عقارك جاهزة»، وتنرسل الدراسة أول ما يرد</span>';
     if(i.status==='send_failed')return '<span class="cps-chip bad">ما انرسلت</span>';
-    if(i.status==='sent')return '<span class="cps-chip ok">انرسلت للمالك '+esc(when(i.sent_at))+'</span>';
+    if(i.status==='sent')return '<span class="cps-chip ok">انرسلت للمالك '+esc(when(i.sent_at))+(i.sent_by_name?' · من الجوال: '+esc(i.sent_by_name):'')+'</span>';
     if(i.status==='rejected')return '<span class="cps-chip">رجعت لـ Claude بملاحظتك</span>';
     return '';
   }
+  // a study that can still be sent from the phone (SQL146)
+  const phoneable=i=>['awaiting_approval','approved','waiting_owner','send_failed'].includes(i.status);
   function card(i){
     const id=esc(i.id),open=i.status==='awaiting_approval',retry=i.status==='approved'||i.status==='send_failed';
     const place=[i.area,i.wilayat].filter(Boolean).join(' ، ');
@@ -249,7 +251,8 @@
       +'<div class="cps-nums">'+cell('صافي المالك',i.owner_net,true)+cell('العمولة',i.commission,true)+'</div>'
       +'<div class="cps-files"><button type="button" class="btn-secondary" data-cps="file" data-path="'+esc(i.owner_report_path||'')+'">تقرير المالك PDF</button>'
       +'<button type="button" class="btn-secondary" data-cps="file" data-path="'+esc(i.internal_report_path||'')+'">التقرير الداخلي PDF</button>'
-      +(typeof window.crmWaButtons==='function'?window.crmWaButtons({phone:i.phone,conversationId:i.conversation_id,clientId:i.client_id,cls:'btn-secondary'}):'')+'</div>'
+      // 19 Nov 2026 (Ahmed): «فتح في واتساب الجوال» opens the chat with the owner message already typed, while it can still go
+      +(typeof window.crmWaButtons==='function'?window.crmWaButtons({phone:i.phone,conversationId:i.conversation_id,clientId:i.client_id,cls:'btn-secondary',text:phoneable(i)?i.owner_message:''}):'')+'</div>'
       // SQL96: the office inspection, while the task is still open (nothing left to study once the owner has the study)
       +(i.task_id&&!['sent','sending','waiting_owner'].includes(i.status)?inspBox(i.task_id)
         +(open?'<div class="cps-restudy"><button type="button" class="btn-secondary" data-cps="restudy" data-id="'+id+'">أعد الدراسة بعد المعاينة</button>'
@@ -258,10 +261,13 @@
       +'<textarea class="fi" rows="6" dir="auto" data-cps-msg="'+id+'"'+(open?'':' readonly')+'>'+esc(i.owner_message||'')+'</textarea></label>'
       /* R88 / SQL108 (Ahmed 16 Nov 2026): the owner did not answer «دراسة سعر عقارك جاهزة» (WhatsApp lets the system send only that
          after 24 hours), or the send failed: the office sends it from the phone's WhatsApp, message and report ready here. */
-      +(i.status==='waiting_owner'||retry?'<div class="cps-phone"><small class="cps-facts">ما رد المالك؟ ارسلها له بنفسك من واتساب الجوال: الرسالة تنفتح جاهزة، أرفق معها ملف التقرير، وبعدها اضغط «تم الإرسال»</small>'
-        +'<div class="cps-actions"><button type="button" class="btn-primary" data-cps="phone" data-id="'+id+'">افتح واتساب والرسالة جاهزة</button>'
-        +'<button type="button" class="btn-secondary" data-cps="phone-file" data-id="'+id+'">ملف التقرير (شارك أو حمّل)</button>'
-        +'<button type="button" class="btn-secondary" data-cps="phone-done" data-id="'+id+'">تم الإرسال من الجوال</button></div></div>':'')
+      /* SQL146 (Ahmed 19 Nov 2026): also while it waits for approval, for the owner and the staff: the same message and the same
+         owner PDF from the branch's WhatsApp on the phone. The system closes it by itself when the app sends that chat the PDF or
+         the message; «تم الإرسال» is there for when that is late. Sending it this way counts as approving it. */
+      +(phoneable(i)?'<div class="cps-phone"><small class="cps-facts">'+(i.status==='waiting_owner'?'ما رد المالك؟ ':'')+'ترسلها من واتساب الجوال (رقم الفرع): 1) افتح المحادثة والرسالة جاهزة 2) ارسل ملف التقرير 3) النظام يسجلها مرسلة لحاله، ولو تأخر اضغط «تم الإرسال»</small>'
+        +'<div class="cps-actions"><button type="button" class="btn-primary" data-cps="phone" data-id="'+id+'">1) افتح واتساب والرسالة جاهزة</button>'
+        +'<button type="button" class="btn-secondary" data-cps="phone-file" data-id="'+id+'">2) ملف التقرير (شارك أو حمّل)</button>'
+        +'<button type="button" class="btn-secondary" data-cps="phone-done" data-id="'+id+'">3) تم الإرسال</button></div></div>':'')
       +(open?'<div class="cps-actions"><button type="button" class="btn-primary" data-cps="approve" data-id="'+id+'">موافق</button>'
         +'<button type="button" class="btn-secondary" data-cps="reject" data-id="'+id+'">رفض مع ملاحظة</button></div>'
         +'<div class="cps-reject" data-cps-reject="'+id+'" hidden><textarea class="fi" rows="3" dir="auto" data-cps-note="'+id+'" placeholder="اكتب ملاحظتك لـ Claude: وش يعدل في الدراسة"></textarea>'
@@ -277,12 +283,19 @@
     const mode=data.send_mode==='live'?'':'<p class="cps-mode">'+(data.send_mode==='off'?'الإرسال للملاك موقف. الموافقة تنحفظ وما ينرسل شي'
       :'وضع التجربة: الموافقة تنحفظ، والإرسال يوصل رقمك التجريبي بس. الملاك ما يوصلهم شي لين يتفعّل الإرسال')+'</p>';
     // R59 (14 Nov 2026, Ahmed): each branch on its own, like the daily follow-ups; a study goes out from its chat's branch number
-    const n=k=>data.items.filter(i=>i.route_key===k).length;
-    if(branch!=='all'&&!n(branch))branch='all';
-    const tabs=[['all','الكل',data.items.length],['barka','بركاء',n('barka')],['muscat','مسقط',n('muscat')]]
-      .map(([k,l,c])=>'<button type="button" class="cfu-tab'+(branch===k?' on':'')+'" data-cps="tab" data-v="'+k+'" aria-pressed="'+(branch===k)+'">'+l+' <b dir="ltr">'+c+'</b></button>').join('');
-    return mode+'<p class="coh-since">راجع الأرقام والتقريرين. «موافق» يرسل الرسالة وتقرير المالك من رقم الفرع ويقفل المهمة. ما ينرسل شي قبل الموافقة</p>'
-      +'<div class="cfu-tabs coh-ptabs">'+tabs+'</div><ul class="coh-list cps-list">'+data.items.filter(i=>branch==='all'||i.route_key===branch).map(card).join('')+'</ul>';
+    // 19 Nov 2026 (Ahmed: «مكتوب 8 … ولما ندخل الكل 14»): the tile and the tabs count the same thing, the studies waiting for
+    // approval; the ones already approved, waiting for the owner or sent this week are listed under their own heading
+    const n=k=>waiting().filter(i=>k==='all'||i.route_key===k).length;
+    const inBranch=i=>branch==='all'||i.route_key===branch;
+    if(branch!=='all'&&!data.items.some(i=>i.route_key===branch))branch='all';
+    const tabs=[['all','الكل'],['barka','بركاء'],['muscat','مسقط']]
+      .map(([k,l])=>'<button type="button" class="cfu-tab'+(branch===k?' on':'')+'" data-cps="tab" data-v="'+k+'" aria-pressed="'+(branch===k)+'">'+l+' <b dir="ltr">'+n(k)+'</b></button>').join('');
+    const wait=data.items.filter(i=>i.status==='awaiting_approval'&&inBranch(i)),rest=data.items.filter(i=>i.status!=='awaiting_approval'&&inBranch(i));
+    return mode+'<p class="coh-since">راجع الأرقام والتقريرين. «موافق» يرسل الرسالة وتقرير المالك من رقم الفرع ويقفل المهمة، أو ارسلها أنت من واتساب الجوال. ما ينرسل شي قبل الموافقة</p>'
+      +'<div class="cfu-tabs coh-ptabs">'+tabs+'</div>'
+      +'<h4 class="cps-group">تنتظر موافقتك <b dir="ltr">'+wait.length+'</b></h4>'
+      +(wait.length?'<ul class="coh-list cps-list">'+wait.map(card).join('')+'</ul>':'<p class="coh-empty">ما في دراسات تنتظر موافقتك هنا</p>')
+      +(rest.length?'<h4 class="cps-group">بعد الموافقة: تنتظر المالك أو انرسلت هالأسبوع <b dir="ltr">'+rest.length+'</b></h4><ul class="coh-list cps-list">'+rest.map(card).join('')+'</ul>':'');
   }
   // 12 Nov 2026: the list is not drawn again under his hands (typing, recording, a kept recording, photos uploading), and a
   // rejection note or an edited message he has not sent yet survives a new draw
@@ -344,7 +357,10 @@
   function phoneOpen(id){
     const s=studyOf(id),d=s?String(s.phone||'').replace(/\D/g,''):'';
     if(!s||d.length<8){toast('رقم المالك مو مسجل','error');return;}
-    window.open('https://wa.me/'+(d.length===8?'968'+d:d)+'?text='+encodeURIComponent(String(s.owner_message||'')),'_blank','noopener');
+    // the branch's WhatsApp Business app on the phone (crm-wa-buttons.js), with the message already typed
+    const msg=document.querySelector('[data-cps-msg="'+CSS.escape(id)+'"]'),text=String(msg&&msg.value||s.owner_message||'');
+    const l=typeof window.crmWaPhoneLink==='function'?window.crmWaPhoneLink(d,text):'https://wa.me/'+(d.length===8?'968'+d:d)+'?text='+encodeURIComponent(text);
+    if(/^https:/.test(l))window.open(l,'_blank','noopener');else window.location.href=l;
   }
   async function phoneFile(id){
     const s=studyOf(id);if(!s||!s.owner_report_path){toast('الملف ما انحفظ','error');return;}
@@ -358,7 +374,8 @@
   }
   async function phoneDone(b){
     const id=b.dataset.id;
-    if(!window.confirm('أكدت إنك أرسلت الرسالة وملف التقرير للمالك من واتساب الجوال؟'))return;
+    const s=studyOf(id);
+    if(!window.confirm('أكدت إنك أرسلت الرسالة وملف التقرير للمالك من واتساب الجوال؟'+(s&&s.status==='awaiting_approval'?'\nتنسجل موافقة ومرسلة باسمك':'')))return;
     b.disabled=true;
     const r=await supa.rpc('crm_price_study_sent_by_phone',{p_study_id:id});
     if(r.error){b.disabled=false;toast('ما انحفظ: '+(r.error.message||''),'error');return;}

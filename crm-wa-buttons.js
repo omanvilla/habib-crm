@@ -8,12 +8,15 @@
   'use strict';
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
   const digits=v=>String(v||'').replace(/\D/g,'');
-  const waLink=d=>d?'https://wa.me/'+d:'';
-  function phoneLink(phone){
-    const d=digits(phone),ua=navigator.userAgent||'';if(!d)return '';
-    if(/Android/i.test(ua))return 'intent://send?phone='+d+'#Intent;scheme=whatsapp;package=com.whatsapp.w4b;S.browser_fallback_url='+encodeURIComponent(waLink(d))+';end';
-    if(/iPhone|iPad|iPod/i.test(ua))return 'whatsapp-smb://send?phone='+d;
-    return waLink(d);
+  // 19 Nov 2026 (Ahmed): an optional text opens the chat with the message already typed (the price study from the phone)
+  const waLink=(d,t)=>d?'https://wa.me/'+d+(t?'?text='+encodeURIComponent(t):''):'';
+  function phoneLink(phone,text){
+    let d=digits(phone);const ua=navigator.userAgent||'',t=String(text||'');if(!d)return '';
+    if(d.length===8)d='968'+d;
+    const q=t?'&text='+encodeURIComponent(t):'';
+    if(/Android/i.test(ua))return 'intent://send?phone='+d+q+'#Intent;scheme=whatsapp;package=com.whatsapp.w4b;S.browser_fallback_url='+encodeURIComponent(waLink(d,t))+';end';
+    if(/iPhone|iPad|iPod/i.test(ua))return 'whatsapp-smb://send?phone='+d+q;
+    return waLink(d,t);
   }
   window.crmWaPhoneLink=phoneLink;
   // 12 Nov 2026 (Ahmed: «ما جاي مرتب»): the buttons carry their own look (crm-wa-buttons.css), the same in every place.
@@ -21,7 +24,7 @@
   // pair for narrow cards, with the short words «الجوال» / «النظام» and the full words as the tooltip.
   const FULL={phone:'فتح في واتساب الجوال',crm:'فتح في النظام'},SHORT={phone:'الجوال',crm:'النظام'};
   window.crmWaButtons=function(o){
-    o=o||{};const conv=o.conversationId||'',client=o.clientId||'',link=phoneLink(o.phone);
+    o=o||{};const conv=o.conversationId||'',client=o.clientId||'',link=phoneLink(o.phone,o.text);
     const extra=String(o.cls||'').split(/\s+/).filter(c=>c&&!/^btn-(primary|secondary)$/.test(c));
     const small=o.size==='sm'||extra.indexOf('crm-wa-small')>=0;
     const cls='crm-wa-btn'+(small?' crm-wa-sm':'')+extra.filter(c=>c!=='crm-wa-small').map(c=>' '+esc(c)).join('');

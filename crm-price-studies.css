@@ -1,5 +1,7 @@
 /* Price studies waiting for Ahmed's approval (SQL94, 11 Nov 2026): cards inside the home sheet. */
 .cps-list{display:grid;gap:12px}
+.cps-group{display:flex;align-items:center;gap:8px;margin:14px 0 8px;font-size:14px;font-weight:800;color:#1f2d45}
+.cps-group b{min-width:24px;padding:1px 8px;border-radius:999px;background:#e6ecf5;text-align:center}
 .cps-card{display:grid;gap:8px;padding:14px;border:1px solid #e6e1d4;border-radius:16px;background:#fff;min-width:0}
 .cps-card.focus{border-color:#d9a441;box-shadow:0 0 0 3px rgba(217,164,65,.25)}
 .cps-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}

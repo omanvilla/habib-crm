@@ -17,6 +17,7 @@
 // Nothing goes to an owner before Ahmed's approval, and while price_study_send_mode is «test» only the runtime test numbers
 // receive anything.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -107,6 +108,23 @@ async function driveCreate(name: string, parent: string, mime: string, bytes: Ui
   }
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.id) throw new Error(`drive_${r.status}: ${short(j?.error?.message || JSON.stringify(j), 200)}`);
+  return j.id;
+}
+// A service account has no storage on a Gmail Drive (Google: «Service Accounts do not have storage quota»), so a file is
+// written by Ahmed's own Apps Script web app («CRM رفع مستندات التسعير», runs as him, only inside DRIVE_ROOT). Its address
+// and key are in public.crm_service_settings (service role only). Folders still come from the service account.
+let uploader: { url: string; token: string } | null = null;
+async function driveUpload(name: string, folder: string, mime: string, bytes: Uint8Array): Promise<string> {
+  if (!uploader) {
+    const s = await db.from("crm_service_settings").select("key,value").in("key", ["drive_upload_url", "drive_upload_token"]);
+    const m = Object.fromEntries((s.data || []).map((x: any) => [x.key, x.value]));
+    if (!m.drive_upload_url || !m.drive_upload_token) throw new Error("drive_upload_not_configured");
+    uploader = { url: m.drive_upload_url, token: m.drive_upload_token };
+  }
+  const r = await fetch(uploader.url, { method: "POST", redirect: "follow", headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ token: uploader.token, action: "file", folder_id: folder, name, mime, data: encodeBase64(bytes) }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j?.ok || !j.id) throw new Error(`drive_upload_${r.status}: ${short(j?.error || "no_answer", 200)}`);
   return j.id;
 }
 
@@ -246,7 +264,7 @@ async function driveSync(taskId: string, convId: string, title: string, budgetMs
     try {
       const b = await db.storage.from(BUCKET).download(r.storage_path);
       if (b.error || !b.data) throw new Error(`bucket: ${b.error?.message || "empty"}`);
-      const id = await driveCreate(String(r.filename || r.storage_path.split("/").pop()), folder, String(r.mime || "application/octet-stream"), new Uint8Array(await b.data.arrayBuffer()));
+      const id = await driveUpload(String(r.filename || r.storage_path.split("/").pop()), folder, String(r.mime || "application/octet-stream"), new Uint8Array(await b.data.arrayBuffer()));
       await db.from("owner_price_study_docs").update({ drive_file_id: id, drive_error: null }).eq("id", r.id);
       out.copied++;
     } catch (e) {
@@ -453,12 +471,16 @@ async function sendStudy(studyId: string, from: "approved" | "waiting_owner") {
 }
 // R88 / SQL108 (Ahmed 16 Nov 2026): the office sent the study itself from the phone's WhatsApp (the owner had not answered the
 // template, or the send failed). It is closed like an automatic send, so the owner's later answer does not bring it again.
-async function sentByPhone(studyId: string, by: string) {
-  const claim = await db.from("owner_price_studies").update({ status: "sending", updated_at: new Date().toISOString() }).eq("id", studyId).in("status", ["waiting_owner", "approved", "send_failed"]).select("*");
+// SQL146 (Ahmed 19 Nov 2026): also straight from «تنتظر موافقتك» (sending it counts as approving it), by the owner or a staff
+// member, and by itself when the branch app's echo shows the PDF or the message went to that chat (via = "echo").
+async function sentByPhone(studyId: string, by: string, via = "") {
+  const before = await db.from("owner_price_studies").select("status").eq("id", studyId).maybeSingle();
+  const claim = await db.from("owner_price_studies").update({ status: "sending", updated_at: new Date().toISOString() }).eq("id", studyId).in("status", ["awaiting_approval", "waiting_owner", "approved", "send_failed"]).select("*");
   const s: any = (claim.data || [])[0];
   if (!s) return { study_id: studyId, skipped: "not_waiting" };
   const now = new Date().toISOString();
-  await db.from("owner_price_studies").update({ status: "sent", sent_at: now, send_error: `sent_by_phone${by ? `:${by}` : ""}`, updated_at: now }).eq("id", s.id);
+  const approvedNow = before.data?.status === "awaiting_approval" ? { decided_at: now, decided_by: by || null } : {};
+  await db.from("owner_price_studies").update({ status: "sent", sent_at: now, send_error: `sent_by_phone${by ? `:${by}` : via === "echo" ? ":echo" : ""}`, updated_at: now, ...approvedNow }).eq("id", s.id);
   const { conv } = await studyContext(s);
   const after = conv ? await afterSent(s, conv, now) : ["conversation"];
   return { study_id: studyId, status: "sent", by_phone: true, not_recorded: after };
@@ -611,7 +633,8 @@ const nextRunAr = (d = new Date()) => {
 };
 const KIND_AR: Record<string, string> = { land: "أرض", plot: "أرض", villa: "فيلا", house: "بيت", building: "مبنى", apartment: "شقة", farm: "مزرعة", shop: "محل", chalet: "شاليه", rest_house: "استراحة" };
 // the type as the owner offer has it (in Arabic), else «أرض» or «مبنى» as Claude's queue calls it; then the area
-const propertyLine = (r: any) => [KIND_AR[String(r?.kind_raw || "").trim().toLowerCase()] || String(r?.kind_raw || "").trim() || String(r?.property_kind || "").trim() || "عقار", [r?.area, r?.wilayat].filter(Boolean).join(" ، ")].filter(Boolean).join(" · ");
+// «other» (a shop or anything the offer did not name) shows as Claude's queue calls it, never the English word
+const propertyLine = (r: any) => [KIND_AR[String(r?.kind_raw || "").trim().toLowerCase()] || (/^(other|unknown)$/i.test(String(r?.kind_raw || "").trim()) ? "" : String(r?.kind_raw || "").trim()) || String(r?.property_kind || "").trim() || "عقار", [r?.area, r?.wilayat].filter(Boolean).join(" ، ")].filter(Boolean).join(" · ");
 // two pricing runs passed and still no study: one message a day listing every such task (SQL145, Ahmed 19 Nov 2026)
 const unpricedText = (list: any[], at = new Date()) => [
   `⏰ عقارات ما تسعّرت بعد (${list.length}):`,
@@ -701,7 +724,7 @@ Deno.serve(async (req) => {
     if (action === "sign_inspection") { const id = uuid(body?.task_id); return id ? json({ ok: true, photos: await signInspection(id) }) : json({ ok: false, error: "task_id_required" }, 400); }
     if (action === "pull_files") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await pullFiles(id, secret) }) : json({ ok: false, error: "study_id_required" }, 400); }
     if (action === "send") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await sendStudy(id, "approved") }) : json({ ok: false, error: "study_id_required" }, 400); }
-    if (action === "sent_by_phone") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await sentByPhone(id, uuid(body?.by)) }) : json({ ok: false, error: "study_id_required" }, 400); }
+    if (action === "sent_by_phone") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await sentByPhone(id, uuid(body?.by), body?.via === "echo" ? "echo" : "") }) : json({ ok: false, error: "study_id_required" }, 400); }
     if (action === "owner_inbound") { const id = uuid(body?.conversation_id); return id ? json({ ok: true, result: await ownerInbound(id, uuid(body?.message_id), secret) }) : json({ ok: false, error: "conversation_id_required" }, 400); }
     if (action === "held_tick") return json({ ok: true, results: await heldTick(secret) });
     if (action === "drive_tick") return json({ ok: true, results: await driveTick() });
