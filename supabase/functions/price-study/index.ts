@@ -2,17 +2,15 @@
 // functions and triggers; nothing here is reachable from the browser.
 //   save_docs      copy every image / document / video the owner sent in a «دراسة سعر» chat into the private bucket
 //                  (Meta drops media after about two weeks), newest first
-//   sign           6-hour links to those copies, for Claude (crm_price_study_documents); with task_id, the Drive copies first
-//   drive_tick     SQL145: copy the saved documents of open tasks to Google Drive («مستندات التسعير الآلي», a folder per
-//                  task) so the cloud pricing session opens them with the Drive connector, without a browser
+//   sign           6-hour links to those copies, for Claude (crm_price_study_documents)
 //   sign_inspection 6-hour links to the photos of the office inspection of a task, for Claude (crm_price_study_inspection)
 //   pull_files     copy the two PDF reports of a study Claude handed in from Google Drive into the bucket, then tell Ahmed
 //   send           after Ahmed's approval: the message and the owner report go to the owner from the chat's branch number;
 //                  outside the 24-hour window an approved template asks first and the study follows the owner's answer
 //   owner_inbound  the owner answered: deliver a waiting study, or read whether the price did not suit him
 //   template       submit the template to Meta for both numbers / refresh its status
-//   unpriced_tick  SQL145: tasks two pricing runs old with no study → one message a day to Ahmed listing all of them
-//   requeue_alert  SQL99: Ahmed rejected a study → he is told it is back in the queue
+//   unpriced_tick  SQL99: a task two counted hours old with no study handed in → Ahmed is told once to check the laptop
+//   requeue_alert  SQL99: Ahmed rejected a study → he is told it is back in the queue and to open the laptop
 // Owner net, commission and the internal report never leave the owner-only table and bucket: no message carries them.
 // Nothing goes to an owner before Ahmed's approval, and while price_study_send_mode is «test» only the runtime test numbers
 // receive anything.
@@ -61,54 +59,6 @@ const branchAr = (rk: string) => rk === "barka" ? "بركاء" : "مسقط";
 const dayAr = (d = new Date()) => d.toLocaleDateString("ar-OM-u-nu-latn", { timeZone: "Asia/Muscat", day: "numeric", month: "long", year: "numeric" });
 function b64(s: string) { const b = atob(s); const o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return o; }
 const background = (p: Promise<unknown>) => { try { (globalThis as any).EdgeRuntime?.waitUntil?.(p); } catch (_) { /* runs anyway */ } };
-
-// ---------- Google Drive (SQL145) ----------
-// The service account of sheet-sync (edge secret GOOGLE_SERVICE_ACCOUNT_JSON) is an editor of Ahmed's folder
-// «مستندات التسعير الآلي»; it only sees what is shared with it.
-const DRIVE_ROOT = "1782HyF_tblLdf6fhNM_z-nak0qtD0Mje";
-let gToken: { t: string; exp: number } | null = null;
-const b64url = (b: ArrayBuffer | Uint8Array | string) => {
-  const bytes = typeof b === "string" ? enc.encode(b) : new Uint8Array(b as ArrayBuffer);
-  let s = ""; for (const x of bytes) s += String.fromCharCode(x);
-  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-};
-async function googleToken(): Promise<string> {
-  if (gToken && gToken.exp > Date.now() + 60e3) return gToken.t;
-  const raw = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON") ?? "";
-  if (!raw) throw new Error("google_key_missing");
-  const sa = JSON.parse(raw);
-  const pem = String(sa.private_key).replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
-  const key = await crypto.subtle.importKey("pkcs8", Uint8Array.from(atob(pem), (c) => c.charCodeAt(0)), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
-  const now = Math.floor(Date.now() / 1000);
-  const head = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const claims = b64url(JSON.stringify({ iss: sa.client_email, scope: "https://www.googleapis.com/auth/drive", aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 }));
-  const sig = b64url(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, enc.encode(`${head}.${claims}`)));
-  const r = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: `${head}.${claims}.${sig}` }) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.access_token) throw new Error(`google_token_failed: ${short(JSON.stringify(j), 200)}`);
-  gToken = { t: j.access_token, exp: Date.now() + (j.expires_in ?? 3600) * 1000 };
-  return j.access_token;
-}
-// multipart upload (metadata + bytes); a folder when bytes is null
-async function driveCreate(name: string, parent: string, mime: string, bytes: Uint8Array | null): Promise<string> {
-  const meta = { name, parents: [parent], ...(bytes ? {} : { mimeType: "application/vnd.google-apps.folder" }) };
-  const auth = { Authorization: `Bearer ${await googleToken()}` };
-  let r: Response;
-  if (!bytes) {
-    r = await fetch("https://www.googleapis.com/drive/v3/files?fields=id&supportsAllDrives=true", { method: "POST", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify(meta) });
-  } else {
-    const bd = "crm" + crypto.randomUUID().replace(/-/g, "");
-    const pre = enc.encode(`--${bd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${bd}\r\nContent-Type: ${mime}\r\n\r\n`);
-    const post = enc.encode(`\r\n--${bd}--`);
-    const body = new Uint8Array(pre.length + bytes.length + post.length);
-    body.set(pre, 0); body.set(bytes, pre.length); body.set(post, pre.length + bytes.length);
-    r = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id&supportsAllDrives=true", { method: "POST", headers: { ...auth, "Content-Type": `multipart/related; boundary=${bd}` }, body });
-  }
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.id) throw new Error(`drive_${r.status}: ${short(j?.error?.message || JSON.stringify(j), 200)}`);
-  return j.id;
-}
 
 async function routeTokens(companyId: string, routeKey: string) {
   const out: string[] = [];
@@ -222,61 +172,8 @@ async function saveDocs(convId: string, budgetMs = 100000) {
   }
   return { conversation_id: convId, ...count };
 }
-// the saved documents of a task's chat that have no Drive copy yet go to the task's sub-folder (made on first use)
-async function driveSync(taskId: string, convId: string, title: string, budgetMs: number) {
-  const started = Date.now();
-  const out = { task_id: taskId, copied: 0, failed: 0, left: 0, error: null as string | null };
-  try { await saveDocs(convId, Math.min(budgetMs / 2, 40000)); } catch (_) { /* the copies already saved still go */ }
-  const d = await db.from("owner_price_study_docs").select("id,message_id,mime,filename,storage_path").eq("conversation_id", convId).eq("status", "saved")
-    .not("storage_path", "is", null).is("drive_file_id", null).order("message_timestamp", { ascending: true });
-  const todo = d.data || [];
-  if (!todo.length) return out;
-  let folder = "";
-  try {
-    const f = await db.from("owner_price_study_drive_folders").select("folder_id").eq("task_id", taskId).maybeSingle();
-    folder = String(f.data?.folder_id || "");
-    if (!folder) {
-      const label = String(title || "").replace(/^\s*دراسة\s*سعر\s*:?\s*/, "").replace(/[\\/]/g, "-").slice(0, 90);
-      folder = await driveCreate(`${label} · ${taskId.slice(0, 8)}`, DRIVE_ROOT, "", null);
-      await db.from("owner_price_study_drive_folders").upsert({ task_id: taskId, folder_id: folder }, { onConflict: "task_id" });
-    }
-  } catch (e) { out.error = short(String((e as any)?.message || e), 200); return out; }
-  for (const r of todo as any[]) {
-    if (Date.now() - started > budgetMs) { out.left++; continue; }
-    try {
-      const b = await db.storage.from(BUCKET).download(r.storage_path);
-      if (b.error || !b.data) throw new Error(`bucket: ${b.error?.message || "empty"}`);
-      const id = await driveCreate(String(r.filename || r.storage_path.split("/").pop()), folder, String(r.mime || "application/octet-stream"), new Uint8Array(await b.data.arrayBuffer()));
-      await db.from("owner_price_study_docs").update({ drive_file_id: id, drive_error: null }).eq("id", r.id);
-      out.copied++;
-    } catch (e) {
-      out.failed++;
-      await db.from("owner_price_study_docs").update({ drive_error: short(String((e as any)?.message || e), 300), updated_at: new Date().toISOString() }).eq("id", r.id);
-    }
-  }
-  return out;
-}
-// SQL145 cron: open tasks with documents not yet in Drive (the first runs copy the old ones once)
-async function driveTick() {
-  const started = Date.now();
-  const q = await db.rpc("crm_price_study_drive_due");
-  if (q.error) return [{ error: short(q.error.message, 200) }];
-  const out: any[] = [];
-  for (const t of (q.data || []) as any[]) {
-    const left = 120000 - (Date.now() - started);
-    if (left < 15000) break;
-    out.push(await driveSync(t.task_id, t.conversation_id, t.title, left));
-  }
-  return out;
-}
-async function signDocs(convId: string, taskId = "") {
-  if (taskId) {
-    try {
-      const t = await db.from("tasks").select("title").eq("id", taskId).maybeSingle();
-      await driveSync(taskId, convId, String(t.data?.title || ""), 45000);
-    } catch (e) { console.error("[price-study] drive", String((e as any)?.message || e)); }
-  }
-  const d = await db.from("owner_price_study_docs").select("message_id,message_type,mime,filename,caption,size_bytes,storage_path,status,message_timestamp,drive_file_id").eq("conversation_id", convId).order("message_timestamp", { ascending: true });
+async function signDocs(convId: string) {
+  const d = await db.from("owner_price_study_docs").select("message_id,message_type,mime,filename,caption,size_bytes,storage_path,status,message_timestamp").eq("conversation_id", convId).order("message_timestamp", { ascending: true });
   const rows = d.data || [];
   const saved = rows.filter((r: any) => r.status === "saved" && r.storage_path);
   const urls: Record<string, string> = {};
@@ -284,13 +181,13 @@ async function signDocs(convId: string, taskId = "") {
     const s = await db.storage.from(BUCKET).createSignedUrls(saved.map((r: any) => r.storage_path), 6 * 3600);
     for (const x of s.data || []) if (x?.path && x.signedUrl) urls[x.path] = x.signedUrl;
   }
-  const docs = rows.map((r: any) => ({ sent_at: r.message_timestamp, kind: r.message_type, filename: r.filename, mime: r.mime, size: r.size_bytes, caption: r.caption, status: r.status, url: urls[r.storage_path] || null, drive_file_id: r.drive_file_id || null }));
+  const docs = rows.map((r: any) => ({ sent_at: r.message_timestamp, kind: r.message_type, filename: r.filename, mime: r.mime, size: r.size_bytes, caption: r.caption, status: r.status, url: urls[r.storage_path] || null }));
   // media that has no copy yet shows as «not_saved_yet» and is fetched in the background for the next call
   const known = new Set(rows.map((r: any) => r.message_id));
   const m = await db.from("whatsapp_messages").select("id,message_type,body,message_timestamp").eq("conversation_id", convId).eq("direction", "inbound").in("message_type", ["image", "document", "video"]).not("media_id", "is", null)
     .gte("message_timestamp", new Date(Date.now() - 90 * 86400000).toISOString()).order("message_timestamp", { ascending: true }).limit(200);
   const missing = (m.data || []).filter((x: any) => !known.has(x.id));
-  for (const x of missing) docs.push({ sent_at: x.message_timestamp, kind: x.message_type, filename: null, mime: null, size: null, caption: x.body ? short(x.body, 500) : null, status: "not_saved_yet", url: null, drive_file_id: null });
+  for (const x of missing) docs.push({ sent_at: x.message_timestamp, kind: x.message_type, filename: null, mime: null, size: null, caption: x.body ? short(x.body, 500) : null, status: "not_saved_yet", url: null });
   if (missing.length || rows.some((r: any) => r.status === "failed")) background(saveDocs(convId));
   return docs;
 }
@@ -600,39 +497,32 @@ async function heldTick(secret: string) {
   return out;
 }
 
-// ---------- alerts to Ahmed for unpriced tasks (SQL99, SQL145) ----------
-// Pricing runs in the cloud at 08:00 and 14:00 Muscat (no laptop since 19 Nov 2026). Which tasks are due and «once a day»
-// are decided in SQL (crm_price_study_unpriced_due, crm_price_study_requeued); here the text is only built and sent to
-// Ahmed's own number. Nothing here reaches an owner.
-// the next pricing run, as Ahmed reads it
-const nextRunAr = (d = new Date()) => {
-  const m = new Date(d.getTime() + 4 * 3600 * 1000), mins = m.getUTCHours() * 60 + m.getUTCMinutes();
-  return mins < 8 * 60 ? "8 الصبح" : mins < 14 * 60 ? "2 الظهر" : "8 الصبح بكرة";
-};
+// ---------- «افتح اللابتوب» alerts (SQL99, Ahmed 13 Nov 2026) ----------
+// The scheduled tasks «تسعير آلي: الأراضي» and «تسعير آلي: العقارات الجاهزة» run on Ahmed's laptop, so a property waits while
+// the laptop is closed. Which task or study is due, the counted two hours and «once» are all decided in SQL99
+// (crm_price_study_unpriced_due, crm_price_study_requeued); here the text is only built and sent to Ahmed's own number.
+// The line added to the report of a new study is in whatsapp-owner-hot-alert. Nothing here reaches an owner.
+const LAPTOP_LINE = "افتح اللابتوب وتطبيق Claude عشان يتسعر";
 const KIND_AR: Record<string, string> = { land: "أرض", plot: "أرض", villa: "فيلا", house: "بيت", building: "مبنى", apartment: "شقة", farm: "مزرعة", shop: "محل", chalet: "شاليه", rest_house: "استراحة" };
 // the type as the owner offer has it (in Arabic), else «أرض» or «مبنى» as Claude's queue calls it; then the area
 const propertyLine = (r: any) => [KIND_AR[String(r?.kind_raw || "").trim().toLowerCase()] || String(r?.kind_raw || "").trim() || String(r?.property_kind || "").trim() || "عقار", [r?.area, r?.wilayat].filter(Boolean).join(" ، ")].filter(Boolean).join(" · ");
-// two pricing runs passed and still no study: one message a day listing every such task (SQL145, Ahmed 19 Nov 2026)
-const unpricedText = (list: any[], at = new Date()) => [
-  `⏰ عقارات ما تسعّرت بعد (${list.length}):`,
-  ...list.map((r) => `- ${propertyLine(r)}`),
-  `التسعير الجاي الساعة ${nextRunAr(at)}`,
-].join("\n");
+// two counted hours after a task was opened and still no study handed in: once per task
 async function unpricedTick(secret: string) {
   const q = await db.rpc("crm_price_study_unpriced_due");
   if (q.error) return [{ error: short(q.error.message, 200) }];
-  const rows = (q.data || []) as any[];
-  const byCompany = new Map<string, any[]>();
-  for (const r of rows) byCompany.set(r.company_id, [...(byCompany.get(r.company_id) || []), r]);
   const out: any[] = [];
-  const day = new Date(Date.now() + 4 * 3600 * 1000).toISOString().slice(0, 10);
-  for (const [companyId, list] of byCompany) {
-    const told = await tellAhmed(secret, companyId, list[0].branch === "barka" ? "barka" : "muscat", unpricedText(list), `price_study_unpriced_day:${day}`);
-    out.push({ company_id: companyId, tasks: list.length, told_ahmed: told.sent });
+  for (const r of (q.data || []) as any[]) {
+    const told = await tellAhmed(secret, r.company_id, r.branch === "barka" ? "barka" : "muscat", [
+      "⏰ العقار لسه ما تسعّر، تأكد إن اللابتوب شغال",
+      `العقار: ${propertyLine(r)}`,
+      r.branch ? `الفرع: ${branchAr(r.branch)}` : "",
+    ].filter(Boolean).join("\n"), `price_study_unpriced:${r.task_id}`);
+    out.push({ task_id: r.task_id, told_ahmed: told.sent });
+    await pause(1500);
   }
   return out;
 }
-// Ahmed rejected a study (it is back in Claude's queue): the type, the area and when the next pricing run is
+// Ahmed rejected a study (it is back in Claude's queue): the type, the area and the same line as a new study
 async function requeueAlert(studyId: string, secret: string) {
   const q = await db.rpc("crm_price_study_requeued", { p_study_id: studyId });
   if (q.error) return { study_id: studyId, error: short(q.error.message, 200) };
@@ -641,7 +531,7 @@ async function requeueAlert(studyId: string, secret: string) {
   const told = await tellAhmed(secret, r.company_id, r.branch === "barka" ? "barka" : "muscat", [
     `🔁 دراسة سعر رجعت للقائمة${r.branch ? ` · ${branchAr(r.branch)}` : ""}`,
     `العقار: ${propertyLine(r)}`,
-    `يتسعر في التشغيل الجاي الساعة ${nextRunAr()}`,
+    LAPTOP_LINE,
   ].join("\n"), `price_study_requeued:${studyId}`);
   return { study_id: studyId, told_ahmed: told.sent };
 }
@@ -697,14 +587,13 @@ Deno.serve(async (req) => {
   const uuid = (v: unknown) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v || "")) ? String(v) : "";
   try {
     if (action === "save_docs") { const id = uuid(body?.conversation_id); return id ? json({ ok: true, result: await saveDocs(id) }) : json({ ok: false, error: "conversation_id_required" }, 400); }
-    if (action === "sign") { const id = uuid(body?.conversation_id); return id ? json({ ok: true, documents: await signDocs(id, uuid(body?.task_id)) }) : json({ ok: false, error: "conversation_id_required" }, 400); }
+    if (action === "sign") { const id = uuid(body?.conversation_id); return id ? json({ ok: true, documents: await signDocs(id) }) : json({ ok: false, error: "conversation_id_required" }, 400); }
     if (action === "sign_inspection") { const id = uuid(body?.task_id); return id ? json({ ok: true, photos: await signInspection(id) }) : json({ ok: false, error: "task_id_required" }, 400); }
     if (action === "pull_files") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await pullFiles(id, secret) }) : json({ ok: false, error: "study_id_required" }, 400); }
     if (action === "send") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await sendStudy(id, "approved") }) : json({ ok: false, error: "study_id_required" }, 400); }
     if (action === "sent_by_phone") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await sentByPhone(id, uuid(body?.by)) }) : json({ ok: false, error: "study_id_required" }, 400); }
     if (action === "owner_inbound") { const id = uuid(body?.conversation_id); return id ? json({ ok: true, result: await ownerInbound(id, uuid(body?.message_id), secret) }) : json({ ok: false, error: "conversation_id_required" }, 400); }
     if (action === "held_tick") return json({ ok: true, results: await heldTick(secret) });
-    if (action === "drive_tick") return json({ ok: true, results: await driveTick() });
     if (action === "unpriced_tick") return json({ ok: true, results: await unpricedTick(secret) });
     if (action === "requeue_alert") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await requeueAlert(id, secret) }) : json({ ok: false, error: "study_id_required" }, 400); }
     if (action === "template") {
