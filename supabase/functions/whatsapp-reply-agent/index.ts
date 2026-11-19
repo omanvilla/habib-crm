@@ -567,6 +567,14 @@ function ownerDecisions(out: any, lines: string[], c: any) {
       out.guard_far_request = true;
     }
   }
+  // R115 (dry run of 799202aa on the branch, one run of three): the yes to «… انحجزت ⏎ تحب تشوف خيارات ثانية ؟» got only
+  // «حاليا ما عندنا فيلا متوفره في الرميس ⏎ اول ما يتوفر بتواصل معك». A reply that offers nothing gets the nearest home instead.
+  if (out.action === "none" && out.category === "buyer" && !c.visitedProp && texts.length
+    && !/^\s*(لا|لاا|ما\s*(ابي|أبي|اريد|أريد|ابغى)|مب|مو|مشكور|شكرا)/.test(String(c.burstSaid || ""))
+    && texts.every((t) => /ما\s*(عندنا|متوفر|في)|اول\s*ما\s*يتوفر|بتواصل\s*معك/.test(t))) {
+    const alt = soldNoticeYes(out, c);
+    if (alt) { texts = alt; out.guard_sold_yes_nothing = true; }
+  }
   // R116 (reply audit 19 Nov, Ahmed chose «متى يناسبك تزور ؟» then «اسمك الكريم ؟»; c53c9aee and four more): an offer with no
   // question left the client with nothing to answer («ارسلي اشوف» got the ad of the Al Sawmhan villa only, 799202aa). An available
   // home offered to a buyer who has not seen it gets its reel (when not sent in this chat) and the visit question.
