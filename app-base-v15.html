@@ -2456,12 +2456,6 @@ function clearClientSmartSearch(){
   renderClients();
 }
 
-/* Phone-like query (92236346 / 96892236346 / +968 9223 6346 / Arabic digits) matches any stored form by its last 8 digits. */
-function crmPhoneQueryMatch(query,values){
-  const raw=crmDigits(query).trim();if(!/^[+\d\s().\-]+$/.test(raw))return false;
-  const q=raw.replace(/\D/g,'');if(q.length<3)return false;const key=q.length>8?q.slice(-8):q;
-  return (values||[]).some(v=>crmDigits(v).replace(/\D/g,'').includes(key));
-}
 function matchesClientSmartFilter(c){
   const f=window.clientSmartFilter;
   if(!f)return true;
@@ -2487,6 +2481,15 @@ function matchesClientSmartFilter(c){
     }
     return true;
   });
+}
+/* Phone-like query matches any stored form: 92236346 / 96892236346 / +968 9223 6346 / 0096892236346 /
+   Arabic digits all reduce to the Omani 8 digits. Only Oman's 968 is dropped, so +968 4165551234
+   never matches the Canadian +1 416 555 1234. Declared here so the client-search test extracts it. */
+function crmPhoneQueryMatch(query,values){
+  const raw=crmDigits(query).trim();if(!/^[+\d\s().\-]+$/.test(raw))return false;
+  let q=raw.replace(/\D/g,'').replace(/^00/,'');if(q.length<3)return false;
+  if(q.length===11&&q.startsWith('968'))q=q.slice(3);
+  return (values||[]).some(v=>crmDigits(v).replace(/\D/g,'').replace(/^00/,'').includes(q));
 }
 
 

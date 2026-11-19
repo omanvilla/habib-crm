@@ -308,9 +308,10 @@ Deno.serve(async (req) => {
       const search=String(payload?.q||"").trim().slice(0,80)
         .replace(/[٠-٩]/g,(d)=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[۰-۹]/g,(d)=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
       if (search) {
-        const digits=search.replace(/\D/g,"");
+        const digits=search.replace(/\D/g,"").replace(/^00/,"");
         const phoneLike=/^[+\d\s().\-]+$/.test(search)&&digits.length>=3;
-        const key=phoneLike?(digits.length>8?digits.slice(-8):digits):"";
+        // Only Oman's 968 is dropped: +968 4165551234 must not match a foreign +1 416 555 1234.
+        const key=phoneLike?(digits.length===11&&digits.startsWith("968")?digits.slice(3):digits):"";
         const text=phoneLike?"":search.replace(/[,()*%\\"'.:]/g," ").replace(/\s+/g," ").trim();
         if (!key && !text) return json({ ok:true, conversations:[], has_more:false, next_offset:null, unread_total:0, handoff_total:0 });
         const ors=phoneLike?[`customer_wa_id.ilike.*${key}*`,`customer_phone.ilike.*${key}*`]:[`customer_name.ilike."*${text}*"`];

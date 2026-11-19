@@ -410,7 +410,7 @@ functions:{invoke:async(name,params)=>{
   wa.push({id:'wa-weak',route_key:'muscat',customer_name:'ههه',customer_phone:'+96899887766',customer_wa_id:'96899887766',last_message_at:new Date(Date.now()-200*36e5).toISOString(),unread_count:0,client:null,last_message:{body:'السلام عليكم',direction:'inbound'}});
   wa.push({id:'wa-owner',route_key:'owner',customer_name:'خاص بالمالك',customer_phone:'+96899887700',customer_wa_id:'96899887700',last_message_at:new Date(Date.now()-300*36e5).toISOString(),unread_count:0,client:null,last_message:{body:'خاص',direction:'inbound'}});
   let rows=wa.filter(c=>profile.role==='owner'||c.route_key!=='owner');
-  const q=String(params.body.q||'').trim(),digits=q.replace(/\D/g,''),phoneLike=/^[+\d\s().\-]+$/.test(q)&&digits.length>=3,key=digits.length>8?digits.slice(-8):digits;
+  const q=String(params.body.q||'').trim(),digits=q.replace(/\D/g,'').replace(/^00/,''),phoneLike=/^[+\d\s().\-]+$/.test(q)&&digits.length>=3,key=digits.length===11&&digits.startsWith('968')?digits.slice(3):digits;
   if(q)rows=rows.filter(c=>phoneLike?(c.customer_wa_id.includes(key)||c.customer_phone.includes(key)):c.customer_name.includes(q));
   const off=Number(params.body.offset||0),lim=Number(params.body.limit||100);
   return {data:{ok:true,conversations:rows.slice(off,off+lim),has_more:rows.length>off+lim,next_offset:rows.length>off+lim?off+lim:null,unread_total:0},error:null};
