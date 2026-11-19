@@ -414,7 +414,18 @@ auth:{
 functions:{invoke:async(name,params)=>{
  state.calls.push({function:name,action:params?.body?.action,blocked:true});
  const action=params?.body?.action;
- if(name==='whatsapp-inbox'&&action==='list')return {data:{ok:true,conversations:[],unread_total:0},error:null};
+ if(name==='whatsapp-inbox'&&action==='list'){
+  // 19 Nov 2026: 110 synthetic chats so the target «ههه» (99887766) sits beyond the first page of 100,
+  // plus one owner-only chat staff must never get. Search mirrors the server: name, or last 8 phone digits.
+  const wa=[];for(let i=0;i<110;i++)wa.push({id:'wa-'+i,route_key:'muscat',customer_name:'عميل اختبار '+i,customer_phone:'+9687100'+String(1000+i),customer_wa_id:'9687100'+String(1000+i),last_message_at:new Date(Date.now()-i*36e5).toISOString(),unread_count:0,client:null,last_message:{body:'رسالة '+i,direction:'inbound'}});
+  wa.push({id:'wa-weak',route_key:'muscat',customer_name:'ههه',customer_phone:'+96899887766',customer_wa_id:'96899887766',last_message_at:new Date(Date.now()-200*36e5).toISOString(),unread_count:0,client:null,last_message:{body:'السلام عليكم',direction:'inbound'}});
+  wa.push({id:'wa-owner',route_key:'owner',customer_name:'خاص بالمالك',customer_phone:'+96899887700',customer_wa_id:'96899887700',last_message_at:new Date(Date.now()-300*36e5).toISOString(),unread_count:0,client:null,last_message:{body:'خاص',direction:'inbound'}});
+  let rows=wa.filter(c=>profile.role==='owner'||c.route_key!=='owner');
+  const q=String(params.body.q||'').trim(),digits=q.replace(/\D/g,'').replace(/^00/,''),phoneLike=/^[+\d\s().\-]+$/.test(q)&&digits.length>=3,key=digits.length===11&&digits.startsWith('968')?digits.slice(3):digits;
+  if(q)rows=rows.filter(c=>phoneLike?(c.customer_wa_id.includes(key)||c.customer_phone.includes(key)):c.customer_name.includes(q));
+  const off=Number(params.body.offset||0),lim=Number(params.body.limit||100);
+  return {data:{ok:true,conversations:rows.slice(off,off+lim),has_more:rows.length>off+lim,next_offset:rows.length>off+lim?off+lim:null,unread_total:0},error:null};
+ }
  if(name==='instagram-api'&&action==='status')return {data:{ok:true,connected:false},error:null};
  return {data:null,error:{message:'TEST outbound, media download, AI and automation disabled'}};
 }},

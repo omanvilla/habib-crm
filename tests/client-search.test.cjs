@@ -19,6 +19,11 @@ test('international contacts keep their country code and identity without an Oma
  for(const text of ['+1 (416) 555-1234','0014165551234','٤١٦٥٥٥١٢٣٤']){f.window.clientSmartFilter={text};assert.equal(f.matchesClientSmartFilter(contact),true,text)}
  f.window.clientSmartFilter={text:'+9684165551234'};assert.equal(f.matchesClientSmartFilter(contact),false);
 });
+test('a number saved without 968 is found when searched with 968, +968, 00968 or spaces (19 Nov)',()=>{
+ const f=fixture(),local={...client,phone:'9234 4273',phone_normalized:null};
+ for(const text of ['92344273','96892344273','+96892344273','0096892344273','+968 9234 4273']){f.window.clientSmartFilter={text};assert.equal(f.matchesClientSmartFilter(local),true,text)}
+ f.window.clientSmartFilter={text:'96892344274'};assert.equal(f.matchesClientSmartFilter(local),false);
+});
 test('secondary request can match, but criteria from two independent requests cannot mix',()=>{
  const f=fixture();f.clientWorkRequests=[
   {client_id:client.id,route_key:'barka',property_type:'villa',preferred_area:'الرميس',budget_min:55000,budget_max:65000},

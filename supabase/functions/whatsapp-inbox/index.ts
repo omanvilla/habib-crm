@@ -303,6 +303,25 @@ Deno.serve(async (req) => {
         .eq("company_id", companyId);
       if (profile.role !== "owner" && ownerOnly.size) q = q.not("route_key", "in", `(${[...ownerOnly].join(",")})`);
       if(internalWaIds.size)q=q.not("customer_wa_id","in",`(${[...internalWaIds].join(",")})`);
+      // Search across ALL accessible chats (not only the loaded page): name, or phone in any
+      // form (92236346 / 96892236346 / +968 9223 6346) matched on its last 8 digits.
+      const search=String(payload?.q||"").trim().slice(0,80)
+        .replace(/[٠-٩]/g,(d)=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[۰-۹]/g,(d)=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
+      if (search) {
+        const digits=search.replace(/\D/g,"").replace(/^00/,"");
+        const phoneLike=/^[+\d\s().\-]+$/.test(search)&&digits.length>=3;
+        // Only Oman's 968 is dropped: +968 4165551234 must not match a foreign +1 416 555 1234.
+        const key=phoneLike?(digits.length===11&&digits.startsWith("968")?digits.slice(3):digits):"";
+        const text=phoneLike?"":search.replace(/[,()*%\\"'.:]/g," ").replace(/\s+/g," ").trim();
+        if (!key && !text) return json({ ok:true, conversations:[], has_more:false, next_offset:null, unread_total:0, handoff_total:0 });
+        const ors=phoneLike?[`customer_wa_id.ilike.*${key}*`,`customer_phone.ilike.*${key}*`]:[`customer_name.ilike."*${text}*"`];
+        const matched=await userClient.from("clients").select("id").eq("company_id",companyId)
+          .or(phoneLike?`phone_normalized.ilike.*${key}*,phone.ilike.*${key}*`:`name.ilike."*${text}*"`).limit(200);
+        if (matched.error) throw new Error(`client_search_failed: ${matched.error.message}`);
+        const ids=(matched.data||[]).map((c:any)=>c.id).filter((id:string)=>/^[0-9a-f-]{36}$/i.test(id));
+        if (ids.length) ors.push(`client_id.in.(${ids.join(",")})`);
+        q=q.or(ors.join(","));
+      }
       // Independent reads run together; errors are still reported in the original order.
       const [r, counters, hidden] = await Promise.all([
         q.order("last_message_at", { ascending: false, nullsFirst: false })
