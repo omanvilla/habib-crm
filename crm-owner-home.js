@@ -80,6 +80,12 @@
     window[name]=function(){const self=this,args=arguments,g=window.crmHomeFirst;
       return g?g.then(()=>f.apply(self,args)):f.apply(self,args);};};
   afterHome('loadNotifications');afterHome('refreshWhatsAppBadge');
+  // updateUserUI / applyRoleVisibility call these just before the gate is armed, so they look one step later: the branch
+  // people names and the owner's settings cards (lead routing, Google Sheet) are not on the home
+  const afterHomeNext=name=>{const f=window[name];if(typeof f!=='function')return;
+    window[name]=function(){const self=this,args=arguments;
+      Promise.resolve().then(()=>{const g=window.crmHomeFirst;return g?g.then(()=>f.apply(self,args)):f.apply(self,args);}).catch(()=>{});};};
+  afterHomeNext('crmLoadBranchPeople');afterHomeNext('refreshLeadFormCard');
 
   function mount(){
     const page=byId('page-dash');if(!page)return null;
