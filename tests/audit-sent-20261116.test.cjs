@@ -255,16 +255,17 @@ test('R88 / SQL108: the study goes by the phone, the pricing list drops what is 
  assert(f.includes('REVOKE ALL ON FUNCTION public.crm_price_study_sent_by_phone(uuid) FROM PUBLIC, anon;')&&f.includes('REVOKE ALL ON FUNCTION public.crm_price_study_drop(uuid, text) FROM PUBLIC, anon;'));
  assert(rb.includes('DROP FUNCTION IF EXISTS public.crm_price_study_sent_by_phone(uuid);')&&rb.includes('DROP FUNCTION IF EXISTS public.crm_price_study_drop(uuid, text);'));
  const ps=fs.readFileSync('supabase/functions/price-study/index.ts','utf8');
- assert(ps.includes('if (action === "sent_by_phone") {')&&ps.includes('.in("status", ["waiting_owner", "approved", "send_failed"])'));
+ assert(ps.includes('if (action === "sent_by_phone") {')&&ps.includes('.in("status", ["awaiting_approval", "waiting_owner", "approved", "send_failed"])'),'SQL146: also straight from «تنتظر موافقتك»');
  assert(ps.includes('const after = conv ? await afterSent(s, conv, now) : ["conversation"];')&&ps.includes('const after = await afterSent(s, conv, now);'),'the phone send closes like the automatic one');
  assert(ps.includes('media_id: (extra as any)?.media?.id ?? null'),'the report sent to the owner opens from the chat');
  assert(!/sentByPhone[\s\S]{0,900}metaSend\(/.test(ps.slice(ps.indexOf('async function sentByPhone'),ps.indexOf('async function afterSent'))),'recording sends nothing');
  const ui=fs.readFileSync('crm-price-studies.js','utf8'),home=fs.readFileSync('crm-owner-home.js','utf8'),index=fs.readFileSync('index.html','utf8');
- assert(ui.includes("(i.status==='waiting_owner'||retry?'<div class=\"cps-phone\">")&&ui.includes('data-cps="phone-done"'));
- assert(ui.includes("'?text='+encodeURIComponent(String(s.owner_message||''))")&&ui.includes("supa.rpc('crm_price_study_sent_by_phone',{p_study_id:id})"));
+ // SQL146 (19 Nov 2026): the phone steps show while the study waits for approval too
+ assert(ui.includes("const phoneable=i=>['awaiting_approval','approved','waiting_owner','send_failed'].includes(i.status);")&&ui.includes("+(phoneable(i)?'<div class=\"cps-phone\">")&&ui.includes('data-cps="phone-done"'));
+ assert(ui.includes("window.crmWaPhoneLink(d,text)")&&ui.includes("supa.rpc('crm_price_study_sent_by_phone',{p_study_id:id})"));
  assert(ui.includes("window.crmPriceStudyChats=()=>new Set("));
  assert(home.includes("window.crmPriceStudyChats().has(i&&i.conversation_id));")&&home.includes("supa.rpc('crm_price_study_drop',{p_conversation_id:id,p_reason:why.trim()})"));
- assert(index.includes('crm-price-studies.js?v=20261116-ps3')&&index.includes('crm-owner-home.js?v=20261119-audit1'));
+ assert(/crm-price-studies\.js\?v=202611(19|2\d)-/.test(index)&&index.includes('crm-owner-home.js?v=20261119-audit1'));
 });
 
 // ---- R89 (Ahmed 16 Nov 2026, Jehan): the client confirmed a meeting time while the agent stays out → Ahmed's WhatsApp ----
