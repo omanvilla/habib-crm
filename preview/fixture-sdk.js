@@ -227,6 +227,11 @@ function fixtureExtraRpc(name,args){
  };
  const callPeople=()=>profiles.filter(p=>p.role==='agent'&&(!staff||p.id===profile.id));
  const span=(from,to,calls,target,extra)=>({from,to,calls,target,...extra});
+ // ?failhome=N (19 Nov 2026): the home read fails N times, to check the old dashboard never comes back
+ if((name==='crm_owner_home'||name==='crm_staff_home')&&typeof location!=='undefined'){
+  const n=Number(new URLSearchParams(location.search).get('failhome')||0);window.__homeFails=(window.__homeFails||0)+1;
+  if(window.__homeFails<=n)return {data:null,error:{message:'TEST home failed',code:'57014'}};
+ }
  switch(name){
   case 'crm_owner_home':return isOwner?ok({...home(),auto_visits:1}):ownerOnly();
   case 'crm_staff_home':return isOwner?ownerOnly():ok({...home(),scope:'staff'});

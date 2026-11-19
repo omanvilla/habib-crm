@@ -1,7 +1,7 @@
 /* Owner home page (redesigned 9 November 2026). One screen: a hello line, big tiles for what needs Ahmed now
  * (each opens a sheet over the page or its own page, so the home page stays short), small quick decisions,
  * hot-buyer alerts at the top, and one compact summary. The old work list stays one click away.
- * Reads crm_owner_home and crm_paused_chats (owner only). If the data does not load, the old page stays as it was. */
+ * Reads crm_owner_home and crm_paused_chats (owner only). If the data does not load, the placeholder stays and the home keeps retrying (never the old page, 19 Nov 2026). */
 (function(){
   'use strict';
   const byId=id=>document.getElementById(id);
@@ -56,9 +56,17 @@
     if(!gate)return;
     clearTimeout(gate.timer);const g=gate;gate=null;window.crmHomeFirst=null;g.done();
   }
+  /* 19 Nov 2026 (Ahmed: «ما اريد النسخة القديمة ابدا»): .coh-home on <html> for every account with this home. The old
+   * dashboard stays hidden under the placeholder until the home is drawn, however long the home takes (crm-owner-home.css);
+   * the 8 s gate above only stops holding back the old reads. An account with no home role gets the old page as before. */
+  function markHome(){
+    const on=hasHome(),root=document.documentElement;
+    root.classList.toggle('coh-home',on);if(!on)root.classList.remove('coh-slow');
+  }
   const roleVisibility=window.applyRoleVisibility;
   if(typeof roleVisibility==='function')window.applyRoleVisibility=function(){
     const r=roleVisibility.apply(this,arguments);
+    markHome();
     if(hasHome()&&!last)armGate();else if(!hasHome())releaseGate();
     return r;
   };
@@ -379,6 +387,7 @@
   }
   async function load(){
     const page=byId('page-dash'),box=mount();if(!page||!box){releaseGate();return;}
+    markHome();
     if(!hasHome()||typeof supa==='undefined'){box.hidden=true;page.classList.remove('coh-on');releaseGate();return;}
     const seq=++sequence,owner=isOwner(),twinForce=forceTwins;let ok=false;forceTwins=false;
     try{
@@ -395,7 +404,7 @@
       usage=[];
       if(pz&&!pz.error&&pz.data)paused=pz.data;
       if(home.error||!home.data){if(!last){box.hidden=true;page.classList.remove('coh-on');}return;}
-      ok=true;retries=0;clearTimeout(retryTimer);
+      ok=true;retries=0;clearTimeout(retryTimer);document.documentElement.classList.remove('coh-slow');
       last={data:home.data,pending:pending||0,twins:twinGroups&&!twinGroups.error?twinGroups.data:[]};
       render();
       box.hidden=false;page.classList.add('coh-on');
@@ -424,9 +433,12 @@
    * it as soon as a read succeeds. */
   let retries=0,retryTimer=null;
   function retryLater(){
-    if(last||!hasHome()||retries>=10)return false;
+    // 19 Nov 2026: no last try any more (the old dashboard is never the fallback); after three failed tries the placeholder
+    // says the connection is slow, and the home keeps trying (every 30 seconds after ten tries)
+    if(last||!hasHome())return false;
     clearTimeout(retryTimer);
-    retryTimer=setTimeout(()=>{if(!last&&hasHome())load().catch(()=>{});},[2000,4000,8000][retries]||15000);
+    if(retries>=3)document.documentElement.classList.add('coh-slow');
+    retryTimer=setTimeout(()=>{if(!last&&hasHome())load().catch(()=>{});},[2000,4000,8000][retries]||(retries<10?15000:30000));
     retries++;return true;
   }
   function render(){
@@ -535,5 +547,5 @@
    * more in that case, so every module that wraps it gets its first run. An account with no home role gives the class
    * back at once. */
   const appOpen=()=>{const a=byId('appScreen');return !!(a&&a.classList.contains('visible'));};
-  if(appOpen()){if(hasHome())armGate();else releaseGate();}
+  if(appOpen()){markHome();if(hasHome())armGate();else releaseGate();}
 })();

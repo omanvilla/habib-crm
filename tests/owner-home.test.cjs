@@ -14,12 +14,14 @@ test('the home sections are there and the full work list stays reachable',()=>{
  assert.match(css,/coh-on:not\(\.coh-full-open\)>#opsDailyWork/);
 });
 // 11 Nov 2026 (Ahmed): staff get this same home too (crm_staff_home, tests/staff-home.test.cjs); an account with no role keeps the old page
-test('an account without a home role and a failed load keep the old page',()=>{
+test('an account without a home role keeps the old page; a home account never gets it back (19 Nov 2026)',()=>{
+ assert(js.includes("root.classList.toggle('coh-home',on);"),'.coh-home follows the role');
+ assert(css.includes('html.coh-home.coh-slow #page-dash:not(.coh-on)::before'));
  assert.match(js,/if\(!hasHome\(\)[^;]*;page\.classList\.remove\('coh-on'\);(releaseGate\(\);)?return;\}/);
  assert.match(js,/if\(home\.error\|\|!home\.data\)\{if\(!last\)\{box\.hidden=true;page\.classList\.remove\('coh-on'\);\}return;\}/);
 });
 test('the old dashboard is never painted for the owner before the home (boot gate, 10 Nov 2026)',()=>{
- assert.match(css,/html\.coh-boot #page-dash:not\(\.coh-on\)>\*\{display:none!important\}/);
+ assert(css.includes(':is(html.coh-boot,html.coh-home) #page-dash:not(.coh-on)>*{display:none!important}'));
  assert.match(js,/if\(hasHome\(\)&&!last\)armGate\(\);else if\(!hasHome\(\)\)releaseGate\(\);/);
  assert.match(js,/timer:setTimeout\(releaseGate,8000\)/,'the gate never holds the page longer than 8 s');
  assert.match(js,/\}finally\{if\(seq===sequence&&\(ok\|\|!retryLater\(\)\)\)releaseGate\(\);\}/,'the gate opens after the first load; a failed one is retried and the 8 s timer still opens it');
@@ -27,23 +29,23 @@ test('the old dashboard is never painted for the owner before the home (boot gat
  assert.equal((ops.match(/if\(window\.crmHomeFirst\)\{await window\.crmHomeFirst;/g)||[]).length,2,'old dashboard reads wait for the home');
 });
 // 14 Nov 2026 (Ahmed, signed in as staff, saw the old dashboard): two causes, both held here.
-test('a failed first load of the home is read again by itself, a bounded number of times',()=>{
+test('a failed first load of the home is read again by itself until it loads (19 Nov 2026: never the old page)',()=>{
  const body=js.slice(js.indexOf('function retryLater(){'),js.indexOf('function render(){'));
- assert(body.includes('if(last||!hasHome()||retries>=10)return false;'),'never after a success, never without end');
- assert(body.includes("retryTimer=setTimeout(()=>{if(!last&&hasHome())load().catch(()=>{});},[2000,4000,8000][retries]||15000);"));
+ assert(body.includes('if(last||!hasHome())return false;'),'never after a success');
  assert(js.includes('ok=true;retries=0;clearTimeout(retryTimer);'),'a success stops the retries');
  // the retry logic itself, run as plain JS
- let last=null,retries=0,retryTimer=null,calls=[];const hasHome=()=>true,load=()=>Promise.resolve();
+ let last=null,retries=0,retryTimer=null,calls=[];const hasHome=()=>true,load=()=>Promise.resolve();const cls=new Set(),document={documentElement:{classList:{add:c=>cls.add(c)}}};
  const setTimeout=(f,ms)=>{calls.push(ms);return calls.length;},clearTimeout=()=>{};
  const retryLater=eval('('+body.slice(0,body.lastIndexOf('}')+1)+')');
  for(let i=0;i<12;i++)retryLater();
- assert.deepEqual(calls,[2000,4000,8000,15000,15000,15000,15000,15000,15000,15000]);
- assert.equal(retryLater(),false);
+ assert.deepEqual(calls,[2000,4000,8000,15000,15000,15000,15000,15000,15000,15000,30000,30000]);
+ assert(cls.has('coh-slow'),'the placeholder says the connection is slow');
+ last={};assert.equal(retryLater(),false);
 });
 test('the app starting before the modules arrived still gets the home (empty cache after a publication)',()=>{
  assert(index.includes(`h=h.replace('<html lang="ar" dir="rtl">','<html lang="ar" dir="rtl" class="coh-boot">');`),'the old dashboard is hidden from the first paint');
  assert(fs.readFileSync('app-base-v15.html','utf8').includes('<html lang="ar" dir="rtl">'),'the tag index.html replaces is there');
- assert(js.includes("if(appOpen()){if(hasHome())armGate();else releaseGate();}"),'the gate gets its 8 s timer even when applyRoleVisibility ran before this file');
+ assert(js.includes("if(appOpen()){markHome();if(hasHome())armGate();else releaseGate();}"),'the gate gets its 8 s timer even when applyRoleVisibility ran before this file');
  const tail=index.slice(index.indexOf('window.APP_VERSION='));
  assert(tail.includes('if(a&&a.classList.contains("visible")&&typeof loadDashboard==="function")loadDashboard();'),'every wrapper of loadDashboard gets its first run');
  assert(tail.includes('if(!window.crmOwnerHomeRefresh)document.documentElement.classList.remove("coh-boot")'),'a missing home file never leaves the page blank');

@@ -1,11 +1,14 @@
 /* Owner home page: four sections. The old sections stay in the page, hidden until "قائمة العمل الكاملة". */
 /* Boot gate (10 Nov 2026): owner account, home not drawn yet. Nothing of the old dashboard is painted; a light
- * placeholder shaped like the home stands in. crm-owner-home.js removes .coh-boot after the first load (8 s at most). */
-html.coh-boot #page-dash:not(.coh-on)>*{display:none!important}
-html.coh-boot #page-dash:not(.coh-on)::before{content:'جاري تجهيز الرئيسية…';display:flex;align-items:flex-end;box-sizing:border-box;height:112px;padding:18px 20px;margin-bottom:16px;border-radius:20px;background:linear-gradient(145deg,#1f4d40,#2b6a57);color:#fff;font-size:15px;font-weight:700}
-html.coh-boot #page-dash:not(.coh-on)::after{content:'';display:block;height:234px;background:linear-gradient(#fff,#fff) 0 0/calc(50% - 5px) 112px no-repeat,linear-gradient(#fff,#fff) 100% 0/calc(50% - 5px) 112px no-repeat,linear-gradient(#fff,#fff) 0 100%/calc(50% - 5px) 112px no-repeat,linear-gradient(#fff,#fff) 100% 100%/calc(50% - 5px) 112px no-repeat;opacity:.75;animation:cohPulse 1.2s ease-in-out infinite alternate}
+ * placeholder shaped like the home stands in. crm-owner-home.js removes .coh-boot after the first load (8 s at most); .coh-home keeps it. */
+:is(html.coh-boot,html.coh-home) #page-dash:not(.coh-on)>*{display:none!important}
+:is(html.coh-boot,html.coh-home) #page-dash:not(.coh-on)::before{content:'جاري تجهيز الرئيسية…';display:flex;align-items:flex-end;box-sizing:border-box;height:112px;padding:18px 20px;margin-bottom:16px;border-radius:20px;background:linear-gradient(145deg,#1f4d40,#2b6a57);color:#fff;font-size:15px;font-weight:700}
+:is(html.coh-boot,html.coh-home) #page-dash:not(.coh-on)::after{content:'';display:block;height:234px;background:linear-gradient(#fff,#fff) 0 0/calc(50% - 5px) 112px no-repeat,linear-gradient(#fff,#fff) 100% 0/calc(50% - 5px) 112px no-repeat,linear-gradient(#fff,#fff) 0 100%/calc(50% - 5px) 112px no-repeat,linear-gradient(#fff,#fff) 100% 100%/calc(50% - 5px) 112px no-repeat;opacity:.75;animation:cohPulse 1.2s ease-in-out infinite alternate}
 @keyframes cohPulse{to{opacity:.4}}
-@media (prefers-reduced-motion:reduce){html.coh-boot #page-dash:not(.coh-on)::after{animation:none}}
+@media (prefers-reduced-motion:reduce){:is(html.coh-boot,html.coh-home) #page-dash:not(.coh-on)::after{animation:none}}
+/* 19 Nov 2026 (Ahmed: «ما اريد النسخة القديمة ابدا»): an account with the new home (.coh-home, set by crm-owner-home.js from its role)
+ * never sees the old dashboard, also when the home is slow or a read fails: the placeholder stays and the home keeps retrying. */
+html.coh-home.coh-slow #page-dash:not(.coh-on)::before{content:'الاتصال بطيء، نكمل المحاولة…'}
 #page-dash.coh-on:not(.coh-full-open)>.ops-dashboard-intro,
 #page-dash.coh-on:not(.coh-full-open)>#opsEmployeeTargets,
 #page-dash.coh-on:not(.coh-full-open)>#opsDailyWork{display:none!important}

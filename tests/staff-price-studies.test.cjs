@@ -60,5 +60,5 @@ test('R59 is written down, and R37 says what it changed',()=>{
   const rules=read('docs/agent-rules.md');
   assert(/\| R59 \| \*\*دراسات السعر للموظف/.test(rules));
   assert(rules.includes('(تعدلت بـ R59، 14 نوفمبر'));
-  assert(index.includes('crm-price-studies.js?v=20261119-phone1')&&index.includes('crm-owner-home.js?v=20261119-audit1'));
+  assert(index.includes('crm-price-studies.js?v=20261119-phone1')&&/crm-owner-home\.js\?v=202611(19|2\d)-/.test(index));
 });
