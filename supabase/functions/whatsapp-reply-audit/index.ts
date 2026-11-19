@@ -41,6 +41,7 @@ export const TYPES: Record<string, { label: string; critical?: boolean }> = {
 export const RELEASES: { at: string; rules: string[] }[] = [
   { at: "2026-11-18T11:37:00Z", rules: ["R112", "R113", "R114", "R115"] }, // brain 103a979, then v101 ab76b4e (11:49Z)
   { at: "2026-11-18T13:33:40Z", rules: ["R74"] }, // v102 73cacaa
+  { at: "2026-11-19T06:47:09Z", rules: ["R115", "R116", "R117"] }, // v103 6651f9b (first reply audit)
 ];
 const releasedAfter = (rule: string, at: string) => RELEASES.some((r) => r.rules.includes(rule) && new Date(at).getTime() < new Date(r.at).getTime());
 const MODEL_TYPES = Object.keys(TYPES).filter((k) => !["send_failed", "unanswered"].includes(k));
