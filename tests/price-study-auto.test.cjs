@@ -32,7 +32,7 @@ test('owner net, commission and the internal report are owner-only: no staff pol
   const queue=fwd.slice(fwd.indexOf('FUNCTION public.crm_price_study_queue()'),fwd.indexOf('REVOKE ALL ON FUNCTION public.crm_price_study_queue()'));
   assert(!/owner_net|commission/.test(queue));
   const told=[...fn.matchAll(/tellAhmed\(secret,[\s\S]*?\`price_study_[a-z]+:\$\{[^}]+\}\`\)/g)].map(m=>m[0]);
-  assert.equal(told.length,5); // 3 of SQL94 / SQL95, and the two «افتح اللابتوب» alerts of SQL99 (13 Nov 2026)
+  assert.equal(told.length,4); // 3 of SQL94 / SQL95, and one of SQL99's two «افتح اللابتوب» alerts (SQL145, 19 Nov: no laptop line, one daily message)
   for(const t of told)assert(!/owner_net|commission|internal/.test(t),'no confidential figure in an alert');
 });
 test('nothing reaches an owner before the approval, and test mode only reaches the test numbers',()=>{

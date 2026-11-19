@@ -86,7 +86,8 @@ test('dry run rows 701-740: the property she named by area and price is not call
  const available=[{id:'h59',branch_key:'barka',area:'بركاء الرميس',price:59000},{id:'s69',branch_key:'barka',area:'الصومحان الجنوبية',price:69000}];
  const h=[IN('ممكن الموقع'),OUT('موقع ايش ؟'),IN('فلة الرميس اللي ب59 الف')];
  const r=decide(['الفيلا اللي سألتي عنها انباعت','بس عندنا فيلا ثانية في الرميس بـ 59 الف متوفرة حالياً','اسمك الكريم ؟ ومتى يناسبك تزورين ؟'],h,null,{available,route:'barka'});
- assert.deepEqual(r.texts,['عندنا فيلا في الرميس بـ 59 الف متوفرة حالياً','اسمك الكريم ؟ ومتى يناسبك تزورين ؟']);assert.equal(r.out.property_id,'h59');
+ // R116 (19 Nov, Ahmed's order): the visit question first, «اسمك الكريم ؟» last on its own line
+ assert.deepEqual(r.texts,['عندنا فيلا في الرميس بـ 59 الف متوفرة حالياً','متى يناسبك تزورين ؟','اسمك الكريم ؟']);assert.equal(r.out.property_id,'h59');
  // live check after v91: «سألتِ» with a kasra
  assert.deepEqual(decide(['الفيلا اللي سألتِ عنها انباعت','بس عندنا فيلا ثانية في الرميس بـ 59 الف متوفره حالياً'],h,null,{available,route:'barka'}).texts,['عندنا فيلا في الرميس بـ 59 الف متوفره حالياً']);
  // dry run on the branch: words between «عنها» and «انباعت», and another area offered: her named one goes instead
