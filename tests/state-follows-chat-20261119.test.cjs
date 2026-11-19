@@ -42,3 +42,14 @@ test('ج: a person answering with a day, an hour or a location relabels the meet
   assert.match(sql, /NEW\.actor_type <> 'human'/);
   assert(!/done = true/.test(sql.split('meeting_answered_by_person')[1] || ''));
 });
+
+test('«كمّل يا عقل» never runs the agent on a client message older than 24 hours', () => {
+  const inbox = fs.readFileSync('supabase/functions/whatsapp-inbox/index.ts', 'utf8');
+  const home = fs.readFileSync('crm-owner-home.js', 'utf8'), base = fs.readFileSync('app-base-v15.html', 'utf8');
+  const i = inbox.indexOf('resume:"too_old"'), f = inbox.indexOf('functions/v1/whatsapp-reply-agent');
+  assert(i > 0 && f > i, 'the age check comes before the agent call');
+  assert.match(inbox, /if\(Date\.now\(\)-inAt>24\*3600000\)/);
+  assert.match(home, /res\.resume==='too_old'/);
+  assert.match(base, /res\.resume==='too_old'/);
+  assert(index.includes('crm-owner-home.js?v=20261119-open3') && index.includes('app-base-v15.html?v=20261119-open3'));
+});
