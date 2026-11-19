@@ -532,7 +532,7 @@
           else if(a.ignored)msg='رجعت للعقل ('+a.ignored+')';
         }else if(res&&res.resume==='agent_pending')msg='رجعت للعقل، والرد في الطريق';
         // 19 Nov 2026: the client's last message is older than 24 hours, so the agent is not run on it (whatsapp-inbox «too_old»)
-        else if(res&&res.resume==='too_old')msg='رجعت للعقل. آخر رسالة من العميل '+(typeof timeAgo==='function'&&res.last_inbound_at?timeAgo(res.last_inbound_at):'أقدم من يوم')+'، فالعقل ما يرد عليها، ويرد أول ما يكتب العميل';
+        else if(res&&res.resume==='too_old')msg='رجعت للعقل. آخر رسالة من العميل '+(typeof timeAgo==='function'&&res.last_inbound_at?'قبل '+timeAgo(res.last_inbound_at):'أقدم من يوم')+'، فالعقل ما يرد عليها، ويرد أول ما يكتب العميل';
         paused.total=paused.items.length;if(last)drawTiles(last.data,last.pending);drawSheet();toast(msg,kind);
         if(kind==='error'&&typeof window.crmOwnerHomeRefresh==='function')setTimeout(window.crmOwnerHomeRefresh,1500);
       }).catch(()=>{b.disabled=false;b.textContent='كمّل يا عقل';toast('ما انحفظ. جرب مرة ثانية','error');});

@@ -438,6 +438,9 @@ auth:{
 functions:{invoke:async(name,params)=>{
  state.calls.push({function:name,action:params?.body?.action,blocked:true});
  const action=params?.body?.action;
+ // 19 Nov 2026: «كمّل يا عقل» on a chat whose client wrote 3 days ago: the server returns too_old and runs no agent
+ if(name==='whatsapp-inbox'&&action==='clear_handoff'&&params.body.resume===true)
+  return {data:{ok:true,resume:'too_old',last_inbound_at:new Date(Date.now()-3*864e5).toISOString()},error:null};
  if(name==='whatsapp-inbox'&&action==='list'){
   // 19 Nov 2026: 110 synthetic chats so the target «ههه» (99887766) sits beyond the first page of 100,
   // plus one owner-only chat staff must never get. Search mirrors the server: name, or last 8 phone digits.

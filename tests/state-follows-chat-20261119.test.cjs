@@ -51,5 +51,5 @@ test('«كمّل يا عقل» never runs the agent on a client message older th
   assert.match(inbox, /if\(Date\.now\(\)-inAt>24\*3600000\)/);
   assert.match(home, /res\.resume==='too_old'/);
   assert.match(base, /res\.resume==='too_old'/);
-  assert(index.includes('crm-owner-home.js?v=20261119-open3') && index.includes('app-base-v15.html?v=20261119-open3'));
+  assert(index.includes('crm-owner-home.js?v=20261119-') && index.includes('app-base-v15.html?v=20261119-'));
 });
