@@ -10,3 +10,13 @@
 .cat-actions{display:flex;flex-wrap:wrap;gap:6px}
 .cat-actions>*{width:auto!important;min-height:40px}
 @media(max-width:600px){.cat-actions{flex:1 1 100%}.cat-actions>*{flex:1}}
+/* «🧠 فحص الردود» sheet (crm-reply-audit.js, SQL144) */
+.cra-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 10px}
+.cra-stats div{background:#F7F3EA;border-radius:10px;padding:8px;text-align:center}
+.cra-stats b{display:block;font-size:20px}
+.cra-stats small{font-size:11px;color:#6f6552}
+.cra-health{margin:0 0 12px;padding:8px 10px;border-radius:10px;font-size:13px}
+.cra-health.ok{background:#ECFDF3;color:#166534}
+.cra-health.bad{background:#FEF2F2;color:#991B1B}
+.cra-names{font-size:13px;line-height:1.9;margin:0 0 10px}
+@media (max-width:420px){.cra-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}

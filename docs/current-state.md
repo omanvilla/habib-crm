@@ -6,6 +6,23 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 19 November 2026 — reply audit twice a day, SQL144 (`claude/reply-audit-20261119`)
+
+Ahmed: «فاحص الردود الآلية مرتين باليوم … تطوير لمدرّب الردود الموجود». Rules and how to decide: `docs/agent-rules.md`
+(«طريقة التعديل» step 7 and «فاحص الردود»).
+- **SQL144 (live, `apply_migration` `reply_audit_20261119`):** `whatsapp_reply_audit_runs`, `whatsapp_reply_audit_findings`
+  (RLS on, no policy, nothing granted to browsers); `crm_reply_audit_card()` (owner only, the home tile);
+  `crm_reply_audit_open / _decide / _apply` and the helpers `crm_reply_audit_health / _unanswered` (service role and postgres
+  only: the Claude chat). Cron `reply_audit_morning` `30 3 * * *` and `reply_audit_afternoon` `30 10 * * *` (07:30 / 14:30
+  Muscat, every day). Rollback `144-reply-audit.rollback.sql` (tables dropped only when empty). Next SQL number **145**.
+- **`whatsapp-reply-audit`** (new, pinned remote import, `verify_jwt=false`, x-crm-agent secret inside): judges every chat with
+  an agent draft in the period (sent + «no_reply_needed») with the model (`REPLY_AUDIT_MODEL` or the coach's), against the brain,
+  the pinned replies, `rules.ts` (generated from this file's R rows by `build-rules.ps1`), `KNOWN_MISTAKES`, the property list with
+  the ad text and reels; adds failed sends and chats left with no reply; groups, keeps 5, mutes a chat only on a certain critical
+  mistake, sends the report to Ahmed's WhatsApp (Muscat number) and a CRM notification every run. `{dry:true}` writes and sends
+  nothing. Front end: `crm-reply-audit.js` + tile «🧠 فحص الردود» in `crm-owner-home.js` (owner only, read only).
+- `reply_coach_weekly` is unchanged: it scores the A/B wordings by outcome (replied, visit, deal), the audit looks for mistakes.
+
 ## 17 November 2026 (evening) — check of the live database, SQL116 (`claude/system-check-20261117`)
 
 Ahmed: «سوّ فحص شامل للنظام وعدّل عليه». The screens were checked the same morning (section below), so this one read the
