@@ -4,8 +4,8 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','utf8').replace(/\r\n/g,'\n');
 const pickA=(start,end)=>{const a=agent.indexOf(start);assert(a>=0,'missing: '+start);const b=agent.indexOf(end,a);assert(b>a,'no end: '+start);return agent.slice(a,b+end.length);};
 const dsrc=['const THEIR_OFFICE','const ASK_CONFIRM','const WE_SHOW','const MY_OWN','const SILENT_TYPES','const COMMISSION_ASK','const COMMISSION_BUYER_LINES','const COMMISSION_OWNER_LINES','const ASK_LINK','const areaKey','const BOOKING_ASK','const BOOKING_NOT','const ASK_HOUR','const NEEDS_AHMED','const VIDEO_PROMISE','const FAREWELL','const FIXED_PRICE_LINE','const IG_CODE','const UNKNOWN_Q','const LOCATION_ASK','const AREA_REASON','const OUTSIDE_LOOK','const locationForArea','const LOCATION_HELD','const AREA_LINES','const INSIDE_VIDEO_ASK','const LAYOUT_ASK','const LAYOUT_LINES','const OUR_HOUR','const HOUR_SAID','const OWNER_TIME_LINE','const DEPOSIT_SAID','const REASON_Q','const VISIT_Q']
- .map((s)=>pickA(s,'\n')).join('')+pickA('const R66_DETAILS_ASK','\n')+pickA('const R66_GENERIC','\n')+pickA('function nearBarka','\n}\n')+pickA('function ownerDecisions','\n}\n');
-const D=new Function(dsrc.replace(/ as (?:string|any|unknown|number)(?:\[\])?(?=\))/g,'').replace(/(\w+): (?:string|any|unknown|number)(?:\[\])?(?=[,)])/g,'$1')+';return {ownerDecisions,THEIR_OFFICE,COMMISSION_BUYER_LINES,COMMISSION_OWNER_LINES,locationForArea,INSIDE_VIDEO_ASK,LAYOUT_ASK,LAYOUT_LINES,AREA_LINES,OWNER_TIME_LINE,DEPOSIT_SAID};')();
+ .map((s)=>pickA(s,'\n')).join('')+pickA('const R66_DETAILS_ASK','\n')+pickA('const R66_GENERIC','\n')+pickA('function nearBarka','\n}\n')+pickA('function soldNoticeYes','\n}\n')+pickA('function ownerDecisions','\n}\n');
+const D=new Function(dsrc.replace(/\): string\[\] \| null \{/g,'){').replace(/ as (?:string|any|unknown|number)(?:\[\])?(?=\))/g,'').replace(/(\w+): (?:string|any|unknown|number)(?:\[\])?(?=[,)])/g,'$1')+';return {ownerDecisions,THEIR_OFFICE,COMMISSION_BUYER_LINES,COMMISSION_OWNER_LINES,locationForArea,INSIDE_VIDEO_ASK,LAYOUT_ASK,LAYOUT_LINES,AREA_LINES,OWNER_TIME_LINE,DEPOSIT_SAID};')();
 const IN=(b)=>({direction:'inbound',body:b}),OUT=(b)=>({direction:'outbound',body:b});
 const MAP='https://maps.app.goo.gl/TEST',MAIN='https://www.instagram.com/reel/TESTMAIN/',INSIDE='https://www.instagram.com/reel/TESTINSIDE/';
 const decide=(texts,history,out,c)=>{const o={action:'none',category:'buyer',...(out||{})};const burst=[];for(const h of history){if(h.direction==='outbound')burst.length=0;else burst.push(h.body);}
@@ -155,7 +155,7 @@ test('ninth dry-run batch: an ad that mentions a commission is not a question; d
 test('a deleted message that is not in the history gets no answer either',()=>{
  let r=decide(['اسمك الكريم ؟','ارسل الملكية اذا ما عليك امر'],[OUT('اسمك الكريم ؟')],{},{msgType:'revoke'});assert.deepEqual(r.texts,[]);assert.equal(r.out.guard_nothing_said,true);
  r=decide(['مرحبتين تفضل'],[IN('مرحبا')],{},{msgType:'text'});assert.equal(r.texts.length,1);
- assert(agent.includes('typeLabel: typeAr, msgType: msg.message_type });'));
+ assert(agent.includes('typeLabel: typeAr, msgType: msg.message_type,'),'the guard context still carries the message type (R115 added budget after it)');
 });
 test('tenth dry-run batch: a named area with one available property gets its details; a meeting at the client\'s office says so',()=>{
  const AD='للبيع | منزل + شقتين مؤجرة مسقط الحيل الجنوبية السعر: 130,000 ريال مساحة الأرض: 692 م² مساحة البناء: 430 م²';
