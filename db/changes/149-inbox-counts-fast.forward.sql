@@ -1,4 +1,4 @@
--- SQL148 (19 Nov 2026): crm_whatsapp_inbox_counts without the per-row RLS checks.
+-- SQL149 (19 Nov 2026): crm_whatsapp_inbox_counts without the per-row RLS checks.
 -- The unread badge (whatsapp-inbox action=counts) calls it every 30 s from every open tab. As SECURITY INVOKER it ran both
 -- whatsapp_conversations policies on each of ~1,800 rows (investment_row_allowed + can_access_whatsapp_conversation, each
 -- reading profiles again): ~220 ms warm, 554 ms mean in pg_stat_statements, the largest total in the database.
@@ -8,7 +8,7 @@
 --   * manager/agent: route_key is not 'owner', the route exists for the company and is not an owner-only inbox (or is
 --     'investment'), and the row is not on the owner's private line (owner_line_is_private, as investment_row_allowed);
 --   * any other role or an inactive account: zero.
--- Rollback: 148-inbox-counts-fast.rollback.sql (the previous SECURITY INVOKER body).
+-- Rollback: 149-inbox-counts-fast.rollback.sql (the previous SECURITY INVOKER body).
 CREATE OR REPLACE FUNCTION public.crm_whatsapp_inbox_counts()
  RETURNS jsonb
  LANGUAGE sql

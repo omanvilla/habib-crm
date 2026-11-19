@@ -49,6 +49,10 @@ const visits=[
 {id:uuid(406),client_id:uuid(101),request_id:uuid(201),property_id:uuid(301),agent_id:muscat,viewing_date:relative(-2),viewing_time:'12:00:00',status:'cancelled'}
 ].map(v=>({...v,company_id:company,created_by:v.agent_id,created_at:now,archived:false,row_version:1,duration_minutes:60,pipeline_outcome:v.status==='done'?'followup':null}));
 const db={profiles,companies:[{id:company,name:'أبناء حبيب · شركة اختبار',created_at:'2026-05-06T15:00:00Z',default_company_commission:0}],clients,client_requests:requests,properties,viewings:visits,
+// SQL148 (19 Nov 2026): one handed-over chat per branch for «عملاء يحتاجونك الحين» and its «آخر رسالة من مين ومتى» line
+whatsapp_conversations:[
+{id:uuid(1701),company_id:company,client_id:uuid(101),route_key:'muscat',assigned_to:muscat,customer_name:'عميل مسقط الاصطناعي',customer_wa_id:'96800000101',human_handoff_required:true,handoff_reason:'مشتري جاد: يسأل عن الحجز (اختبار)',handoff_updated_at:now,last_inbound_at:now,owner_alert_done_at:null,updated_at:now},
+{id:uuid(1702),company_id:company,client_id:uuid(103),route_key:'barka',assigned_to:barka,customer_name:'عميل بركاء الاصطناعي',customer_wa_id:'96800000103',human_handoff_required:true,handoff_reason:'طلب اتصال: يبي أحد يكلمه (اختبار)',handoff_updated_at:now,last_inbound_at:now,owner_alert_done_at:null,updated_at:now}],
 owners:[{id:uuid(901),company_id:company,added_by:muscat,name:'مالك مسقط الاصطناعي',phone:'+96800000011',owner_type:'owner',archived:false},{id:uuid(902),company_id:company,added_by:barka,name:'مالك بركاء الاصطناعي',phone:'+96800000012',owner_type:'owner',archived:false}],
 // SQL123: one new-listing client kept outside the best 20 (owner-only table, like the real RLS)
 whatsapp_outreach_queue:[{id:uuid(1501),company_id:company,kind:'new_listing',status:'skipped',reason:'over_cap',dry_run:false,property_id:uuid(305),client_id:uuid(103),conversation_id:uuid(1601),route_key:'barka',summary:'قريب (نفس الولاية) · طلبه: فيلا في بركاء بحدود 80 الف',messages:['نزل عندنا فيلا في حي عاصم بـ 75 الف ممكن يناسب طلبك','لين الحين تبحث ؟'],created_at:now}],
@@ -327,6 +331,12 @@ rpc:async(name,args={})=>{
   return {data:allowed.filter(c=>wanted.has(c.id)).map(c=>{const contacts=[...(db.whatsapp_messages||[]).map(m=>({...m,source:'whatsapp'})),...(db.instagram_messages||[]).map(m=>({...m,source:'instagram'}))].filter(m=>m.client_id===c.id&&m.direction==='inbound'&&m.message_timestamp&&(profile.role==='owner'||db.whatsapp_conversations.find(w=>w.id===m.conversation_id)?.route_key!=='owner')).sort((a,b)=>Date.parse(a.message_timestamp)-Date.parse(b.message_timestamp));return {client_id:c.id,first_contact_at:contacts[0]?.message_timestamp||null,first_contact_source:contacts[0]?.source||null};}),error:null};
  }
  if(name==='normalize_property_marketing_link')return {data:marketingLinkKey(args.p_url),error:null};
+ // SQL148: who wrote last (the real one reads whatsapp_messages; staff only see their branch chats)
+ if(name==='crm_last_message_by_clients'){
+  const seen=(db.whatsapp_conversations||[]).filter(w=>profile.role==='owner'||w.assigned_to===profile.id).map(w=>w.client_id);
+  const who={[uuid(101)]:['العميل',-2],[uuid(103)]:['العقل',-30]};
+  return {data:(args.p_clients||[]).filter(id=>seen.includes(id)&&who[id]).map(id=>({client_id:id,who:who[id][0],at:new Date(Date.now()+who[id][1]*60000).toISOString()})),error:null};
+ }
  if(['crm_branch_target_snapshot','crm_branch_performance','crm_branch_monthly_targets','crm_save_branch_monthly_targets'].includes(name)){
   if(profile.is_active===false||!['owner','manager','agent'].includes(profile.role))return {data:null,error:{message:'TEST branch access denied',code:'42501'}};
   const month=args.p_month||today.slice(0,7)+'-01';

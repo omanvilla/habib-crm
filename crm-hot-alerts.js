@@ -8,7 +8,8 @@
  * kept on a browser (localStorage crmHotHidden) is moved to the database the first time it is seen. «فتح المحادثة» opens the
  * client's chat, «تم» marks it handled. A new one also shows a phone/desktop notification while the CRM is open.
  * 10 Nov 2026 (R19): a meeting the reply agent booked (handoff «اجتماع: ...») shows here too, labelled «📅 اجتماع».
- * Owner only; reads his own notifications (RLS). Checks every 45 seconds while the page is visible. */
+ * Owner only; reads his own notifications (RLS). Checks every 45 seconds while the page is visible.
+ * 19 Nov 2026 (SQL148): each row shows «آخر رسالة: العميل / العقل / أحمد · منذ …» (crm_last_message_by_clients). */
 (function(){
   'use strict';
   const byId=id=>document.getElementById(id);
@@ -52,7 +53,7 @@
     box.hidden=!items.length;
     if(!items.length){box.innerHTML='';return;}
     box.innerHTML='<p class="cha-title">🔥 عملاء يحتاجونك الحين <b dir="ltr">'+items.length+'</b></p><ul class="cha-list">'+items.map(n=>
-      '<li class="cha-row"><div class="cha-info"><strong dir="auto">'+esc(n.title)+'</strong>'+(n.body?'<small dir="auto">'+esc(n.body)+'</small>':'')+'<small class="cha-time">'+esc(ago(n.created_at))+'</small></div>'
+      '<li class="cha-row"><div class="cha-info"><strong dir="auto">'+esc(n.title)+'</strong>'+(n.body?'<small dir="auto">'+esc(n.body)+'</small>':'')+'<small class="cha-time">'+(n.last?'آخر رسالة: '+esc(n.last.who)+' · '+esc(ago(n.last.at)):esc(ago(n.created_at)))+'</small></div>'
       // 11 Nov 2026 (Ahmed): every chat opens two ways, the phone's WhatsApp and the CRM chat (crm-wa-buttons.js)
       +'<div class="cha-actions">'+(typeof window.crmWaButtons==='function'?window.crmWaButtons({phone:n.phone,conversationId:n.conversation_id,clientId:n.client_id,cls:'btn-primary'})
         :(n.phone?'<a class="btn-primary cha-open" href="'+esc(businessLink(n.phone))+'" rel="noopener noreferrer">فتح المحادثة</a>':'<button type="button" class="btn-primary" data-cha="open" data-id="'+esc(n.id)+'">فتح المحادثة</button>'))+'<button type="button" class="btn-secondary" data-cha="done" data-id="'+esc(n.id)+'">تم</button></div></li>').join('')+'</ul>';
@@ -120,8 +121,17 @@
         if(!n.client_id)return true;
         const key=n.client_id+'|'+kind;if(once.has(key))return false;once.add(key);return true;
       });
+      list=list.slice(0,20);
+      // SQL148 (19 Nov 2026, Ahmed: «اعرض لكل واحد: آخر رسالة من مين (العميل / العقل / أحمد) ومتى»): the row's time was the chat's
+      // last update (any write), so a chat handled long ago looked new. Each row now says who wrote last and when.
+      const lc=[...new Set(list.map(n=>n.client_id).filter(Boolean))];
+      if(lc.length){
+        const lm=await supa.rpc('crm_last_message_by_clients',{p_clients:lc});
+        const by=new Map((lm.error?[]:lm.data||[]).map(x=>[x.client_id,x]));
+        list.forEach(n=>{const x=n.client_id&&by.get(n.client_id);if(x&&x.at)n.last={who:x.who,at:x.at};});
+      }
       if(seen)ping(list.filter(n=>!seen.has(n.id)));
-      seen=new Set(list.map(n=>n.id));items=list.slice(0,20);render();
+      seen=new Set(list.map(n=>n.id));items=list;render();
     }finally{busy=false;}
   }
   async function openChat(n){

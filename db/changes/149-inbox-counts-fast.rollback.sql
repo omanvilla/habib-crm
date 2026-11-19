@@ -1,4 +1,4 @@
--- Rollback of SQL148: the previous SECURITY INVOKER body (whatsapp_conversations RLS decides the rows).
+-- Rollback of SQL149: the previous SECURITY INVOKER body (whatsapp_conversations RLS decides the rows).
 CREATE OR REPLACE FUNCTION public.crm_whatsapp_inbox_counts()
  RETURNS jsonb
  LANGUAGE sql
