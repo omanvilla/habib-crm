@@ -456,6 +456,10 @@ Deno.serve(async (req) => {
         ]);
         const inAt=li.data?.message_timestamp?Date.parse(li.data.message_timestamp):0,outAt=lo.data?.message_timestamp?Date.parse(lo.data.message_timestamp):0;
         if(!inAt||outAt>=inAt)return json({ok:true,resume:"nothing_to_answer"});
+        // 19 Nov 2026 (Ahmed: «نعم، عدّله»): «كمّل يا عقل» on a chat whose last client message is older than 24 hours ran the agent
+        // on a days-old message (16 Nov ×24, 19 Nov ×19): it handed the client over again as new, with an alert, and sent nothing
+        // (the free-text window is closed). Now the chat only goes back to the agent, which answers the client's next message.
+        if(Date.now()-inAt>24*3600000)return json({ok:true,resume:"too_old",last_inbound_at:li.data?.message_timestamp||null});
         try{
           const r=await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-reply-agent`,{method:"POST",headers:{"Content-Type":"application/json",Authorization:authHeader},body:JSON.stringify({resume:true,conversation_id:conversationId}),signal:AbortSignal.timeout(110000)});
           const agent=await r.json().catch(()=>null);
