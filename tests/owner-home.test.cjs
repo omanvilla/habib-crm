@@ -8,10 +8,17 @@ test('the page loads the owner home after the sections it reuses',()=>{
  assert.match(index,/crm-owner-home\.css\?v=/);
 });
 // 9 Nov 2026 redesign: hello line, tiles for what needs the owner now, quick decisions, one summary (owner decision).
-test('the home sections are there and the full work list stays reachable',()=>{
+test('the home sections are there; the old work list is never read or shown (19 Nov 2026)',()=>{
  for(const title of ['المطلوب منك الآن','مشاكل','ملخص','العقارات','متابعة اليوم','العقل موقوف عندهم'])assert(js.includes(title),title);
- assert(js.includes('قائمة العمل الكاملة'));
- assert.match(css,/coh-on:not\(\.coh-full-open\)>#opsDailyWork/);
+ assert(!js.includes('قائمة العمل الكاملة')&&!js.includes("act==='full'"),'no button back to the old work list');
+ assert(css.includes(':is(#page-dash.coh-on,html.coh-home #page-dash)>:is(.ops-dashboard-intro,#opsEmployeeTargets,#opsDailyWork,#crmQuickVisits){display:none!important}'));
+ assert(js.includes('window.crmHomeActive=()=>hasHome();'));
+ const ops=fs.readFileSync('crm-operations-v6.js','utf8'),qv=fs.readFileSync('crm-quick-visit.js','utf8');
+ const work=ops.slice(ops.indexOf('window.crmLoadDashboardWork=async function(){'));
+ assert(work.indexOf("if(await window.crmOldDashSkip())return;")<work.indexOf('const scopes=owner?'),'crm_dashboard_work is not read for a home account');
+ assert(ops.includes("window.crmOldDashSkip().then(skip=>{if(!skip)mountTargetDashboard();});"),'nor the old target card');
+ assert(qv.includes("if(typeof window.crmOldDashSkip==='function'&&await window.crmOldDashSkip())return;"),'nor the hidden visits card');
+ assert(ops.includes("return typeof window.crmHomeActive==='function'&&!!window.crmHomeActive();"),'with the home file missing the old page still reads');
 });
 // 11 Nov 2026 (Ahmed): staff get this same home too (crm_staff_home, tests/staff-home.test.cjs); an account with no role keeps the old page
 test('an account without a home role keeps the old page; a home account never gets it back (19 Nov 2026)',()=>{

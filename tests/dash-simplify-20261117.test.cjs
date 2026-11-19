@@ -64,9 +64,9 @@ test('the summary counts the company target of 25 and drops the links the side m
  assert(box.innerHTML.includes('<small>متاح بركاء</small>')&&box.innerHTML.includes('<small>متاح مسقط</small>'));
 });
 
-test('the agent\'s inventory reminder is not said twice on the home; the work list and four shortcuts stay',()=>{
+test('the agent\'s inventory reminder is not said twice on the home; the four shortcuts stay (the old work list went 19 Nov)',()=>{
  assert(css.includes('#page-dash.coh-on>#employeeInventoryReminder{display:none!important}'));
- assert(home.includes('قائمة العمل الكاملة'));
+ assert(!home.includes('قائمة العمل الكاملة'));
  const base=fs.readFileSync('app-base-v15.html','utf8');
  assert.equal((base.slice(base.indexOf('<div class="dash-toolbar"'),base.indexOf('</div></div>',base.indexOf('<div class="dash-toolbar"'))).match(/class="qa-btn"/g)||[]).length,4);
  assert(/crm-owner-home\.js\?v=202611(19|2\d)-/.test(index)&&/crm-owner-home\.css\?v=202611(1[89]|2\d)-/.test(index)&&index.includes('crm-calls-meetings.js?v=20261118-d36'));

@@ -224,6 +224,14 @@
     window.dashboardContactQueue=state.data?.contactQueue||[];
     window.dashboardWorkSnapshot=state.data||null;
   }
+  /* 19 Nov 2026 (Ahmed: «إيه، سرّعها»): true when the signed-in account has the new home (crm-owner-home.js), so the old
+   * dashboard's reads are skipped. The boot calls loadDashboard before that file has run: then this waits for the page to
+   * finish loading and asks again. With that file missing the answer is false and the old page reads as before. */
+  window.crmOldDashSkip=async function(){
+    if(typeof window.crmHomeActive!=='function'&&['loading','interactive'].includes(document.readyState)&&typeof window.addEventListener==='function')
+      await new Promise(r=>window.addEventListener('load',r,{once:true}));
+    return typeof window.crmHomeActive==='function'&&!!window.crmHomeActive();
+  };
   // 18 Nov 2026 (decision 64): the boot calls loadDashboard twice and both wait for the home's gate, so each scope was read
   // twice at the same moment. A scope still being read for the same session is joined instead of read again; a call
   // after it finished (a save) reads again as before.
@@ -275,6 +283,9 @@
     const date=$id('opsDashboardDate');if(date)date.textContent=new Date().toLocaleDateString('ar-OM-u-nu-latn',{timeZone:'Asia/Muscat',weekday:'long',day:'numeric',month:'long',year:'numeric'});
     const panel=$id('opsPerformanceDetails');if(panel){panel.hidden=!['owner','manager','agent'].includes(currentProfile.role);const heading=panel.querySelector('summary>span');if(heading)heading.textContent=owner||currentProfile.role==='manager'?'أداء الفريق خلال الفترة':'أدائي خلال الفترة';}
     if(typeof loadEmployeeTargetReminder==='function')loadEmployeeTargetReminder();
+    // 19 Nov 2026 (Ahmed: «إيه، سرّعها»): an account with the new home never sees this work list, so it is not read at all
+    // (two crm_dashboard_work calls of about 2 s each on every open, competing with the home's own reads)
+    if(await window.crmOldDashSkip())return;
     const scopes=owner?['branches','investment']:['branches'];scopes.forEach(scope=>dashboardScopes.set(scope,{status:'loading'}));renderDashboard();
     // Owner: wait for the new home's first load (boot gate, at most 8 s) so its reads are not queued behind these.
     if(window.crmHomeFirst){await window.crmHomeFirst;if(session!==crmSessionGeneration+':'+(currentUser&&currentUser.id))return;}
@@ -284,7 +295,8 @@
     if(panel?.open&&!panel.hidden)reads.push(window.crmDashboardPerformancePeriod(dashboardPerformancePeriod));
     await Promise.allSettled(reads);
   };
-  window.loadDashboard=function(){const result=window.crmLoadDashboardWork.apply(this,arguments);mountTargetDashboard();return result;};
+  // the old target card is skipped the same way (the home has its own goals card)
+  window.loadDashboard=function(){const result=window.crmLoadDashboardWork.apply(this,arguments);window.crmOldDashSkip().then(skip=>{if(!skip)mountTargetDashboard();});return result;};
   const propertyActionQueue=window.loadPropertyActionQueue;
   if(typeof propertyActionQueue==='function')window.loadPropertyActionQueue=function(target){if(target==='dashboard')return Promise.resolve();return propertyActionQueue.apply(this,arguments);};
   document.addEventListener('click',e=>{

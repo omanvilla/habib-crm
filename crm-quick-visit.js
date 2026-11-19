@@ -37,6 +37,8 @@
   }
   async function loadCard(){
     const box=cardHost();if(!box||!editable()||typeof supa==='undefined')return;
+    // 19 Nov 2026: the new home hides this card, so it is not read (crm-owner-home.js crmHomeActive)
+    if(typeof window.crmOldDashSkip==='function'&&await window.crmOldDashSkip())return;
     const r=await supa.from('viewings').select('id,viewing_date,viewing_time,client:clients(name),property:properties(title)')
       .eq('status','scheduled').neq('archived',true).lte('viewing_date',today()).order('viewing_date').order('viewing_time').limit(6);
     if(r.error){box.innerHTML='';return;}

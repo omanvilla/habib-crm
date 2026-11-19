@@ -1,6 +1,6 @@
 /* Owner home page (redesigned 9 November 2026). One screen: a hello line, big tiles for what needs Ahmed now
  * (each opens a sheet over the page or its own page, so the home page stays short), small quick decisions,
- * hot-buyer alerts at the top, and one compact summary. The old work list stays one click away.
+ * hot-buyer alerts at the top, and one compact summary. The old work list is gone (19 Nov 2026: never read, never shown).
  * Reads crm_owner_home and crm_paused_chats (owner only). If the data does not load, the placeholder stays and the home keeps retrying (never the old page, 19 Nov 2026). */
 (function(){
   'use strict';
@@ -82,8 +82,8 @@
       // 18 Nov 2026 (decision 36): the twins decision and the Instagram videos are tiles that open a sheet; #cohIg only
       // parks the Instagram card (crm-instagram-discovery.js) while its sheet is closed, it is never shown on the page
       +'<section class="coh-quick" id="cohQuick"><div id="cohAuto"></div><div id="cohIg" hidden></div><div id="cohUsage"></div></section>'
-      +'<section class="card coh-sec" id="cohSummary"></section>'
-      +'<button type="button" class="btn-secondary coh-full" data-coh="full" aria-expanded="false">قائمة العمل الكاملة</button>';
+      // 19 Nov 2026 (Ahmed: «إيه، سرّعها»): no «قائمة العمل الكاملة» any more; the old work list is never read or shown
+      +'<section class="card coh-sec" id="cohSummary"></section>';
     const header=page.querySelector('.page-header');if(header)header.after(box);else page.prepend(box);
     return box;
   }
@@ -494,7 +494,6 @@
         toast(on?'انتقل للمتجاهلين، وما بيوصله رد ولا متابعة':'رجع للعقل، ويرد عليه أول ما يكتب','success');
       }).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});
     }
-    else if(act==='full'){const page=byId('page-dash'),open=page.classList.toggle('coh-full-open');b.setAttribute('aria-expanded',String(open));b.textContent=open?'إخفاء قائمة العمل الكاملة':'قائمة العمل الكاملة';}
     else if(act==='popen'&&typeof navigate==='function'&&typeof openWhatsAppConversation==='function'){const id=b.dataset.id;closeSheet();navigate('whatsapp',null);setTimeout(()=>openWhatsAppConversation(id),300);}
     else if(act==='pnote'&&typeof window.crmClaudeNote==='function'){
       const it=paused.items.find(i=>i.conversation_id===b.dataset.id)||{};
@@ -537,6 +536,9 @@
     }
   });
   window.crmOwnerHomeRefresh=()=>load().catch(()=>{});
+  // 19 Nov 2026: the old dashboard's reads (crm-operations-v6.js work list and target card, crm-quick-visit.js card) ask
+  // this before reading; with this file missing they read as before, so the old page still works as the fallback
+  window.crmHomeActive=()=>hasHome();
   const loadDash=window.loadDashboard;
   if(typeof loadDash==='function')window.loadDashboard=function(){const r=loadDash.apply(this,arguments);window.crmOwnerHomeRefresh();return r;};
   /* 14 Nov 2026: the app starts (init() in the base page) while these files are still arriving. With an empty cache

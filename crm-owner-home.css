@@ -9,10 +9,8 @@
 /* 19 Nov 2026 (Ahmed: «ما اريد النسخة القديمة ابدا»): an account with the new home (.coh-home, set by crm-owner-home.js from its role)
  * never sees the old dashboard, also when the home is slow or a read fails: the placeholder stays and the home keeps retrying. */
 html.coh-home.coh-slow #page-dash:not(.coh-on)::before{content:'الاتصال بطيء، نكمل المحاولة…'}
-#page-dash.coh-on:not(.coh-full-open)>.ops-dashboard-intro,
-#page-dash.coh-on:not(.coh-full-open)>#opsEmployeeTargets,
-#page-dash.coh-on:not(.coh-full-open)>#opsDailyWork{display:none!important}
-#page-dash.coh-on>#crmQuickVisits{display:none!important}
+/* 19 Nov 2026 (Ahmed: «إيه، سرّعها»): the old sections are not read any more for these accounts and never shown */
+:is(#page-dash.coh-on,html.coh-home #page-dash)>:is(.ops-dashboard-intro,#opsEmployeeTargets,#opsDailyWork,#crmQuickVisits){display:none!important}
 .coh{display:grid;gap:14px;margin-bottom:14px}
 .coh[hidden]{display:none}
 .coh-sec{padding:16px!important;min-width:0}
