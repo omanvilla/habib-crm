@@ -130,6 +130,9 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   if (texts.some((t) => REASON_Q.test(t)) && c.history.some((h: any) => h.direction === "outbound" && REASON_Q.test(String(h.body || "")))) {
     texts = texts.filter((t) => !REASON_Q.test(t)); out.guard_reason_once = true;
   }
+  // R11 day words (used by R74 below and by R11 further down; declared here so both read the same ones)
+  const DAY_WITH = /(^|[\s،,.])(ا?ليوم|الحين|ال[اآ]ن|بكر[ةه]?|باكر|الليل[ةه]|السبت|ال[اأ]حد|ال[اإ]ثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمع[ةه])($|[\s،,.؟?!])/;
+  const DAY_NOT = /ما\s*(يناسب|[اأ]قدر|بقدر|اقدر|بيمدي|يمدي)|صعب|مب\s*ا?ليوم|مو\s*ا?ليوم/;
   // R74 (Ahmed: «نعم نرسل الموقع في هذه الحاله»; changes R11 in this case only): a client who asks for the location to see
   // whether the place suits him, before he chooses a time, gets it, once. No visit is recorded from it (location_for_area).
   // (rows 1521-1560: «الفيلا اللي سألت عنها ما متوفره حالياً» went with the location of that same villa: not for a property the
@@ -150,8 +153,13 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     if (!c.prop) { out.property_id = areaProp.id; c.prop = areaProp; }
     out.action = "send_location"; out.location_for_area = true; out.guard_location_for_area = true;
     // (17 Nov: «تمام شوف الموقع اول واذا ناسبك خبرني» before «تفضل هذا الموقع / شوف اذا المنطقة تناسبك» said it twice)
-    texts = texts.filter((t) => !(t.length <= 200 && (LOCATION_HELD.test(t) || FAREWELL.test(t) || /شوف\s*(ال)?(موقع|لوكيشن|منطق)|ناسب(ك|تك)\s*خبرني/.test(t))) && !VISIT_Q.test(t)).slice(0, 1);
-    texts.push(...AREA_LINES);
+    // (19 Nov, R11 test back in CI: «اريد اعرف الموقع اول حاجه يمكن السبت» got «اذا تأكدت من الوقت يوم الخميس خبرني عشان ارسل
+    // لك الموقع» beside the location itself. The promise to send it goes, and a client who already named a day is not asked
+    // «متى يناسبك تزور» again.)
+    texts = texts.filter((t) => !(t.length <= 200 && (LOCATION_HELD.test(t) || FAREWELL.test(t) || /شوف\s*(ال)?(موقع|لوكيشن|منطق)|ناسب(ك|تك)\s*خبرني/.test(t)
+      || /(ارسل|أرسل|برسل|نرسل)\s*(لك|ل[كج])?\s*(ال)?(موقع|لوكيشن|اللوكيشن)/.test(t))) && !VISIT_Q.test(t)).slice(0, 1);
+    const dayNamed = DAY_WITH.test(String(c.burstSaid || "")) && !DAY_NOT.test(String(c.burstSaid || ""));
+    texts.push(...(dayNamed ? AREA_LINES.slice(0, 1) : AREA_LINES));
   }
   // R75 (Ahmed gave the reel): a request for a video of the inside gets the reel marked «من الداخل» in the property's
   // marketing journal. The agent says nothing of its own about what a video shows.
@@ -438,8 +446,6 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   // ---- audit of the replies really sent 16 Nov 12:20 to 17 Nov 13:00 (Ahmed 17 Nov: «إيه صلّحهم») ----
   // R11 (401f1402 «وزين ترسلي الموقع بحاول باذن الله امر ليوم»): he asked for the location and named the day, and got the reel
   // and «متى يناسبك تزور ؟» with no location. A day said with the request is enough (R11: the day or the hour).
-  const DAY_WITH = /(^|[\s،,.])(ا?ليوم|الحين|ال[اآ]ن|بكر[ةه]?|باكر|الليل[ةه]|السبت|ال[اأ]حد|ال[اإ]ثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمع[ةه])($|[\s،,.؟?!])/;
-  const DAY_NOT = /ما\s*(يناسب|[اأ]قدر|بقدر|اقدر|بيمدي|يمدي)|صعب|مب\s*ا?ليوم|مو\s*ا?ليوم/;
   if (out.action === "none" && ["buyer", "tenant"].includes(out.category) && !c.hardHandoff && c.prop?.map_url
     && !["owner_lives", "office"].includes(String(c.prop.visit_method || "")) && !sentBefore(String(c.prop.map_url))
     && LOCATION_ASK.test(String(c.burstSaid || "")) && DAY_WITH.test(String(c.burstSaid || "")) && !DAY_NOT.test(String(c.burstSaid || ""))) {
