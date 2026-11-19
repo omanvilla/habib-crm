@@ -22,7 +22,7 @@ Ahmed: «فاحص الردود الآلية مرتين باليوم … تطوي
   mistake, sends the report to Ahmed's WhatsApp (Muscat number) and a CRM notification every run. `{dry:true}` writes and sends
   nothing. Front end: `crm-reply-audit.js` + tile «🧠 فحص الردود» in `crm-owner-home.js` (owner only, read only).
 - `reply_coach_weekly` is unchanged: it scores the A/B wordings by outcome (replied, visit, deal), the audit looks for mistakes.
-- **First audit's fixes, published (Ahmed «إيه، انشر»):** `whatsapp-reply-agent` v103 → `6651f9b` (was v102 `73cacaa`; brain.ts
+- **First audit's fixes, published (Ahmed «إيه، انشر»):** `whatsapp-reply-agent` v103 → `6651f9b`, then v104 → `e6f9cf9` (the live check found R115 missed a «ما متوفر» reply that carried a visit question; was v102 `73cacaa`; brain.ts
   unchanged, no prompt sync). R115 gap (a yes to the sold notice answered «ما متوفر» only gets the nearest home), R116 (an offered
   home's ad goes with its reel and the visit question; «اسمك الكريم ؟ ومتى يناسبك تزور ؟» split, name last), R117 (pitch and
   contact sentences of a reel caption are not sent). Dry run on 799202aa 4 of 4 right; 30 other replies of the day untouched by
