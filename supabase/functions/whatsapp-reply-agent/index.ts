@@ -571,7 +571,9 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   // «حاليا ما عندنا فيلا متوفره في الرميس ⏎ اول ما يتوفر بتواصل معك». A reply that offers nothing gets the nearest home instead.
   if (out.action === "none" && out.category === "buyer" && !c.visitedProp && texts.length
     && !/^\s*(لا|لاا|ما\s*(ابي|أبي|اريد|أريد|ابغى)|مب|مو|مشكور|شكرا)/.test(String(c.burstSaid || ""))
-    && texts.every((t) => /ما\s*(عندنا|متوفر|في)|اول\s*ما\s*يتوفر|بتواصل\s*معك/.test(t))) {
+    // (live check of v103: «حالياً ما متوفر … ⏎ اول ما يتوفر بتواصل معك ⏎ متى يناسبك تزور ؟»: a visit question with nothing to visit
+    // does not stop it)
+    && texts.some((t) => !VISIT_Q.test(t)) && texts.filter((t) => !VISIT_Q.test(t)).every((t) => /ما\s*(عندنا|متوفر|في)|اول\s*ما\s*يتوفر|بتواصل\s*معك/.test(t))) {
     const alt = soldNoticeYes(out, c);
     if (alt) { texts = alt; out.guard_sold_yes_nothing = true; }
   }

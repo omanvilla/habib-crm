@@ -50,3 +50,10 @@ test('R115: a yes to «انحجزت … خيارات ثانية» answered with 
  assert.equal(decide(['حاليا ما عندنا فيلا متوفره في الرميس'],[h[0],IN('لا مشكور')],null,{available:av,route:'barka'}).out.guard_sold_yes_nothing,undefined);
  assert.equal(decide(['حاليا ما عندنا فيلا متوفره في الرميس'],[IN('عندكم فيلا في الرميس ؟')],null,{available:av,route:'barka'}).out.guard_sold_yes_nothing,undefined);
 });
+test('R115: «ما متوفر … اول ما يتوفر» with a visit question and nothing to visit gets the nearest home too (live check of v103)',()=>{
+ const h=[OUT('بخصوص الفيلا اللي سألت عنها في بركاء الرميس انحجزت\nتحب تشوف خيارات ثانية ؟'),IN('ارسلي اشوف')];
+ const av=[{id:'p9',type:'villa',area:'الصومحان الجنوبية',price:69000,branch_key:'barka',listing_purpose:'sale'}];
+ const r=decide(['حالياً ما متوفر فيلا للبيع في الرميس بالمواصفات اللي طلبتها','اول ما يتوفر بتواصل معك','متى يناسبك تزور ؟'],h,null,{available:av,route:'barka'});
+ assert.equal(r.out.guard_sold_yes_nothing,true);
+ assert.deepEqual(r.texts,['اقرب شي عندنا في الصومحان الجنوبية فيلا بـ69 الف','تحب ارسلك تفاصيلها ؟']);
+});
