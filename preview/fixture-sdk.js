@@ -241,6 +241,17 @@ function fixtureExtraRpc(name,args){
     new_contracts:[{study_id:uuid(1700),client_id:clients[0].id,conversation_id:uuid(1701),name:'مالك اصطناعي',phone:'+96890000000',property:'أرض · النعمان',accepted_at:relative(-2)+'T08:00:00Z'}]});
   }
   case 'crm_waiting_buyer_done':case 'crm_property_confirm_available':return ok(true); // SQL130: staff too
+  // SQL144 (19 Nov 2026): the last reply audit, owner only (synthetic)
+  case 'crm_reply_audit_card':{
+   if(!isOwner)return ownerOnly();
+   const cs=clients.filter(c=>c.lead_route!=='investment').slice(0,3);
+   return ok({run:{id:uuid(1800),period_start:relative(-1)+'T10:30:00Z',period_end:relative(0)+'T03:30:00Z',checked_count:14,findings_count:2,
+     replied_clients:cs.map((c,i)=>({conversation_id:uuid(1810+i),name:c.name,phone:c.phone,route:c.lead_route,replies:i+1})),
+     system_health:{status:'ok',reasons:[]},summary:'فحص اصطناعي',created_at:relative(0)+'T03:31:00Z'},
+    findings:[{id:uuid(1820),customer_name:cs[0].name,error_type:'sold_offered',severity:'critical',explanation:'عرض فيلا انباعت كأنها متوفرة\nكان لازم يقول انباعت ويعرض البديل',conversations_count:1,paused:true,status:'open',conversation_id:uuid(1810)},
+     {id:uuid(1821),customer_name:cs[1].name,error_type:'style',severity:'normal',explanation:'الرد أربع رسائل وفيه كلام رسمي',conversations_count:3,paused:false,status:'open',conversation_id:uuid(1811)}],
+    open_before:1});
+  }
   case 'crm_paused_chats':{
    const items=clients.filter(c=>c.lead_route!=='investment'&&allowed(c,'clients')).slice(0,2).map((c,i)=>chat(c,i===0
     ?{kind:'negotiation',reason:'العميل يسأل عن خصم على السعر',summary:'يبي ينزل السعر 3 آلاف'}

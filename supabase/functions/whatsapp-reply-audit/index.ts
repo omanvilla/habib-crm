@@ -72,7 +72,7 @@ async function ai(instructions: string, input: string, sch: any, name: string) {
   try {
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST", signal: ctl.signal, headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: MODEL, store: false, reasoning: { effort: "medium" }, instructions, input, text: { format: { type: "json_schema", name, strict: true, schema: sch } } }),
+      body: JSON.stringify({ model: MODEL, store: false, reasoning: { effort: "high" }, instructions, input, text: { format: { type: "json_schema", name, strict: true, schema: sch } } }),
     });
     const p = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(p?.error?.message || `openai_${r.status}`);
@@ -115,7 +115,8 @@ const INSTRUCTIONS = (brain: string, knowledge: string, pinned: string, props: s
 - known_mistake: نفس غلط من «الأغلاط اللي سبق صلّحناها» رجع (اكتب رقمه في known_mistake)
 certain=true بس إذا الغلط واضح أكيد. خاصة الأنواع الخطيرة (invented_info و sold_offered و serious_not_handed): هذي توقف العقل على المحادثة، فلا تقول certain إلا إذا متأكد من القائمة والمحادثة.
 لا تحكم على شي سواه المكتب بيده (المكتب) ولا على رسائل المتابعة الآلية، بس على مسودات العقل المرقمة.
-المعلومة المكتوبة في نص الإعلان أو الوصف أو طريقة الزيارة أو معرفة المشاريع مو مخترعة. والعقار اللي ما له تفاصيل في القائمة (مباع أو مؤرشف) لا تحكم على تفاصيله إلا إذا تخالف القائمة.
+المعلومة المكتوبة في نص الإعلان أو الوصف أو كابشن الريل أو طريقة الزيارة أو معرفة المشاريع مو مخترعة، ورابط الريل المكتوب تحت العقار مو مخترع.
+المؤنث صح لاسم أنثوي واضح أو «أم فلان» أو إذا العميل كتب بالمؤنث (R15)، ولا تحكم إنه غلط إلا إذا ما في أي واحد منها في المحادثة. والعقار اللي ما له تفاصيل في القائمة (مباع أو مؤرشف) لا تحكم على تفاصيله إلا إذا تخالف القائمة.
 كل قاعدة R جنبها تاريخها: إذا تاريخ القاعدة بعد يوم الرد، الغلط انصلح بعدين، اكتب before_fix=true.
 الاقتراحات (options): 2 أو 3 ردود كاملة صحيحة يقدر أحمد يختار منها، باللهجة العمانية البيضاء وعلى طريقة كتابة المكتب بالضبط (رسائل قصيرة، كل رسالة في سطر، بدون نقطة آخر السطر، « ؟» بمسافة)، وبدون أي معلومة مو مكتوبة في القائمة أو المعرفة. إذا الصح إن العقل ما يرد ويحوّل لأحمد، اكتب في الاقتراح: «(بدون رد، تحويل لأحمد: …)».
 explanation: سطرين بالعربي البسيط.
@@ -191,6 +192,11 @@ async function audit(companyId: string, opts: { hours?: number; dry?: boolean; t
     db.from("profiles").select("id").eq("company_id", companyId).eq("role", "owner").eq("is_active", true).limit(1).maybeSingle(),
     db.from("whatsapp_automation_events").select("id").eq("company_id", companyId).eq("action_type", "owner_notify").eq("status", "failed").gte("created_at", S),
   ]);
+  // the reels of each property: the agent sends their link as the video and may take the ad text from the caption
+  const reelsR = await db.from("instagram_media_catalog").select("property_id,permalink,caption,published_at").eq("company_id", companyId)
+    .not("property_id", "is", null).order("published_at", { ascending: false }).limit(300);
+  const reels: Record<string, any[]> = {};
+  for (const r of reelsR.data || []) (reels[r.property_id] ||= []).push(r);
   const drafts = draftsR.data || [];
   const sent = drafts.filter((d: any) => d.status === "sent"), failed = drafts.filter((d: any) => d.status === "failed");
   const skipped = drafts.filter((d: any) => d.status === "skipped");
@@ -225,7 +231,8 @@ async function audit(companyId: string, opts: { hours?: number; dry?: boolean; t
       p.electricity_connected != null || p.water_connected != null ? `  الكهرباء: ${p.electricity_connected ? "موصلة" : "مو موصلة / مو معروف"} · الماي: ${p.water_connected ? "موصل" : "مو موصل / مو معروف"}` : "",
       p.rental_terms ? `  شروط الإيجار: ${short(typeof p.rental_terms === "string" ? p.rental_terms : JSON.stringify(p.rental_terms), 200)}` : "",
       p.public_details ? `  نص الإعلان: ${short(p.public_details, 1200).replace(/\n+/g, " / ")}` : "",
-      p.description ? `  وصف: ${short(p.description, 500).replace(/\n+/g, " / ")}` : ""].filter(Boolean).join("\n");
+      p.description ? `  وصف: ${short(p.description, 500).replace(/\n+/g, " / ")}` : "",
+      ...(reels[p.id] || []).slice(0, 4).map((r: any, i: number) => `  ريل ${i + 1}: ${r.permalink || ""}${r.caption ? ` · الكابشن: ${short(r.caption, i ? 200 : 900).replace(/\n+/g, " / ")}` : ""}`)].filter(Boolean).join("\n");
   }).join("\n");
   const instructions = INSTRUCTIONS(String(brainR.data?.content || ""), String(knowR.data?.content || ""), pinned, props);
   const problems: any[] = [];
