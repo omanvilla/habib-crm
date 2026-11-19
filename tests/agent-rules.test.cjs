@@ -74,7 +74,8 @@ test('brain and knowledge stay one template string the prompt sync can read',()=
  // not shortened (its wording is Ahmed's rules); the live sync at 8cfe964 copied all of it (md5 of the body compared).
  // 18 Nov 2026: Ahmed's rules of the day (call topic, documents before a viewing, «الحين», old prices before a meeting) took it
  // past 70,000. Nothing downstream limits it (the sync and the agent read it whole), so the guard moves, the wording stays his.
- assert(body(brain).length<72000,'the brain stays compact (Ahmed\'s open notes are appended after it)');
+ // 19 Nov 2026: R112–R115 (24h audit of sent replies, a1719df) took it to 73,667; same reasoning, the guard moves to 80,000.
+ assert(body(brain).length<80000,'the brain stays compact (Ahmed\'s open notes are appended after it)');
 });
 test('R18: only the figures Ahmed wrote; any other price gets the "it depends" line and a meeting',()=>{
  assert(knowledge.includes('57,000'),'Iconic Tower studio from 57,000');
