@@ -82,7 +82,7 @@
       // 18 Nov 2026 (decision 36): the twins decision and the Instagram videos are tiles that open a sheet; #cohIg only
       // parks the Instagram card (crm-instagram-discovery.js) while its sheet is closed, it is never shown on the page
       +'<section class="coh-quick" id="cohQuick"><div id="cohAuto"></div><div id="cohIg" hidden></div><div id="cohUsage"></div></section>'
-      // 19 Nov 2026 (Ahmed: «إيه، سرّعها»): no «قائمة العمل الكاملة» any more; the old work list is never read or shown
+      // 19 Nov 2026 (Ahmed: «إيه، سرّعها»): no button to the old work list any more; it is never read or shown
       +'<section class="card coh-sec" id="cohSummary"></section>';
     const header=page.querySelector('.page-header');if(header)header.after(box);else page.prepend(box);
     return box;

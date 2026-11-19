@@ -227,9 +227,13 @@
   /* 19 Nov 2026 (Ahmed: «إيه، سرّعها»): true when the signed-in account has the new home (crm-owner-home.js), so the old
    * dashboard's reads are skipped. The boot calls loadDashboard before that file has run: then this waits for the page to
    * finish loading and asks again. With that file missing the answer is false and the old page reads as before. */
+  // answers at once when it can (true/false), null while the page is still loading and the home file has not run yet
+  window.crmOldDashSkipNow=function(){
+    if(typeof window.crmHomeActive==='function')return !!window.crmHomeActive();
+    return ['loading','interactive'].includes(document.readyState)&&typeof window.addEventListener==='function'?null:false;
+  };
   window.crmOldDashSkip=async function(){
-    if(typeof window.crmHomeActive!=='function'&&['loading','interactive'].includes(document.readyState)&&typeof window.addEventListener==='function')
-      await new Promise(r=>window.addEventListener('load',r,{once:true}));
+    if(window.crmOldDashSkipNow()===null)await new Promise(r=>window.addEventListener('load',r,{once:true}));
     return typeof window.crmHomeActive==='function'&&!!window.crmHomeActive();
   };
   // 18 Nov 2026 (decision 64): the boot calls loadDashboard twice and both wait for the home's gate, so each scope was read
@@ -285,7 +289,8 @@
     if(typeof loadEmployeeTargetReminder==='function')loadEmployeeTargetReminder();
     // 19 Nov 2026 (Ahmed: «إيه، سرّعها»): an account with the new home never sees this work list, so it is not read at all
     // (two crm_dashboard_work calls of about 2 s each on every open, competing with the home's own reads)
-    if(await window.crmOldDashSkip())return;
+    const skipNow=window.crmOldDashSkipNow();
+    if(skipNow===true||(skipNow===null&&await window.crmOldDashSkip()))return;
     const scopes=owner?['branches','investment']:['branches'];scopes.forEach(scope=>dashboardScopes.set(scope,{status:'loading'}));renderDashboard();
     // Owner: wait for the new home's first load (boot gate, at most 8 s) so its reads are not queued behind these.
     if(window.crmHomeFirst){await window.crmHomeFirst;if(session!==crmSessionGeneration+':'+(currentUser&&currentUser.id))return;}
@@ -296,7 +301,7 @@
     await Promise.allSettled(reads);
   };
   // the old target card is skipped the same way (the home has its own goals card)
-  window.loadDashboard=function(){const result=window.crmLoadDashboardWork.apply(this,arguments);window.crmOldDashSkip().then(skip=>{if(!skip)mountTargetDashboard();});return result;};
+  window.loadDashboard=function(){const result=window.crmLoadDashboardWork.apply(this,arguments);const skipNow=window.crmOldDashSkipNow();if(skipNow===false)mountTargetDashboard();else if(skipNow===null)window.crmOldDashSkip().then(skip=>{if(!skip)mountTargetDashboard();});return result;};
   const propertyActionQueue=window.loadPropertyActionQueue;
   if(typeof propertyActionQueue==='function')window.loadPropertyActionQueue=function(target){if(target==='dashboard')return Promise.resolve();return propertyActionQueue.apply(this,arguments);};
   document.addEventListener('click',e=>{

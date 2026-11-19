@@ -15,8 +15,8 @@ test('the home sections are there; the old work list is never read or shown (19 
  assert(js.includes('window.crmHomeActive=()=>hasHome();'));
  const ops=fs.readFileSync('crm-operations-v6.js','utf8'),qv=fs.readFileSync('crm-quick-visit.js','utf8');
  const work=ops.slice(ops.indexOf('window.crmLoadDashboardWork=async function(){'));
- assert(work.indexOf("if(await window.crmOldDashSkip())return;")<work.indexOf('const scopes=owner?'),'crm_dashboard_work is not read for a home account');
- assert(ops.includes("window.crmOldDashSkip().then(skip=>{if(!skip)mountTargetDashboard();});"),'nor the old target card');
+ assert(work.indexOf("if(skipNow===true||(skipNow===null&&await window.crmOldDashSkip()))return;")<work.indexOf('const scopes=owner?'),'crm_dashboard_work is not read for a home account');
+ assert(ops.includes("if(skipNow===false)mountTargetDashboard();else if(skipNow===null)window.crmOldDashSkip().then(skip=>{if(!skip)mountTargetDashboard();});"),'nor the old target card');
  assert(qv.includes("if(typeof window.crmOldDashSkip==='function'&&await window.crmOldDashSkip())return;"),'nor the hidden visits card');
  assert(ops.includes("return typeof window.crmHomeActive==='function'&&!!window.crmHomeActive();"),'with the home file missing the old page still reads');
 });
