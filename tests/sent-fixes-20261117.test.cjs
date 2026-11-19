@@ -6,8 +6,8 @@ const agent=fs.readFileSync('supabase/functions/whatsapp-reply-agent/index.ts','
 const pickFrom=(src)=>(start,end)=>{const a=src.indexOf(start);assert(a>=0,'missing: '+start);const b=src.indexOf(end,a);assert(b>a,'no end: '+start);return src.slice(a,b+end.length);};
 const pickA=pickFrom(agent);
 const dsrc=['const THEIR_OFFICE','const ASK_CONFIRM','const WE_SHOW','const MY_OWN','const SILENT_TYPES','const COMMISSION_ASK','const COMMISSION_BUYER_LINES','const COMMISSION_OWNER_LINES','const ASK_LINK','const areaKey','const BOOKING_ASK','const BOOKING_NOT','const ASK_HOUR','const NEEDS_AHMED','const VIDEO_PROMISE','const FAREWELL','const FIXED_PRICE_LINE','const IG_CODE','const UNKNOWN_Q','const LOCATION_ASK','const AREA_REASON','const OUTSIDE_LOOK','const locationForArea','const LOCATION_HELD','const AREA_LINES','const INSIDE_VIDEO_ASK','const LAYOUT_ASK','const LAYOUT_LINES','const OUR_HOUR','const HOUR_SAID','const OWNER_TIME_LINE','const DEPOSIT_SAID','const REASON_Q','const VISIT_Q','const R66_DETAILS_ASK','const R66_GENERIC']
- .map((s)=>pickA(s,'\n')).join('')+pickA('function nearBarka','\n}\n')+pickA('function ownerDecisions','\n}\n');
-const D=new Function(dsrc.replace(/(\w+): (?:string|any|unknown|number)(?:\[\])?(?=[,)])/g,'$1')+';return {ownerDecisions};')();
+ .map((s)=>pickA(s,'\n')).join('')+pickA('function nearBarka','\n}\n')+pickA('function soldNoticeYes','\n}\n')+pickA('function ownerDecisions','\n}\n');
+const D=new Function(dsrc.replace(/\): string\[\] \| null \{/g,'){').replace(/ as (?:string|any|unknown|number)(?:\[\])?(?=\))/g,'').replace(/(\w+): (?:string|any|unknown|number)(?:\[\])?(?=[,)])/g,'$1')+';return {ownerDecisions};')();
 const IN=(b,type)=>({direction:'inbound',body:b,message_type:type||'text'}),OUT=(b)=>({direction:'outbound',body:b});
 const decide=(texts,history,out,c)=>{const o={action:'none',category:'buyer',...(out||{})};const burst=[];for(const h of history){if(h.direction==='outbound')burst.length=0;else if(h.body)burst.push(h.body);}
  const t=D.ownerDecisions(o,texts,{history,burstSaid:burst.join(' '),prop:null,visitedProp:false,visitedAny:false,saidVisited:false,handoffOpen:false,hardHandoff:false,...(c||{})});return {out:o,texts:t};};
@@ -86,7 +86,8 @@ test('dry run rows 701-740: the property she named by area and price is not call
  const available=[{id:'h59',branch_key:'barka',area:'بركاء الرميس',price:59000},{id:'s69',branch_key:'barka',area:'الصومحان الجنوبية',price:69000}];
  const h=[IN('ممكن الموقع'),OUT('موقع ايش ؟'),IN('فلة الرميس اللي ب59 الف')];
  const r=decide(['الفيلا اللي سألتي عنها انباعت','بس عندنا فيلا ثانية في الرميس بـ 59 الف متوفرة حالياً','اسمك الكريم ؟ ومتى يناسبك تزورين ؟'],h,null,{available,route:'barka'});
- assert.deepEqual(r.texts,['عندنا فيلا في الرميس بـ 59 الف متوفرة حالياً','اسمك الكريم ؟ ومتى يناسبك تزورين ؟']);assert.equal(r.out.property_id,'h59');
+ // R116 (19 Nov, Ahmed's order): the visit question first, «اسمك الكريم ؟» last on its own line
+ assert.deepEqual(r.texts,['عندنا فيلا في الرميس بـ 59 الف متوفرة حالياً','متى يناسبك تزورين ؟','اسمك الكريم ؟']);assert.equal(r.out.property_id,'h59');
  // live check after v91: «سألتِ» with a kasra
  assert.deepEqual(decide(['الفيلا اللي سألتِ عنها انباعت','بس عندنا فيلا ثانية في الرميس بـ 59 الف متوفره حالياً'],h,null,{available,route:'barka'}).texts,['عندنا فيلا في الرميس بـ 59 الف متوفره حالياً']);
  // dry run on the branch: words between «عنها» and «انباعت», and another area offered: her named one goes instead

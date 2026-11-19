@@ -43,7 +43,7 @@ test('visits and owners tables: the two buttons; an owner chat is found by the n
  assert(css.includes('.crm-grid .crm-grid-actions .crm-wa-btn::before{display:none}')&&!css.includes('#page-viewings .crm-grid .crm-grid-actions'),'not the visits table only');
  assert(css.includes('#page-viewings .crm-grid td.crm-grid-client{max-width:124px;overflow:hidden;text-overflow:ellipsis}'));
  assert(ui.includes('<td class="crm-grid-client" title="'),'the full client name stays as the tooltip');
- assert(/crm-simple-ui\.js\?v=20261117-menu1/.test(index));
+ assert(((index.match(/crm-simple-ui\.js\?v=(\d{8})/)||[])[1]||'')>='20261117','simple-ui version from 17 Nov or newer');
 });
 test('the same two buttons in the follow-ups, the chat header, the waiting list and the client file',()=>{
  const f=fs.readFileSync('crm-followups-today.js','utf8'),chat=fs.readFileSync('crm-whatsapp-chat.js','utf8'),ip=fs.readFileSync('crm-investment-projects.js','utf8'),base=fs.readFileSync('app-base-v15.html','utf8');
