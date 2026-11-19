@@ -36,6 +36,13 @@ export const TYPES: Record<string, { label: string; critical?: boolean }> = {
   send_failed: { label: "فشل إرسال" },
   unanswered: { label: "عميل ما انرد عليه" },
 };
+// When a rule went live in the agent (brain sync or deploy, UTC). A reply sent before that is not a mistake of today's agent and
+// is not reported. Add a line with every agent publish that adds or changes a rule (docs/agent-rules.md, «طريقة التعديل» 7).
+export const RELEASES: { at: string; rules: string[] }[] = [
+  { at: "2026-11-18T11:37:00Z", rules: ["R112", "R113", "R114", "R115"] }, // brain 103a979, then v101 ab76b4e (11:49Z)
+  { at: "2026-11-18T13:33:40Z", rules: ["R74"] }, // v102 73cacaa
+];
+const releasedAfter = (rule: string, at: string) => RELEASES.some((r) => r.rules.includes(rule) && new Date(at).getTime() < new Date(r.at).getTime());
 const MODEL_TYPES = Object.keys(TYPES).filter((k) => !["send_failed", "unanswered"].includes(k));
 
 // Mistakes already fixed (step 1 of Ahmed's request): from approver notes, rejected / superseded drafts, the review backup and
@@ -250,7 +257,8 @@ async function audit(companyId: string, opts: { hours?: number; dry?: boolean; t
           const d = c.drafts[Number(p.draft) - 1] || c.drafts[c.drafts.length - 1];
           if (!TYPES[p.error_type]) continue;
           // the rule that covers it came after this reply: fixed since, not a mistake of today's agent
-          if (p.before_fix === true) { beforeFix++; continue; }
+          const rs = String(p.rule_r || "").match(/R\d+/g) || [];
+          if (p.before_fix === true || (rs.length && d && rs.every((r: string) => releasedAfter(r, d.created_at)))) { beforeFix++; continue; }
           problems.push({ ...p, conv: c.conv, draft: d });
         }
       }

@@ -41,3 +41,7 @@ test('rules.ts is regenerated from docs/agent-rules.md (run build-rules.ps1 afte
  assert(ids.length>70);
  for(const r of ids) assert(new RegExp('^  "'+r+'[:،]','m').test(rules),r+' is missing from rules.ts');
 });
+test('a reply sent before its rule went live is not reported (RELEASES)',()=>{
+ assert(fn.includes('{ at: "2026-11-18T11:37:00Z", rules: ["R112", "R113", "R114", "R115"] }'));
+ assert(fn.includes('rs.every((r: string) => releasedAfter(r, d.created_at))'));
+});
