@@ -209,7 +209,7 @@
       const q=(byId('ownerSearchQ')?byId('ownerSearchQ').value:'').trim().toLowerCase();
       let rows=all;
       if(filter&&filter!=='all')rows=rows.filter(o=>(o.owner_type||'owner')===filter);
-      if(q)rows=rows.filter(o=>(o.name||'').toLowerCase().includes(q)||(o.phone||'').includes(q));
+      if(q)rows=rows.filter(o=>(o.name||'').toLowerCase().includes(q)||(o.phone||'').includes(q)||(typeof crmPhoneQueryMatch==='function'&&crmPhoneQueryMatch(q,[o.phone])));
       const set=(id,n)=>{const el=byId(id);if(el)el.textContent=n;};
       set('cntOwAll',all.length);set('cntOwOwner',all.filter(o=>(o.owner_type||'owner')==='owner').length);set('cntOwBroker',all.filter(o=>o.owner_type==='broker').length);
       set('cntOwAgent',all.filter(o=>o.owner_type==='agent').length);set('cntOwAgency',all.filter(o=>o.owner_type==='agency').length);set('cntOwDev',all.filter(o=>o.owner_type==='developer').length);

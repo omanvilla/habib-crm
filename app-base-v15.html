@@ -3408,7 +3408,7 @@ function filterClientDropdown(q){
     var name=(c.name||'').toLowerCase();
     var phone=(c.phone||'').replace(/[^0-9]/g,'');
     var qDigits=q.replace(/[^0-9]/g,'');
-    return name.indexOf(q)>=0||(qDigits&&phone.indexOf(qDigits)>=0);
+    return name.indexOf(q)>=0||(qDigits&&phone.indexOf(qDigits)>=0)||crmPhoneQueryMatch(q,[c.phone,c.phone_normalized]);
   }):list;
   
   var dd=document.getElementById('dClientDropdown');
@@ -4387,7 +4387,7 @@ function closeCmdPalette(){$('cmdPalette').classList.remove('on')}
 function cmdSearch(){const q=$('cmdInput').value.trim().toLowerCase();const items=[];
 const pages=[{i:'📊',t:'لوحة العمل',a:'navigate(\'dash\',document.querySelector(\'[onclick*=dash]\'))',s:'الصفحة الرئيسية'},{i:'⏰',t:'المهام',a:'navigate(\'daily\',document.querySelector(\'[onclick*=daily]\'))',s:'قائمة المهام'},{i:'👥',t:'العملاء',a:'navigate(\'clients\',document.querySelector(\'[onclick*=clients]\'))',s:'إدارة العملاء'},{i:'🏠',t:'العقارات',a:'navigate(\'properties\',document.querySelector(\'[onclick*=properties]\'))',s:'إدارة العقارات'},{i:'🤝',t:'الصفقات',a:'navigate(\'deals\',document.querySelector(\'[onclick*=deals]\'))',s:'إدارة الصفقات'},{i:'📅',t:'التقويم',a:'navigate(\'calendar\',document.querySelector(\'[onclick*=calendar]\'))',s:'المواعيد'},{i:'🤖',t:'قوالب الرسائل',a:'navigate(\'ai\',document.querySelector(\'[onclick*=ai]\'))',s:'قوالب جاهزة'},{i:'📈',t:'التقارير',a:'navigate(\'reports\',document.querySelector(\'[onclick*=reports]\'))',s:'الإحصائيات'}];const actions=[{i:'➕',t:'عميل جديد',a:'openModal(\'mClient\')',s:'إضافة عميل'},{i:'🏠',t:'عقار جديد',a:'openModal(\'mProperty\')',s:'إضافة عقار'},{i:'🤝',t:'صفقة جديدة',a:'openModal(\'mDeal\')',s:'إضافة صفقة'},{i:'⏰',t:'مهمة جديدة',a:'openModal(\'mTask\')',s:'إضافة مهمة'},{i:'📅',t:'موعد جديد',a:'openModal(\'mEvent\')',s:'إضافة موعد'},{i:'⚙️',t:'الإعدادات',a:'navigate(\'settings\',null)',s:'تعديل الحساب'},{i:'🚪',t:'تسجيل الخروج',a:'forceLogout()',s:'الخروج من النظام'}];
 [...pages,...actions].forEach(p=>{if(p.t==='التقارير'&&!isOwner())return;if(!q||p.t.toLowerCase().indexOf(q)>=0||p.s.toLowerCase().indexOf(q)>=0)items.push(p)});
-if(q&&q.length>=2){allClients.filter(c=>(c.name||'').toLowerCase().indexOf(q)>=0||(c.phone||'').indexOf(q)>=0).slice(0,5).forEach(c=>{items.push({i:'👤',t:c.name,a:'viewClient(\''+c.id+'\')',s:'عميل · '+escapeHtml(c.phone||'')+' · '+(c.preferred_area||'')})})}cmdItems=items;cmdSelectedIdx=0;renderCmdResults()}
+if(q&&q.length>=2){allClients.filter(c=>(c.name||'').toLowerCase().indexOf(q)>=0||(c.phone||'').indexOf(q)>=0||crmPhoneQueryMatch(q,[c.phone,c.phone_normalized])).slice(0,5).forEach(c=>{items.push({i:'👤',t:c.name,a:'viewClient(\''+c.id+'\')',s:'عميل · '+escapeHtml(c.phone||'')+' · '+(c.preferred_area||'')})})}cmdItems=items;cmdSelectedIdx=0;renderCmdResults()}
 function renderCmdResults(){const r=$('cmdResults');if(!cmdItems.length){r.innerHTML='<div class="cmd-empty">لا توجد نتائج</div>';return}let h='';cmdItems.forEach((it,i)=>{h+='<div class="cmd-item '+(i===cmdSelectedIdx?'selected':'')+'" onclick="cmdExec('+i+')"><div class="cmd-icon">'+it.i+'</div><div class="cmd-text"><div class="cmd-title">'+escapeHtml(it.t)+'</div><div class="cmd-sub">'+escapeHtml(it.s||'')+'</div></div></div>'});r.innerHTML=h}
 function cmdExec(i){const it=cmdItems[i];if(!it)return;closeCmdPalette();try{eval(it.a)}catch(e){console.error(e)}}
 function cmdKeyDown(e){if(e.key==='Escape'){closeCmdPalette()}else if(e.key==='ArrowDown'){e.preventDefault();cmdSelectedIdx=Math.min(cmdSelectedIdx+1,cmdItems.length-1);renderCmdResults()}else if(e.key==='ArrowUp'){e.preventDefault();cmdSelectedIdx=Math.max(cmdSelectedIdx-1,0);renderCmdResults()}else if(e.key==='Enter'){e.preventDefault();cmdExec(cmdSelectedIdx)}}
@@ -4427,7 +4427,7 @@ function ownerTypeBadge(t){
 async function renderOwners(){const list=$('ownersList');const q=($('ownerSearchQ')?$('ownerSearchQ').value:'').trim().toLowerCase();let filtered=allOwners;
 // فلترة حسب النوع
 if(ownerTypeFilter&&ownerTypeFilter!=='all'){filtered=filtered.filter(o=>(o.owner_type||'owner')===ownerTypeFilter)}
-if(q){filtered=filtered.filter(o=>(o.name||'').toLowerCase().indexOf(q)>=0||(o.phone||'').indexOf(q)>=0)}
+if(q){filtered=filtered.filter(o=>(o.name||'').toLowerCase().indexOf(q)>=0||(o.phone||'').indexOf(q)>=0||crmPhoneQueryMatch(q,[o.phone]))}
 // تحديث العدادات
 if($('cntOwAll'))$('cntOwAll').textContent=allOwners.length;
 if($('cntOwOwner'))$('cntOwOwner').textContent=allOwners.filter(o=>(o.owner_type||'owner')==='owner').length;
