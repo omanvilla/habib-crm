@@ -65,6 +65,8 @@
  window.crmIgAlertCount=()=>scope()?igCount:0;
  const igChanged=n=>{if(n===igCount)return;igCount=n;document.dispatchEvent(new CustomEvent('crm-ig-alert-updated'));};
  async function overviewOnce(){
+  // 19 Nov 2026: the home tile count waits for the home's first draw (window.crmHomeFirst, crm-owner-home.js)
+  if(window.crmHomeFirst)await window.crmHomeFirst;
   const identity=scope();mount();if(!identity)return null;
   const company=currentProfile.company_id;
   const state=await supa.from('instagram_discovery_state').select('enabled,auto_link_enabled,backfill_complete,last_success_at,last_error_code').eq('company_id',company);

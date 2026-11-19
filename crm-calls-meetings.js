@@ -381,6 +381,7 @@
   const vc=window.viewClient;
   if(typeof vc==='function')window.viewClient=async function(){const r=await vc.apply(this,arguments);paintCallBtn();loadCalls();return r;};
   const ld=window.loadDashboard;
-  if(typeof ld==='function')window.loadDashboard=function(){const r=ld.apply(this,arguments);setTimeout(()=>{loadUnasked();paintHomeCall();},1500);return r;};
-  setTimeout(()=>{loadUnasked();loadCalls();paintHomeCall();},2500);
+  if(typeof ld==='function')window.loadDashboard=function(){const r=ld.apply(this,arguments);setTimeout(()=>(window.crmAfterHome||(f=>f()))(()=>{loadUnasked();paintHomeCall();}),1500);return r;};
+  // 19 Nov 2026: after the home's first draw (crm-owner-home.js), so these reads do not slow the home read at open
+  setTimeout(()=>(window.crmAfterHome||(f=>f()))(()=>{loadUnasked();loadCalls();paintHomeCall();}),2500);
 })();

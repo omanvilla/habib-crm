@@ -70,6 +70,16 @@
     if(hasHome()&&!last)armGate();else if(!hasHome())releaseGate();
     return r;
   };
+  /* 19 Nov 2026 (open speed): at open about 15 reads used to start together with crm_owner_home on a small database whose
+   * fresh connections are slow, so the home read took 4-6 s instead of ~0.3 s. What the first draw does not need waits until
+   * the home is drawn (the same gate, never longer than 8 s): the bell list, the WhatsApp unread badge, and the tiles that
+   * draw themselves later (hot alerts, «مشترين واقفين», the reply audit card, calls and visits). crmAfterHome(fn) runs fn
+   * at once when nothing is waiting. */
+  window.crmAfterHome=fn=>{const g=window.crmHomeFirst;if(g)g.then(()=>fn(),()=>fn());else fn();};
+  const afterHome=name=>{const f=window[name];if(typeof f!=='function')return;
+    window[name]=function(){const self=this,args=arguments,g=window.crmHomeFirst;
+      return g?g.then(()=>f.apply(self,args)):f.apply(self,args);};};
+  afterHome('loadNotifications');afterHome('refreshWhatsAppBadge');
 
   function mount(){
     const page=byId('page-dash');if(!page)return null;

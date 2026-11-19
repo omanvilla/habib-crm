@@ -4169,7 +4169,8 @@ async function refreshWhatsAppBadge(){
   if(!currentProfile||!currentProfile.company_id)return;
   try{const d=await waInboxInvoke({action:'list'});updateWhatsAppBadge(d.unread_total||0);if(document.getElementById('page-whatsapp')?.classList.contains('active')){const updated=d.conversations||[];waInboxConversations=[...new Map([...waInboxConversations,...updated].map(x=>[x.id,x])).values()];renderWhatsAppConversations()}}catch(e){console.warn('[WA badge]',e)}
 }
-setInterval(()=>{if(currentProfile&&currentProfile.company_id&&document.visibilityState==='visible')refreshWhatsAppBadge()},30000);
+/* 19 Nov 2026 (open speed): the unread badge every 60 s instead of 30 s; opening a chat or sending still refreshes it at once */
+setInterval(()=>{if(currentProfile&&currentProfile.company_id&&document.visibilityState==='visible')refreshWhatsAppBadge()},60000);
 
 function toggleNotifPanel(e){e&&e.stopPropagation();const p=$('notifPanel');p.classList.toggle('on');if(p.classList.contains('on'))loadNotifications()}
 document.addEventListener('click',function(e){if(!e.target.closest('.bell-wrapper')&&!e.target.closest('.notif-panel')){$('notifPanel').classList.remove('on')}});
@@ -4329,7 +4330,10 @@ async function requestNotifPermission(){if(!('Notification' in window))return fa
 function sendBrowserNotif(title,body,icon){if(!('Notification' in window))return;if(Notification.permission!=='granted')return;try{const n=new Notification(title,{body:body,icon:icon||'⌘',badge:'⌘',tag:title,silent:false});setTimeout(()=>{try{n.close()}catch(e){}},10000);n.onclick=function(){window.focus();n.close()}}catch(e){console.warn('Notif failed:',e)}}
 async function checkAndNotifyNew(){if(!currentProfile||!currentProfile.company_id||!('Notification' in window))return;if(Notification.permission!=='granted')return;try{const since=new Date(Date.now()-90000).toISOString();const r=await supa.from('clients').select('id,name,phone,source').gte('created_at',since).eq('source','website');(r.data||[]).forEach(c=>{const key='lead-'+c.id;if(!lastNotifIds.has(key)){lastNotifIds.add(key);sendBrowserNotif('🎉 عميل جديد من الموقع!',c.name+(c.phone?' · '+c.phone:''))}})}catch(e){console.warn(e)}}
 async function enableNotifications(){const granted=await requestNotifPermission();if(granted){showToast('🔔 تم تفعيل الإشعارات','success');sendBrowserNotif('Habib Sons CRM','✅ الإشعارات مفعّلة! ستصلك تنبيهات العملاء الجدد')}else{showToast('⚠️ لم تُمنح الإشعارات','error')}}
-setInterval(()=>{if(currentProfile&&currentProfile.company_id&&document.visibilityState==='visible'){loadNotifications();checkAndNotifyNew()}},60000);
+/* 19 Nov 2026 (open speed): the bell list every 2 minutes instead of every minute (opening the bell still reads it at once); the website-lead
+   browser notice keeps its 1-minute check (checkAndNotifyNew reads 90 seconds back) */
+setInterval(()=>{if(currentProfile&&currentProfile.company_id&&document.visibilityState==='visible')checkAndNotifyNew()},60000);
+setInterval(()=>{if(currentProfile&&currentProfile.company_id&&document.visibilityState==='visible')loadNotifications()},120000);
 async function loadCalendar(){await loadCalEvents();renderCalendar()}
 async function loadCalEvents(){try{const tasksR=await supa.from('tasks').select('*, client:clients(name,lead_route)').order('due_date');const eventsR=await supa.from('events').select('*, client:clients(name)').order('event_date');const items=[];(tasksR.data||[]).forEach(t=>{if(t.due_date)items.push({id:'t-'+t.id,type:'task',title:t.title,date:t.due_date,done:t.done,client:t.client,priority:t.priority,raw:t})});(eventsR.data||[]).forEach(e=>{items.push({id:'e-'+e.id,type:'event',title:e.title,date:e.event_date,time:e.event_time,evtType:e.type,client:e.client,location:e.notes,raw:e})});allEvents=items}catch(err){console.error('Calendar:',err);allEvents=[]}}
 function navCalendar(dir){if(dir===0){calCurrentDate=new Date()}else if(calView==='month'){calCurrentDate.setMonth(calCurrentDate.getMonth()+dir)}else if(calView==='week'){calCurrentDate.setDate(calCurrentDate.getDate()+dir*7)}renderCalendar()}

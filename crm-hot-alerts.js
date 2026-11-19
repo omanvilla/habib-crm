@@ -155,5 +155,5 @@
   setInterval(()=>{if(document.visibilityState==='visible')window.crmHotAlertsRefresh();},45000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)window.crmHotAlertsRefresh();});
   const loadDash=window.loadDashboard;
-  if(typeof loadDash==='function')window.loadDashboard=function(){const r=loadDash.apply(this,arguments);setTimeout(window.crmHotAlertsRefresh,600);return r;};
+  if(typeof loadDash==='function')window.loadDashboard=function(){const r=loadDash.apply(this,arguments);setTimeout(()=>(window.crmAfterHome||(f=>f()))(window.crmHotAlertsRefresh),600);return r;}; // waits for the home's first draw (crm-owner-home.js)
 })();

@@ -50,7 +50,7 @@
   setInterval(()=>{if(!document.hidden)load(true);},600000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-doneAt>600000)load(true);});
   const loadDash=window.loadDashboard;
-  if(typeof loadDash==='function')window.loadDashboard=function(){const r=loadDash.apply(this,arguments);setTimeout(load,900);return r;};
+  if(typeof loadDash==='function')window.loadDashboard=function(){const r=loadDash.apply(this,arguments);setTimeout(()=>(window.crmAfterHome||(f=>f()))(load),900);return r;}; // waits for the home's first draw (crm-owner-home.js)
   // a session change never keeps the owner's report for the next account in the same tab
   if(typeof currentProfile!=='undefined'&&!isOwner())data=null;
 })();

@@ -69,5 +69,5 @@ test('the agent\'s inventory reminder is not said twice on the home; the four sh
  assert(!home.includes('قائمة العمل الكاملة'));
  const base=fs.readFileSync('app-base-v15.html','utf8');
  assert.equal((base.slice(base.indexOf('<div class="dash-toolbar"'),base.indexOf('</div></div>',base.indexOf('<div class="dash-toolbar"'))).match(/class="qa-btn"/g)||[]).length,4);
- assert(/crm-owner-home\.js\?v=202611(19|2\d)-/.test(index)&&/crm-owner-home\.css\?v=202611(1[89]|2\d)-/.test(index)&&index.includes('crm-calls-meetings.js?v=20261118-d36'));
+ assert(/crm-owner-home\.js\?v=202611(19|2\d)-/.test(index)&&/crm-owner-home\.css\?v=202611(1[89]|2\d)-/.test(index)&&index.includes('crm-calls-meetings.js?v=20261119-open1'));
 });
