@@ -570,12 +570,17 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   // R116 (reply audit 19 Nov, Ahmed chose «متى يناسبك تزور ؟» then «اسمك الكريم ؟»; c53c9aee and four more): an offer with no
   // question left the client with nothing to answer («ارسلي اشوف» got the ad of the Al Sawmhan villa only, 799202aa). An available
   // home offered to a buyer who has not seen it gets its reel (when not sent in this chat) and the visit question.
+  // (dry run on the branch: the model now asked the visit question itself but left the reel out; the reel goes with the ad
+  // before the last question either way)
   if (out.action === "none" && out.category === "buyer" && c.prop && (!c.prop.status || c.prop.status === "available") && !c.visitedProp && !out.viewing_date
-    && texts.length && !texts.some((t) => /[؟?]/.test(t)) && texts.some((t) => t.length > 120)) {
+    && texts.some((t) => t.length > 120 && !/^https?:/.test(t))) {
     const vcode = c.prop.video ? (String(c.prop.video).match(IG_CODE) || [])[1] || String(c.prop.video) : "";
-    if (vcode && !sentBefore(vcode) && !texts.some((t) => t.includes(vcode))) texts.push(String(c.prop.video));
-    texts.push("متى يناسبك تزور ؟");
-    out.guard_offer_question = true;
+    const hasQ = texts.some((t) => /[؟?]/.test(t));
+    if (vcode && !sentBefore(vcode) && !texts.some((t) => t.includes(vcode))) {
+      if (hasQ && /[؟?]\s*$/.test(texts[texts.length - 1])) texts.splice(texts.length - 1, 0, String(c.prop.video)); else texts.push(String(c.prop.video));
+      out.guard_offer_question = true;
+    }
+    if (!hasQ) { texts.push("متى يناسبك تزور ؟"); out.guard_offer_question = true; }
   }
   // R116: «اسمك الكريم ؟ ومتى يناسبك تزور ؟» in one line: the other question first, the name question last on its own line
   {

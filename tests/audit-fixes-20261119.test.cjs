@@ -20,7 +20,9 @@ test('R116: an available home offered with no question gets its reel and the vis
  assert.deepEqual(r.texts,[ad,RUMAIS.video,'متى يناسبك تزور ؟']);
  // the reel already sent in this chat is not sent again; a reply with a question, a tenant, a visited home: untouched
  assert.deepEqual(decide([ad],[OUT(RUMAIS.video),...h],null,{prop:RUMAIS}).texts,[ad,'متى يناسبك تزور ؟']);
- assert.deepEqual(decide([ad,'تحب تشوفها ؟'],h,null,{prop:RUMAIS}).texts,[ad,'تحب تشوفها ؟']);
+ // the model asked the question itself: the reel goes before it (dry run of 799202aa on the branch)
+ assert.deepEqual(decide([ad,'تحب تشوفها ؟'],h,null,{prop:RUMAIS}).texts,[ad,RUMAIS.video,'تحب تشوفها ؟']);
+ assert.deepEqual(decide([ad,'تحب تشوفها ؟'],[OUT(RUMAIS.video),...h],null,{prop:RUMAIS}).texts,[ad,'تحب تشوفها ؟']);
  assert.equal(decide([ad],h,{category:'tenant'},{prop:RUMAIS}).out.guard_offer_question,undefined);
  assert.equal(decide([ad],h,null,{prop:RUMAIS,visitedProp:true}).out.guard_offer_question,undefined);
  assert.equal(decide(['تمام'],h,null,{prop:RUMAIS}).out.guard_offer_question,undefined);
