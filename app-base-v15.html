@@ -228,7 +228,7 @@ window.fbAsyncInit = function(){
 <div class="page-header"><div><div class="page-title"><span>واتساب</span></div><div class="page-sub">كل محادثات واتساب في مكان واحد — والرد يخرج من نفس الرقم الذي راسله العميل</div></div><button class="btn-secondary" id="waInboxRefreshBtn" onclick="loadWhatsAppInbox(true)">🔄 تحديث</button></div>
 <div class="wa-inbox-grid">
   <div class="wa-conv-panel">
-    <div class="wa-conv-head"><input class="fi wa-conv-search" id="waInboxSearch" placeholder="🔍 ابحث بالاسم أو الرقم..." oninput="renderWhatsAppConversations()"><span id="waInboxTotal" class="badge b-em">0</span></div>
+    <div class="wa-conv-head"><input class="fi wa-conv-search" id="waInboxSearch" placeholder="🔍 ابحث بالاسم أو الرقم..." oninput="waInboxSearchInput()"><span id="waInboxTotal" class="badge b-em">0</span></div>
     <div class="wa-conv-list" id="waConversationList"><div class="empty"><div class="loader-spinner"></div></div></div>
   </div>
   <div class="wa-chat-panel">
@@ -2456,6 +2456,12 @@ function clearClientSmartSearch(){
   renderClients();
 }
 
+/* Phone-like query (92236346 / 96892236346 / +968 9223 6346 / Arabic digits) matches any stored form by its last 8 digits. */
+function crmPhoneQueryMatch(query,values){
+  const raw=crmDigits(query).trim();if(!/^[+\d\s().\-]+$/.test(raw))return false;
+  const q=raw.replace(/\D/g,'');if(q.length<3)return false;const key=q.length>8?q.slice(-8):q;
+  return (values||[]).some(v=>crmDigits(v).replace(/\D/g,'').includes(key));
+}
 function matchesClientSmartFilter(c){
   const f=window.clientSmartFilter;
   if(!f)return true;
@@ -2464,9 +2470,7 @@ function matchesClientSmartFilter(c){
   if(f.text){
     const query=text(f.text),hay=text((c.name||'')+' '+(c.phone||''));
     if(!hay.includes(query)){
-      const phoneQuery=/^\+?[\d\s().-]+$/.test(query)?query.replace(/\D/g,'').replace(/^00/,''):'';
-      const phones=[c.phone_normalized,c.phone].filter(Boolean).map(value=>text(value).replace(/\D/g,'').replace(/^00/,''));
-      if(!phoneQuery||!phones.some(phone=>phone.includes(phoneQuery)))return false;
+      if(!crmPhoneQueryMatch(query,[c.phone_normalized,c.phone]))return false;
     }
   }
   // Requests are already limited by RLS. Keep each request's criteria together,
@@ -4014,17 +4018,31 @@ async function loadWhatsAppInbox(force,append){
  }catch(e){const box=$('waConversationList');if(box)box.innerHTML='<div class="wa-inbox-error">'+escapeHtml(e.message||String(e))+' <button class="btn-secondary" onclick="loadWhatsAppInbox(true)">إعادة المحاولة</button></div>'}
  finally{waInboxLoading=false;if(button){button.disabled=false;button.textContent='تحديث'}}
 }
+/* Name looks like a placeholder (short, one repeated letter like «ههه», no letters): show the phone beside it. */
+function waWeakName(name){const letters=String(name||'').replace(/[^\p{L}]/gu,'');return letters.length<=3||new Set(letters).size<=2;}
+let waInboxSearchTimer=null,waInboxSearchSeq=0,waInboxSearchQ='',waInboxSearchRows=null;
+function waInboxSearchInput(){
+  clearTimeout(waInboxSearchTimer);const q=crmDigits(($('waInboxSearch')&&$('waInboxSearch').value)||'').trim().toLowerCase();
+  if(!q){waInboxSearchSeq++;waInboxSearchQ='';waInboxSearchRows=null;renderWhatsAppConversations();return}
+  renderWhatsAppConversations();
+  waInboxSearchTimer=setTimeout(async()=>{const seq=++waInboxSearchSeq;
+    try{const d=await waInboxInvoke({action:'list',limit:100,q:q});if(seq!==waInboxSearchSeq)return;waInboxSearchQ=q;waInboxSearchRows=d.conversations||[];renderWhatsAppConversations();}
+    catch(e){if(seq===waInboxSearchSeq)console.warn('[WA search]',e);}
+  },300);
+}
 function renderWhatsAppConversations(){
   const el=$('waConversationList');if(!el)return;
-  const q=(($('waInboxSearch')&&$('waInboxSearch').value)||'').trim().toLowerCase();
+  const q=crmDigits(($('waInboxSearch')&&$('waInboxSearch').value)||'').trim().toLowerCase();
   let rows=waInboxConversations;
-  if(q)rows=rows.filter(c=>{const cl=c.client||{};return [cl.name,c.customer_name,cl.phone,c.customer_phone,c.inbound_number,c.ai_summary,c.last_message&&c.last_message.body].some(v=>String(v||'').toLowerCase().includes(q))});
+  if(q){const qd=crmDigits(q);rows=rows.filter(c=>{const cl=c.client||{};return [cl.name,c.customer_name,cl.phone,c.customer_phone,c.inbound_number,c.ai_summary,c.last_message&&c.last_message.body].some(v=>crmDigits(v).toLowerCase().includes(qd))||crmPhoneQueryMatch(q,[c.customer_phone,c.customer_wa_id,cl.phone,cl.phone_normalized])});
+    /* Server results cover chats beyond the loaded page (an older chat searched by phone). */
+    if(waInboxSearchRows&&waInboxSearchQ===q)rows=[...new Map([...rows,...waInboxSearchRows].map(x=>[x.id,x])).values()].sort((a,b)=>String(b.last_message_at||'').localeCompare(String(a.last_message_at||'')));}
   if($('waInboxTotal'))$('waInboxTotal').textContent=rows.length;
   if(!rows.length){el.innerHTML='<div class="empty"><div class="empty-ico">💬</div><div class="empty-title">لا توجد محادثات</div><div class="empty-desc">أول رسالة واتساب واردة ستظهر هنا تلقائياً.</div></div>';return}
   el.innerHTML=rows.map(c=>{
-    const cl=c.client||{};const name=cl.name||c.customer_name||c.customer_phone||'عميل واتساب';const u=Number(c.unread_count||0);const lm=c.last_message||{};const preview=lm.body||lm.transcript||c.ai_summary||('رسالة '+(lm.message_type||''));const arrow=lm.direction==='outbound'?'↗':'↙';const handoff=c.human_handoff_required?'<span style="background:#FEE2E2;color:#991B1B;border:1px solid #FECACA;border-radius:999px;padding:2px 6px;font-size:9px">⚠️ تدخل بشري</span>':'';
-    return '<div class="wa-conv-item '+(c.id===waInboxActiveId?'active':'')+'" onclick="openWhatsAppConversation(\''+c.id+'\')"><div class="wa-conv-top"><span class="wa-status-dot"></span><div class="wa-conv-name">'+escapeHtml(name)+'</div>'+handoff+(u?'<span class="wa-unread">'+u+'</span>':'')+'</div><div class="wa-conv-meta"><span dir="ltr">'+escapeHtml(c.customer_phone||cl.phone||'')+'</span> · '+escapeHtml(waRouteLabel(c.route_key))+' · <span dir="ltr">'+escapeHtml(c.inbound_number||'')+'</span></div><div class="wa-conv-preview">'+arrow+' '+escapeHtml(preview||'')+' <span style="float:left">'+escapeHtml(waInboxTime(c.last_message_at))+'</span></div></div>';
-  }).join('')+(waInboxNextOffset!==null?'<button class="btn-secondary" onclick="loadWhatsAppInbox(false,true)">عرض محادثات أقدم</button>':'');
+    const cl=c.client||{};const name=cl.name||c.customer_name||c.customer_phone||'عميل واتساب';const namePhone=waWeakName(name)?(c.customer_phone||cl.phone||c.customer_wa_id||''):'';const u=Number(c.unread_count||0);const lm=c.last_message||{};const preview=lm.body||lm.transcript||c.ai_summary||('رسالة '+(lm.message_type||''));const arrow=lm.direction==='outbound'?'↗':'↙';const handoff=c.human_handoff_required?'<span style="background:#FEE2E2;color:#991B1B;border:1px solid #FECACA;border-radius:999px;padding:2px 6px;font-size:9px">⚠️ تدخل بشري</span>':'';
+    return '<div class="wa-conv-item '+(c.id===waInboxActiveId?'active':'')+'" onclick="openWhatsAppConversation(\''+c.id+'\')"><div class="wa-conv-top"><span class="wa-status-dot"></span><div class="wa-conv-name">'+escapeHtml(name)+(namePhone&&namePhone!==name?' <span class="wa-conv-name-phone" dir="ltr" style="font-weight:400;color:#64748B;font-size:.85em">'+escapeHtml(namePhone)+'</span>':'')+'</div>'+handoff+(u?'<span class="wa-unread">'+u+'</span>':'')+'</div><div class="wa-conv-meta"><span dir="ltr">'+escapeHtml(c.customer_phone||cl.phone||'')+'</span> · '+escapeHtml(waRouteLabel(c.route_key))+' · <span dir="ltr">'+escapeHtml(c.inbound_number||'')+'</span></div><div class="wa-conv-preview">'+arrow+' '+escapeHtml(preview||'')+' <span style="float:left">'+escapeHtml(waInboxTime(c.last_message_at))+'</span></div></div>';
+  }).join('')+(!q&&waInboxNextOffset!==null?'<button class="btn-secondary" onclick="loadWhatsAppInbox(false,true)">عرض محادثات أقدم</button>':'');
 }
 async function openWhatsAppConversation(id){
  const seq=++waConversationLoadSeq;if(waInboxActiveId&&$('waInboxMessage'))waInboxDrafts.set(waInboxActiveId,$('waInboxMessage').value);
