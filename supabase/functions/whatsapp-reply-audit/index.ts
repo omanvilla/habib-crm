@@ -84,11 +84,12 @@ const SCHEMA = {
   type: "object", additionalProperties: false, required: ["chats"],
   properties: { chats: { type: "array", items: { type: "object", additionalProperties: false, required: ["chat", "problems"],
     properties: { chat: { type: "integer" }, problems: { type: "array", items: { type: "object", additionalProperties: false,
-      required: ["draft", "error_type", "certain", "customer_message", "explanation", "options", "rule_r", "pinned_rule", "known_mistake"],
+      required: ["draft", "error_type", "certain", "before_fix", "customer_message", "explanation", "options", "rule_r", "pinned_rule", "known_mistake"],
       properties: {
         draft: { type: "integer", description: "رقم مسودة العقل (#) اللي فيها الغلط" },
         error_type: { type: "string", enum: MODEL_TYPES },
         certain: { type: "boolean", description: "true بس إذا الغلط أكيد من المحادثة والقائمة، مو تخمين" },
+        before_fix: { type: "boolean", description: "true إذا القاعدة اللي تغطي الغلط تاريخها بعد يوم الرد (يعني انصلح بعدين)" },
         customer_message: { type: "string", description: "رسالة العميل اللي رد عليها العقل غلط، نصها" },
         explanation: { type: "string", description: "سطرين بالعربي البسيط لأحمد: وش الغلط وليش" },
         options: { type: "array", items: { type: "string" }, description: "2 أو 3 ردود صحيحة بديلة، كل رد كامل، كل رسالة في سطر" },
@@ -114,6 +115,8 @@ const INSTRUCTIONS = (brain: string, knowledge: string, pinned: string, props: s
 - known_mistake: نفس غلط من «الأغلاط اللي سبق صلّحناها» رجع (اكتب رقمه في known_mistake)
 certain=true بس إذا الغلط واضح أكيد. خاصة الأنواع الخطيرة (invented_info و sold_offered و serious_not_handed): هذي توقف العقل على المحادثة، فلا تقول certain إلا إذا متأكد من القائمة والمحادثة.
 لا تحكم على شي سواه المكتب بيده (المكتب) ولا على رسائل المتابعة الآلية، بس على مسودات العقل المرقمة.
+المعلومة المكتوبة في نص الإعلان أو الوصف أو طريقة الزيارة أو معرفة المشاريع مو مخترعة. والعقار اللي ما له تفاصيل في القائمة (مباع أو مؤرشف) لا تحكم على تفاصيله إلا إذا تخالف القائمة.
+كل قاعدة R جنبها تاريخها: إذا تاريخ القاعدة بعد يوم الرد، الغلط انصلح بعدين، اكتب before_fix=true.
 الاقتراحات (options): 2 أو 3 ردود كاملة صحيحة يقدر أحمد يختار منها، باللهجة العمانية البيضاء وعلى طريقة كتابة المكتب بالضبط (رسائل قصيرة، كل رسالة في سطر، بدون نقطة آخر السطر، « ؟» بمسافة)، وبدون أي معلومة مو مكتوبة في القائمة أو المعرفة. إذا الصح إن العقل ما يرد ويحوّل لأحمد، اكتب في الاقتراح: «(بدون رد، تحويل لأحمد: …)».
 explanation: سطرين بالعربي البسيط.
 
@@ -179,7 +182,7 @@ async function audit(companyId: string, opts: { hours?: number; dry?: boolean; t
     db.from("whatsapp_reply_drafts").select("id,conversation_id,client_id,status,error,analysis,reply_messages,approved_messages,created_at,sent_at")
       .eq("company_id", companyId).gte("created_at", S).lt("created_at", E).order("created_at"),
     db.from("whatsapp_reply_rules").select("id,situation,approved_reply,category").eq("company_id", companyId).eq("active", true),
-    db.from("properties").select("id,title,internal_name,type,area,wilayat,price,status,listing_purpose,branch_key,bedrooms,land_size,built_size").eq("company_id", companyId),
+    db.from("properties").select("id,title,internal_name,type,area,wilayat,price,status,archived,listing_purpose,branch_key,bedrooms,bathrooms,land_size,built_size,public_details,description,visit_method,visit_instructions,map_url,rental_terms,price_negotiable,electricity_connected,water_connected,updated_at").eq("company_id", companyId),
     db.from("whatsapp_agent_prompts").select("content").eq("key", "brain").maybeSingle(),
     db.from("whatsapp_agent_prompts").select("content").eq("key", "knowledge").maybeSingle(),
     db.from("whatsapp_reply_audit_findings").select("id,conversation_id,customer_name,error_type,severity,conversations,conversations_count,created_at,paused").eq("company_id", companyId).eq("status", "open").order("created_at"),
@@ -207,11 +210,27 @@ async function audit(companyId: string, opts: { hours?: number; dry?: boolean; t
   // ---------- model judgment, chunk by chunk ----------
   const byConv = convIds.slice(0, MAX_CHATS).map((cid) => ({ conv: convs[cid] || { id: cid }, drafts: judged.filter((d: any) => d.conversation_id === cid) }));
   const pinned = (rulesR.data || []).map((r: any) => `${id8(r.id)} | ${short(r.situation, 300)} | الرد: ${short(r.approved_reply, 200).replace(/\n/g, " / ")}`).join("\n") || "ما في";
-  const props = (propsR.data || []).map((p: any) => [id8(p.id), p.title || p.internal_name, p.type, [p.area, p.wilayat].filter(Boolean).join("/"), p.price ? `${p.price} ريال` : "بدون سعر", p.status,
-    p.listing_purpose, p.branch_key, p.bedrooms ? `${p.bedrooms} غرف` : "", p.land_size ? `أرض ${p.land_size}` : "", p.built_size ? `بناء ${p.built_size}` : ""].filter(Boolean).join(" | ")).join("\n");
+  // the properties on offer (available / reserved) with everything the agent may say about them (the ad text, how to visit,
+  // utilities), so a fact taken from the ad is not called invented; the others in one line each with their status
+  const VISIT: Record<string, string> = { open: "البيت مفتوح", lockbox: "صندوق مفتاح", owner: "تواصل مع المالك", office: "تنسيق من المكتب" };
+  const live = (p: any) => !p.archived && ["available", "reserved"].includes(p.status);
+  const props = (propsR.data || []).sort((a: any, b: any) => Number(live(b)) - Number(live(a))).map((p: any) => {
+    const head = [id8(p.id), p.title || p.internal_name, p.type, [p.area, p.wilayat].filter(Boolean).join("/"), p.price ? `${p.price} ريال` : "بدون سعر",
+      `الحالة: ${p.status}${p.archived ? " (مؤرشف)" : ""}${p.status !== "available" && p.updated_at ? ` من ${String(p.updated_at).slice(0, 10)}` : ""}`,
+      p.listing_purpose, p.branch_key, p.bedrooms ? `${p.bedrooms} غرف` : "", p.land_size ? `أرض ${p.land_size}` : "", p.built_size ? `بناء ${p.built_size}` : ""].filter(Boolean).join(" | ");
+    if (!live(p)) return head;
+    return [head,
+      p.visit_method ? `  طريقة الزيارة: ${VISIT[p.visit_method] || p.visit_method}${p.visit_instructions ? ` (${short(p.visit_instructions, 250)})` : ""}` : "",
+      p.map_url ? "  له لوكيشن" : "", p.price_negotiable != null ? `  السعر قابل للتفاوض: ${p.price_negotiable ? "نعم" : "لا"}` : "",
+      p.electricity_connected != null || p.water_connected != null ? `  الكهرباء: ${p.electricity_connected ? "موصلة" : "مو موصلة / مو معروف"} · الماي: ${p.water_connected ? "موصل" : "مو موصل / مو معروف"}` : "",
+      p.rental_terms ? `  شروط الإيجار: ${short(typeof p.rental_terms === "string" ? p.rental_terms : JSON.stringify(p.rental_terms), 200)}` : "",
+      p.public_details ? `  نص الإعلان: ${short(p.public_details, 1200).replace(/\n+/g, " / ")}` : "",
+      p.description ? `  وصف: ${short(p.description, 500).replace(/\n+/g, " / ")}` : ""].filter(Boolean).join("\n");
+  }).join("\n");
   const instructions = INSTRUCTIONS(String(brainR.data?.content || ""), String(knowR.data?.content || ""), pinned, props);
   const problems: any[] = [];
   const errors: string[] = [];
+  let beforeFix = 0;
   const chunks: any[][] = [];
   for (let i = 0; i < byConv.length; i += CHUNK) chunks.push(byConv.slice(i, i + CHUNK));
   await Promise.all(chunks.map(async (chunk, ci) => {
@@ -223,6 +242,8 @@ async function audit(companyId: string, opts: { hours?: number; dry?: boolean; t
         for (const p of ch.problems || []) {
           const d = c.drafts[Number(p.draft) - 1] || c.drafts[c.drafts.length - 1];
           if (!TYPES[p.error_type]) continue;
+          // the rule that covers it came after this reply: fixed since, not a mistake of today's agent
+          if (p.before_fix === true) { beforeFix++; continue; }
           problems.push({ ...p, conv: c.conv, draft: d });
         }
       }
@@ -249,17 +270,22 @@ async function audit(companyId: string, opts: { hours?: number; dry?: boolean; t
   const ruleIds = new Map((rulesR.data || []).map((r: any) => [id8(r.id), r.id]));
   const isCritical = (p: any) => !!TYPES[p.error_type]?.critical && p.certain === true;
   const groups = new Map<string, any[]>();
+  // same type = one item; a rule violation is grouped by its rule (R114 four times is one item, not one with R48 and R74)
+  const firstR = (p: any) => String(p.rule_r || "").match(/R\d+/)?.[0] || "";
   for (const p of fresh) {
-    if (!p.certain && !["send_failed", "unanswered"].includes(p.error_type) && p.error_type !== "style") { /* keep uncertain ones too, as normal */ }
-    const k = p.error_type; if (!groups.has(k)) groups.set(k, []); groups.get(k)!.push(p);
+    const k = p.error_type === "rule_violation" ? `rule_violation|${firstR(p)}` : p.error_type;
+    if (!groups.has(k)) groups.set(k, []); groups.get(k)!.push(p);
   }
-  const items = [...groups.entries()].map(([type, ps]) => {
-    ps.sort((a, b) => Number(isCritical(b)) - Number(isCritical(a)));
+  const items = [...groups.entries()].map(([key, ps]) => {
+    const type = key.split("|")[0];
+    ps.sort((a, b) => Number(isCritical(b)) - Number(isCritical(a)) || Number(!!b.certain) - Number(!!a.certain));
     const head = ps[0];
     const repeatRule = ps.map((p) => ruleIds.get(String(p.pinned_rule || "").slice(0, 8))).find(Boolean) || null;
     const repeatR = ps.map((p) => String(p.rule_r || "").match(/R\d+/)?.[0]).find(Boolean) || null;
-    return { type, ps, head, critical: ps.some(isCritical), repeatRule, repeatR, known: ps.some((p) => Number(p.known_mistake) > 0) };
-  }).sort((a, b) => Number(b.critical) - Number(a.critical) || Number(!!b.repeatRule) - Number(!!a.repeatRule) || Number(b.known) - Number(a.known) || b.ps.length - a.ps.length);
+    const label = type === "rule_violation" && repeatR ? `${TYPES[type].label} ${repeatR}` : TYPES[type].label;
+    return { type, label, ps, head, critical: ps.some(isCritical), repeatRule, repeatR, known: ps.some((p) => Number(p.known_mistake) > 0), certain: ps.some((p) => p.certain) };
+  }).sort((a, b) => Number(b.critical) - Number(a.critical) || Number(!!b.repeatRule) - Number(!!a.repeatRule) || Number(b.known) - Number(a.known)
+    || Number(b.certain) - Number(a.certain) || b.ps.length - a.ps.length);
   const kept = items.slice(0, MAX_FINDINGS), dropped = items.slice(MAX_FINDINGS);
 
   // ---------- system health ----------
@@ -277,10 +303,10 @@ async function audit(companyId: string, opts: { hours?: number; dry?: boolean; t
 
   const stats = { sent: sent.length, skipped: skipped.length, failed: failed.length, judged: judged.length, chats_judged: byConv.length, chats_total: convIds.length,
     unanswered: (unanswered.data || []).length, skipped_by_reason: skipped.reduce((a: any, d: any) => { a[d.error || "-"] = (a[d.error || "-"] || 0) + 1; return a; }, {}),
-    problems_found: problems.length, repeated_open: problems.length - fresh.length, dropped_types: dropped.map((g) => ({ type: g.type, count: g.ps.length })), errors };
+    problems_found: problems.length, fixed_since: beforeFix, repeated_open: problems.length - fresh.length, dropped_types: dropped.map((g) => ({ type: g.type, count: g.ps.length })), errors };
 
   const shift = new Date(end.getTime() + 4 * 3600000).getUTCHours() < 12 ? "الصبح" : "الظهر";
-  const lineOf = (g: any, i: number) => `${i + 1}. ${g.critical ? "🔴" : "🟡"} ${TYPES[g.type].label} · ${g.head.conv?.name || "عميل"}${g.ps.length > 1 ? ` (+${g.ps.length - 1} محادثة)` : ""}${g.critical ? " · وقفت العقل" : ""}${g.repeatRule || g.known ? " · تكرر رغم القاعدة" : ""}`;
+  const lineOf = (g: any, i: number) => `${i + 1}. ${g.critical ? "🔴" : "🟡"} ${g.label} · ${g.head.conv?.name || "عميل"}${g.ps.length > 1 ? ` (+${g.ps.length - 1} محادثة)` : ""}${g.critical ? " · وقفت العقل" : ""}${g.repeatRule || g.known ? " · تكرر رغم القاعدة" : ""}`;
   const names = replied_clients.map((r) => r.name);
   const summary = [
     `🧠 فحص الردود · ${shift}`,
@@ -309,7 +335,7 @@ async function audit(companyId: string, opts: { hours?: number; dry?: boolean; t
     for (const p of crit) {
       const cid = p.conv?.id; if (!cid || paused.some((x) => x.id === cid)) continue;
       const now = new Date().toISOString();
-      const up = await db.from("whatsapp_conversations").update({ agent_muted: true, agent_muted_reason: `فحص الردود: ${TYPES[g.type].label}`, updated_at: now }).eq("id", cid).eq("agent_muted", false).select("id");
+      const up = await db.from("whatsapp_conversations").update({ agent_muted: true, agent_muted_reason: `فحص الردود: ${g.label}`, updated_at: now }).eq("id", cid).eq("agent_muted", false).select("id");
       p.paused = !up.error; paused.push({ id: cid, p, g, already: !up.error && !(up.data || []).length });
     }
     const draftText = (d: any) => d ? short((d.approved_messages?.length ? d.approved_messages : d.reply_messages || []).join("\n"), 1500) : null;
@@ -341,11 +367,11 @@ async function audit(companyId: string, opts: { hours?: number; dry?: boolean; t
   };
   for (const x of paused) {
     const c = x.p.conv;
-    const text = [`🚨 فحص الردود: غلط خطير · ${ROUTE(c.route_key)}`, `الاسم: ${c.name || "عميل"}`, c.phone ? `الرقم: ${c.phone}` : "", `الغلط: ${TYPES[x.g.type].label}`,
+    const text = [`🚨 فحص الردود: غلط خطير · ${ROUTE(c.route_key)}`, `الاسم: ${c.name || "عميل"}`, c.phone ? `الرقم: ${c.phone}` : "", `الغلط: ${x.g.label}`,
       short(x.p.explanation, 300), x.already ? "العقل كان موقوف على المحادثة من قبل" : "وقفت العقل على هالمحادثة، ترجّعه من «كمّل يا عقل»"].filter(Boolean).join("\n");
     await notifyOwner(c.route_key, text, `reply_audit:${run.data.id}:${c.id}`);
     if (ownerR.data?.id) await db.from("notifications").insert({ user_id: ownerR.data.id, type: "reply_audit", is_read: false, link: "whatsapp", client_id: c.client_id || null,
-      title: `🚨 غلط خطير في رد آلي: ${c.name || "عميل"}`, body: short(`${TYPES[x.g.type].label}\n${x.p.explanation}`, 400) });
+      title: `🚨 غلط خطير في رد آلي: ${c.name || "عميل"}`, body: short(`${x.g.label}\n${x.p.explanation}`, 400) });
   }
   const sentOk = await notifyOwner("muscat", short(summary, 890), `reply_audit_report:${run.data.id}`);
   if (ownerR.data?.id) await db.from("notifications").insert({ user_id: ownerR.data.id, type: "reply_audit", is_read: false, link: "home",

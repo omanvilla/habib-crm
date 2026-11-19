@@ -20,7 +20,7 @@
   const OWNER_KIND={unknown_q:'سؤال ما يعرف جوابه',negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرارك',muted:'مكتوم عنهم',manual_reply:'رديت بنفسك'};
   const STAFF_KIND={unknown_q:'سؤال ما يعرف جوابه',negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرار',muted:'مكتوم عنهم',manual_reply:'انرد عليها من المكتب'};
   const KIND=new Proxy({},{get:(_,k)=>(isOwner()?OWNER_KIND:STAFF_KIND)[k],ownKeys:()=>Object.keys(OWNER_KIND),getOwnPropertyDescriptor:()=>({enumerable:true,configurable:true})});
-  const TITLES={waiting:'مشترين واقفين، سألوا وما انرد عليهم',contracts:'العقود',followups:'متابعة اليوم',paused:'العقل موقوف عندهم',pricing:'دراسة سعر: ملاك ينتظرون تسعيرك',studies:'دراسات سعر تنتظر موافقتك',visits:'زيارات يتابعها الذكاء الاصطناعي',problems:'مشاكل تحتاج انتباه',twins:'قرار سريع: عقارات بنفس المواصفات',ig:'فيديوهات إنستقرام تحتاج ربط'};
+  const TITLES={waiting:'مشترين واقفين، سألوا وما انرد عليهم',contracts:'العقود',followups:'متابعة اليوم',paused:'العقل موقوف عندهم',pricing:'دراسة سعر: ملاك ينتظرون تسعيرك',studies:'دراسات سعر تنتظر موافقتك',visits:'زيارات يتابعها الذكاء الاصطناعي',problems:'مشاكل تحتاج انتباه',twins:'قرار سريع: عقارات بنفس المواصفات',ig:'فيديوهات إنستقرام تحتاج ربط',audit:'🧠 فحص الردود'};
   let sequence=0,sheetKind=null,pausedFilter='all',pricingBranch='all',paused={items:[],total:0},last=null,ignoredOpen=false,ignoredList=null;
   /* «دراسة سعر:» handoffs (11 Nov 2026, Ahmed): owners waiting for a price have their own tile and list, so the
    * paused list keeps only chats that need another decision. Display only: the hold, the reason text and
@@ -128,6 +128,10 @@
       if(tw){todo+=tw;t.push(tile('عقارات بنفس المواصفات',tw,'data-coh="sheet" data-kind="twins"','قرار سريع: تربط الفيديوهات؟',false));}
       const ig=igCount();
       if(ig){todo+=ig;t.push(tile('فيديوهات إنستقرام',ig,'data-coh="sheet" data-kind="ig"','تحتاج ربط بعقار',false));}
+      // SQL144 (19 Nov 2026): the last twice-a-day check of the reply agent, read only (crm-reply-audit.js). The count is the
+      // mistakes still open; the tile shows after the first run, also with none
+      const ra=window.crmReplyAudit,rc=ra?ra.count():null;
+      if(rc!=null){const u=ra.urgent();if(u)todo+=rc;t.push(tile('🧠 فحص الردود',rc,'data-coh="sheet" data-kind="audit"',ra.sub(),u));}
     }
     byId('cohTiles').innerHTML=t.length?t.join(''):'<p class="coh-empty">'+(isOwner()?'ما في شي يحتاج قرارك الحين ✓':'ما في شي متأخر الحين ✓')+'</p>';
     drawHello(todo);
@@ -256,6 +260,7 @@
     if(sheetKind==='studies'){if(typeof window.crmPriceStudiesDraw==='function')window.crmPriceStudiesDraw(body);else body.innerHTML=typeof window.crmPriceStudiesHtml==='function'?window.crmPriceStudiesHtml():'';return;}
     if((sheetKind==='waiting'||sheetKind==='contracts')&&window.crmHomeAttention){body.innerHTML=window.crmHomeAttention.html(sheetKind);return;}
     if(sheetKind==='ig'){drawIgSheet();return;}
+    if(sheetKind==='audit'){body.innerHTML=window.crmReplyAudit?window.crmReplyAudit.html():'';return;}
     body.innerHTML=sheetKind==='twins'?twinsHtml():sheetKind==='paused'?pausedHtml():sheetKind==='pricing'?pricingHtml():sheetKind==='visits'?visitsHtml():problemsHtml();
   }
   function openSheet(kind){
@@ -433,6 +438,7 @@
   document.addEventListener('crm-price-studies-updated',()=>{if(last)drawTiles(last.data,last.pending);});
   document.addEventListener('crm-home-attention-updated',()=>{if(last)drawTiles(last.data,last.pending);if(sheetKind==='waiting'||sheetKind==='contracts')drawSheet();});
   document.addEventListener('crm-ig-alert-updated',()=>{if(last)drawTiles(last.data,last.pending);if(sheetKind==='ig')drawSheet();});
+  document.addEventListener('crm-reply-audit-updated',()=>{if(last)drawTiles(last.data,last.pending);if(sheetKind==='audit')drawSheet();});
   document.addEventListener('crm-visits-unasked-updated',()=>{if(last)drawTiles(last.data,last.pending);if(sheetKind==='visits')drawSheet();});
   window.crmOwnerHomeOpenSheet=kind=>{if(hasHome())openSheet(kind);};
   document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();});

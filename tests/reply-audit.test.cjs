@@ -36,7 +36,8 @@ test('the report is sent every run, also with nothing wrong',()=>{
  assert(fn.includes('const sentOk = await notifyOwner("muscat"'));
 });
 test('rules.ts is regenerated from docs/agent-rules.md (run build-rules.ps1 after changing the rules)',()=>{
- const table=(md.split('\n### ')[0].match(/^\| R\d+ \|/gm)||[]).length;
- const digest=(rules.match(/^  "R\d+: /gm)||[]).length;
- assert.equal(digest,table);
+ const current=md.split('\n## سيناريوهات')[0];
+ const ids=[...current.matchAll(/^\| (R\d+) \|/gm),...current.matchAll(/^- \*\*(R\d+):\*\*/gm)].map(m=>m[1]);
+ assert(ids.length>70);
+ for(const r of ids) assert(new RegExp('^  "'+r+'[:،]','m').test(rules),r+' is missing from rules.ts');
 });
