@@ -138,3 +138,5 @@ body.coh-lock{overflow:hidden}
 .coh-goal>small{font-size:12px;color:#6f6552}
 .coh-goal.met{border-color:#b9dcc6;background:#f1faf4}
 .coh-goal.met b{color:#1f6b45}
+/* 19 Nov 2026: the home drawn from the saved copy says it is updating until the fresh read replaces it (crm-owner-home.js) */
+.coh.coh-stale .coh-hello span::after{content:' · يتحدث…';opacity:.9}
