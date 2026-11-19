@@ -567,6 +567,43 @@ function ownerDecisions(out: any, lines: string[], c: any) {
       out.guard_far_request = true;
     }
   }
+  // R115 (dry run of 799202aa on the branch, one run of three): the yes to «… انحجزت ⏎ تحب تشوف خيارات ثانية ؟» got only
+  // «حاليا ما عندنا فيلا متوفره في الرميس ⏎ اول ما يتوفر بتواصل معك». A reply that offers nothing gets the nearest home instead.
+  if (out.action === "none" && out.category === "buyer" && !c.visitedProp && texts.length
+    && !/^\s*(لا|لاا|ما\s*(ابي|أبي|اريد|أريد|ابغى)|مب|مو|مشكور|شكرا)/.test(String(c.burstSaid || ""))
+    && texts.every((t) => /ما\s*(عندنا|متوفر|في)|اول\s*ما\s*يتوفر|بتواصل\s*معك/.test(t))) {
+    const alt = soldNoticeYes(out, c);
+    if (alt) { texts = alt; out.guard_sold_yes_nothing = true; }
+  }
+  // R116 (reply audit 19 Nov, Ahmed chose «متى يناسبك تزور ؟» then «اسمك الكريم ؟»; c53c9aee and four more): an offer with no
+  // question left the client with nothing to answer («ارسلي اشوف» got the ad of the Al Sawmhan villa only, 799202aa). An available
+  // home offered to a buyer who has not seen it gets its reel (when not sent in this chat) and the visit question.
+  // (dry run on the branch: the model now asked the visit question itself but left the reel out; the reel goes with the ad
+  // before the last question either way)
+  if (out.action === "none" && out.category === "buyer" && c.prop && (!c.prop.status || c.prop.status === "available") && !c.visitedProp && !out.viewing_date
+    && texts.some((t) => t.length > 120 && !/^https?:/.test(t))) {
+    const vcode = c.prop.video ? (String(c.prop.video).match(IG_CODE) || [])[1] || String(c.prop.video) : "";
+    const hasQ = texts.some((t) => /[؟?]/.test(t));
+    if (vcode && !sentBefore(vcode) && !texts.some((t) => t.includes(vcode))) {
+      if (hasQ && /[؟?]\s*$/.test(texts[texts.length - 1])) texts.splice(texts.length - 1, 0, String(c.prop.video)); else texts.push(String(c.prop.video));
+      out.guard_offer_question = true;
+    }
+    if (!hasQ) { texts.push("متى يناسبك تزور ؟"); out.guard_offer_question = true; }
+  }
+  // R116: «اسمك الكريم ؟ ومتى يناسبك تزور ؟» in one line: the other question first, the name question last on its own line
+  {
+    let moved = false;
+    texts = texts.map((t) => t.split("\n").map((l) => {
+      const m = l.match(/^\s*اسمك\s*الكريم\s*؟\s*و\s*(\S.*[؟?])\s*$/);
+      if (!m) return l;
+      moved = true; return m[1].trim();
+    }).join("\n"));
+    if (moved) {
+      texts = texts.map((t) => t.split("\n").filter((l) => !/^\s*اسمك\s*الكريم\s*؟\s*$/.test(l)).join("\n")).filter((t) => t.trim());
+      texts.push("اسمك الكريم ؟");
+      out.guard_name_after_q = true;
+    }
+  }
   const NAME_LINE = /^\s*اسمك\s*الكريم\s*؟\s*$/;
   for (let i = 0; i < texts.length - 1; i++) {
     const ls = texts[i].split("\n");
@@ -975,8 +1012,14 @@ function publicText(v: unknown) {
   return String(v ?? "").replace(/https?:\/\/\S+/gi, "").replace(/\+?968[\s-]?\d{8}|\b[79]\d{7}\b/g, "")
     .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "").replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n")
     // reel calls to action ("ارسل كلمة صومحان على الواتساب"، "علق"، "تابعنا") are for Instagram, not for a customer already on WhatsApp
-    .split("\n").filter((l) => !CTA_RE.test(l)).join("\n").replace(/#\S+/g, "").trim();
+    .split("\n").filter((l) => !CTA_RE.test(l))
+    // R117 (reply audit 19 Nov, Blessed da239273): a reel caption went out with «راسلني واتساب على وأرد عليك على طول» (number
+    // taken out), «اللي يسبق يختار» and «تبي الموقع أو التفاصيل كاملة أو ترتيب معاينة؟». Those sentences are dropped from the line,
+    // the description stays.
+    .map((l) => l.split(/(?<=[.؟?!])\s+/).filter((s) => !AD_PITCH_RE.test(s)).join(" ").trim()).filter(Boolean)
+    .join("\n").replace(/#\S+/g, "").trim();
 }
+const AD_PITCH_RE = /راسل(ني|نا)|كلم(ني|نا)|واتس\s*اب|وارد\s*عليك|وأرد\s*عليك|يسبق\s*يختار|تبي\s*الموقع\s*(أو|او)|ترتيب\s*معاينة|لا\s*تفوت|سارع|العرض\s*لفترة/;
 const CTA_RE = /(^|[\s،.:-])(ارسل|أرسل|ارسلوا|أرسلوا|اكتب|اكتبوا|ابعث|علق|علّق|كومنت|تابعنا|تابعونا|اضغط|للتواصل|التواصل|تواصل|تواصلوا)(?=$|[\s،.:])|الرابط في|البايو|في الخاص|\b(dm|comment|follow)\b/i;
 
 // Internal type codes never reach the client (twin_villa went out in follow-ups, 7 Nov). Known codes become Arabic.
