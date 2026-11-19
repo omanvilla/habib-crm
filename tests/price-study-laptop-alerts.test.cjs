@@ -71,22 +71,20 @@ test('alert 3: the moment a study becomes rejected, for its latest version on an
   assert(rq.includes("where x.task_id = s.task_id and x.status <> 'cancelled' and x.version > s.version)"));
   assert(rq.includes("and e.reason = 'price_study_requeued:' || s.id::text"));
 });
-test('the edge function only builds the two texts and sends them to Ahmed; the words are his',()=>{
+test('the edge function only builds the texts and sends them to Ahmed; SQL145: one message a day, no laptop line',()=>{
   assert(fn.includes('if (action === "unpriced_tick") return json({ ok: true, results: await unpricedTick(secret) });'));
   assert(fn.includes('if (action === "requeue_alert") { const id = uuid(body?.study_id); return id ? json({ ok: true, result: await requeueAlert(id, secret) })'));
-  const part=fn.slice(fn.indexOf('// ---------- «افتح اللابتوب» alerts'),fn.indexOf('// ---------- the template at Meta'));
-  assert(part.includes('const LAPTOP_LINE = "'+LINE+'";'));
-  assert(part.includes('"⏰ العقار لسه ما تسعّر، تأكد إن اللابتوب شغال",'));
-  assert(part.includes('`price_study_unpriced:${r.task_id}`')&&part.includes('`price_study_requeued:${studyId}`'));
+  const part=fn.slice(fn.indexOf('// ---------- alerts to Ahmed for unpriced tasks'),fn.indexOf('// ---------- the template at Meta'));
+  assert(!part.includes('اللابتوب'),'pricing runs in the cloud');
+  assert(part.includes('`⏰ عقارات ما تسعّرت بعد (${list.length}):`,'));
+  assert(part.includes('`التسعير الجاي الساعة ${nextRunAr(at)}`,'));
+  assert(part.includes('`price_study_unpriced_day:${day}`')&&part.includes('`price_study_requeued:${studyId}`'));
   assert(part.includes('await db.rpc("crm_price_study_unpriced_due")')&&part.includes('await db.rpc("crm_price_study_requeued", { p_study_id: studyId })'));
-  // to Ahmed's own number only: nothing is sent to an owner, written in a chat, or changed on a study, a task or an offer
+  // one tellAhmed for the daily list (once per company) and one for a rejected study; no loop of messages per task
   assert.equal((part.match(/tellAhmed\(/g)||[]).length,2);
+  assert(!part.includes('price_study_unpriced:${r.task_id}'));
   assert(!/metaSend|metaUpload|recordOut|sendStudy|\.update\(|\.insert\(|\.upsert\(|\.delete\(/.test(part));
   assert(!/owner_net|commission|market_value|asking_price|internal/.test(part));
-  // the type and the area in both, and the line of alert 3 is the line of alert 1
-  assert.equal((part.match(/`العقار: \$\{propertyLine\(r\)\}`,/g)||[]).length,2);
-  const requeue=part.slice(part.indexOf('async function requeueAlert'));
-  assert(requeue.includes('`العقار: ${propertyLine(r)}`,\n    LAPTOP_LINE,'));
 });
 test('alert 1: the line is added to the report of every new study, not sent as a second message',()=>{
   assert(hot.includes('const LAPTOP_LINE = "'+LINE+'";'));
