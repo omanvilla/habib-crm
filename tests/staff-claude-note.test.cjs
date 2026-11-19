@@ -74,7 +74,7 @@ test('the look and the versions',()=>{
   assert(/@media \(min-width:641px\) and \(max-width:1400px\)\{[^@]*#page-viewings td\.crm-grid-actions \.crm-wa-note\{display:none!important\}/.test(css));
   // and «النظام» on a deal card did nothing (the card stops the click): the pair listens in the capture phase too
   assert(wa.includes("if(crm){e.preventDefault();e.stopPropagation();window.crmOpenCrmChat(")&&wa.includes("if(ph){e.preventDefault();e.stopPropagation();ph.disabled=true;")&&/\n  \},true\);\n\}\)\(\);\s*$/.test(wa));
-  assert(/crm-owner-home\.js\?v=2026111[4678]-/.test(index));
+  assert(/crm-owner-home\.js\?v=2026111[46789]-/.test(index));
   assert(index.indexOf('crm-wa-buttons.js?v=')<index.indexOf('crm-claude-note.js?v='));
 });
 
