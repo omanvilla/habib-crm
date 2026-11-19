@@ -72,7 +72,7 @@ async function ai(instructions: string, input: string, sch: any, name: string) {
   try {
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST", signal: ctl.signal, headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: MODEL, store: false, reasoning: { effort: "high" }, instructions, input, text: { format: { type: "json_schema", name, strict: true, schema: sch } } }),
+      body: JSON.stringify({ model: MODEL, store: false, reasoning: { effort: "medium" }, instructions, input, text: { format: { type: "json_schema", name, strict: true, schema: sch } } }),
     });
     const p = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(p?.error?.message || `openai_${r.status}`);
