@@ -50,3 +50,7 @@
 .cps-restudy button{width:auto!important;min-height:44px;justify-self:start}
 .cps-task{margin-top:12px}
 .cps-task[hidden]{display:none}
+/* SQL152: document grade */
+.cps-grade-A{background:#ecf7ef}
+.cps-grade-B{background:#fbf7ec}
+.cps-grade-C{background:#fdecec}

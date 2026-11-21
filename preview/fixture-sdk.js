@@ -296,7 +296,7 @@ function fixtureExtraRpc(name,args){
     owner_name:'مالك اصطناعي '+n,phone:'+9680000081'+n,property_kind:'مبنى',kind_raw:'villa',area:route==='barka'?'الرميس':'الخوض',wilayat:route==='barka'?'بركاء':'السيب',owner_price:60000,land_size:300,built_size:250,
     market_value:58000,asking_price:61000,negotiation_margin:3000,owner_net:57000,commission:1500,owner_message:'السلام عليكم، دراسة سعر مبدئية لعقارك في '+(route==='barka'?'الرميس':'الخوض')+' (نص اصطناعي للمعاينة)',
     owner_report_path:'reports/x/owner.pdf',internal_report_path:'reports/x/internal.pdf',submitted_at:now,sent_at:null,send_error:null,...extra});
-   return ok({items:[st(1,'awaiting_approval','barka'),st(2,'awaiting_approval','barka'),st(3,'awaiting_approval','muscat'),st(4,'waiting_owner','barka'),
+   return ok({items:[st(1,'awaiting_approval','barka',{doc_grade:'A'}),st(2,'awaiting_approval','barka',{doc_grade:'B',doc_grade_note:'ناقص شهادة اتمام البناء'}),st(3,'awaiting_approval','muscat',{doc_grade:'C',doc_grade_note:'ناقص الملكية'}),st(4,'waiting_owner','barka'),
     st(5,'sent','muscat',{sent_at:now,send_error:'sent_by_phone:'+muscat,sent_by_name:'موظفة مسقط التجريبية'}),
     // SQL150: an office-call owner whose price fits, one whose price is above the asking price, and one kept inside the office
     st(6,'awaiting_approval','barka',{office_outreach:true,owner_price:59000}),st(7,'awaiting_approval','barka',{office_outreach:true,owner_price:66000}),

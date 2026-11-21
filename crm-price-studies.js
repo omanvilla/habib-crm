@@ -247,6 +247,13 @@
         :'سعره مب مسجل، فـ«موافق» يخليها داخلية وتطلع مهمة «زيارة وتوقيع» تسأله فيها عن سعره')
       :'سعره أعلى من سعر العرض، فـ«موافق» يرسل له الرسالة تحت (السعر أعلى من السوق) مع التقرير')+'</p>';
   }
+  /* SQL152 (Ahmed 21 Nov 2026): the document grade. A: deed + krookie (+ completion certificate for a building).
+     B: deed + krookie, something else missing. C: deed or krookie missing: no study, no listing until the papers come. */
+  const GRADE={A:'أوراقه كاملة',B:'أوراقه الأساسية موجودة وفيه ناقص',C:'ناقص الملكية أو الكروكي: لا دراسة ولا عرض لين تكمل الأوراق'};
+  function gradeLine(i){
+    if(!i.doc_grade||!GRADE[i.doc_grade])return '';
+    return '<p class="cps-note cps-grade cps-grade-'+esc(i.doc_grade)+'"><b>درجة العقار '+esc(i.doc_grade)+'</b>: '+esc(GRADE[i.doc_grade])+(i.doc_grade_note?' · '+esc(i.doc_grade_note):'')+'</p>';
+  }
   // a study that can still be sent from the phone (SQL146)
   const phoneable=i=>['awaiting_approval','approved','waiting_owner','send_failed'].includes(i.status);
   function card(i){
@@ -262,7 +269,7 @@
       +'<div class="cps-head"><strong>'+esc(i.owner_name||'مالك')+' <small>'+esc(ROUTE[i.route_key]||'')+(i.version>1?' · نسخة '+esc(i.version):'')+'</small></strong>'+statusLine(i)+'</div>'
       +(facts?'<small class="cps-facts">'+esc(facts)+'</small>':'')
       +'<small class="cps-facts">السعر اللي في بال المالك: <b dir="ltr">'+num(i.owner_price)+'</b></small>'
-      +(note?'<p class="cps-note">'+esc(note)+'</p>':'')+outreachLine(i)
+      +(note?'<p class="cps-note">'+esc(note)+'</p>':'')+gradeLine(i)+outreachLine(i)
       +'<div class="cps-nums">'+cell('القيمة السوقية',i.market_value)+cell('سعر العرض',i.asking_price)+cell('هامش التفاوض',i.negotiation_margin)+'</div>'
       +'<p class="cps-private">داخلي للمكتب، ما يوصل للمالك</p>'
       +'<div class="cps-nums">'+cell('صافي المالك',i.owner_net,true)+cell('العمولة',i.commission,true)+'</div>'
