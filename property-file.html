@@ -69,7 +69,8 @@ pre{white-space:pre-wrap;font-family:inherit;margin:0}
       h+='<div class="card"><h2>الأوراق</h2><ul class="docs">'+DOCS.map(function(x){var v=d.docs[x[0]];return '<li><span>'+x[1]+'</span>'+(v===true?'<span class="y">موجودة ✓</span>':'<span class="n">مب متوفرة الحين</span>')+'</li>'}).join('')+'</ul><p class="note">الأوراق نعرضها عليك في الزيارة.</p></div>';
     }
     if(d.cost&&num(d.cost.new_cost)){
-      var c=d.cost,dt=String(c.study_date||'').slice(0,7);
+      var MON=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+      var c=d.cost,sd=String(c.study_date||''),dt=/^\d{4}-\d{2}/.test(sd)?MON[Number(sd.slice(5,7))-1]+' '+sd.slice(0,4):'';
       h+='<div class="card cost"><h2>كم يكلف بناء مثله اليوم</h2>'
         +'<p>بناء '+num(d.built_size)+' م² بتشطيب '+esc(c.tier)+' اليوم يكلف تقريباً <b>'+num(c.new_cost)+' ريال</b> (سعر المتر '+num(c.rate)+' ريال)</p>'
         +(c.now_cost?'<p>وبعد عمر البناء ('+esc(c.age)+' سنة) قيمته تقريباً <b>'+num(c.now_cost)+' ريال</b>، من غير الأرض</p>':'')
