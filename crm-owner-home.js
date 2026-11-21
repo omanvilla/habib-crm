@@ -20,7 +20,7 @@
   const OWNER_KIND={unknown_q:'سؤال ما يعرف جوابه',negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرارك',muted:'مكتوم عنهم',manual_reply:'رديت بنفسك'};
   const STAFF_KIND={unknown_q:'سؤال ما يعرف جوابه',negotiation:'تفاوض أو مشتري جاد',handoff:'يحتاج قرار',muted:'مكتوم عنهم',manual_reply:'انرد عليها من المكتب'};
   const KIND=new Proxy({},{get:(_,k)=>(isOwner()?OWNER_KIND:STAFF_KIND)[k],ownKeys:()=>Object.keys(OWNER_KIND),getOwnPropertyDescriptor:()=>({enumerable:true,configurable:true})});
-  const TITLES={waiting:'مشترين واقفين، سألوا وما انرد عليهم',contracts:'العقود',followups:'متابعة اليوم',paused:'العقل موقوف عندهم',pricing:'دراسة سعر: ملاك ينتظرون تسعيرك',studies:'دراسات سعر تنتظر موافقتك',visits:'زيارات يتابعها الذكاء الاصطناعي',problems:'مشاكل تحتاج انتباه',twins:'قرار سريع: عقارات بنفس المواصفات',ig:'فيديوهات إنستقرام تحتاج ربط',audit:'🧠 فحص الردود'};
+  const TITLES={waiting:'مشترين واقفين، سألوا وما انرد عليهم',contracts:'العقود',followups:'متابعة اليوم',paused:'العقل موقوف عندهم',pricing:'دراسة سعر: ملاك ينتظرون تسعيرك',studies:'دراسات سعر تنتظر موافقتك',visits:'زيارات يتابعها الذكاء الاصطناعي',problems:'مشاكل تحتاج انتباه',twins:'قرار سريع: عقارات بنفس المواصفات',ig:'فيديوهات إنستقرام تحتاج ربط',direct:'تواصل مباشر: العقل ما يرد عليهم',audit:'🧠 فحص الردود'};
   let sequence=0,sheetKind=null,pausedFilter='all',pricingBranch='all',paused={items:[],total:0},last=null,ignoredOpen=false,ignoredList=null;
   /* «دراسة سعر:» handoffs (11 Nov 2026, Ahmed): owners waiting for a price have their own tile and list, so the
    * paused list keeps only chats that need another decision. Display only: the hold, the reason text and
@@ -37,6 +37,7 @@
   // the same day: «حتى دراسة تسعير اريد تظهر للموظف»); nobody resumes the agent on one (R26)
   const canResume=()=>typeof currentProfile!=='undefined'&&currentProfile&&['owner','manager','agent'].includes(currentProfile.role);
   const pricingItems=()=>canResume()?paused.items.filter(isPricing):[];
+  const directItems=()=>Array.isArray(paused.direct)?paused.direct:[];
   const otherPaused=()=>paused.items.filter(i=>!isPricing(i));
 
   /* Boot gate (10 Nov 2026). The owner saw the old dashboard for several seconds before this page replaced it.
@@ -132,6 +133,10 @@
     if(st0){todo+=st0;t.push(tile('دراسات سعر جاهزة',st0,'data-coh="sheet" data-kind="studies"','راجع الأرقام ووافق',true));}
     const pr0=pricingItems().length,pa0=otherPaused().length;
     if(pa0){todo+=pa0;t.push(tile('العقل موقوف عندهم',pa0,'data-coh="sheet" data-kind="paused"','شوف السبب وكمّل',true));}
+    // SQL151 (Ahmed 21 Nov 2026): owners we work with, developers' marketers and office-call owners: the agent never answers them
+    // and they are not «العقل موقوف»; one tile with how many, and how many wait for an answer from the office
+    const dr=directItems(),drw=dr.filter(i=>i.waiting).length;
+    if(dr.length){if(drw)todo+=drw;t.push(tile('تواصل مباشر',dr.length,'data-coh="sheet" data-kind="direct"',drw?drw+' رسالة تنتظر ردكم':'العقل ما يرد عليهم، التواصل منكم',!!drw));}
     if(pr0){todo+=pr0;t.push(tile('دراسة سعر',pr0,'data-coh="sheet" data-kind="pricing"','ملاك ينتظرون تسعيرك',true));}
     // 18 Nov 2026 (Ahmed: «لوحة العمل ما أريدها تكون ربشة… يكون في عدد أضغط عليه أشوف»): «مشترين واقفين» and «العقود» (SQL126,
     // crm-home-attention.js) are tiles that open a sheet like the rest, never open lists on the page. Owner only.
@@ -216,6 +221,9 @@
       +(pricing||!canResume()||(!isOwner()&&isStudyChat(i))?'':'<button type="button" class="btn-primary coh-go" data-coh="presume" data-id="'+esc(i.conversation_id)+'">كمّل يا عقل</button>')
       // R40: «تجاهل نهائي» = no reply and no follow-up ever, and the chat leaves this list
       +(pricing||!canResume()||isStudyChat(i)?'':'<button type="button" class="btn-secondary coh-go coh-ignore" data-coh="pignore" data-id="'+esc(i.conversation_id)+'">تجاهل نهائي</button>')
+      // SQL151: «تواصل مباشر» moves the chat out of here for good; the agent never answers it
+      +(pricing||!canResume()?'':'<button type="button" class="btn-secondary coh-go" data-coh="pdirect-owner" data-id="'+esc(i.conversation_id)+'">تواصل مباشر: مالك</button>'
+        +'<button type="button" class="btn-secondary coh-go" data-coh="pdirect-developer" data-id="'+esc(i.conversation_id)+'">تواصل مباشر: مسوق مطور</button>')
       +(pricing&&canResume()?'<button type="button" class="btn-primary coh-go" data-coh="pprice" data-id="'+esc(i.conversation_id)+'">ارسل السعر للمالك</button>'
         +'<button type="button" class="btn-secondary coh-go" data-coh="pdrop" data-id="'+esc(i.conversation_id)+'">ما نسعّره (الغِ)</button>':'')+'</div>'
       +(pricing&&canResume()?priceForm(i):'')+'</li>').join('');
@@ -258,6 +266,16 @@
     supa.rpc('crm_ignored_chats').then(r=>{if(r.error)throw r.error;ignoredList=(r.data&&r.data.items)||[];paused.ignored=ignoredList.length;drawSheet();})
       .catch(()=>{ignoredList=[];ignoredOpen=false;drawSheet();toast('ما قدرت أفتح المتجاهلين. جرب مرة ثانية','error');});
   }
+  function directHtml(){
+    const items=directItems();
+    if(!items.length)return '<p class="coh-empty">ما في أحد في التواصل المباشر</p>';
+    return '<p class="coh-since">العقل ما يرد عليهم أبداً ولا توصلهم متابعة. التواصل معاهم منكم مباشرة. «رجّعه للعقل» يخليه يرد عليه مرة ثانية</p><ul class="coh-list">'+items.map(i=>
+      '<li class="coh-row coh-paused"><div class="coh-info"><strong>'+esc(i.name||'عميل')+' <small>'+esc(i.reason||'')+(i.route_key?' · '+esc(ROUTE[i.route_key]||''):'')+'</small></strong>'
+      +(i.waiting?'<small class="coh-note"><b>آخر رسالة منه ما انرد عليها</b></small>':'')
+      +(i.last_message?'<small class="coh-note">آخر رسالة منه: <span dir="auto">'+esc(i.last_message)+'</span></small>':'')+'</div>'
+      +'<div class="coh-paused-actions">'+(typeof window.crmWaButtons==='function'?window.crmWaButtons({phone:i.phone,conversationId:i.conversation_id,clientId:i.client_id,cls:'btn-secondary coh-go'}):'')
+      +(canResume()?'<button type="button" class="btn-secondary coh-go" data-coh="pundirect" data-id="'+esc(i.conversation_id)+'">رجّعه للعقل</button>':'')+'</div></li>').join('')+'</ul>';
+  }
   function pausedHtml(){
     const items=otherPaused();
     if(!items.length)return '<p class="coh-empty">ما في أحد موقوف عنده العقل</p>'+ignoredHtml();
@@ -285,7 +303,7 @@
     if((sheetKind==='waiting'||sheetKind==='contracts')&&window.crmHomeAttention){body.innerHTML=window.crmHomeAttention.html(sheetKind);return;}
     if(sheetKind==='ig'){drawIgSheet();return;}
     if(sheetKind==='audit'){body.innerHTML=window.crmReplyAudit?window.crmReplyAudit.html():'';return;}
-    body.innerHTML=sheetKind==='twins'?twinsHtml():sheetKind==='paused'?pausedHtml():sheetKind==='pricing'?pricingHtml():sheetKind==='visits'?visitsHtml():problemsHtml();
+    body.innerHTML=sheetKind==='twins'?twinsHtml():sheetKind==='paused'?pausedHtml():sheetKind==='direct'?directHtml():sheetKind==='pricing'?pricingHtml():sheetKind==='visits'?visitsHtml():problemsHtml();
   }
   function openSheet(kind){
     const s=sheetEl();
@@ -502,7 +520,7 @@
     const b=e.target.closest('[data-coh]');if(!b)return;
     const act=b.dataset.coh;
     // while the saved copy shows, nothing that writes runs on lists that may be a little old
-    if(stale&&['psend','pdrop','pignore','punignore','presume','auto-done','twin-yes','twin-no'].includes(act)){toast('لحظة، الرئيسية تتحدث…','error');return;}
+    if(stale&&['psend','pdrop','pignore','punignore','presume','pdirect-owner','pdirect-developer','pundirect','auto-done','twin-yes','twin-no'].includes(act)){toast('لحظة، الرئيسية تتحدث…','error');return;}
     if(act==='pprice'){const f=document.querySelector('[data-pf="'+CSS.escape(b.dataset.id)+'"]');if(f){f.hidden=!f.hidden;if(!f.hidden){const p=f.querySelector('[data-pf-price]');if(p)p.focus();}}return;}
     if(act==='psend'){
       const id=b.dataset.id,it=paused.items.find(i=>i.conversation_id===id)||{},ta=document.querySelector('[data-pf-text="'+CSS.escape(id)+'"]');
@@ -528,6 +546,17 @@
         if(r.error){b.disabled=false;toast('ما انحفظ: '+(r.error.message||''),'error');return;}
         paused.items=paused.items.filter(i=>i.conversation_id!==id);toast('انشال من التسعير','success');drawSheet();if(last)drawTiles(last.data,last.pending);
       });
+    }
+    else if(act==='pdirect-owner'||act==='pdirect-developer'||act==='pundirect'){
+      const id=b.dataset.id,on=act!=='pundirect';if(b.disabled)return;b.disabled=true;
+      supa.rpc('crm_set_direct_contact',{p_conversation:id,p_on:on,p_kind:act==='pdirect-developer'?'developer':'owner'}).then(r=>{
+        if(r.error)throw r.error;
+        if(on){const it=paused.items.find(i=>i.conversation_id===id);paused.items=paused.items.filter(i=>i.conversation_id!==id);paused.total=paused.items.length;
+          if(it)paused.direct=[{conversation_id:id,client_id:it.client_id,name:it.name,phone:it.phone,route_key:it.route_key,kind:act==='pdirect-developer'?'developer':'owner',reason:act==='pdirect-developer'?'مسوق مطور':'مالك نشتغل معاه',waiting:false,last_message:it.last_message}].concat(directItems());}
+        else paused.direct=directItems().filter(i=>i.conversation_id!==id);
+        if(last)drawTiles(last.data,last.pending);drawSheet();
+        toast(on?'انتقل للتواصل المباشر، والعقل ما يرد عليه':'رجع للعقل، ويرد عليه أول ما يكتب','success');
+      }).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});
     }
     else if(act==='ptoggle-ignored'){ignoredOpen=!ignoredOpen;if(ignoredOpen)loadIgnored();else drawSheet();}
     else if(act==='pignore'||act==='punignore'){

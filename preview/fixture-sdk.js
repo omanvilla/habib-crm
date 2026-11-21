@@ -265,8 +265,12 @@ function fixtureExtraRpc(name,args){
    const items=clients.filter(c=>c.lead_route!=='investment'&&allowed(c,'clients')).slice(0,2).map((c,i)=>chat(c,i===0
     ?{kind:'negotiation',reason:'العميل يسأل عن خصم على السعر',summary:'يبي ينزل السعر 3 آلاف'}
     :{kind:'negotiation',reason:'دراسة سعر: مالك ينتظر تسعيرك',summary:'أرض في '+(c.preferred_area||'المنطقة')}));
-   return ok({items,total:items.length,ignored:1});
+   // SQL151: one direct contact waiting for the office, one quiet
+   const dc=clients.filter(c=>c.lead_route!=='investment'&&allowed(c,'clients')).slice(2,4);
+   const direct=dc.map((c,i)=>chat(c,{kind:i?'developer':'owner',reason:i?'مسوق مطور':'مالك نشتغل معاه',waiting:i===0,direct_contact_at:relative(-1)+'T08:00:00Z'}));
+   return ok({items,total:items.length,ignored:1,direct});
   }
+  case 'crm_set_direct_contact':return ok({ok:true,direct:!!args.p_on});
   case 'crm_ignored_chats':{const c=clients.find(x=>x.lead_route==='barka');return ok({items:c&&allowed(c,'clients')?[chat(c,{reason:'رقم مكتب عقاري',ignored_at:relative(-3)+'T10:00:00Z',ignore_kind:'manual'})]:[],total:1});}
   case 'crm_property_twins':return ok([]);
   case 'crm_followups_today':{
