@@ -421,8 +421,15 @@ async function sendStudy(studyId: string, from: "approved" | "waiting_owner") {
     return { study_id: studyId, status, send_error };
   };
   try {
-    const { conv, phone: to } = await studyContext(s);
+    const { conv, phone: to, lead, property } = await studyContext(s);
     if (!conv || !["barka", "muscat"].includes(conv.route_key)) return await set("send_failed", "conversation_missing");
+    // SQL150 (Ahmed 21 Nov 2026): an owner the office called did not ask for a study. If his price fits (not above our asking
+    // price) the study stays inside the office and the next step is the visit; only a price above it goes to him (the run
+    // writes that message as «السعر أعلى من السوق» with the prices it found).
+    if (s.office_outreach) {
+      const ask = Number(s.owner_price ?? lead?.price ?? 0);
+      if (!ask || ask <= Number(s.asking_price || 0)) return await keptInternal(s, conv, lead, property, ask);
+    }
     const phoneId = digits(conv.meta_phone_number_id);
     if (!to || !phoneId) return await set("send_failed", "owner_number_or_branch_number_missing");
     if (!s.owner_report_path) return await set("send_failed", "owner_report_missing");
@@ -435,14 +442,10 @@ async function sendStudy(studyId: string, from: "approved" | "waiting_owner") {
     const tokens = await routeTokens(conv.company_id, conv.route_key);
     const inWindow = !!conv.last_inbound_at && Date.now() - Date.parse(conv.last_inbound_at) < WINDOW_MS;
     if (!inWindow) {
-      // the owner's last message is older than 24 hours: the approved template asks, his answer brings the study (owner_inbound)
-      if (s.template_sent_at && Date.now() - Date.parse(s.template_sent_at) < 24 * 3600 * 1000) return await set("waiting_owner", null);
-      const tpl = await templateApproved(conv.company_id, conv.route_key);
-      if (!tpl) return await set("approved", "template_not_approved");
-      const t = await metaSend(tokens, phoneId, to, { type: "template", template: { name: tpl.name, language: { code: "ar" } } });
-      if (!t.id) return await set("send_failed", `template: ${t.error}`);
-      await recordOut(s, conv, phoneId, to, t.id, "template", tpl.text, { template: tpl.name });
-      return await set("waiting_owner", null, { template_sent_at: new Date().toISOString() });
+      // 21 Nov 2026 (Ahmed): «دراسة سعر عقارك جاهزة نرسلها لك هنا ؟» is not sent any more. The study waits (approved,
+      // template_not_approved) and goes as plain text the moment the owner writes (owner_inbound), or the office sends it
+      // from the branch phone. The full template (report attached, net price in the body) comes once Ahmed approves its text.
+      return await set("approved", "template_not_approved");
     }
     let textId = s.owner_message_wamid as string | null;
     if (!textId) {
@@ -468,6 +471,31 @@ async function sendStudy(studyId: string, from: "approved" | "waiting_owner") {
   } catch (e) {
     return await set("send_failed", short(String((e as any)?.message || e), 300));
   }
+}
+// SQL150: the owner's price fits, so nothing goes to him. The study task closes, the offer gets the line, and «زيارة وتوقيع»
+// opens for the office (one open at a time per offer). His price unknown: the same task says to ask him first.
+async function keptInternal(s: any, conv: any, lead: any, property: string, ask: number) {
+  const now = new Date().toISOString();
+  const done = await db.from("owner_price_studies").update({ status: "kept_internal", send_error: null, updated_at: now }).eq("id", s.id).eq("status", "sending").select("id");
+  if (!(done.data || []).length) return { study_id: s.id, skipped: "changed_meanwhile" };
+  const after: string[] = [];
+  if (s.task_id) { const t = await db.from("tasks").update({ done: true, completed_at: now }).eq("id", s.task_id); if (t.error) after.push("task"); }
+  const fits = ask ? `السعر اللي طالبه المالك ${money(ask)} مناسب (سعر العرض عندنا ${money(s.asking_price)})` : "المالك ما حدد سعره";
+  const line = `دراسة داخلية ${dayAr()} (اتصال المكتب): ${fits}، وما انرسلت له. الخطوة الجاية: زيارة وتوقيع`;
+  if (lead?.id) { const u = await db.from("owner_leads").update({ notes: [lead.notes, line].filter(Boolean).join("\n").slice(0, 4000), updated_at: now }).eq("id", lead.id); if (u.error) after.push("owner_lead"); }
+  const KIND_AR: Record<string, string> = { villa: "فيلا", house: "بيت", land: "أرض", apartment: "شقة", building: "مبنى", farm: "مزرعة", shop: "محل", chalet: "شاليه", resthouse: "استراحة", twin_villa: "توين فيلا" };
+  const place = lead ? [lead.area, lead.wilayat].filter(Boolean).join(" ، ") : "";
+  const what = lead ? [KIND_AR[String(lead.kind || "")] || lead.kind || "عقار", place, lead.land_size ? `أرض ${lead.land_size} م²` : ""].filter(Boolean).join(" · ") : property;
+  const title = short(`زيارة وتوقيع: ${what || "عقار المالك"}`, 200);
+  const open = lead?.id ? await db.from("tasks").select("id").eq("owner_lead_id", lead.id).eq("done", false).ilike("title", "زيارة وتوقيع%").limit(1) : { data: [] };
+  if (!(open.data || []).length) {
+    const owner = await db.from("profiles").select("id").eq("company_id", s.company_id).eq("role", "owner").eq("is_active", true).limit(1).maybeSingle();
+    const notes = [line, ask ? "" : "اسأل المالك عن السعر اللي يبيه قبل الزيارة.", `القيمة السوقية ${money(s.market_value)} · سعر العرض ${money(s.asking_price)} · صافي المالك ${money(s.owner_net)}`].filter(Boolean).join("\n");
+    const t = await db.from("tasks").insert({ company_id: s.company_id, user_id: owner.data?.id || null, client_id: s.client_id || conv.client_id || null, owner_lead_id: lead?.id || null,
+      title, notes: short(notes, 1000), due_date: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date()), priority: "high", done: false });
+    if (t.error) after.push("visit_task");
+  }
+  return { study_id: s.id, status: "kept_internal", not_recorded: after };
 }
 // R88 / SQL108 (Ahmed 16 Nov 2026): the office sent the study itself from the phone's WhatsApp (the owner had not answered the
 // template, or the send failed). It is closed like an automatic send, so the owner's later answer does not bring it again.

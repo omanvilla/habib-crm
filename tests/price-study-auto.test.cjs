@@ -50,16 +50,11 @@ test('nothing reaches an owner before the approval, and test mode only reaches t
   assert(fwd.includes("perform crm_repair_private.price_study_call(jsonb_build_object('action', 'send', 'study_id', s.id));"));
   assert(fwd.includes("if length(v_note) < 3 then raise exception 'reject_note_required'; end if;"));
 });
-test('outside the 24-hour window the approved template asks first; the study follows the owner\'s answer',()=>{
-  assert(fn.includes('const TEMPLATE = "owner_price_study_ready_ar_v1";'));
-  assert(fn.includes('const TEMPLATE_TEXT = "السلام عليكم دراسة سعر عقارك جاهزة نرسلها لك هنا ؟";'));
-  assert(fn.includes('const tpl = await templateApproved(conv.company_id, conv.route_key);'));
-  assert(fn.includes('if (!tpl) return await set("approved", "template_not_approved");'));
-  // v2 (Ahmed 11 Nov, night): Meta rated v1 MARKETING on Muscat; the wording he approved for that number only
-  assert(fn.includes('{ name: "owner_price_study_ready_ar_v2", text: "السلام عليكم بخصوص طلبك دراسة سعر عقارك الدراسة جاهزة نرسلها لك هنا ؟", routes: ["muscat"] },'));
-  assert(fn.includes('{ name: TEMPLATE, text: TEMPLATE_TEXT, routes: ["barka", "muscat"] },'));
-  assert(fn.includes('template: { name: tpl.name, language: { code: "ar" } }'),'the template sent is the one usable on that number');
-  assert(fn.includes('return await set("waiting_owner", null, { template_sent_at: new Date().toISOString() });'));
+test('outside the 24-hour window nothing goes (21 Nov 2026: no «نرسلها لك هنا ؟»); the study waits for the owner or the phone',()=>{
+  const out=fn.slice(fn.indexOf("if (!inWindow) {"),fn.indexOf("let textId"));
+  assert(out.includes('return await set("approved", "template_not_approved");'));
+  assert(!out.includes("metaSend"),"no template is sent outside the window");
+  assert(!out.includes("waiting_owner"));
   assert(fwd.includes("s.status = 'waiting_owner'"));
 });
 test('SQL95: an approved study held for the template goes by itself when the owner writes or Meta approves',()=>{

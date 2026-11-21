@@ -71,7 +71,7 @@ test('the screen: the box on cards whose task is open and inside the task window
   assert(ui.includes("supa.rpc('crm_price_study_inspection_save',{p_task_id:t,"));
   assert(ui.includes("<p class=\"cps-private\">داخلية للمكتب، ما توصل للمالك</p>"));
   assert(home.includes("if(sheetKind==='studies'){if(typeof window.crmPriceStudiesDraw==='function')window.crmPriceStudiesDraw(body);"));
-  assert(index.includes('crm-price-studies.css?v=20261119-phone1')&&index.includes('crm-price-studies.js?v=20261119-phone1'));
+  assert(index.includes('crm-price-studies.css?v=20261119-phone1')&&/crm-price-studies\.js\?v=202611(19-phone1|2[1-9]-)/.test(index));
   assert(/crm-owner-home\.js\?v=202611(19|2\d)-/.test(index),'crm-owner-home.js moved on with R40, then SQL102');
 });
 test('«أعد الدراسة بعد المعاينة» only while the study waits for approval, through the existing rejection',()=>{

@@ -23,7 +23,9 @@
   const waiting=()=>data.items.filter(i=>i.status==='awaiting_approval');
   const HOLD={test_mode_hold:'وافقت عليها. الإرسال للملاك في وضع التجربة، فما انرسلت. تنرسل لما يتفعّل الإرسال وتضغط «ارسل الحين»',
     sending_off:'وافقت عليها، والإرسال للملاك موقف',
-    template_not_approved:'موافقتك انحفظت، بس ما انرسلت للحين: آخر رسالة من المالك أقدم من 24 ساعة، وقالب «دراسة سعر عقارك جاهزة» ما اعتمدته Meta. تنرسل لحالها أول ما يكتب المالك أو يعتمد القالب، وما تحتاج تضغط مرة ثانية',
+    // 21 Nov 2026 (Ahmed): «دراسة سعر عقارك جاهزة نرسلها لك هنا ؟» does not go any more
+    template_not_approved:'موافقتك انحفظت، بس ما انرسلت للحين: آخر رسالة من المالك أقدم من 24 ساعة. تنرسل لحالها أول ما يكتب المالك، أو ارسلها أنت من واتساب الجوال تحت',
+    held_by_ahmed_new_flow:'موقفة بقرارك (21 نوفمبر) لين تتطبق الطريقة الجديدة. اضغط «ارسل الحين» عشان تمشي عليها: لو المالك من اتصال المكتب وسعره مناسب تظل داخلية وتطلع مهمة «زيارة وتوقيع»',
     owner_said_no_to_the_template:'المالك رد إنه ما يبي الدراسة (أو قال «لا») على رسالة «دراسة سعر عقارك جاهزة»، فما انرسلت له'};
   const REACTION={accepted:'المالك وافق على السعر',price_rejected:'السعر ما ناسب المالك',counter_offer:'المالك طلب سعر ثاني'};
 
@@ -228,7 +230,18 @@
     if(i.status==='send_failed')return '<span class="cps-chip bad">ما انرسلت</span>';
     if(i.status==='sent')return '<span class="cps-chip ok">انرسلت للمالك '+esc(when(i.sent_at))+(i.sent_by_name?' · من الجوال: '+esc(i.sent_by_name):'')+'</span>';
     if(i.status==='rejected')return '<span class="cps-chip">رجعت لـ Claude بملاحظتك</span>';
+    if(i.status==='kept_internal')return '<span class="cps-chip ok">داخلية: السعر مناسب، ما انرسلت للمالك · طلعت مهمة «زيارة وتوقيع»</span>';
     return '';
+  }
+  /* SQL150 (Ahmed 21 Nov 2026): the office called this owner, he did not ask for a study. «موافق» keeps it inside the office
+     when his price is not above our asking price (and opens «زيارة وتوقيع»); above it, the «السعر أعلى من السوق» message goes. */
+  function outreachLine(i){
+    if(!i.office_outreach||!['awaiting_approval','approved','send_failed'].includes(i.status))return '';
+    const ask=Number(i.owner_price||0),fits=!ask||ask<=Number(i.asking_price||0);
+    return '<p class="cps-note">من اتصال المكتب: المالك ما طلب دراسة. '+(fits
+      ?(ask?'سعره مناسب (مب أعلى من سعر العرض)، فـ«موافق» يخليها داخلية وما ترسل له شي، وتطلع مهمة «زيارة وتوقيع»'
+        :'سعره مب مسجل، فـ«موافق» يخليها داخلية وتطلع مهمة «زيارة وتوقيع» تسأله فيها عن سعره')
+      :'سعره أعلى من سعر العرض، فـ«موافق» يرسل له الرسالة تحت (السعر أعلى من السوق) مع التقرير')+'</p>';
   }
   // a study that can still be sent from the phone (SQL146)
   const phoneable=i=>['awaiting_approval','approved','waiting_owner','send_failed'].includes(i.status);
@@ -245,7 +258,7 @@
       +'<div class="cps-head"><strong>'+esc(i.owner_name||'مالك')+' <small>'+esc(ROUTE[i.route_key]||'')+(i.version>1?' · نسخة '+esc(i.version):'')+'</small></strong>'+statusLine(i)+'</div>'
       +(facts?'<small class="cps-facts">'+esc(facts)+'</small>':'')
       +'<small class="cps-facts">السعر اللي في بال المالك: <b dir="ltr">'+num(i.owner_price)+'</b></small>'
-      +(note?'<p class="cps-note">'+esc(note)+'</p>':'')
+      +(note?'<p class="cps-note">'+esc(note)+'</p>':'')+outreachLine(i)
       +'<div class="cps-nums">'+cell('القيمة السوقية',i.market_value)+cell('سعر العرض',i.asking_price)+cell('هامش التفاوض',i.negotiation_margin)+'</div>'
       +'<p class="cps-private">داخلي للمكتب، ما يوصل للمالك</p>'
       +'<div class="cps-nums">'+cell('صافي المالك',i.owner_net,true)+cell('العمولة',i.commission,true)+'</div>'
