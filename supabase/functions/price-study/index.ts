@@ -723,6 +723,7 @@ async function requeueAlert(studyId: string, secret: string) {
   return { study_id: studyId, told_ahmed: told.sent };
 }
 
+// ---------- the template at Meta ----------
 // the full template of this kind, usable on this number (APPROVED and UTILITY), from the registry or freshly from Meta
 async function fullTemplateApproved(companyId: string, routeKey: string, kind: "full" | "high") {
   const tpl = FULL_TEMPLATES.find((t) => t.kind === kind)!;
@@ -790,7 +791,7 @@ async function fullTemplates(action: "create" | "status", companyId: string) {
   }
   return out;
 }
-// ---------- the template at Meta ----------
+
 async function templates(action: "create" | "status", companyId: string) {
   const out: any[] = [];
   for (const rk of ["barka", "muscat"]) {
