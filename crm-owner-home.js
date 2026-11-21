@@ -406,6 +406,9 @@
     markHome();
     if(!hasHome()||typeof supa==='undefined'){box.hidden=true;page.classList.remove('coh-on');releaseGate();return;}
     const seq=++sequence,owner=isOwner(),twinForce=forceTwins;let ok=false;forceTwins=false;
+    if(!last){const c=readCache();
+      if(c){last={data:c.data,pending:c.pending||0,twins:Array.isArray(c.twins)?c.twins:[]};paused=c.paused&&Array.isArray(c.paused.items)?c.paused:{items:[],total:0};
+        setStale(true);render();box.hidden=false;page.classList.add('coh-on');hideStartScreen();}}
     try{
       // The follow-up count is read together with the rest (it is lighter), so its tile is there on the first draw.
       const fu=typeof window.crmFollowupsRefresh==='function'?Promise.race([window.crmFollowupsRefresh(),new Promise(r=>setTimeout(r,1500))]):null;
@@ -422,8 +425,8 @@
       if(home.error||!home.data){if(!last){box.hidden=true;page.classList.remove('coh-on');}return;}
       ok=true;retries=0;clearTimeout(retryTimer);document.documentElement.classList.remove('coh-slow');
       last={data:home.data,pending:pending||0,twins:twinGroups&&!twinGroups.error?twinGroups.data:[]};
-      render();
-      box.hidden=false;page.classList.add('coh-on');
+      setStale(false);render();saveCache();
+      box.hidden=false;page.classList.add('coh-on');hideStartScreen();
       // after the first draw, so the home never waits for it
       readAutoNotes().then(list=>{if(seq!==sequence||list==null)return;autoNotes=list;drawAuto();});
       supa.rpc('crm_whatsapp_usage').then(r=>{if(seq!==sequence||!r||r.error)return;usage=r.data||[];drawUsage();});
@@ -451,10 +454,11 @@
   function retryLater(){
     // 19 Nov 2026: no last try any more (the old dashboard is never the fallback); after three failed tries the placeholder
     // says the connection is slow, and the home keeps trying (every 30 seconds after ten tries)
-    if(last||!hasHome())return false;
+    // a home drawn from the saved copy (stale) keeps trying too, until a fresh read replaces it
+    if((last&&!stale)||!hasHome())return false;
     clearTimeout(retryTimer);
     if(retries>=3)document.documentElement.classList.add('coh-slow');
-    retryTimer=setTimeout(()=>{if(!last&&hasHome())load().catch(()=>{});},[2000,4000,8000][retries]||(retries<10?15000:30000));
+    retryTimer=setTimeout(()=>{if((!last||stale)&&hasHome())load().catch(()=>{});},[2000,4000,8000][retries]||(retries<10?15000:30000));
     retries++;return true;
   }
   function render(){
@@ -462,6 +466,30 @@
     const d=last.data;
     drawTiles(d,last.pending);drawSummary(d);drawSheet();
   }
+  /* 19 Nov 2026 (Ahmed: «إيه، سوّها»): the home is drawn at once from the last copy this account saved on this device, then
+   * the fresh read replaces it (about 2 s on a small database after a quiet minute). The copy is per account and role, only
+   * for today (Muscat) and at most 12 hours old, and it is removed on sign-out. While it shows, the home says «يتحدث…» and
+   * nothing that writes can be pressed (the lists may be a little old); opening a tile or a sheet still works. */
+  const CACHE_PREFIX='crm_home_cache_v1:';
+  let stale=false;
+  const muscatToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Muscat'}).format(new Date());
+  const cacheKey=()=>typeof currentUser!=='undefined'&&currentUser&&currentUser.id?CACHE_PREFIX+currentUser.id:null;
+  const roleNow=()=>typeof currentProfile!=='undefined'&&currentProfile?currentProfile.role:null;
+  function readCache(){
+    try{const k=cacheKey();if(!k)return null;const c=JSON.parse(localStorage.getItem(k)||'null');
+      if(!c||c.v!==1||c.uid!==currentUser.id||c.role!==roleNow()||!c.data||String(c.data.today||'')!==muscatToday()||!(Date.now()-c.at<12*3600000))return null;
+      return c;}catch(_){return null;}
+  }
+  function saveCache(){
+    try{const k=cacheKey();if(!k||!last)return;
+      localStorage.setItem(k,JSON.stringify({v:1,uid:currentUser.id,role:roleNow(),at:Date.now(),data:last.data,pending:last.pending,twins:last.twins,paused}));}catch(_){}
+  }
+  function clearCaches(){try{Object.keys(localStorage).filter(k=>k.indexOf(CACHE_PREFIX)===0).forEach(k=>localStorage.removeItem(k));}catch(_){}}
+  const clearSession=window.clearSessionUI;
+  if(typeof clearSession==='function')window.clearSessionUI=function(){clearCaches();stale=false;return clearSession.apply(this,arguments);};
+  function setStale(on){stale=on;const box=byId('crmOwnerHome');if(box)box.classList.toggle('coh-stale',on);}
+  // the base page's start screen (#instantLoader) stays a fixed 2.5 s; it goes as soon as the home is drawn
+  const hideStartScreen=()=>{const l=byId('instantLoader');if(l)l.style.display='none';};
   document.addEventListener('crm-followups-updated',()=>{if(last)drawTiles(last.data,last.pending);});
   document.addEventListener('crm-price-studies-updated',()=>{if(last)drawTiles(last.data,last.pending);});
   document.addEventListener('crm-home-attention-updated',()=>{if(last)drawTiles(last.data,last.pending);if(sheetKind==='waiting'||sheetKind==='contracts')drawSheet();});
@@ -473,6 +501,8 @@
   document.addEventListener('click',e=>{
     const b=e.target.closest('[data-coh]');if(!b)return;
     const act=b.dataset.coh;
+    // while the saved copy shows, nothing that writes runs on lists that may be a little old
+    if(stale&&['psend','pdrop','pignore','punignore','presume','auto-done','twin-yes','twin-no'].includes(act)){toast('لحظة، الرئيسية تتحدث…','error');return;}
     if(act==='pprice'){const f=document.querySelector('[data-pf="'+CSS.escape(b.dataset.id)+'"]');if(f){f.hidden=!f.hidden;if(!f.hidden){const p=f.querySelector('[data-pf-price]');if(p)p.focus();}}return;}
     if(act==='psend'){
       const id=b.dataset.id,it=paused.items.find(i=>i.conversation_id===id)||{},ta=document.querySelector('[data-pf-text="'+CSS.escape(id)+'"]');

@@ -38,16 +38,17 @@ test('the old dashboard is never painted for the owner before the home (boot gat
 // 14 Nov 2026 (Ahmed, signed in as staff, saw the old dashboard): two causes, both held here.
 test('a failed first load of the home is read again by itself until it loads (19 Nov 2026: never the old page)',()=>{
  const body=js.slice(js.indexOf('function retryLater(){'),js.indexOf('function render(){'));
- assert(body.includes('if(last||!hasHome())return false;'),'never after a success');
+ assert(body.includes('if((last&&!stale)||!hasHome())return false;'),'never after a success (a home drawn from the saved copy keeps trying, 19 Nov 2026)');
  assert(js.includes('ok=true;retries=0;clearTimeout(retryTimer);'),'a success stops the retries');
  // the retry logic itself, run as plain JS
- let last=null,retries=0,retryTimer=null,calls=[];const hasHome=()=>true,load=()=>Promise.resolve();const cls=new Set(),document={documentElement:{classList:{add:c=>cls.add(c)}}};
+ let last=null,stale=false,retries=0,retryTimer=null,calls=[];const hasHome=()=>true,load=()=>Promise.resolve();const cls=new Set(),document={documentElement:{classList:{add:c=>cls.add(c)}}};
  const setTimeout=(f,ms)=>{calls.push(ms);return calls.length;},clearTimeout=()=>{};
  const retryLater=eval('('+body.slice(0,body.lastIndexOf('}')+1)+')');
  for(let i=0;i<12;i++)retryLater();
  assert.deepEqual(calls,[2000,4000,8000,15000,15000,15000,15000,15000,15000,15000,30000,30000]);
  assert(cls.has('coh-slow'),'the placeholder says the connection is slow');
  last={};assert.equal(retryLater(),false);
+ stale=true;assert.equal(retryLater(),true,'the saved copy is not a success');stale=false;
 });
 test('the app starting before the modules arrived still gets the home (empty cache after a publication)',()=>{
  assert(index.includes(`h=h.replace('<html lang="ar" dir="rtl">','<html lang="ar" dir="rtl" class="coh-boot">');`),'the old dashboard is hidden from the first paint');
