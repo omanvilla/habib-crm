@@ -17,7 +17,7 @@ test('office_outreach comes from «اتصال المكتب» on the chat, set wh
   assert(rb.includes("WHERE status = 'kept_internal'"),'the rollback keeps those studies held, not lost');
 });
 test('a fitting price stays inside the office and opens «زيارة وتوقيع»; a higher price is sent',()=>{
-  assert(fn.includes('if (!ask || ask <= Number(s.asking_price || 0)) return await keptInternal(s, conv, lead, property, ask);'));
+  assert(fn.includes('if (s.office_outreach && (!ask || ask <= Number(s.asking_price || 0))) return await keptInternal(s, conv, lead, property, ask, "office");'));
   const k=fn.slice(fn.indexOf('async function keptInternal'),fn.indexOf('async function sentByPhone'));
   assert(k.includes('status: "kept_internal"'));
   assert(!k.includes('metaSend'),'nothing goes to the owner');
@@ -33,6 +33,13 @@ test('outside the 24-hour window only the full template goes (report as header),
   assert(!out.includes('templateApproved(conv.company_id, conv.route_key);'),'the old question template is not used');
   assert(fn.includes('name: "owner_price_study_full_ar_v1"')&&fn.includes('name: "owner_price_study_high_ar_v1"'));
   assert(fn.includes('{ type: "HEADER", format: "DOCUMENT", example: { header_handle: [h.handle] } }'));
+});
+test('a villa or building gets no number before the inspection (21 Nov 2026); land is unchanged',()=>{
+  assert(fn.includes('if (isBuilding(lead) && !(await inspected(s.task_id))) return await keptInternal(s, conv, lead, property, ask, "building");'));
+  assert(fn.includes('const BUILDING_KINDS = new Set(["villa", "house", "building", "apartment", "twin_villa", "chalet", "resthouse", "shop", "farm"]);'));
+  assert(!fn.slice(fn.indexOf('const BUILDING_KINDS'),fn.indexOf('const isBuilding')).includes('"land"'));
+  assert(fn.includes('.from("owner_price_study_inspections").select("task_id,note,photos")'));
+  assert(ui.includes('فيلا أو مبنى بدون معاينة: ما نرسل رقم للمالك قبل المعاينة.'));
 });
 test('the screen says what «موافق» does for an office-call owner',()=>{
   assert(ui.includes("if(i.status==='kept_internal')"));

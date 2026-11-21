@@ -433,10 +433,12 @@ async function sendStudy(studyId: string, from: "approved" | "waiting_owner") {
     // SQL150 (Ahmed 21 Nov 2026): an owner the office called did not ask for a study. If his price fits (not above our asking
     // price) the study stays inside the office and the next step is the visit; only a price above it goes to him (the run
     // writes that message as «السعر أعلى من السوق» with the prices it found).
-    if (s.office_outreach) {
-      const ask = Number(s.owner_price ?? lead?.price ?? 0);
-      if (!ask || ask <= Number(s.asking_price || 0)) return await keptInternal(s, conv, lead, property, ask);
-    }
+    // 21 Nov 2026 (Ahmed: «لازم نكون متأكدين من الدراسة 100% قبل لا تنرسل للمالك... خاصة الفلل»): a villa or any building gets
+    // no number before the office inspected it. The study stays inside the office and «زيارة وتوقيع» opens; the price is given
+    // to the owner at the visit, with the cost sheet. Land is unchanged. After the inspection the run studies it again (final).
+    const ask = Number(s.owner_price ?? lead?.price ?? 0);
+    if (isBuilding(lead) && !(await inspected(s.task_id))) return await keptInternal(s, conv, lead, property, ask, "building");
+    if (s.office_outreach && (!ask || ask <= Number(s.asking_price || 0))) return await keptInternal(s, conv, lead, property, ask, "office");
     const phoneId = digits(conv.meta_phone_number_id);
     if (!to || !phoneId) return await set("send_failed", "owner_number_or_branch_number_missing");
     if (!s.owner_report_path) return await set("send_failed", "owner_report_missing");
@@ -500,14 +502,23 @@ async function sendStudy(studyId: string, from: "approved" | "waiting_owner") {
 }
 // SQL150: the owner's price fits, so nothing goes to him. The study task closes, the offer gets the line, and «زيارة وتوقيع»
 // opens for the office (one open at a time per offer). His price unknown: the same task says to ask him first.
-async function keptInternal(s: any, conv: any, lead: any, property: string, ask: number) {
+const BUILDING_KINDS = new Set(["villa", "house", "building", "apartment", "twin_villa", "chalet", "resthouse", "shop", "farm"]);
+const isBuilding = (lead: any) => !!lead && (BUILDING_KINDS.has(String(lead.kind || "")) || Number(lead.built_size || 0) > 0);
+async function inspected(taskId: string | null) {
+  if (!taskId) return false;
+  const r = await db.from("owner_price_study_inspections").select("task_id,note,photos").eq("task_id", taskId).maybeSingle();
+  return !!r.data && (String(r.data.note || "").trim().length > 0 || (r.data.photos || []).length > 0);
+}
+async function keptInternal(s: any, conv: any, lead: any, property: string, ask: number, why: "office" | "building" = "office") {
   const now = new Date().toISOString();
   const done = await db.from("owner_price_studies").update({ status: "kept_internal", send_error: null, updated_at: now }).eq("id", s.id).eq("status", "sending").select("id");
   if (!(done.data || []).length) return { study_id: s.id, skipped: "changed_meanwhile" };
   const after: string[] = [];
   if (s.task_id) { const t = await db.from("tasks").update({ done: true, completed_at: now }).eq("id", s.task_id); if (t.error) after.push("task"); }
   const fits = ask ? `السعر اللي طالبه المالك ${money(ask)} مناسب (سعر العرض عندنا ${money(s.asking_price)})` : "المالك ما حدد سعره";
-  const line = `دراسة داخلية ${dayAr()} (اتصال المكتب): ${fits}، وما انرسلت له. الخطوة الجاية: زيارة وتوقيع`;
+  const line = why === "building"
+    ? `دراسة داخلية ${dayAr()} (فيلا أو مبنى بدون معاينة): ما ينرسل رقم للمالك قبل المعاينة. ${ask ? `طالب ${money(ask)}، والسعر العادل عندنا ${money(s.owner_net)} صافي (سعر العرض ${money(s.asking_price)})` : "المالك ما حدد سعره"}. الخطوة الجاية: زيارة ومعاينة، والسعر يتعطى له في الزيارة مع ورقة التكلفة (في التقرير الداخلي)`
+    : `دراسة داخلية ${dayAr()} (اتصال المكتب): ${fits}، وما انرسلت له. الخطوة الجاية: زيارة وتوقيع`;
   if (lead?.id) { const u = await db.from("owner_leads").update({ notes: [lead.notes, line].filter(Boolean).join("\n").slice(0, 4000), updated_at: now }).eq("id", lead.id); if (u.error) after.push("owner_lead"); }
   const KIND_AR: Record<string, string> = { villa: "فيلا", house: "بيت", land: "أرض", apartment: "شقة", building: "مبنى", farm: "مزرعة", shop: "محل", chalet: "شاليه", resthouse: "استراحة", twin_villa: "توين فيلا" };
   const place = lead ? [lead.area, lead.wilayat].filter(Boolean).join(" ، ") : "";

@@ -230,13 +230,17 @@
     if(i.status==='send_failed')return '<span class="cps-chip bad">ما انرسلت</span>';
     if(i.status==='sent')return '<span class="cps-chip ok">انرسلت للمالك '+esc(when(i.sent_at))+(i.sent_by_name?' · من الجوال: '+esc(i.sent_by_name):'')+'</span>';
     if(i.status==='rejected')return '<span class="cps-chip">رجعت لـ Claude بملاحظتك</span>';
-    if(i.status==='kept_internal')return '<span class="cps-chip ok">داخلية: السعر مناسب، ما انرسلت للمالك · طلعت مهمة «زيارة وتوقيع»</span>';
+    if(i.status==='kept_internal')return '<span class="cps-chip ok">داخلية: ما انرسلت للمالك · طلعت مهمة «زيارة وتوقيع»</span>';
     return '';
   }
   /* SQL150 (Ahmed 21 Nov 2026): the office called this owner, he did not ask for a study. «موافق» keeps it inside the office
      when his price is not above our asking price (and opens «زيارة وتوقيع»); above it, the «السعر أعلى من السوق» message goes. */
   function outreachLine(i){
-    if(!i.office_outreach||!['awaiting_approval','approved','send_failed'].includes(i.status))return '';
+    if(!['awaiting_approval','approved','send_failed'].includes(i.status))return '';
+    // 21 Nov 2026 (Ahmed): a villa or building gets no number before the office inspected it
+    const sv=i.task_id?saved(i.task_id):null,seen=!!(sv&&(String(sv.note||'').trim()||(sv.photos||[]).length));
+    if(i.property_kind==='مبنى'&&!seen)return '<p class="cps-note">فيلا أو مبنى بدون معاينة: ما نرسل رقم للمالك قبل المعاينة. «موافق» يخليها داخلية وتطلع مهمة «زيارة وتوقيع»، والسعر تعطيه له في الزيارة مع ورقة التكلفة اللي في التقرير الداخلي. بعد المعاينة احفظها تحت واضغط «أعد الدراسة بعد المعاينة»</p>';
+    if(!i.office_outreach)return '';
     const ask=Number(i.owner_price||0),fits=!ask||ask<=Number(i.asking_price||0);
     return '<p class="cps-note">من اتصال المكتب: المالك ما طلب دراسة. '+(fits
       ?(ask?'سعره مناسب (مب أعلى من سعر العرض)، فـ«موافق» يخليها داخلية وما ترسل له شي، وتطلع مهمة «زيارة وتوقيع»'
