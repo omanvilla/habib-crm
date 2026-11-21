@@ -271,6 +271,8 @@ function fixtureExtraRpc(name,args){
    return ok({items,total:items.length,ignored:1,direct});
   }
   case 'crm_set_direct_contact':return ok({ok:true,direct:!!args.p_on});
+  // SQL153: the buyer's file link (the token is synthetic)
+  case 'crm_property_file_link':return ok({token:'0123456789abcdef0123456789abcdef'});
   case 'crm_ignored_chats':{const c=clients.find(x=>x.lead_route==='barka');return ok({items:c&&allowed(c,'clients')?[chat(c,{reason:'رقم مكتب عقاري',ignored_at:relative(-3)+'T10:00:00Z',ignore_kind:'manual'})]:[],total:1});}
   case 'crm_property_twins':return ok([]);
   case 'crm_followups_today':{

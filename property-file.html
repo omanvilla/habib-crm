@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>ملف العقار | أبناء حبيب للعقارات</title>
+<!-- SQL153 (Ahmed 21 Nov 2026): the buyer's one-page file. Reads only crm_property_file_public(token): public fields,
+     which papers are ready, and the build cost from the monthly materials study. No owner data, no plot number, no map pin. -->
+<style>
+:root{--ink:#2b2118;--muted:#7a6a5a;--gold:#b08a3e;--bg:#faf7f1;--card:#fff;--line:#eadfcb;--ok:#1f7a45;--no:#a33a2b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans Arabic',Tahoma,sans-serif;line-height:1.6}
+.wrap{max-width:680px;margin:0 auto;padding:16px}
+header{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
+header b{font-size:15px}header small{color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+h1{font-size:21px;margin:0 0 4px}
+.price{font-size:22px;font-weight:800;color:var(--gold)}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:10px}
+.fact{background:var(--bg);border-radius:10px;padding:8px 10px}.fact small{display:block;color:var(--muted);font-size:12px}.fact b{font-size:16px}
+.gallery{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -4px;padding:0 4px}
+.gallery img{height:220px;border-radius:12px;scroll-snap-align:start;object-fit:cover;flex:0 0 auto;max-width:90%}
+h2{font-size:16px;margin:0 0 8px}
+ul.docs{list-style:none;margin:0;padding:0}ul.docs li{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line)}
+ul.docs li:last-child{border-bottom:0}.y{color:var(--ok);font-weight:700}.n{color:var(--muted)}
+.cost b{color:var(--ink)}.note{color:var(--muted);font-size:13px;margin:8px 0 0}
+.cta{display:block;text-align:center;background:#1f7a45;color:#fff;text-decoration:none;font-weight:800;padding:13px;border-radius:12px;font-size:16px}
+.msg{text-align:center;padding:40px 16px;color:var(--muted)}
+pre{white-space:pre-wrap;font-family:inherit;margin:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><div><b>أبناء حبيب للعقارات</b><br><small>ملف العقار</small></div></header>
+  <div id="app"><div class="msg">جاري التحميل…</div></div>
+</div>
+<script>
+(function(){
+  var URL_='https://dmsckqjkcnsfmnzfjczz.supabase.co/rest/v1/rpc/crm_property_file_public';
+  var KEY='sb_publishable_cblz5giFrHdXSCYSG6j0Cw_oaxkmHi4';
+  var app=document.getElementById('app');
+  var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
+  var num=function(v){var n=Number(v);return isFinite(n)&&n>0?n.toLocaleString('en-US'):''};
+  var TYPE={villa:'فيلا',house:'بيت',twin_villa:'توين فيلا',apartment:'شقة',building:'عمارة',land:'أرض',farm:'مزرعة',shop:'محل',chalet:'شاليه',rest_house:'استراحة'};
+  var DOCS=[['ملكية','الملكية'],['كروكي','الكروكي'],['اتمام_بناء','شهادة اتمام البناء'],['خرائط','الخرائط'],['ضمان','ضمان المقاول']];
+  var token=(new URLSearchParams(location.search).get('t')||'').toLowerCase();
+  if(!/^[0-9a-f]{32}$/.test(token)){app.innerHTML='<div class="msg">الرابط غير صحيح</div>';return;}
+  fetch(URL_,{method:'POST',headers:{'content-type':'application/json',apikey:KEY,authorization:'Bearer '+KEY},body:JSON.stringify({p_token:token})})
+    .then(function(r){return r.json()}).then(draw).catch(function(){app.innerHTML='<div class="msg">تعذر فتح الملف، جرّب بعد شوي</div>'});
+  function draw(d){
+    if(!d||!d.ok){app.innerHTML='<div class="msg">'+(d&&d.error==='not_available'?'هذا العقار ما عاد متوفر':'الملف غير موجود')+'</div>';return;}
+    var kind=TYPE[d.type]||'عقار',place=[d.area,d.wilayat].filter(Boolean).join('، ');
+    var h='';
+    var imgs=(d.images||[]).filter(function(u){return /^https:\/\//.test(u)});
+    if(imgs.length)h+='<div class="card"><div class="gallery">'+imgs.map(function(u){return '<img loading="lazy" src="'+esc(u)+'" alt="">'}).join('')+'</div></div>';
+    h+='<div class="card"><h1>'+esc(kind)+(place?' في '+esc(place):'')+'</h1>';
+    if(num(d.price))h+='<div class="price">'+num(d.price)+' ريال</div>';
+    var f=[];
+    if(num(d.land_size))f.push(['مساحة الأرض',num(d.land_size)+' م²']);
+    if(num(d.built_size))f.push(['مساحة البناء',num(d.built_size)+' م²']);
+    if(num(d.bedrooms))f.push(['غرف النوم',num(d.bedrooms)]);
+    if(num(d.bathrooms))f.push(['دورات المياه',num(d.bathrooms)]);
+    if(d.build_year)f.push(['سنة البناء',esc(d.build_year)]);
+    if(d.finish)f.push(['التشطيب',esc(d.finish)]);
+    h+='<div class="facts">'+f.map(function(x){return '<div class="fact"><small>'+x[0]+'</small><b>'+x[1]+'</b></div>'}).join('')+'</div></div>';
+    if(d.details)h+='<div class="card"><h2>تفاصيل</h2><pre>'+esc(d.details)+'</pre></div>';
+    if(d.docs&&typeof d.docs==='object'){
+      h+='<div class="card"><h2>الأوراق</h2><ul class="docs">'+DOCS.map(function(x){var v=d.docs[x[0]];return '<li><span>'+x[1]+'</span>'+(v===true?'<span class="y">موجودة ✓</span>':'<span class="n">مب متوفرة الحين</span>')+'</li>'}).join('')+'</ul><p class="note">الأوراق نعرضها عليك في الزيارة.</p></div>';
+    }
+    if(d.cost&&num(d.cost.new_cost)){
+      var c=d.cost,dt=String(c.study_date||'').slice(0,7);
+      h+='<div class="card cost"><h2>كم يكلف بناء مثله اليوم</h2>'
+        +'<p>بناء '+num(d.built_size)+' م² بتشطيب '+esc(c.tier)+' اليوم يكلف تقريباً <b>'+num(c.new_cost)+' ريال</b> (سعر المتر '+num(c.rate)+' ريال)</p>'
+        +(c.now_cost?'<p>وبعد عمر البناء ('+esc(c.age)+' سنة) قيمته تقريباً <b>'+num(c.now_cost)+' ريال</b>، من غير الأرض</p>':'')
+        +'<p class="note">حسب دراستنا الشهرية لأسعار مواد البناء في عمان ('+esc(dt)+'). رقم تقريبي للمقارنة، مب تقييم معتمد.</p></div>';
+    }
+    var wa='https://wa.me/'+esc(d.branch_phone)+'?text='+encodeURIComponent('السلام عليكم، شفت ملف '+kind+(place?' في '+place:'')+' وأبي أعرف أكثر');
+    h+='<a class="cta" href="'+wa+'" target="_blank" rel="noopener">تواصل معنا على الواتساب</a>';
+    app.innerHTML=h;
+  }
+})();
+</script>
+</body>
+</html>
