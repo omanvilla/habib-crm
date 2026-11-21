@@ -50,11 +50,10 @@ test('nothing reaches an owner before the approval, and test mode only reaches t
   assert(fwd.includes("perform crm_repair_private.price_study_call(jsonb_build_object('action', 'send', 'study_id', s.id));"));
   assert(fwd.includes("if length(v_note) < 3 then raise exception 'reject_note_required'; end if;"));
 });
-test('outside the 24-hour window nothing goes (21 Nov 2026: no «نرسلها لك هنا ؟»); the study waits for the owner or the phone',()=>{
+test('outside the 24-hour window the full template goes once approved, otherwise the study waits (21 Nov 2026)',()=>{
   const out=fn.slice(fn.indexOf("if (!inWindow) {"),fn.indexOf("let textId"));
-  assert(out.includes('return await set("approved", "template_not_approved");'));
-  assert(!out.includes("metaSend"),"no template is sent outside the window");
-  assert(!out.includes("waiting_owner"));
+  assert(out.includes('if (!tpl) return await set("approved", "template_not_approved");'));
+  assert(!out.includes("waiting_owner"),"no question template, so nothing waits for an answer");
   assert(fwd.includes("s.status = 'waiting_owner'"));
 });
 test('SQL95: an approved study held for the template goes by itself when the owner writes or Meta approves',()=>{

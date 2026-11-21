@@ -42,6 +42,13 @@ const TEMPLATES: { name: string; text: string; routes: string[] }[] = [
   { name: TEMPLATE, text: TEMPLATE_TEXT, routes: ["barka", "muscat"] },
   { name: "owner_price_study_ready_ar_v2", text: "السلام عليكم بخصوص طلبك دراسة سعر عقارك الدراسة جاهزة نرسلها لك هنا ؟", routes: ["muscat"] },
 ];
+// 21 Nov 2026 (Ahmed approved both texts): outside the 24-hour window the whole study goes in one template, the owner PDF as
+// its header and the place ({{1}}) and the net price ({{2}}) in the body. «full» for an owner who asked for the study; «high»
+// for an office-call owner whose price is above our asking price. Sent only once Meta approved it as UTILITY on that number.
+const FULL_TEMPLATES: { name: string; kind: "full" | "high"; text: string }[] = [
+  { name: "owner_price_study_full_ar_v1", kind: "full", text: "السلام عليكم بخصوص عقارك في {{1}} سوينا دراسة سوق والتقرير مرفق\nالسعر المتوقع اللي يوصلك صافي {{2}} ريال\nيناسبك نبدأ نعرضه ؟" },
+  { name: "owner_price_study_high_ar_v1", kind: "high", text: "السلام عليكم بخصوص عقارك في {{1}} درسنا سعره على العقارات المشابهة المعروضة الحين\nالسعر المطلوب طلع أعلى من السوق والتقرير مرفق وفيه الأسعار اللي شفناها\nالسعر اللي نقدر نبيع فيه ويوصلك صافي {{2}} ريال\nيناسبك ؟" },
+];
 const REPORT_NAME = "دراسة سعر العقار.pdf";
 const PRICE_STUDY = /^\s*دراسة\s*سعر/;
 // the owner answered the template with a plain «لا»: nothing is sent, Ahmed is told
@@ -442,10 +449,29 @@ async function sendStudy(studyId: string, from: "approved" | "waiting_owner") {
     const tokens = await routeTokens(conv.company_id, conv.route_key);
     const inWindow = !!conv.last_inbound_at && Date.now() - Date.parse(conv.last_inbound_at) < WINDOW_MS;
     if (!inWindow) {
-      // 21 Nov 2026 (Ahmed): «دراسة سعر عقارك جاهزة نرسلها لك هنا ؟» is not sent any more. The study waits (approved,
-      // template_not_approved) and goes as plain text the moment the owner writes (owner_inbound), or the office sends it
-      // from the branch phone. The full template (report attached, net price in the body) comes once Ahmed approves its text.
-      return await set("approved", "template_not_approved");
+      // 21 Nov 2026 (Ahmed): «دراسة سعر عقارك جاهزة نرسلها لك هنا ؟» is not sent any more. The whole study goes in the full
+      // template (report attached); until Meta approves it as UTILITY on this number the study waits (approved,
+      // template_not_approved) and goes as plain text the moment the owner writes (owner_inbound), or from the branch phone.
+      const kind = s.office_outreach ? "high" : "full";
+      const tpl = await fullTemplateApproved(conv.company_id, conv.route_key, kind);
+      if (!tpl) return await set("approved", "template_not_approved");
+      const file = await db.storage.from(BUCKET).download(s.owner_report_path);
+      if (file.error || !file.data) return await set("send_failed", `report_read: ${short(file.error?.message, 150)}`);
+      const up = await metaUpload(tokens, phoneId, new Uint8Array(await file.data.arrayBuffer()), "application/pdf", REPORT_NAME);
+      if (!up.id) return await set("send_failed", `report_upload: ${up.error}`);
+      const place = short(lead?.area || lead?.wilayat || "منطقتك", 60);
+      const net = money(s.owner_net);
+      const t = await metaSend(tokens, phoneId, to, { type: "template", template: { name: tpl.name, language: { code: "ar" }, components: [
+        { type: "header", parameters: [{ type: "document", document: { id: up.id, filename: REPORT_NAME } }] },
+        { type: "body", parameters: [{ type: "text", text: place }, { type: "text", text: net }] }] } });
+      if (!t.id) return await set("send_failed", `template: ${t.error}`);
+      const body = tpl.text.replace("{{1}}", place).replace("{{2}}", net);
+      await recordOut(s, conv, phoneId, to, t.id, "template", body, { template: tpl.name, document: { filename: REPORT_NAME }, media: { kind: "document", mime_type: "application/pdf", filename: REPORT_NAME, id: up.id } });
+      const now = new Date().toISOString();
+      await db.from("owner_price_studies").update({ status: "sent", sent_at: now, template_sent_at: now, owner_report_wamid: t.id, send_error: null, updated_at: now }).eq("id", s.id);
+      const after = await afterSent(s, conv, now);
+      if (after.length) await db.from("owner_price_studies").update({ send_error: `sent, not recorded: ${after.join(", ")}` }).eq("id", s.id);
+      return { study_id: studyId, status: "sent", template: tpl.name, not_recorded: after };
     }
     let textId = s.owner_message_wamid as string | null;
     if (!textId) {
@@ -697,6 +723,73 @@ async function requeueAlert(studyId: string, secret: string) {
   return { study_id: studyId, told_ahmed: told.sent };
 }
 
+// the full template of this kind, usable on this number (APPROVED and UTILITY), from the registry or freshly from Meta
+async function fullTemplateApproved(companyId: string, routeKey: string, kind: "full" | "high") {
+  const tpl = FULL_TEMPLATES.find((t) => t.kind === kind)!;
+  const usable = (x: any) => x && String(x.status || "").toUpperCase() === "APPROVED" && String(x.category || "").toUpperCase() === "UTILITY";
+  const r = await db.from("whatsapp_template_registry").select("status,category").eq("company_id", companyId).eq("route_key", routeKey).eq("template_name", tpl.name).eq("language", "ar").maybeSingle();
+  if (usable(r.data)) return tpl;
+  const fresh = await fullTemplates("status", companyId);
+  return fresh.some((x: any) => x.route === routeKey && x.name === tpl.name && usable(x)) ? tpl : null;
+}
+// Meta needs a sample document for a DOCUMENT header: a one-page PDF goes through the app's resumable upload, its handle is
+// the example. The app id comes from the token itself (debug_token).
+const SAMPLE_PDF = enc.encode("%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n");
+async function sampleHandle(token: string) {
+  const dbg = await fetch(`https://graph.facebook.com/${GRAPH}/debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(token)}`);
+  const dj = await dbg.json().catch(() => ({}));
+  const app = String(dj?.data?.app_id || "");
+  if (!app) return { handle: null, error: short(dj?.error?.message || "app_id_unknown", 200) };
+  const s = await fetch(`https://graph.facebook.com/${GRAPH}/${app}/uploads?file_name=study.pdf&file_length=${SAMPLE_PDF.length}&file_type=application/pdf&access_token=${encodeURIComponent(token)}`, { method: "POST" });
+  const sj = await s.json().catch(() => ({}));
+  if (!s.ok || !sj?.id) return { handle: null, error: short(sj?.error?.message || `upload_session_${s.status}`, 200) };
+  const u = await fetch(`https://graph.facebook.com/${GRAPH}/${sj.id}`, { method: "POST", headers: { Authorization: `OAuth ${token}`, file_offset: "0" }, body: SAMPLE_PDF });
+  const uj = await u.json().catch(() => ({}));
+  return uj?.h ? { handle: String(uj.h), error: null } : { handle: null, error: short(uj?.error?.message || `upload_${u.status}`, 200) };
+}
+async function fullTemplates(action: "create" | "status", companyId: string) {
+  const out: any[] = [];
+  for (const rk of ["barka", "muscat"]) {
+    try {
+      const a = await db.from("company_lead_routes").select("meta_waba_id").eq("company_id", companyId).eq("route_key", rk).eq("is_active", true).maybeSingle();
+      const waba = String(a.data?.meta_waba_id || "");
+      const tokens = await routeTokens(companyId, rk);
+      if (!waba || !tokens.length) { out.push({ route: rk, error: "route_not_ready" }); continue; }
+      for (const tpl of FULL_TEMPLATES) {
+        let t: any = null, err: string | null = null, reached = false;
+        for (const token of tokens) {
+          const f = await fetch(`https://graph.facebook.com/${GRAPH}/${waba}/message_templates?name=${tpl.name}&fields=name,status,category,language,id`, { headers: { Authorization: `Bearer ${token}` } });
+          const p = await f.json().catch(() => ({}));
+          if (!f.ok) { err = short(p?.error?.message || `HTTP ${f.status}`, 300); continue; }
+          reached = true; err = null;
+          t = (p.data || []).find((x: any) => x.name === tpl.name && String(x.language).toLowerCase().startsWith("ar")) || null;
+          if (!t && action === "create") {
+            const h = await sampleHandle(token);
+            if (!h.handle) { err = `sample: ${h.error}`; break; }
+            const c = await fetch(`https://graph.facebook.com/${GRAPH}/${waba}/message_templates`, {
+              method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ name: tpl.name, language: "ar", category: "UTILITY", components: [
+                { type: "HEADER", format: "DOCUMENT", example: { header_handle: [h.handle] } },
+                { type: "BODY", text: tpl.text, example: { body_text: [["الرميس", "59,500"]] } }] }),
+            });
+            const cp = await c.json().catch(() => ({}));
+            if (c.ok) t = { id: cp.id, status: cp.status || "PENDING", category: cp.category || "UTILITY" };
+            else err = short(cp?.error?.error_user_msg || cp?.error?.message || `HTTP ${c.status}`, 300);
+          }
+          break;
+        }
+        if (reached) {
+          const row = { company_id: companyId, route_key: rk, waba_id: waba, template_name: tpl.name, language: "ar", template_id: t?.id || null,
+            status: t ? String(t.status || "PENDING").toUpperCase() : (err ? "ERROR" : "MISSING"), category: t?.category || "UTILITY", last_error: err,
+            last_checked_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+          if (t || err) await db.from("whatsapp_template_registry").upsert(row, { onConflict: "company_id,route_key,template_name,language" });
+        }
+        out.push({ route: rk, name: tpl.name, status: t ? String(t.status).toUpperCase() : (err ? "ERROR" : "MISSING"), category: t?.category || null, error: err });
+      }
+    } catch (e) { out.push({ route: rk, error: short(String((e as any)?.message || e), 200) }); }
+  }
+  return out;
+}
 // ---------- the template at Meta ----------
 async function templates(action: "create" | "status", companyId: string) {
   const out: any[] = [];
@@ -761,6 +854,7 @@ Deno.serve(async (req) => {
     if (action === "template") {
       const c = await db.from("whatsapp_automation_runtime").select("company_id").limit(1).maybeSingle();
       if (!c.data?.company_id) return json({ ok: false, error: "company_missing" }, 500);
+      if (body?.set === "full") return json({ ok: true, results: await fullTemplates(body?.op === "create" ? "create" : "status", c.data.company_id) });
       return json({ ok: true, results: await templates(body?.op === "create" ? "create" : "status", c.data.company_id) });
     }
     return json({ ok: false, error: "unknown_action" }, 400);

@@ -24,10 +24,15 @@ test('a fitting price stays inside the office and opens «زيارة وتوقي�
   assert(k.includes('زيارة وتوقيع'));
   assert(k.includes('.ilike("title", "زيارة وتوقيع%")'),'one open visit task per offer');
 });
-test('outside the 24-hour window no template goes; the old question template is not sent',()=>{
+test('outside the 24-hour window only the full template goes (report as header), never the old question template',()=>{
   const out=fn.slice(fn.indexOf('if (!inWindow) {'),fn.indexOf('let textId'));
-  assert(out.includes('return await set("approved", "template_not_approved");'));
-  assert(!/metaSend\(tokens, phoneId, to, \{ type: "template"/.test(fn),'no template send left in price-study');
+  assert(out.includes('const tpl = await fullTemplateApproved(conv.company_id, conv.route_key, kind);'));
+  assert(out.includes('if (!tpl) return await set("approved", "template_not_approved");'));
+  assert(out.includes('{ type: "header", parameters: [{ type: "document"'));
+  assert(out.includes('const kind = s.office_outreach ? "high" : "full";'));
+  assert(!out.includes('templateApproved(conv.company_id, conv.route_key);'),'the old question template is not used');
+  assert(fn.includes('name: "owner_price_study_full_ar_v1"')&&fn.includes('name: "owner_price_study_high_ar_v1"'));
+  assert(fn.includes('{ type: "HEADER", format: "DOCUMENT", example: { header_handle: [h.handle] } }'));
 });
 test('the screen says what «موافق» does for an office-call owner',()=>{
   assert(ui.includes("if(i.status==='kept_internal')"));
