@@ -73,3 +73,14 @@ test('last check: a nearest-home offer left with no question gets one; a general
  assert(agent.indexOf('out.guard_budget_question = true;\n    }\n    // keep the question')>0);
  assert.match(agent,/if \(goneVilla && general\) \{/);
 });
+test('silentOwner: an owner chat the office took is read silently and only a «دراسة سعر:» handoff opens the study (عادل العامري 97f4e834)',()=>{
+ assert.match(agent,/silentOwner = !resume && !redo && \(\(lead\.data \|\| \[\]\)\.length > 0 \|\| \(sold\.data \|\| \[\]\)\.length > 0\) && !\(task\.data \|\| \[\]\)\.length && !task\.error;/);
+ const a=agent.indexOf('if (silentOwner) {'),b=agent.indexOf('return fail("staff_active_study_opened");');
+ assert(a>0&&b>a,'silent block');
+ const blk=agent.slice(a,b);
+ // nothing in it sends: no meta call, no reply_messages, no whatsapp_messages insert
+ assert.doesNotMatch(blk,/graph\.facebook|whatsapp_messages|reply_messages|sendText|meta\(/);
+ assert.match(blk,/if \(!study\) return \(await meetingAlert\("staff_active"\)\) \|\| fail\("staff_active"\);/);
+ // it runs right after the model, before any other step
+ assert(a<agent.indexOf('const ignored = out.category === "ignore"'));
+});

@@ -1382,6 +1382,7 @@ Deno.serve(async (req) => {
     if (!review && rt.mode === "test" && !(rt.allowed_customer_phones || []).map(digits).includes(to)) return fail("not_allowlisted");
     if (!(rt.allowed_routes || []).includes(conv.route_key)) return fail("route_blocked");
     const hardHandoff = !!conv.human_handoff_required && HARD_HANDOFF.test(String(conv.handoff_reason || ""));
+    let silentOwner = false;
     // R89: the client confirmed a meeting or call time the office proposed, in a chat the agent stays out of → Ahmed is told
     // on WhatsApp from this branch number, once per proposal. An inline dry run sends nothing and shows the text.
     const meetingAlert = async (why: string) => {
@@ -1404,10 +1405,22 @@ Deno.serve(async (req) => {
 
     // R1: Ahmed (or anyone in the office) typed in this chat and has not handed it back → stay out (fails closed).
     // Replaces the 6 Nov rule "carry on 30 seconds after Ahmed answers" that answered Tasnim mid-negotiation.
-    if (!review) {
+    // (an inline dry run with check_hold: true goes through the hold too, to test silentOwner; it writes nothing either way)
+    if (!review || (inline && body?.check_hold === true)) {
       const hold = await db.rpc("crm_chat_hold", { p_conversation: conv.id });
       if (hold.error) { await watch(); return fail("hold_check_failed"); }
-      if (hold.data === "manual_reply") { await watch(); return (await meetingAlert("staff_active")) || fail("staff_active"); }
+      if (hold.data === "manual_reply") {
+        // (Ahmed 22 Nov, عادل العامري 97f4e834: details and papers on 15 Nov while the office was typing, no price study until 22 Nov)
+        // An owner's chat the office took is still read, silently, when he may have sent what a price study needs: an open owner
+        // lead or a «seller» draft in this chat, and no open «دراسة سعر» task. Nothing is sent; see silentOwner after the model.
+        const [lead, sold, task] = await Promise.all([
+          db.from("owner_leads").select("id").eq("conversation_id", conv.id).eq("status", "open").limit(1),
+          db.from("whatsapp_reply_drafts").select("id").eq("conversation_id", conv.id).eq("analysis->>category", "seller").limit(1),
+          db.from("tasks").select("id").eq("client_id", client.id).ilike("title", "دراسة سعر%").eq("done", false).limit(1),
+        ]);
+        silentOwner = !resume && !redo && ((lead.data || []).length > 0 || (sold.data || []).length > 0) && !(task.data || []).length && !task.error;
+        if (!silentOwner) { await watch(); return (await meetingAlert("staff_active")) || fail("staff_active"); }
+      }
       if (hold.data === "negotiation") { await watch(); return fail("human_handoff_open"); }
       if (hold.data === "muted") { await watch(); return fail("agent_muted"); }
     }
@@ -1861,6 +1874,20 @@ Deno.serve(async (req) => {
     const aiP = await ai.json().catch(() => ({}));
     if (!ai.ok) throw new Error(aiP?.error?.message || `openai_${ai.status}`);
     const out = JSON.parse(aiP.output_text || aiP.output?.flatMap((x: any) => x?.content || []).find((x: any) => x?.type === "output_text")?.text || "{}");
+    // silentOwner (22 Nov): the office took this chat, so nothing is sent. Only a «دراسة سعر:» handoff of an owner opens the study
+    // (the same task as below and the chat's handoff, so priceStudyOpen holds); anything else stays the office's (staff_active).
+    if (silentOwner) {
+      const study = out.category === "seller" && out.action === "handoff" && /^\s*دراسة سعر/.test(String(out.handoff_reason || ""));
+      if (!study) return (await meetingAlert("staff_active")) || fail("staff_active");
+      if (inline) return json({ ok: true, inline: true, ignored: "staff_active", silent_owner_study: short(out.handoff_reason, 200) });
+      try {
+        const o = await db.from("profiles").select("id").eq("company_id", msg.company_id).eq("role", "owner").eq("is_active", true).limit(1).maybeSingle();
+        await db.from("tasks").insert({ company_id: msg.company_id, user_id: o.data?.id || null, client_id: client.id, title: short(out.handoff_reason, 200), notes: short(out.crm_note, 1000), due_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10) });
+        const nowS = new Date().toISOString();
+        await db.from("whatsapp_conversations").update({ human_handoff_required: true, handoff_reason: short(out.handoff_reason, 500), handoff_updated_at: nowS, updated_at: nowS }).eq("id", conv.id);
+      } catch (e) { console.error("[reply-agent] silent owner study", String((e as any)?.message || e)); }
+      return fail("staff_active_study_opened");
+    }
     // R40: nothing is said and nothing is handed to Ahmed; below the chat is muted for good and kept in the ignored list
     // R61 (note of 14 Nov 2026 on a chat that asked «متى تبدأ المسابقة؟»): the office runs no contest. Whoever asks about one,
     // with no property in the chat, is ignored for good like R40, whatever the model chose. Kept in the list as «other».
