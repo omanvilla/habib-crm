@@ -68,6 +68,6 @@ test('R14 is checked again on the Step F lines (محمد الزدجالي 35b4ef
 });
 test('last check: a nearest-home offer left with no question gets one; a general villa search is not told «الفيلا اللي سألت عنها انحجزت»',()=>{
  assert.match(agent,/texts\.push\(\/\[0-9٠-٩\]\/\.test\(String\(burstSaid \|\| ""\)\) \|\| out\.request\?\.budget_max \? "تقدر تزيد شوي ؟" : "متى يناسبك تزور ؟"\)/);
- assert(agent.indexOf('out.guard_budget_question = true; }\n    }\n    // keep the question')>0);
+ assert(agent.indexOf('out.guard_budget_question = true;\n    }\n    // keep the question')>0);
  assert.match(agent,/if \(goneVilla && general\) \{/);
 });
