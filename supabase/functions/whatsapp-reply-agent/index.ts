@@ -1339,6 +1339,9 @@ Deno.serve(async (req) => {
     const prev = await db.from("whatsapp_reply_drafts").select("id,status,error,analysis").eq("message_id", msg.id).maybeSingle();
     if (prev.data) {
       if (prev.data.status === "sent") return json({ ok: true, ignored: "already_answered" });
+      // (Ahmed's note 22 Nov, أم محمود 74d9f11d: two «كمّل يا عقل» calls 4 seconds apart; the second found the draft «pending» from
+      // the first, reopened it again, and both runs sent a reply.) A draft another run holds is left to that run.
+      if (["pending", "sending", "approved"].includes(String(prev.data.status))) return json({ ok: true, ignored: "already_processing" });
       const reopened = await db.from("whatsapp_reply_drafts").update({ status: "pending", error: null, analysis: { ...(prev.data.analysis || {}), resumed: { from: prev.data.status, error: prev.data.error, at: new Date().toISOString() } } }).eq("id", prev.data.id).eq("status", prev.data.status).select("id").maybeSingle();
       if (!reopened.data) return json({ ok: true, ignored: "already_processed" });
       draftId = reopened.data.id;

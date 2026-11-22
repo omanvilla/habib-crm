@@ -116,6 +116,8 @@ const REVIEW_RULES = `أنت تراجع متابعة عميل لمكتب عقا�
 - الموقع ما ناسبه (R60، ملاحظة 14 نوفمبر): عميل زار عقار وقال موقعه بعيد أو المنطقة ما تناسبه = ما تناسبه كل عقاراتنا في نفس المنطقة. لا تعرض عليه عقار ثاني في نفس المنطقة ولا "عندنا فيلا ثانية في ..." نفسها، حتى لو اللي شافه انباع. إذا في القائمة شي في منطقة ثانية يقارب طلبه اعرضه، وإلا wait_for_match.
 - رفع التثمين (R63، ملاحظة 14 نوفمبر): عميل موضوعه يدور أحد يرفع له التثمين أو تثمين عالي يغطي قرضه الشخصي: هذا ما عندنا. skip، بدون متابعة عقارية وبدون "لين الحين تبحث".
 - رقم صاحب العقار (R64، ملاحظة 14 نوفمبر): إذا المكتب أرسل له رقم صاحب العقار أو جهة الاتصال أو قال له "تواصل مع المالك مباشرة للزيارة"، الزيارة صارت بينه وبين المالك: لا تسأله "متى يناسبك تزور ؟". اسأله هل قدر يزور العقار، بالاسم.
+- العميل أرسل لنا رقم صاحب العقار (ملاحظة أحمد 22 نوفمبر، ابو الشهم الجابري: أرسل صور فيلا نعمان ورقم «صاحب البيت»): التواصل يكون على الرقم اللي أرسله، مو مع اللي أرسله. لا تطلب منه اسمه ولا التفاصيل مرة ثانية: skip، و reason «أرسل رقم صاحب العقار <الرقم> (<العقار>): تواصل مع صاحب العقار مباشرة».
+- عميل ما يعرف عربي أو المكتب اتفق معه على زيارة أو موعد خارج الواتساب (ملاحظة أحمد 22 نوفمبر، mohammedazizyasin): لا ترسل له أسئلة بالعربي يكررها. إذا في المحادثة أو في ملاحظات أحمد إن الموضوع ماشي بزيارة أو اتصال: skip مع السبب.
 - عرض بركاء على عميل رقم مسقط (R66، أحمد 14 نوفمبر، يعدّل R22): حدد المنطقة اللي يبحث فيها أول. "اذا تقبل بركاء عندنا ..." بس لمن قال إنه يبحث في المعبيلة أو منطقة قريبة من بركاء. اللي يبحث في منطقة ثانية من مسقط (خاصة بميزانية عالية): wait_for_match، ننتظر له شي في مسقط قريب من ميزانيته. وإذا ما قال المنطقة: اسأله "في أي منطقة تبحث ؟".
 - سؤال عن السوق (R67، ملاحظة 14 نوفمبر): عميل آخر كلامه سؤال عام عن السوق (ليش الإيجارات أو الأسعار منخفضة أو مرتفعة في المنطقة، وش السبب) يحتاج دراسة سوق: skip، بدون "متى يناسبك تزور" وبدون "لين الحين تبحث".
 - ما رد على تأكيد الموعد (R50، أحمد 18 نوفمبر، يبدّل R68): عميل أرسلنا له "نأكد موعد زيارة ..." وما رد بعدها بأي شي وما في زيارة مسجلة تمت: لا "كيف شفت". followup بـ "تحب نحدد لك موعد ثاني ؟" بالاسم مرة وحدة بس، وإذا انسأل هالسؤال بعد التأكيد وما رد: skip.
@@ -268,10 +270,14 @@ async function review(item: any, companyId: string, available: string, fixed: st
   const english = writesEnglish(clientLines);
   // R70 / R18: the project facts Ahmed wrote, only when the chat is about a project
   const facts = PROJECT_TALK.test(normAr(`${about} ${fixed} ${chat}`)) ? await projectKnowledge() : "";
+  // R40 (Ahmed's notes 22 Nov on الوليد 2be342c7 and Sultan Balushi 884c6c35): the property the agent last talked about in this chat,
+  // with its status. «متى يناسبك تزور فيلا الرميس» went for a villa sold days ago, and Ahmed Al Shaer's 57,000 villas (gone) were
+  // read as «انحجزت وحدة منها والمتبقي الثانية والثالثة» of Radwan's 69,000 group in the same area.
+  const talked = await talkedProperty(item.conversation_id);
   const ai = await fetch("https://api.openai.com/v1/responses", {
     method: "POST", headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: OPENAI_MODEL, store: false, reasoning: { effort: "low" }, instructions: REVIEW_RULES.replace("{fixed}", fixed),
-      input: `تاريخ اليوم: ${today}\nسبب وجوده في القائمة: ${about}\nالاسم المسجل من الواتساب، يفيد بس لمعرفة إذا امرأة: ${person.data?.name || "غير معروف"}\nرقمنا اللي نتابع منه: ${item.route_key === "barka" ? "بركاء" : "مسقط"}${english ? "\nالعميل يكتب بالإنجليزي: اكتب text بالإنجليزي (R69)." : ""}${facts ? `\n\nمعرفة المشاريع (كتبها أحمد؛ الأرقام اللي فيها بس، R18):\n${facts}` : ""}${behavior ? `\n\n${behavior}\n(المتجوّل ما نتابعه بنفس الأسلوب: اسأله وش يبحث بالضبط. الساخن أولوية. البارد متابعة متباعدة. غير المعقول طلبه: لا تتابع.)` : ""}${file ? `\n\n${file}` : ""}${learnt ? `\n\nدروس من صاحب المكتب من أوامر سابقة (طبقها إذا الموقف مشابه):\n${learnt}` : ""}${instruction ? `\n\nالنص الحالي للمتابعة (اللي يشوفه أحمد الحين): ${current || "لا يوجد"}\n\nأمر صاحب المكتب على هذي المتابعة (أهم من أي قاعدة فوق): ${instruction}\nكيف تفهم الأمر: أحمد يتكلم بلهجته وأحياناً بالصوت، فالأمر ممكن يجي غير مرتب. افهم قصده الحقيقي، ولا تنقل كلامه حرفياً ولا تلصقه في الرسالة. غالباً هو تصحيح للنص الحالي: (1) "بدل X اكتب Y" أو "لا تكتب X" يعني غيّر هذا الجزء بس وخل باقي النص مثل ما هو. (2) "لا تقول كذا قل كذا" يعني استبدل المعنى. (3) قاعدة عامة (مثل: لا تكتب كلمات إنجليزية لعميل عربي) طبقها على هذي الرسالة وعلى أي كلمة إنجليزية فيها. (4) تغيير الهدف (مثل: اسأله متى يناسبه يزور) اكتب النص من جديد. الناتج رسالة مرتبة بلهجة المكتب وبنفس القواعد الثابتة، مو نسخة من كلام أحمد. إذا يقول إن المتابعة ما لها داعي قرارك skip. لا تخالف الممنوعات ولا تكتب معلومة مو مكتوبة قدامك، وإذا يقول وش انقال في رسالة صوتية صدقه. في reason اكتب بسطر وش فهمت منه وش غيرت.` : ""}\n\nالعقارات المتاحة الآن:\n${available || "لا يوجد"}${groups ? `\n\nوحدات انحجزت ولها وحدة متاحة من نفس المجموعة (R38):\n${groups}` : ""}\n\nالمحادثة:\n${chat || "ما في محادثة مسجلة"}\n${other}`,
+      input: `تاريخ اليوم: ${today}\nسبب وجوده في القائمة: ${about}\n${talked ? `العقار اللي كان الكلام عنه آخر شي في المحادثة: ${talked.line}${talked.gone ? ". هذا العقار ما عاد متوفر: ممنوع تسأله يزوره أو تتابعه عليه، ولا تقول عنه «انحجزت وحدة منها» إلا إذا هو نفسه مكتوب في «وحدات انحجزت ولها وحدة متاحة» (فلل نفس المنطقة من مالك ثاني مو نفس المجموعة). إذا ما في سبب ثاني للمتابعة: skip (R40)" : ""}\n` : ""}الاسم المسجل من الواتساب، يفيد بس لمعرفة إذا امرأة: ${person.data?.name || "غير معروف"}\nرقمنا اللي نتابع منه: ${item.route_key === "barka" ? "بركاء" : "مسقط"}${english ? "\nالعميل يكتب بالإنجليزي: اكتب text بالإنجليزي (R69)." : ""}${facts ? `\n\nمعرفة المشاريع (كتبها أحمد؛ الأرقام اللي فيها بس، R18):\n${facts}` : ""}${behavior ? `\n\n${behavior}\n(المتجوّل ما نتابعه بنفس الأسلوب: اسأله وش يبحث بالضبط. الساخن أولوية. البارد متابعة متباعدة. غير المعقول طلبه: لا تتابع.)` : ""}${file ? `\n\n${file}` : ""}${learnt ? `\n\nدروس من صاحب المكتب من أوامر سابقة (طبقها إذا الموقف مشابه):\n${learnt}` : ""}${instruction ? `\n\nالنص الحالي للمتابعة (اللي يشوفه أحمد الحين): ${current || "لا يوجد"}\n\nأمر صاحب المكتب على هذي المتابعة (أهم من أي قاعدة فوق): ${instruction}\nكيف تفهم الأمر: أحمد يتكلم بلهجته وأحياناً بالصوت، فالأمر ممكن يجي غير مرتب. افهم قصده الحقيقي، ولا تنقل كلامه حرفياً ولا تلصقه في الرسالة. غالباً هو تصحيح للنص الحالي: (1) "بدل X اكتب Y" أو "لا تكتب X" يعني غيّر هذا الجزء بس وخل باقي النص مثل ما هو. (2) "لا تقول كذا قل كذا" يعني استبدل المعنى. (3) قاعدة عامة (مثل: لا تكتب كلمات إنجليزية لعميل عربي) طبقها على هذي الرسالة وعلى أي كلمة إنجليزية فيها. (4) تغيير الهدف (مثل: اسأله متى يناسبه يزور) اكتب النص من جديد. الناتج رسالة مرتبة بلهجة المكتب وبنفس القواعد الثابتة، مو نسخة من كلام أحمد. إذا يقول إن المتابعة ما لها داعي قرارك skip. لا تخالف الممنوعات ولا تكتب معلومة مو مكتوبة قدامك، وإذا يقول وش انقال في رسالة صوتية صدقه. في reason اكتب بسطر وش فهمت منه وش غيرت.` : ""}\n\nالعقارات المتاحة الآن:\n${available || "لا يوجد"}${groups ? `\n\nوحدات انحجزت ولها وحدة متاحة من نفس المجموعة (R38):\n${groups}` : ""}\n\nالمحادثة:\n${chat || "ما في محادثة مسجلة"}\n${other}`,
       text: { format: { type: "json_schema", name: "followup_review", strict: true, schema: reviewSchema } } }),
   });
   const p = await ai.json().catch(() => ({}));
@@ -292,6 +298,12 @@ async function review(item: any, companyId: string, available: string, fixed: st
     if (out.text && out.text.includes("؟")) out.text = out.text.slice(0, out.text.indexOf("؟") + 1);
   }
   out.english = english;
+  // R40 in code: a follow-up that asks for a visit or a new date while the property of the chat is gone is not sent (the model
+  // is told above; this holds when it still writes one)
+  if (talked?.gone && out.decision === "followup" && /تزور|موعد|تشوف|زيار|نحدد/.test(String(out.text || ""))) {
+    out.decision = "skip"; out.text = null; out.auto_ok = false; out.offer_no = null;
+    out.reason = short(`${talked.line}: ما نتابعه على عقار ما عاد متوفر (R40)`, 300);
+  }
   // R68: the visit confirmation of an earlier day that the client never answered
   out.confirm_unanswered = confirmUnanswered(chat, today);
   out.rebook_asked = out.confirm_unanswered && rebookAfterConfirm(chat);
@@ -995,7 +1007,21 @@ async function chatHeld(conversationId: string) {
 // R40 (Ahmed 18 Nov «نوقفها كلها»): no follow-up of any kind about a property that is gone. Same test as
 // crm_repair_private.property_is_gone (SQL134): sold, reserved, withdrawn or archived. Such a row is held, never sent; the SQL
 // that prepares follow-ups (SQL136) no longer prepares one. An error counts as gone.
-const propertyGone = (p: any) => ["sold", "reserved", "withdrawn"].includes(String(p?.status || "")) || p?.archived === true;
+const propertyGone = (p: any) => ["sold", "reserved", "withdrawn", "not_available"].includes(String(p?.status || "")) || p?.archived === true;
+// R40 (Ahmed's notes 22 Nov): the property the reply agent last named in this chat (its drafts' analysis.property_id), with its
+// status, so a request follow-up is not about a property that is gone. null when none was named or on an error.
+async function talkedProperty(conversationId: string | null) {
+  if (!conversationId) return null;
+  const d = await db.from("whatsapp_reply_drafts").select("analysis").eq("conversation_id", conversationId).not("analysis->>property_id", "is", null)
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const id = String((d.data as any)?.analysis?.property_id || "");
+  if (d.error || !/^[0-9a-f-]{36}$/.test(id)) return null;
+  const p = await db.from("properties").select("id,title,type,area,price,status,archived").eq("id", id).maybeSingle();
+  if (p.error || !p.data) return null;
+  const gone = propertyGone(p.data);
+  const st = p.data.status === "sold" ? "انباع" : p.data.status === "reserved" ? "انحجز" : gone ? "ما عاد متوفر" : "متوفر";
+  return { gone, line: `${propertyName(p.data) || typeAr(p.data.type)}${p.data.price ? ` بـ ${Number(p.data.price).toLocaleString("en-US")}` : ""} (${st})` };
+}
 async function visitPropertyGone(viewingId: string | null) {
   if (!viewingId) return false;
   const v = await db.from("viewings").select("property_id,properties(status,archived)").eq("id", viewingId).maybeSingle();
@@ -1763,6 +1789,20 @@ Deno.serve(async (req) => {
     const base = db.from("viewings").select("id,company_id,client_id,property_id,viewing_date,viewing_time,status,properties(type,area),clients(name)").eq("company_id", co.data?.company_id).eq("archived", false);
     const vs = await (doneOnly ? base.eq("status", "done").is("client_feedback", null).is("pipeline_outcome", null).gte("viewing_date", opinionSince()) : base.in("status", ["scheduled", "confirmed", "postponed"]).lt("viewing_date", today)).order("viewing_date", { ascending: false }).range(Number(input.offset) || 0, (Number(input.offset) || 0) + 11);
     const items = await Promise.all((vs.data || []).map(async (v: any) => { try { return { id: v.id, client: v.clients?.name, date: v.viewing_date, ...(doneOnly ? { left_to_ahmed: (await opinionBlocked(v)) || null } : {}), ...(await judgeResult(v, today, doneOnly)) }; } catch (e) { return { id: v.id, error: String((e as any)?.message || e) }; } }));
+    return json({ ok: true, items });
+  }
+  // a test of the review (22 Nov, Ahmed's notes): {preview_review: [outreach ids]} reads each request follow-up again and returns
+  // the decision; writes and sends nothing
+  if (Array.isArray(input?.preview_review)) {
+    const co = await db.from("whatsapp_automation_runtime").select("company_id").eq("mode", "live").limit(1).maybeSingle();
+    const available = await availableText(co.data?.company_id);
+    const rows = await db.from("whatsapp_outreach_queue").select("*").in("id", input.preview_review.slice(0, 10).map(String));
+    const items = await Promise.all((rows.data || []).map(async (x: any) => {
+      try {
+        const r = await review(x, co.data?.company_id, available, (Array.isArray(x.messages) ? x.messages : []).join("\n"), String(x.review_reason || "متابعة طلب"));
+        return { id: x.id, decision: r.decision, stage: r.stage, reason: r.reason, text: r.text };
+      } catch (e) { return { id: x.id, error: String((e as any)?.message || e) }; }
+    }));
     return json({ ok: true, items });
   }
   // a test of R21: finds the «بشوف وبرد عليك» chats and writes the question; inserts and sends nothing
