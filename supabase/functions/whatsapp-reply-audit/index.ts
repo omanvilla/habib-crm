@@ -43,6 +43,7 @@ export const RELEASES: { at: string; rules: string[] }[] = [
   { at: "2026-11-18T13:33:40Z", rules: ["R74"] }, // v102 73cacaa
   { at: "2026-11-19T06:47:09Z", rules: ["R116", "R117"] }, // v103 6651f9b (first reply audit)
   { at: "2026-11-19T06:49:59Z", rules: ["R115"] }, // v104 e6f9cf9 (R115 with a visit question)
+  { at: "2026-11-22T07:31:00Z", rules: ["R45", "R22", "R9", "R14", "R114"] }, // v106 94c4ac1 (reply audit 22 Nov guards)
 ];
 const releasedAfter = (rule: string, at: string) => RELEASES.some((r) => r.rules.includes(rule) && new Date(at).getTime() < new Date(r.at).getTime());
 const MODEL_TYPES = Object.keys(TYPES).filter((k) => !["send_failed", "unanswered"].includes(k));
@@ -74,6 +75,10 @@ export const KNOWN_MISTAKES: string[] = [
   "عميل على بركاء ينعرض عليه مسقط أو العكس بدون سبب، أو المستثمر ما انحول لمسقط (R9 / R66)",
   "إجابة بالإنجليزي أو كلام رسمي مو باللهجة («بقيمة»، «بسعر قدره»، نقطة آخر السطر)",
   "«مبروك» أو أسئلة بعد ما العميل قال «حصلت» (R50 / R111): بدون رد",
+  "«ان شاء الله» أو «تمام» بعد عزيمة الاجتماع «… يناسبك ؟» وما انحجز اجتماع (R45، فحص 22 نوفمبر)، أو عزيمة بدون «يناسبك ؟»",
+  "عرض أقرب بيت فوق ميزانية العميل بدون «تقدر تزيد شوي ؟» أو أي سؤال (R22، فحص 22 نوفمبر)",
+  "«كيف الحال ؟» بدون «الحمدلله»، أو «الفيلا اللي سألت عنها انحجزت» لعميل يدور بشكل عام وما سمّى فيلا (فحص 22 نوفمبر)",
+  "سطر «عقارات … يتابعها رقم فرع مسقط» تحت سطر الاستثمار على رقم بركاء (R9)، أو سطر الفرع نفسه مرتين خلال 15 دقيقة (R14)",
 ];
 
 async function ai(instructions: string, input: string, sch: any, name: string) {
@@ -124,6 +129,7 @@ const INSTRUCTIONS = (brain: string, knowledge: string, pinned: string, props: s
 - known_mistake: نفس غلط من «الأغلاط اللي سبق صلّحناها» رجع (اكتب رقمه في known_mistake)
 certain=true بس إذا الغلط واضح أكيد. خاصة الأنواع الخطيرة (invented_info و sold_offered و serious_not_handed): هذي توقف العقل على المحادثة، فلا تقول certain إلا إذا متأكد من القائمة والمحادثة.
 لا تحكم على شي سواه المكتب بيده (المكتب) ولا على رسائل المتابعة الآلية، بس على مسودات العقل المرقمة.
+سطر «(المكتب رجّع المحادثة للعقل بالزر)» يعني العقل يحق له يرد بعده: رده بعد رسالة المكتب مو مخالفة R1. وإرسال الموقع مرة ثانية لأن العميل طلبه مو تكرار. والوحدة اللي تبدأ من 57 الف في مدينة السلطان هيثم هي استوديو الآيكونيك تاور، فـ«أرخص شقة من 57 الف» مو مخترعة. ومطور أو شركة داخل عمان تعزم الوسطاء على عرض مشروع مو من المتجاهلين (R40)، وتحويلها لأحمد صح. (فحص 22 نوفمبر)
 المعلومة المكتوبة في نص الإعلان أو الوصف أو كابشن الريل أو طريقة الزيارة أو معرفة المشاريع مو مخترعة، ورابط الريل المكتوب تحت العقار مو مخترع.
 المؤنث صح لاسم أنثوي واضح أو «أم فلان» أو إذا العميل كتب بالمؤنث (R15)، ولا تحكم إنه غلط إلا إذا ما في أي واحد منها في المحادثة. والعقار اللي ما له تفاصيل في القائمة (مباع أو مؤرشف) لا تحكم على تفاصيله إلا إذا تخالف القائمة.
 كل قاعدة R جنبها تاريخها: إذا تاريخ القاعدة بعد يوم الرد، الغلط انصلح بعدين، اكتب before_fix=true.
@@ -162,8 +168,13 @@ async function chatBlock(n: number, conv: any, drafts: any[], start: string) {
   // keep 10 messages before the first draft of the period, and everything after it
   const idx = all.findIndex((m: any) => m.message_timestamp >= new Date(new Date(first).getTime() - 5 * 60000).toISOString());
   const rows = idx < 0 ? all.slice(-15) : all.slice(Math.max(0, idx - 10));
+  // (22 Nov: the office's «رجّعها للعقل» was invisible, so a reply after it was called an R1 mistake, سليمه 0b1c7b83)
+  if (conv.agent_returned_at && rows.length && conv.agent_returned_at >= rows[0].message_timestamp) {
+    rows.push({ returned: true, message_timestamp: conv.agent_returned_at });
+    rows.sort((a: any, b: any) => new Date(a.message_timestamp).getTime() - new Date(b.message_timestamp).getTime());
+  }
   const who = (m: any) => m.direction === "inbound" ? "العميل" : m.actor_type === "human" ? "المكتب" : "آلي";
-  const lines = rows.map((m: any) => `[${omanTime(m.message_timestamp)}] ${who(m)}: ${short(m.transcript || m.body || `[${m.message_type}]`, 350)}`);
+  const lines = rows.map((m: any) => m.returned ? `[${omanTime(m.message_timestamp)}] (المكتب رجّع المحادثة للعقل بالزر)` : `[${omanTime(m.message_timestamp)}] ${who(m)}: ${short(m.transcript || m.body || `[${m.message_type}]`, 350)}`);
   const vs = (visits as any).data || [];
   const ds = drafts.map((d: any, i: number) => {
     const a = d.analysis || {};
@@ -215,7 +226,7 @@ async function audit(companyId: string, opts: { hours?: number; dry?: boolean; t
   const convIds = [...new Set(judged.map((d: any) => d.conversation_id))];
   const convs: Record<string, any> = {};
   for (let i = 0; i < convIds.length; i += 100) {
-    const r = await db.from("whatsapp_conversations").select("id,client_id,route_key,customer_name,customer_phone,agent_muted,clients(name,phone)").in("id", convIds.slice(i, i + 100));
+    const r = await db.from("whatsapp_conversations").select("id,client_id,route_key,customer_name,customer_phone,agent_muted,agent_returned_at,clients(name,phone)").in("id", convIds.slice(i, i + 100));
     for (const c of r.data || []) convs[c.id] = { ...c, name: (c as any).clients?.name || c.customer_name || c.customer_phone, phone: (c as any).clients?.phone || c.customer_phone };
   }
   const sentConvs = [...new Set(sent.map((d: any) => d.conversation_id))];
