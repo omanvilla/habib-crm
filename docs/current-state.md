@@ -6,6 +6,19 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 22 November 2026 (later) — Ahmed's «ملاحظة لـ Claude» notes (8 open in crm_owner_notes)
+
+- `whatsapp-visit-followup-auto` → `f7354cf`: the review is told the property the agent last named in the chat and its status
+  (talkedProperty, from the drafts' analysis.property_id); a follow-up asking for a visit or a new date on a gone property becomes
+  skip (R40 in code); `not_available` counts as gone; a client who sent the owner's number → skip «تواصل مع صاحب العقار»; no Arabic
+  questions to a non-Arabic client whose visit is arranged. `preview_review: [outreach ids]` reads again and writes nothing:
+  the four flagged follow-ups came out skip with the right reasons. Five rows skipped on Ahmed's yes (reason `owner_note_20261122`).
+- `whatsapp-reply-agent` v108 → `f7354cf` (Ahmed «إيه، انشره»): a second «كمّل يا عقل» does not reopen a draft another run holds
+  (أم محمود 74d9f11d got two replies at 11:17). Rollback: `60c654d`.
+- Template to «…» e62f4082 (expat zero-down answer), queued approved on Ahmed's yes (row 783c38cf).
+- **Open, for Ahmed:** an owner who sends full details while the office is typing in the chat gets no price study until the agent
+  runs (عادل العامري: details 15 Nov, study 22 Nov 11:06).
+
 ## 22 November 2026 — the open reply-audit findings (Ahmed: «تابع ملاحظات كلاود وعدلها», then «إيه، انشر»)
 
 - 12 open findings: 7 fixed by code guards, 5 ignored as the auditor's mistakes (details in `docs/agent-rules.md`, «ملاحظات فحص
