@@ -2361,7 +2361,12 @@ Deno.serve(async (req) => {
       if (villaAsk && !restSaid && rest && texts.some((t) => /استراح/.test(t)) && !(budget && budget >= Number(rest.price || 0) * 0.92)) {
         const sameArea = (a: any) => { const x = String(a || ""), y = String(rest.area || ""); return !!x && !!y && (x.includes(y) || y.includes(x)); };
         const goneVilla = soldRows.find((s: any) => ["villa", "twin_villa", "house"].includes(String(s.type)) && sameArea(s.area));
-        if (goneVilla) {
+        // (reply audit 22 Nov, Azza 4b7e6a19 «متوفر معكم فلل ف الرميس او حي عاصم او حلبان ؟»: a general search named no villa, so
+        // «الفيلا اللي سألت عنها انحجزت» was wrong; she hears there are none there and the budget question)
+        const general = /فلل|متوفر/.test(said) && !/https?:\/\//.test(said) && !history.slice(burstStart).some((h: any) => h.direction === "inbound" && h.message_type === "image");
+        if (goneVilla && general) {
+          texts = [...(out.guard_how_are_you ? ["الحمدلله"] : []), `حالياً ما عندنا فلل متوفره في ${rest.area}`, "في حدود كم ميزانيتك ؟"];
+        } else if (goneVilla) {
           texts = [`الفيلا اللي سألت عنها ${goneVilla.status === "reserved" ? "انحجزت" : "انباعت"}`, "تحب تشوف خيارات ثانية ؟"];
         } else {
           texts = texts.map((t) => t.length > 200 && /استراح/.test(t) ? "" : t.split("\n").filter((l) => !/استراح/.test(l)).join("\n").trim()).filter(Boolean);
@@ -2373,8 +2378,14 @@ Deno.serve(async (req) => {
     }
     let askedOnce = false;
     texts = texts.filter((t) => { const q = t.length < 90 && /(تزور|تزورون|تزورين)\s*؟/.test(t); if (!q) return true; if (askedOnce) return false; askedOnce = true; return true; });
+    // R22 / R116 last check (reply audit 22 Nov, اسماء الهنائي 35bb3ae0, dry run: the question the model wrote was taken out by a
+    // later step and the offer went with none): a buyer offered the nearest home ends with a question
+    if (out.action === "none" && out.category === "buyer" && texts.length && !texts.some((t) => /[؟?]/.test(t))
+      && texts.some((t) => /(اقرب|أقرب)\s*شي/.test(t) && /\d/.test(t))) {
+      texts.push(/[0-9٠-٩]/.test(String(burstSaid || "")) || out.request?.budget_max ? "تقدر تزيد شوي ؟" : "متى يناسبك تزور ؟"); out.guard_budget_question = true;
+    }
     // keep the question even when there are two ads
-    if (texts.length > 3) { const q = texts.find((t) => t.length < 90 && /تزور/.test(t)); texts = q ? [...texts.filter((t) => t !== q).slice(0, 2), q] : texts.slice(0, 3); }
+    if (texts.length > 3) { const q = texts.find((t) => t.length < 90 && /تزور|تزيد\s*شوي/.test(t)); texts = q ? [...texts.filter((t) => t !== q).slice(0, 2), q] : texts.slice(0, 3); }
     out.reply_messages = texts.slice(0, 3);
     // decision 42: the skipped sold notice opens the first reply, once (not over silence, an ignored chat or a line that already says it)
     if (soldLine && out.reply_messages.length && !ignored) {
