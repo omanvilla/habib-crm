@@ -111,6 +111,21 @@ function soldNoticeYes(out: any, c: any): string[] | null {
     ? [`حالياً ما عندنا ${label} بحدود ${Math.round(Number(c.budget) / 1000)} الف`, `اقرب شي عندنا في ${h0.area} ${label} بـ${k} الف تقدر تزيد شوي ؟`]
     : [`اقرب شي عندنا في ${h0.area} ${label} بـ${k} الف`, "تحب ارسلك تفاصيلها ؟"];
 }
+// R45 (reply audit 22 Nov, علي من الأحواز 2d32eee8): «ان شاء الله» right after our «… نرتب لك اجتماع … يناسبك ؟» is a yes, even when
+// the same burst asks something else («تعرض لي فيديوهات الفيلا ؟»); the model answered nothing and booked nothing. Returns the place or null.
+const INVITE_RE = /(نرتب|نرتبلك|نسوي|نحدد)\s*(لك|لكم|لج)?\s*اجتماع/;
+const MEETING_YES = /(^|[\s.!،,])(ان\s*شاء\s*الله|إن\s*شاء\s*الله|انشاء\s*الله|انشالله|ايوا|ايوه|إيوه|اي\s*نعم|نعم|اكيد|أكيد|تمام|اوك|اوكي|ok|okay|يناسبني|مناسب|موافق|زين|طيب)(?=$|[\s.!،,؟?])/i;
+const MEETING_NO = /ما\s*(يناسب|ابي|أبي|اريد|أريد|اقدر|أقدر)|مو\s*مناسب|مب\s*مناسب|لا\s*(شكرا|مشكور)|^\s*لا(\s|$)|بعدين|مب\s*الحين|مو\s*الحين|مشغول|بفكر|افكر|أفكر|بشوف|برد\s*عليك|برجع\s*لك|ارجع\s*لك|أرجع\s*لك/;
+function meetingYes(history: any[]): string | null {
+  let li = -1; history.forEach((h: any, i: number) => { if (h.direction === "outbound") li = i; });
+  if (li < 0) return null;
+  let s = li; while (s > 0 && history[s - 1].direction === "outbound") s--;
+  const invite = history.slice(s, li + 1).map((h: any) => String(h.body || "")).join("\n");
+  if (!INVITE_RE.test(invite) || !/يناسبك\s*؟\s*$/.test(invite.trim())) return null;
+  const said = history.slice(li + 1).filter((h: any) => h.direction === "inbound").map((h: any) => String(h.transcript || h.body || "")).join("\n");
+  if (!said.trim() || !MEETING_YES.test(said) || MEETING_NO.test(said)) return null;
+  return /اونلاين|أونلاين/.test(invite) ? "online" : /المطور|مكتبهم|العذيبة|صبور/.test(invite) ? "developer" : "office";
+}
 function ownerDecisions(out: any, lines: string[], c: any) {
   let texts = [...lines];
   const body = (h: any) => String(h.transcript || h.body || "");
@@ -598,6 +613,18 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     }
     if (!hasQ) { texts.push("متى يناسبك تزور ؟"); out.guard_offer_question = true; }
   }
+  // R22 (reply audit 22 Nov, اسماء الهنائي 35bb3ae0): «بـ60 الف ما عندنا … الصراحة» + «اقرب شي … بـ69 الف» with no question left her
+  // nothing to answer; the nearest home above the budget ends with «تقدر تزيد شوي ؟» (Azza 4b7e6a19 got it right the next day)
+  if (out.action === "none" && out.category === "buyer" && texts.length && !texts.some((t) => /[؟?]/.test(t))
+    && texts.some((t) => t.length <= 250 && /ما\s*عندنا/.test(t) && /\d/.test(t)) && texts.some((t) => /(اقرب|أقرب)\s*شي/.test(t))) {
+    texts.push("تقدر تزيد شوي ؟"); out.guard_budget_question = true;
+  }
+  // R45 (reply audit 22 Nov, احمد الشريف d4d12e25): the invitation «الافضل نرتب لك اجتماع …» always ends with «يناسبك ؟»
+  if (texts.some((t) => t.length <= 300 && /(نرتب|نرتبلك|نسوي|نحدد)\s*(لك|لكم|لج)?\s*اجتماع/.test(t)) && !texts.some((t) => /[؟?]/.test(t))) { texts.push("يناسبك ؟"); out.guard_invite_question = true; }
+  // brain «إذا سأل عن الحال: "الحمدلله" وكمل» (reply audit 22 Nov, Azza 4b7e6a19: «كيف الحال ؟» got no answer)
+  if (texts.length && /(^|[\s.!،,])(كيف\s*(ال)?حال(ك|كم|ج)?|كيفك|كيفكم|شلونك|شلونكم|علومك|علومكم)\s*[؟?]?(?=$|[\s.!،,])/.test(String(c.burstSaid || "")) && !texts.some((t) => /الحمد\s*لله|الحمدالله/.test(t))) {
+    texts.splice(/^\s*وعليكم\s*السلام/.test(texts[0]) ? 1 : 0, 0, "الحمدلله"); out.guard_how_are_you = true;
+  }
   // R116: «اسمك الكريم ؟ ومتى يناسبك تزور ؟» in one line: the other question first, the name question last on its own line
   {
     let moved = false;
@@ -707,6 +734,9 @@ function transferArea(raw: unknown, branch: string) {
 }
 function branchTransferLines(out: any, here: unknown, prop: any, branchOf: (k: any) => { name: string; number: string } | null) {
   if (!["muscat", "barka"].includes(String(here))) return null;
+  // R9 (reply audit 22 Nov, علي من الأحواز f0b8d16b): the investor line already sends him to Muscat; the model's branch_transfer
+  // added «عقارات سلطنة عمان يتابعها رقم فرع مسقط …» under it. The investor line stays alone (decision 77).
+  if ((out.reply_messages || []).some((t) => /الاستثمار والمشاريع\s*تتابعها\s*معنا\s*على\s*رقم\s*مسقط/.test(String(t)))) return null;
   const hit: { to: string; area: string }[] = [];
   const req: string[] = out.request && Array.isArray(out.request.areas) ? out.request.areas : [];
   const make = (to: string, owner: boolean, named: unknown) => {
@@ -1849,6 +1879,17 @@ Deno.serve(async (req) => {
     // decisions 16 and 46 (Ahmed 18 Nov 2026: «ما نلحقهم بس نرد»): investors are answered and their meetings booked, but no
     // follow-up of ours is set for them until 12 Feb 2027
     if (out.category === "investor" && dayM < "2027-02-12" && out.request) { out.request.followup_in_days = null; out.request.followup_note = null; }
+    // R45 (reply audit 22 Nov, 2d32eee8): a yes («ان شاء الله», «تمام») to our meeting invitation is booked like the model's
+    // book_meeting (silent «اجتماع:» below), before the under-57,000 check so that check still holds it
+    if ((out.action === "none" || (out.action === "handoff" && !HARD_HANDOFF.test(String(out.handoff_reason || ""))))
+      && out.category !== "ignore") {
+      const place = meetingYes(history);
+      if (place) {
+        out.action = "book_meeting"; out.meeting = { place, date: out.meeting?.date ?? null, time: out.meeting?.time ?? null };
+        if (!/^\s*(اجتماع|طلب اجتماع|طلب موعد)\s*:/.test(String(out.handoff_reason || ""))) out.handoff_reason = null;
+        out.guard_meeting_yes = true;
+      }
+    }
     // decisions 10 and 11 (Ahmed 18 Nov 2026: «حاجز في الكود»): in a Sultan Haitham City chat (Al Ahli Sabour: Wadi Zaha, the
     // Iconic Tower) where a price or budget under 57,000 was mentioned and the office has not said since that the available
     // units start from 57,000, the meeting is not booked, even when the client agreed (this beats R45). He is told and asked.
@@ -2611,6 +2652,16 @@ Deno.serve(async (req) => {
     const stepF = branchTransferLines(out, conv.route_key, prop, branchOf);
     if (stepF) {
       out.reply_messages = stepF.lines;
+      // R14 again on the rewritten lines (reply audit 22 Nov, محمد الزدجالي 35b4ef9e: «عقارك في المعبيلة السادسة يتابعه رقم فرع مسقط …»
+      // went out twice in two minutes, the model's old wording passed R14 and only became the same line here)
+      if (!review) {
+        const rec = await db.from("whatsapp_messages").select("body").eq("conversation_id", conv.id).eq("direction", "outbound").neq("delivery_status", "failed")
+          .gt("message_timestamp", new Date(Date.now() - 15 * 60 * 1000).toISOString()).limit(40);
+        const nrm = (t: unknown) => String(t || "").replace(/[\s؟?.!،,]+/g, " ").trim();
+        const sent = new Set((rec.data || []).flatMap((r: any) => [r.body, ...String(r.body || "").split(/\n\s*\n/)]).map((b: any) => nrm(b)).filter(Boolean));
+        const kept = out.reply_messages.filter((t: string) => !(BRANCH_NEW_RE.test(String(t).trim()) && sent.has(nrm(t))));
+        if (kept.length !== out.reply_messages.length) { out.reply_messages = kept; analysis.r14_branch_line = true; }
+      }
       analysis.branch_transfer = { to: stepF.to, area: stepF.area };
       // nothing of the other branch is served here (no location, lockbox, owner number or visit); a handoff stays
       if (["send_location", "send_lockbox", "send_owner_number", "book_viewing"].includes(out.action)) { out.action = "none"; out.viewing_date = null; out.viewing_time = null; actionMsgs.length = 0; analysis.viewing_date = null; analysis.viewing_time = null; }
