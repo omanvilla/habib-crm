@@ -12,9 +12,9 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
   الردود المفتوحة»). No SQL. Tests `tests/audit-fixes-20261122.test.cjs`.
 - **Live:** `whatsapp-reply-agent` v106 → `94c4ac1` (was v105 `fef4e8f`), 07:31 UTC. Dry run on the exact messages 8 of 8 right;
   24 other chats untouched. Rollback: pin back to `fef4e8f`.
-- **Waiting for Ahmed:** `60c654d` puts «الحمدلله» on the first line of the reply. In v106 it is a message of its own, so a reply with
-  three messages loses its last content line in the 3-message trim (live check on Azza 4b7e6a19 dropped the Al Sawmhan offer).
-  Dry run of `60c654d` (dry-run copy is pinned to it): the offer stays, 5 of 5. The publish was held: a second publish needs his yes.
+- **Then v107 → `60c654d`** (07:41 UTC, Ahmed «إيه، انشره»): «الحمدلله» goes on the first line of the reply. In v106 it was a message
+  of its own, so a reply with three messages lost its last content line in the 3-message trim (live check on Azza 4b7e6a19 dropped
+  the Al Sawmhan offer). Dry run of `60c654d`: the offer stays, 5 of 5. Rollback: pin back to `94c4ac1`, or `fef4e8f` for all of today.
 - `whatsapp-reply-audit` → `9701b0d`: `RELEASES` has v106, four new `KNOWN_MISTAKES`, it sees the office's «رجّعها للعقل» in the chat,
   and the prompt names the four «not a mistake» cases; `rules.ts` rebuilt. Dry run of the auditor ran clean (nothing written).
 - Chat 2d32eee8 (علي من الأحواز) stays muted by the auditor; he has waited since 20 Nov for the meeting and villa videos (Ahmed).
