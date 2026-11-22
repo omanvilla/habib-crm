@@ -20,7 +20,7 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
   draft and no open «دراسة سعر» task is read by the model silently; a «دراسة سعر:» handoff opens the task and the chat handoff, anything
   else stays `staff_active`; nothing is ever sent. Inline `check_hold: true` tests it. Dry run on the 6 such chats: model ran, all
   `staff_active` (none had what a study needs, the normal path agrees). The study-opening path itself was not run on a live chat.
-  **Not published yet** (live is v108 `f7354cf`), waits for Ahmed.
+  **Published** (Ahmed «إيه، انشره»): `whatsapp-reply-agent` v109 → `23372ef`; live check: a normal chat answers, an office-taken owner chat stays `staff_active`. Rollback: `f7354cf`.
 
 ## 22 November 2026 — the open reply-audit findings (Ahmed: «تابع ملاحظات كلاود وعدلها», then «إيه، انشر»)
 
