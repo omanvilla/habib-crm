@@ -16,8 +16,11 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
 - `whatsapp-reply-agent` v108 → `f7354cf` (Ahmed «إيه، انشره»): a second «كمّل يا عقل» does not reopen a draft another run holds
   (أم محمود 74d9f11d got two replies at 11:17). Rollback: `60c654d`.
 - Template to «…» e62f4082 (expat zero-down answer), queued approved on Ahmed's yes (row 783c38cf).
-- **Open, for Ahmed:** an owner who sends full details while the office is typing in the chat gets no price study until the agent
-  runs (عادل العامري: details 15 Nov, study 22 Nov 11:06).
+- **silentOwner** (`23372ef`, Ahmed «إيه، صلّحه»): an owner chat the office took (manual_reply) with an open owner lead or a «seller»
+  draft and no open «دراسة سعر» task is read by the model silently; a «دراسة سعر:» handoff opens the task and the chat handoff, anything
+  else stays `staff_active`; nothing is ever sent. Inline `check_hold: true` tests it. Dry run on the 6 such chats: model ran, all
+  `staff_active` (none had what a study needs, the normal path agrees). The study-opening path itself was not run on a live chat.
+  **Not published yet** (live is v108 `f7354cf`), waits for Ahmed.
 
 ## 22 November 2026 — the open reply-audit findings (Ahmed: «تابع ملاحظات كلاود وعدلها», then «إيه، انشر»)
 
