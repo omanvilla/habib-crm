@@ -28,8 +28,10 @@ test('R45: the meeting invitation ends with «يناسبك ؟» (احمد الش
 });
 test('«كيف الحال ؟» gets «الحمدلله» (Azza 4b7e6a19)',()=>{
  const r=decide(['حالياً ما عندنا فلل متوفره في الرميس او حلبان','في حدود كم ميزانيتك ؟'],[IN('مـسـآ آلخ ـير'),IN('كيف الحال ؟'),IN('متوفر معكم فلل ف الرميس او حي عاصم او حلبان ؟')]);
- assert.equal(r.texts[0],'الحمدلله');
- assert.deepEqual(decide(['وعليكم السلام ورحمة الله وبركاته','تفضل'],[IN('السلام عليكم كيفك')]).texts,['وعليكم السلام ورحمة الله وبركاته','الحمدلله','تفضل']);
+ // on the first line, never a message of its own (live check of v106: a 4th message made the trimming drop the offer)
+ assert.deepEqual(r.texts,['الحمدلله\nحالياً ما عندنا فلل متوفره في الرميس او حلبان','في حدود كم ميزانيتك ؟']);
+ assert.deepEqual(decide(['وعليكم السلام ورحمة الله وبركاته','تفضل'],[IN('السلام عليكم كيفك')]).texts,['وعليكم السلام ورحمة الله وبركاته','الحمدلله\nتفضل']);
+ assert.deepEqual(decide(['وعليكم السلام ورحمة الله وبركاته'],[IN('السلام عليكم كيفك')]).texts,['وعليكم السلام ورحمة الله وبركاته\nالحمدلله']);
  // no question about the state, an empty reply, or «الحمدلله» already there: untouched
  assert.equal(decide(['تفضل'],[IN('مساء الخير')]).out.guard_how_are_you,undefined);
  assert.deepEqual(decide([],[IN('كيف الحال')]).texts,[]);

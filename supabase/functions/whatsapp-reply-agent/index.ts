@@ -623,7 +623,10 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   if (texts.some((t) => t.length <= 300 && /(نرتب|نرتبلك|نسوي|نحدد)\s*(لك|لكم|لج)?\s*اجتماع/.test(t)) && !texts.some((t) => /[؟?]/.test(t))) { texts.push("يناسبك ؟"); out.guard_invite_question = true; }
   // brain «إذا سأل عن الحال: "الحمدلله" وكمل» (reply audit 22 Nov, Azza 4b7e6a19: «كيف الحال ؟» got no answer)
   if (texts.length && /(^|[\s.!،,])(كيف\s*(ال)?حال(ك|كم|ج)?|كيفك|كيفكم|شلونك|شلونكم|علومك|علومكم)\s*[؟?]?(?=$|[\s.!،,])/.test(String(c.burstSaid || "")) && !texts.some((t) => /الحمد\s*لله|الحمدالله/.test(t))) {
-    texts.splice(/^\s*وعليكم\s*السلام/.test(texts[0]) ? 1 : 0, 0, "الحمدلله"); out.guard_how_are_you = true;
+    // on the first line of the reply (inside the same message), never a message of its own: the reply keeps at most 3 and the
+    // trimming below dropped the offer line for it (live check of v106, Azza 4b7e6a19)
+    const i = /^\s*وعليكم\s*السلام/.test(texts[0]) && texts.length > 1 ? 1 : 0;
+    texts[i] = i === 0 && /^\s*وعليكم\s*السلام/.test(texts[0]) ? `${texts[0]}\nالحمدلله` : `الحمدلله\n${texts[i]}`; out.guard_how_are_you = true;
   }
   // R116: «اسمك الكريم ؟ ومتى يناسبك تزور ؟» in one line: the other question first, the name question last on its own line
   {
@@ -2365,7 +2368,7 @@ Deno.serve(async (req) => {
         // «الفيلا اللي سألت عنها انحجزت» was wrong; she hears there are none there and the budget question)
         const general = /فلل|متوفر/.test(said) && !/https?:\/\//.test(said) && !history.slice(burstStart).some((h: any) => h.direction === "inbound" && h.message_type === "image");
         if (goneVilla && general) {
-          texts = [...(out.guard_how_are_you ? ["الحمدلله"] : []), `حالياً ما عندنا فلل متوفره في ${rest.area}`, "في حدود كم ميزانيتك ؟"];
+          texts = [`${out.guard_how_are_you ? "الحمدلله\n" : ""}حالياً ما عندنا فلل متوفره في ${rest.area}`, "في حدود كم ميزانيتك ؟"];
         } else if (goneVilla) {
           texts = [`الفيلا اللي سألت عنها ${goneVilla.status === "reserved" ? "انحجزت" : "انباعت"}`, "تحب تشوف خيارات ثانية ؟"];
         } else {
