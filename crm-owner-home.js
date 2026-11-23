@@ -37,7 +37,18 @@
   // the same day: «حتى دراسة تسعير اريد تظهر للموظف»); nobody resumes the agent on one (R26)
   const canResume=()=>typeof currentProfile!=='undefined'&&currentProfile&&['owner','manager','agent'].includes(currentProfile.role);
   const pricingItems=()=>canResume()?paused.items.filter(isPricing):[];
-  const directItems=()=>Array.isArray(paused.direct)?paused.direct:[];
+  // 23 Nov 2026 (Ahmed's note on Amir Tolba: «ليش مرتين طالع هنا امير»): one person writing on both numbers was two rows. The rows
+  // of one client (or one phone) are one row: the newest chat's message, both branches named, «رجّعه للعقل» returns all of them.
+  const directItems=()=>{
+    const out=[],seen={};
+    for(const i of (Array.isArray(paused.direct)?paused.direct:[])){
+      const k=i.client_id||String(i.phone||'').replace(/\D/g,'').slice(-8)||i.conversation_id,p=seen[k];
+      if(!p){const row={...i,ids:[i.conversation_id],routes:i.route_key?[i.route_key]:[]};seen[k]=row;out.push(row);continue;}
+      p.ids.push(i.conversation_id);if(i.route_key&&!p.routes.includes(i.route_key))p.routes.push(i.route_key);
+      if(i.waiting&&!p.waiting){p.waiting=true;}
+    }
+    return out;
+  };
   const otherPaused=()=>paused.items.filter(i=>!isPricing(i));
 
   /* Boot gate (10 Nov 2026). The owner saw the old dashboard for several seconds before this page replaced it.
@@ -270,11 +281,11 @@
     const items=directItems();
     if(!items.length)return '<p class="coh-empty">ما في أحد في التواصل المباشر</p>';
     return '<p class="coh-since">العقل ما يرد عليهم أبداً ولا توصلهم متابعة. التواصل معاهم منكم مباشرة. «رجّعه للعقل» يخليه يرد عليه مرة ثانية</p><ul class="coh-list">'+items.map(i=>
-      '<li class="coh-row coh-paused"><div class="coh-info"><strong>'+esc(i.name||'عميل')+' <small>'+esc(i.reason||'')+(i.route_key?' · '+esc(ROUTE[i.route_key]||''):'')+'</small></strong>'
+      '<li class="coh-row coh-paused"><div class="coh-info"><strong>'+esc(i.name||'عميل')+' <small>'+esc(i.reason||'')+(i.routes.length?' · '+esc(i.routes.map(r=>ROUTE[r]||'').filter(Boolean).join(' و')):'')+'</small></strong>'
       +(i.waiting?'<small class="coh-note"><b>آخر رسالة منه ما انرد عليها</b></small>':'')
       +(i.last_message?'<small class="coh-note">آخر رسالة منه: <span dir="auto">'+esc(i.last_message)+'</span></small>':'')+'</div>'
       +'<div class="coh-paused-actions">'+(typeof window.crmWaButtons==='function'?window.crmWaButtons({phone:i.phone,conversationId:i.conversation_id,clientId:i.client_id,cls:'btn-secondary coh-go'}):'')
-      +(canResume()?'<button type="button" class="btn-secondary coh-go" data-coh="pundirect" data-id="'+esc(i.conversation_id)+'">رجّعه للعقل</button>':'')+'</div></li>').join('')+'</ul>';
+      +(canResume()?'<button type="button" class="btn-secondary coh-go" data-coh="pundirect" data-id="'+esc(i.ids.join(','))+'">رجّعه للعقل</button>':'')+'</div></li>').join('')+'</ul>';
   }
   function pausedHtml(){
     const items=otherPaused();
@@ -548,12 +559,14 @@
       });
     }
     else if(act==='pdirect-owner'||act==='pdirect-developer'||act==='pundirect'){
-      const id=b.dataset.id,on=act!=='pundirect';if(b.disabled)return;b.disabled=true;
-      supa.rpc('crm_set_direct_contact',{p_conversation:id,p_on:on,p_kind:act==='pdirect-developer'?'developer':'owner'}).then(r=>{
+      const ids=String(b.dataset.id||'').split(',').filter(Boolean),id=ids[0],on=act!=='pundirect';if(b.disabled)return;b.disabled=true;
+      // (a merged «تواصل مباشر» row carries every chat of that person: «رجّعه للعقل» returns them all)
+      Promise.all((on?[id]:ids).map(x=>supa.rpc('crm_set_direct_contact',{p_conversation:x,p_on:on,p_kind:act==='pdirect-developer'?'developer':'owner'}))).then(rs=>{
+        const r=rs.find(x=>x&&x.error)||rs[0];
         if(r.error)throw r.error;
         if(on){const it=paused.items.find(i=>i.conversation_id===id);paused.items=paused.items.filter(i=>i.conversation_id!==id);paused.total=paused.items.length;
-          if(it)paused.direct=[{conversation_id:id,client_id:it.client_id,name:it.name,phone:it.phone,route_key:it.route_key,kind:act==='pdirect-developer'?'developer':'owner',reason:act==='pdirect-developer'?'مسوق مطور':'مالك نشتغل معاه',waiting:false,last_message:it.last_message}].concat(directItems());}
-        else paused.direct=directItems().filter(i=>i.conversation_id!==id);
+          if(it)paused.direct=[{conversation_id:id,client_id:it.client_id,name:it.name,phone:it.phone,route_key:it.route_key,kind:act==='pdirect-developer'?'developer':'owner',reason:act==='pdirect-developer'?'مسوق مطور':'مالك نشتغل معاه',waiting:false,last_message:it.last_message}].concat(Array.isArray(paused.direct)?paused.direct:[]);}
+        else paused.direct=(Array.isArray(paused.direct)?paused.direct:[]).filter(i=>!ids.includes(i.conversation_id));
         if(last)drawTiles(last.data,last.pending);drawSheet();
         toast(on?'انتقل للتواصل المباشر، والعقل ما يرد عليه':'رجع للعقل، ويرد عليه أول ما يكتب','success');
       }).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});
