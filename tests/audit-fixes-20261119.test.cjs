@@ -57,3 +57,11 @@ test('R115: «ما متوفر … اول ما يتوفر» with a visit question
  assert.equal(r.out.guard_sold_yes_nothing,true);
  assert.deepEqual(r.texts,['اقرب شي عندنا في الصومحان الجنوبية فيلا بـ69 الف','تحب ارسلك تفاصيلها ؟']);
 });
+test('«عارض بيت للبيع في حي عاصم كم مطلوب» is a buyer asking our price, not an owner (Ahmed 23 Nov, 743468e3)',()=>{
+ const owner=['وعليكم السلام ورحمة الله وبركاته','اسمك الكريم ؟','ارسل تفاصيل البيت كاملة والمستندات والسعر اللي في بالك اذا ما عليك امر'];
+ const r=decide(owner,[IN('سلام عليكم ورحمة الله وبركاته \nعارض بيت للبيع في حي عاصم كم مطلوب')],{category:'seller'});
+ assert.equal(r.out.category,'buyer');assert.equal(r.out.guard_our_price,true);
+ assert(!r.texts.some((t)=>/المستندات/.test(t)));
+ // an owner saying the house is his stays an owner
+ assert.equal(decide(owner,[IN('عندي بيت عارضه للبيع في الرميس كم ممكن يجيب')],{category:'seller'}).out.category,'seller');
+});
