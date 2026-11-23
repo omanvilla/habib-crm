@@ -26,6 +26,9 @@ const TEMPLATES: Record<string, string> = {
   // 18 Nov (Ahmed, decision 77, step F): sent from the right branch number to a client who wrote to the other one about its
   // area ({{1}} = the area, {{2}} = the branch); whatsapp-outreach kind branch_transfer sends it (SQL140)
   branch_transfer_ar_v1: "السلام عليكم بخصوص استفسارك عن عقار في {{1}} هذا رقم فرع {{2}} المسؤول عن المنطقة تقدر تكمل معنا هنا",
+  // 23 Nov (Ahmed's note on سالم الطوقي, «سوي كل اللي قلت عليه»): an owner who did not send the kroki and documents after we
+  // asked; whatsapp-outreach kind owner_docs sends it outside the 24 hours (SQL155)
+  owner_docs_reminder_ar_v1: "السلام عليكم بخصوص عرض عقارك عندنا ننتظر منك الكروكي والملكية عشان نبدأ دراسة السعر",
 };
 // the example Meta asks for with each variable, and the quick-reply buttons Ahmed approved with the two texts (18 Nov)
 const EXAMPLES: Record<string, string[]> = { visit_followup_3_ar_v3: ["15 أكتوبر"], branch_transfer_ar_v1: ["الرميس", "بركاء"] };
