@@ -65,3 +65,11 @@ test('«عارض بيت للبيع في حي عاصم كم مطلوب» is a buy
  // an owner saying the house is his stays an owner
  assert.equal(decide(owner,[IN('عندي بيت عارضه للبيع في الرميس كم ممكن يجيب')],{category:'seller'}).out.category,'seller');
 });
+test('R118: an attachment WhatsApp could not show gets «ارسلها مرة ثانية» once (reply audit 22 Nov, cc5cd665)',()=>{
+ const ask='الرسالة ما وضحت عندي ارسلها مرة ثانية اذا ما عليك امر';
+ const r=decide([],[IN('','unsupported')],null,{msgType:'unsupported'});
+ assert.deepEqual(r.texts,[ask]);assert.equal(r.out.guard_unsupported_ask,true);
+ // asked already in this chat: silent as before; a reaction or a deleted message: silent as before
+ assert.deepEqual(decide([],[OUT(ask),IN('','unsupported')],null,{msgType:'unsupported'}).texts,[]);
+ assert.deepEqual(decide(['تمام'],[IN('','reaction')],null,{msgType:'reaction'}).texts,[]);
+});
