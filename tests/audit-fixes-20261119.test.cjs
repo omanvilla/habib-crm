@@ -57,3 +57,19 @@ test('R115: «ما متوفر … اول ما يتوفر» with a visit question
  assert.equal(r.out.guard_sold_yes_nothing,true);
  assert.deepEqual(r.texts,['اقرب شي عندنا في الصومحان الجنوبية فيلا بـ69 الف','تحب ارسلك تفاصيلها ؟']);
 });
+test('«عارض بيت للبيع في حي عاصم كم مطلوب» is a buyer asking our price, not an owner (Ahmed 23 Nov, 743468e3)',()=>{
+ const owner=['وعليكم السلام ورحمة الله وبركاته','اسمك الكريم ؟','ارسل تفاصيل البيت كاملة والمستندات والسعر اللي في بالك اذا ما عليك امر'];
+ const r=decide(owner,[IN('سلام عليكم ورحمة الله وبركاته \nعارض بيت للبيع في حي عاصم كم مطلوب')],{category:'seller'});
+ assert.equal(r.out.category,'buyer');assert.equal(r.out.guard_our_price,true);
+ assert(!r.texts.some((t)=>/المستندات/.test(t)));
+ // an owner saying the house is his stays an owner
+ assert.equal(decide(owner,[IN('عندي بيت عارضه للبيع في الرميس كم ممكن يجيب')],{category:'seller'}).out.category,'seller');
+});
+test('R118: an attachment WhatsApp could not show gets «ارسلها مرة ثانية» once (reply audit 22 Nov, cc5cd665)',()=>{
+ const ask='الرسالة ما وضحت عندي ارسلها مرة ثانية اذا ما عليك امر';
+ const r=decide([],[IN('','unsupported')],null,{msgType:'unsupported'});
+ assert.deepEqual(r.texts,[ask]);assert.equal(r.out.guard_unsupported_ask,true);
+ // asked already in this chat: silent as before; a reaction or a deleted message: silent as before
+ assert.deepEqual(decide([],[OUT(ask),IN('','unsupported')],null,{msgType:'unsupported'}).texts,[]);
+ assert.deepEqual(decide(['تمام'],[IN('','reaction')],null,{msgType:'reaction'}).texts,[]);
+});

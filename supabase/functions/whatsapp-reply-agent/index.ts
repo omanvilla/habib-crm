@@ -138,6 +138,13 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   const tail = c.history.slice(lastOut + 1).filter((h: any) => h.direction === "inbound");
   // (on the real chat the deleted messages were not in the history at all: the message being answered is checked too)
   const silentMsg = SILENT_TYPES.includes(String(c.msgType || "")) && !String(c.burstSaid || "").trim();
+  // R118 (reply audit 22 Nov, «..» cc5cd665; Ahmed 23 Nov «سوي كل اللي قلت عليه»): an attachment WhatsApp could not show us
+  // («unsupported»: view-once, a poll, a file type Meta does not pass) got silence. He is asked once to send it again.
+  const UNSUPPORTED_ASK = "الرسالة ما وضحت عندي ارسلها مرة ثانية اذا ما عليك امر";
+  if (out.action !== "handoff" && !c.hardHandoff && (c.msgType === "unsupported" || (tail.length && tail.every((h: any) => h.message_type === "unsupported")))
+    && !String(c.burstSaid || "").trim() && !sentBefore(UNSUPPORTED_ASK)) {
+    out.action = "none"; out.handoff_reason = null; out.guard_unsupported_ask = true; return [UNSUPPORTED_ASK];
+  }
   if (out.action === "none" && texts.length && (silentMsg || (tail.length && tail.every((h: any) => SILENT_TYPES.includes(String(h.message_type || "")))))) {
     out.guard_nothing_said = true; return [];
   }
@@ -522,7 +529,10 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   // 247f8277 «بكم تعرض البيت للبيع ؟» as a first message was answered as an owner («ارسل تفاصيل البيت كاملة والسعر اللي في
   // بالك»). «بكم تعرضون / بكم معروض» is a buyer asking our price: he is asked which property, as for any unnamed one.
   const ASK_OUR_PRICE = /بكم\s*(تعرض(ون)?|معروض[هة]?|عارضين|تبيع(ون)?)\s*(ال)?(بيت|فيلا|فل[ةه]|شق[ةه]|[اأ]رض|منزل|عقار)/;
-  if (out.action === "none" && out.category === "seller" && ASK_OUR_PRICE.test(String(c.burstSaid || "")) && !MY_OWN.test(recentIn)) {
+  // 23 Nov 2026 (Ahmed's note on 743468e3: «هذا يبحث عن منزل وليس مالك عقار»): «عارض بيت للبيع في حي عاصم كم مطلوب» (you show a house
+  // … how much do you ask) was taken as an owner and opened an owner offer. «عارض / معروض … كم مطلوب / كم السعر» is the same buyer.
+  const ASK_THEIR_AD = /(عارض(ين)?|معروض[هة]?|تعرض(ون)?)\s*(ال)?(بيت|فيلا|فل[ةه]|شق[ةه]|[اأ]رض|منزل|عقار)[^؟?\n]{0,60}?(كم|بكم)\s*(ال)?(مطلوب|سعر[ها]?|يطلب|تطلبون|تبيعون)/;
+  if (out.action === "none" && out.category === "seller" && (ASK_OUR_PRICE.test(String(c.burstSaid || "")) || ASK_THEIR_AD.test(String(c.burstSaid || ""))) && !MY_OWN.test(recentIn)) {
     // (dry run on the branch: «الحمدلله التثمين تبيه للبنك…» rode along; only a line that is nothing but the greeting stays)
     texts = [...texts.filter((t) => /^\s*(وعليكم\s*السلام(\s*ورحمة\s*الله(\s*وبركاته)?)?|الحمد\s*لله|مرحبتين(\s*تفضل)?)\s*$/.test(t)), "ارسل لي رابط الفيديو او صورة منه عشان ارسلك التفاصيل والسعر بالضبط"];
     out.category = "buyer"; out.guard_our_price = true;
