@@ -35,6 +35,20 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
   and the prompt names the four «not a mistake» cases; `rules.ts` rebuilt. Dry run of the auditor ran clean (nothing written).
 - Chat 2d32eee8 (علي من الأحواز) stays muted by the auditor; he has waited since 20 Nov for the meeting and villa videos (Ahmed).
 
+## 23 November 2026 — Ahmed's notes of 22 Nov and the reply audit (Ahmed: «ايوا سوي كل اللي قلت عليه»)
+
+- **«تواصل مباشر» one row per person** (note on Amir Tolba «ليش مرتين طالع هنا امير»): the rows of one client / phone are
+  merged (both branches named, the newest message), «رجّعه للعقل» returns every chat of that person. `crm-owner-home.js`
+  `20261123-direct2`, main `8d24d66`; checked live in Ahmed's Chrome (Amir one row «مسقط وبركاء», tile 19 → 17).
+- **Reply agent v110 → `438bcfb`** (was v109 `23372ef`): «عارض بيت … كم مطلوب» is a buyer asking our price (عابد البلوشي; his
+  wrong owner offer `e44afa6e` closed at Ahmed's word); R118 an «unsupported» attachment is asked again once. Dry run 3/3 on the
+  real messages, 27 other replies untouched; live inline check right after the deploy.
+- **SQL154 (live):** R38's group line says «انباعت وحدة منها» for a sold unit, «انحجزت» for a reserved one.
+- **SQL155 (live), R119:** owners who did not send the kroki / documents get one follow-up 20 hours after our ask and one 3 days
+  later (whatsapp_outreach_queue kind `owner_docs`, sent by whatsapp-outreach; cron `owner_docs_followup_queue` `27 5-15 * * *`).
+  Template `owner_docs_reminder_ar_v1` submitted to Meta for both numbers (PENDING); outside the 24 hours the row waits for it.
+  First candidate: سالم الطوقي. Next SQL number **156**.
+
 ## 19 November 2026 — reply audit twice a day, SQL144 (`claude/reply-audit-20261119`)
 
 Ahmed: «فاحص الردود الآلية مرتين باليوم … تطوير لمدرّب الردود الموجود». Rules and how to decide: `docs/agent-rules.md`
