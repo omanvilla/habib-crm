@@ -28,5 +28,16 @@ test('the home: its own tile, the two buttons on a paused row, «رجّعه لل
   assert(ui.includes("t.push(tile('تواصل مباشر',dr.length,"));
   assert(ui.includes('data-coh="pdirect-owner"')&&ui.includes('data-coh="pdirect-developer"')&&ui.includes('data-coh="pundirect"'));
   assert(ui.includes("supa.rpc('crm_set_direct_contact'"));
-  assert(/crm-owner-home\.js\?v=20261121-direct\d/.test(index));
+  assert(/crm-owner-home\.js\?v=2026112[13]-direct\d/.test(index));
+});
+test('one person on both numbers is one row; «رجّعه للعقل» returns every chat of that row (Ahmed 23 Nov, Amir Tolba)',()=>{
+  const a=ui.indexOf('const directItems=()=>{'),b=ui.indexOf('\n  };',a);
+  const f=new Function('paused',ui.slice(a,b+4).replace('const directItems=','return ')+';')(null);
+  const make=(rows)=>new Function('paused',ui.slice(a,b+4)+'\nreturn directItems();')({direct:rows});
+  const rows=make([{conversation_id:'c2',client_id:'k1',phone:'+96890125738',route_key:'muscat',waiting:true,last_message:'يا هلا'},
+    {conversation_id:'c1',client_id:'k1',phone:'+96890125738',route_key:'barka',waiting:false,last_message:'تم'},
+    {conversation_id:'c3',client_id:'k2',phone:'+96890000001',route_key:'barka'}]);
+  assert.equal(rows.length,2);assert.deepEqual(rows[0].ids,['c2','c1']);assert.deepEqual(rows[0].routes,['muscat','barka']);
+  assert.equal(rows[0].last_message,'يا هلا');assert.equal(typeof f,'function');
+  assert(ui.includes('data-coh="pundirect" data-id="\'+esc(i.ids.join(\',\'))'));
 });
