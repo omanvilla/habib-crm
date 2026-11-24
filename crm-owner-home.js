@@ -155,11 +155,15 @@
     if(ha){const w=ha.count('waiting'),c=ha.count('contracts');
       if(w){todo+=w;t.push(tile('مشترين واقفين',w,'data-coh="sheet" data-kind="waiting"','سألوا وما انرد عليهم',true));}
       if(c)t.push(tile('العقود',c,'data-coh="sheet" data-kind="contracts"',ha.sub('contracts'),false));}
-    if(d.owner_leads_new)t.push(tile('عروض ملاك جديدة',d.owner_leads_new,'data-coh="nav" data-nav="owner-leads"','يفتح صفحة العروض',false));
+    // 24 Nov 2026 (SQL156): offers with ready buyers are a number here, not one bell notification each
+    {const lm=Number(d.owner_leads_matched||0);
+      if(d.owner_leads_new)t.push(tile('عروض ملاك جديدة',d.owner_leads_new,'data-coh="nav" data-nav="owner-leads"',lm?lm+' عرض له مشترين جاهزين':'يفتح صفحة العروض',false));
+      else if(lm)t.push(tile('عروض ملاك لها مشترين',lm,'data-coh="nav" data-nav="owner-leads"','يفتح صفحة العروض',false));}
     // 17 Nov 2026: «معاينات أمس بدون متابعة من العقل» (crm-calls-meetings.js) was its own card above the greeting; it is the
     // same subject, so it now opens from this tile, at the top of the same sheet, and makes the tile urgent
     const un0=unaskedCount();
-    if(Number(d.overdue_total)||un0){if(un0)todo+=un0;t.push(tile('زيارات يتابعها الذكاء الاصطناعي',Number(d.overdue_total||0)+un0,'data-coh="sheet" data-kind="visits"',un0?un0+' معاينة أمس بدون سؤال، شيكها':'للاطلاع، العقل يسأل العميل',!!un0));}
+    const stk0=Number(d.overdue_stuck||0); // SQL156: the agent never asks these (held chat, or 5+ days late)
+    if(Number(d.overdue_total)||un0){if(un0)todo+=un0;if(stk0)todo+=stk0;t.push(tile('زيارات يتابعها الذكاء الاصطناعي',Number(d.overdue_total||0)+un0,'data-coh="sheet" data-kind="visits"',un0?un0+' معاينة أمس بدون سؤال، شيكها':stk0?stk0+' تنتظرك، العقل ما بيسألهم':'للاطلاع، العقل يسأل العميل',!!(un0||stk0)));}
     const pr=(d.problems||[]).length;
     if(pr)t.push(tile('مشاكل',pr,'data-coh="sheet" data-kind="problems"','تحتاج انتباه',false));
     // 18 Nov 2026 (decision 36): the two quick decisions that were open cards are tiles too. Owner only, as before.
@@ -202,11 +206,11 @@
     return '<ul class="coh-list">'+open.map(g=>'<li class="coh-twin"><strong>'+g.properties.map(p=>esc(p.title)).join(' · ')+'</strong><small>'+g.properties.map(p=>num(p.videos)+' فيديو').join(' · ')+'</small><p>تربط كل الفيديوهات على الكل ؟ أداء الفيديو واستفساراته تنحسب لكل عقار</p><div class="coh-twin-actions"><button type="button" class="btn-primary" data-coh="twin-yes" data-key="'+esc(g.key)+'">نعم اربطهم</button><button type="button" class="btn-secondary" data-coh="twin-no" data-key="'+esc(g.key)+'">لا مختلفين</button></div></li>').join('')+'</ul>';
   }
   function visitRow(v){
-    return '<li class="coh-row"><div class="coh-info"><strong>'+esc(v.property||'عقار')+'</strong><small>'+esc(v.client||'—')+' · <span class="coh-late">فات موعدها '+esc(v.viewing_date)+'</span></small>'+(v.notes?'<small class="coh-note">'+esc(v.notes)+'</small>':'')+'</div>'
+    return '<li class="coh-row"><div class="coh-info"><strong>'+esc(v.property||'عقار')+'</strong><small>'+esc(v.client||'—')+' · <span class="coh-late">فات موعدها '+esc(v.viewing_date)+'</span>'+(v.stuck?' · <b class="coh-late">العقل ما بيسأله، سجّلها أنت</b>':'')+'</small>'+(v.notes?'<small class="coh-note">'+esc(v.notes)+'</small>':'')+'</div>'
       +'<button type="button" class="btn-secondary coh-go" data-cqv="result" data-id="'+esc(v.id)+'">سجّل النتيجة</button></li>';
   }
   function visitsHtml(){
-    const o=(last&&last.data.overdue)||[];
+    const o=((last&&last.data.overdue)||[]).slice().sort((a,b)=>(b.stuck?1:0)-(a.stuck?1:0));
     const un=typeof window.crmVisitsUnaskedHtml==='function'?window.crmVisitsUnaskedHtml():'';
     return un+(o.length?'':'<p class="coh-empty">ما في زيارة فات موعدها بدون نتيجة</p>')+'<p class="coh-since">الذكاء الاصطناعي يسأل العميل ويسجل النتيجة لحاله أول ما يرد. تقدر تسجلها أنت إذا تعرفها</p>'
       +'<button type="button" class="coh-add" data-cqv="new">+ زيارة ما كانت مسجّلة</button><ul class="coh-list">'+o.map(visitRow).join('')+'</ul>';

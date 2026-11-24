@@ -79,8 +79,12 @@
     }).catch(()=>{b.disabled=false;toast('ما انحفظ. جرب مرة ثانية','error');});
   });
   window.crmHomeAttentionRefresh=()=>load(true);
-  setInterval(()=>{if(document.visibilityState==='visible')load(true);},90000);
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)load(true);});
+  // 24 Nov 2026 (full check): this read ran 4 times for every home open (every 90 seconds on any page, and on every return to the
+  // tab). Now only while the home is the open page, every 5 minutes, and a return to the tab reads only if the last answer is
+  // older than a minute. Opening the home, «تم» and the refresh button still read at once.
+  const onHome=()=>{const p=document.getElementById('page-dash');return !!(p&&p.classList.contains('active'));};
+  setInterval(()=>{if(document.visibilityState==='visible'&&onHome())load(true);},300000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&onHome()&&Date.now()-doneAt>60000)load(true);});
   const loadDash=window.loadDashboard;
   if(typeof loadDash==='function')window.loadDashboard=function(){const r=loadDash.apply(this,arguments);setTimeout(()=>(window.crmAfterHome||(f=>f()))(load),900);return r;}; // waits for the home's first draw (crm-owner-home.js)
 })();

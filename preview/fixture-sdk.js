@@ -226,7 +226,7 @@ function fixtureExtraRpc(name,args){
    upcoming=vs.filter(v=>v.viewing_date>=today&&['scheduled','confirmed'].includes(v.status));
   const branches=fixtureBranchKeys().map(b=>({branch:b,available:properties.filter(p=>p.branch_key===b&&p.status==='available').length,reserved:properties.filter(p=>p.branch_key===b&&p.status==='reserved').length}));
   return {today,report:{week_start:weekStart,new_clients:clients.filter(c=>mineRow(c,'clients')).length,sales_month:0,visits_done:vs.filter(v=>v.status==='done').length,agent_replies:isOwner?12:null,bookings_month:1},
-   overdue:overdue.map(visitRow),overdue_total:overdue.length,upcoming:upcoming.map(visitRow),problems:[],
+   overdue:overdue.map((v,i)=>Object.assign(visitRow(v),{stuck:i===0})),overdue_total:overdue.length,overdue_stuck:overdue.length?1:0,owner_leads_matched:2,upcoming:upcoming.map(visitRow),problems:[],
    properties:{branches,no_video:[],unchecked:1,added_week:2},owner_leads_new:isOwner?1:0};
  };
  const callPeople=()=>profiles.filter(p=>p.role==='agent'&&(!staff||p.id===profile.id));

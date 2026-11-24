@@ -14,6 +14,18 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
 - Checked and sound: 34 cron jobs (0 failures in 3 days), 20 owner pages and 15 staff pages on the preview with no console
   error, RLS with the two test accounts (anon denied everywhere; staff has no commission report, no owner home, no private
   owner line, cannot promote itself).
+- **SQL156 (live, Ahmed: «إيوا ابدأ»)**, `db/changes/156-home-speed-quiet-alerts.forward.sql`:
+  - `crm_match_owner_leads` no longer writes one `owner_lead_match` notification per offer; both homes return
+    `owner_leads_matched` and the «عروض ملاك» tile shows it. `whatsapp_usage_alert` no longer warns at 800 free replies
+    (the «ردود النظام واقفة» alert stays). Instagram notifications untouched (decision 55 sends them to WhatsApp).
+  - `crm_owner_home` reads `crm_repair_private.cron_last_runs` (one row per job, job `crm_cron_last_runs` every 5 minutes)
+    instead of 44,000 rows of `cron.job_run_details`: that part went from 1,546 ms to 15 ms.
+  - both homes mark an overdue visit `stuck` (chat held by Ahmed, or 5+ days late) and return `overdue_stuck`; the visits
+    tile turns urgent («N تنتظرك، العقل ما بيسألهم») and lists them first.
+  - `crm-home-attention.js` reads only while the home is open, every 5 minutes (was every 90 seconds on any page).
+  - The 158 old unread `owner_lead_match` notifications were NOT marked read: waits for Ahmed.
+- CI on `main` was red since 21 Nov on two tests that pinned older text (the expats line of 21 Nov in `knowledge.ts`, the
+  price-studies css version); both tests now follow the approved changes.
 - Open, waiting for Ahmed: `properties.owner_net` / `expected_commission` are readable by staff through the API (hidden on the
   screen only); the repo is public (agent prompt, rules and docs with client names); home RPCs still 2 to 3 s; 5 available
   properties of the 25 target; 272 unread owner notifications (158 `owner_lead_match`); 6 past visits still «scheduled».

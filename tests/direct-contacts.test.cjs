@@ -28,7 +28,7 @@ test('the home: its own tile, the two buttons on a paused row, «رجّعه لل
   assert(ui.includes("t.push(tile('تواصل مباشر',dr.length,"));
   assert(ui.includes('data-coh="pdirect-owner"')&&ui.includes('data-coh="pdirect-developer"')&&ui.includes('data-coh="pundirect"'));
   assert(ui.includes("supa.rpc('crm_set_direct_contact'"));
-  assert(/crm-owner-home\.js\?v=2026112[13]-direct\d/.test(index));
+  assert(/crm-owner-home\.js\?v=2026112\d-\w+/.test(index)); // any later build of the home (24 Nov: stuck1)
 });
 test('one person on both numbers is one row; «رجّعه للعقل» returns every chat of that row (Ahmed 23 Nov, Amir Tolba)',()=>{
   const a=ui.indexOf('const directItems=()=>{'),b=ui.indexOf('\n  };',a);
