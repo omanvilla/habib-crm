@@ -6,6 +6,18 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
 > names `*_20261112*` and commit messages) were all written on **11 November 2026** (afternoon, Oman time); the date was mislabeled.
 
 
+## 24 November 2026 — full system check (owner, staff, database)
+
+- `whatsapp-reply-audit` → v11, pinned to `4494b48`: the visits query asked for `viewings.outcome`, a column that does not
+  exist, so it returned 400 on every audited chat and the auditor read «ما في زيارة مسجلة» for everyone. It now reads
+  `pipeline_outcome` and `outcome_note` and skips archived visits. Not seen running yet: next run 2:30 pm (10:30 UTC).
+- Checked and sound: 34 cron jobs (0 failures in 3 days), 20 owner pages and 15 staff pages on the preview with no console
+  error, RLS with the two test accounts (anon denied everywhere; staff has no commission report, no owner home, no private
+  owner line, cannot promote itself).
+- Open, waiting for Ahmed: `properties.owner_net` / `expected_commission` are readable by staff through the API (hidden on the
+  screen only); the repo is public (agent prompt, rules and docs with client names); home RPCs still 2 to 3 s; 5 available
+  properties of the 25 target; 272 unread owner notifications (158 `owner_lead_match`); 6 past visits still «scheduled».
+
 ## 22 November 2026 (later) — Ahmed's «ملاحظة لـ Claude» notes (8 open in crm_owner_notes)
 
 - `whatsapp-visit-followup-auto` → `f7354cf`: the review is told the property the agent last named in the chat and its status
