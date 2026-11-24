@@ -55,7 +55,7 @@ test('decision 15: the zero-down offer leaves the prompt and the reply from 1 De
  const ZD=/بدون\s*دفع[ةه]\s*مقدم[ةه]|صفر\s*(ال)?مقدم|دفع[ةه]\s*صفر|zero\s*down/i;
  assert(agent.includes(ZD.source));
  // the lines that mention it carry nothing else Ahmed decided (the Barka rule, R18's figures, the two Sultan cities)
- for(const l of [...brain.split('\n'),...knowledge.split('\n')].filter((x)=>ZD.test(x)))assert(/^- (عرض صفر المقدم|مدينة السلطان هيثم: عرض بدون دفعة مقدمة|الاستثناء الوحيد للتاريخ)/.test(l),l.slice(0,80));
+ for(const l of [...brain.split('\n'),...knowledge.split('\n')].filter((x)=>ZD.test(x)))assert(/^- (عرض صفر المقدم|مدينة السلطان هيثم: عرض بدون دفعة مقدمة|الاستثناء الوحيد للتاريخ|العرض بدون دفعة مقدمة يشمل الوافدين)/.test(l),l.slice(0,80));
 });
 
 test('decisions 20, 21, 24, 27, 30, 69, 70: brain lines and code',()=>{
