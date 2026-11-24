@@ -24,6 +24,15 @@ Updated 2026-11-17. Read AGENTS.md. Latest owner instructions govern. Previous I
     tile turns urgent («N تنتظرك، العقل ما بيسألهم») and lists them first.
   - `crm-home-attention.js` reads only while the home is open, every 5 minutes (was every 90 seconds on any page).
   - The 158 old unread `owner_lead_match` notifications were NOT marked read: waits for Ahmed.
+  - The 158 old unread `owner_lead_match` notifications were marked read later the same day (Ahmed: «إيوا علّمهم»).
+- **The other four improvements (Ahmed: «كمّل باقي التحسينات المقترحة»), live:**
+  - **SQL157** `db/changes/157-silent-study-owners-to-calls.forward.sql`: a «دراسة سعر» chat whose study went out 7+ days ago,
+    with no recorded reaction and no word from the owner since, leaves «العقل موقوف عندهم» and the owner appears in «اتصل
+    بعدهم» (`study_days`). Dry run on the day: nobody qualifies yet; the 9 old «انرسلت الدراسة» chats are owners who
+    answered (counter offer, price rejected, accepted) and wait for Ahmed's decision, so they stay on the tile.
+  - Home goals: with two branches the month's deals and commission are drawn once, summed, in a «الشركة» row.
+  - Side menu between 769 and 1099 px: every icon carries its name (`crm-simple-ui.css`).
+  - Phone bar: «المهام» and «الزيارات» added, seven places (`crm-simple-ui.js`; `tests/design-browser.cjs` counts 7).
 - CI on `main` was red since 21 Nov on two tests that pinned older text (the expats line of 21 Nov in `knowledge.ts`, the
   price-studies css version); both tests now follow the approved changes.
 - Open, waiting for Ahmed: `properties.owner_net` / `expected_commission` are readable by staff through the API (hidden on the

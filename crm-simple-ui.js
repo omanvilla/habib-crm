@@ -291,3 +291,25 @@
   if(typeof nav==='function')window.navigate=function(){const result=nav.apply(this,arguments);setTimeout(refresh,0);return result;};
   refresh();setTimeout(refresh,1500);
 })();
+
+/* 24 Nov 2026 (full check, Ahmed «كمّل باقي التحسينات المقترحة»): the phone bar gets «المهام» and «الزيارات», the two pages staff
+ * open every day; it stays one row, seven places, «+ عقار» in the middle. Only the two buttons are added here: the pages,
+ * permissions and the other five buttons are untouched. */
+(function(){
+  'use strict';
+  const ICON={daily:'<svg class="ui-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1.2 1.2L7 5M3.5 12l1.2 1.2L7 11M3.5 18l1.2 1.2L7 17"/></svg>',
+    viewings:'<svg class="ui-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>'};
+  function addPhoneNav(){
+    const nav=document.getElementById('mobileBottomNav');if(!nav||nav.querySelector('[data-page="daily"]'))return;
+    const clients=nav.querySelector('[data-page="clients"]'),props=nav.querySelector('[data-page="properties"]');if(!clients||!props)return;
+    const make=(page,label)=>{const b=document.createElement('button');b.type='button';b.className='mobile-nav-btn';b.dataset.page=page;
+      b.addEventListener('click',()=>{if(typeof navigate==='function')navigate(page,null);});
+      b.innerHTML='<span class="ico">'+ICON[page]+'</span><span>'+label+'</span>';return b;};
+    nav.insertBefore(make('daily','المهام'),clients);
+    nav.insertBefore(make('viewings','الزيارات'),props);
+    nav.classList.add('crm-nav-7');
+  }
+  if(typeof document==='undefined'||typeof document.addEventListener!=='function')return;
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',addPhoneNav);else addPhoneNav();
+  if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('load',addPhoneNav);
+})();

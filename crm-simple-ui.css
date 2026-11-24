@@ -99,3 +99,12 @@
 #sidebar .nav-link.crm-nav-retired{display:none!important}
 .crm-owner-tools-note{margin:0 0 10px;font-size:13px;color:#5d6f66}
 .crm-owner-tools-row{display:flex;flex-wrap:wrap;gap:8px}
+
+/* 24 Nov 2026 (full check): seven places on the phone bar (crm-simple-ui.js adds «المهام» and «الزيارات») */
+@media(max-width:768px){.mobile-bottom-nav.crm-nav-7{grid-template-columns:1fr 1fr 1fr 1.18fr 1fr 1fr 1fr!important;padding-inline:3px!important}.mobile-bottom-nav.crm-nav-7 .mobile-nav-btn{padding-inline:0!important;font-size:9.5px!important}}
+/* 24 Nov 2026 (full check): between 769 and 1099 px the side menu was icons only (two of them the same house). Each icon
+   now carries its name under it. */
+@media(min-width:769px) and (max-width:1099px){.crm-design .sidebar,.crm-design .sidebar:hover{width:88px!important}.crm-design .main,.crm-design .sidebar:hover~.main{margin-right:88px!important}
+.crm-design .sidebar .nav-label{display:none!important}.crm-design .sidebar .nav-group{margin-bottom:6px!important}
+.crm-design .sidebar .nav-link{flex-direction:column!important;align-items:center!important;gap:2px!important;height:auto!important;min-height:46px!important;padding:5px 3px!important;margin-block:1px!important}
+.crm-design .sidebar .nav-link .nav-text{opacity:1!important;display:block!important;font-size:10px!important;line-height:1.3!important;text-align:center!important;white-space:normal!important;max-width:80px;overflow:hidden}}

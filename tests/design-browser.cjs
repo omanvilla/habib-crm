@@ -74,7 +74,7 @@ let server;
   report.checks.push('task, visit, deposit and owner status selects activate their original filters');
 
   await page.setViewportSize({width:390,height:844});
-  assert.equal(await page.locator('.mobile-nav-btn .ui-symbol').count(),5);
+  assert.equal(await page.locator('.mobile-nav-btn .ui-symbol').count(),7); // 24 Nov: «المهام» and «الزيارات» added to the phone bar
   assert.equal(await page.locator('#toast').isVisible(),false); 
   for(const name of pages.filter(n=>n!=='propertyDetail')){
    await page.evaluate(n=>navigate(n,null),name);await page.waitForTimeout(100);
