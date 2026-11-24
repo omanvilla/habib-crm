@@ -63,10 +63,10 @@
     const rows=nextList.map((x,i)=>{const tel=String(x.phone||'').replace(/[^\d+]/g,'');
       const what=[KIND_AR[x.kind]||x.kind,x.area||x.wilayat,x.price?Number(x.price).toLocaleString('en-US')+' ر.ع':''].filter(Boolean).join(' · ');
       return '<li class="ccm-next"><div><strong dir="auto">'+esc(x.name||'مالك')+'</strong> <bdi dir="ltr">'+esc(x.phone||'')+'</bdi><br><small>'+esc(what)
-        +(x.last_called_at?' · آخر اتصال '+esc(fmtDay(String(x.last_called_at).slice(0,10))):' · ما انتصل فيه')+'</small></div>'
+        +(x.study_days!=null?' · <b>انرسلت له الدراسة من '+esc(x.study_days)+' يوم وما رد</b>':'')+(x.last_called_at?' · آخر اتصال '+esc(fmtDay(String(x.last_called_at).slice(0,10))):' · ما انتصل فيه')+'</small></div>'
         +'<div class="ccm-next-act">'+(tel?'<a class="btn-secondary crm-wa-small" href="tel:'+esc(tel)+'">اتصل</a>':'')
         +'<button type="button" class="btn-primary crm-wa-small" data-ccm="next-log" data-i="'+i+'">سجّل الاتصال</button></div></li>';}).join('');
-    d.innerHTML='<div class="ccm-form"><h3>اتصل بعدهم <small>عروض ملاك ما انتصل فيها آخر 30 يوم</small></h3>'
+    d.innerHTML='<div class="ccm-form"><h3>اتصل بعدهم <small>عروض ملاك ما انتصل فيها آخر 30 يوم، وملاك ما ردوا على الدراسة من أسبوع</small></h3>'
       +(rows?'<ul class="ccm-days">'+rows+'</ul>':'<p class="ccm-note">ما في أحد في القائمة الحين</p>')
       +'<div class="ccm-actions"><button type="button" class="btn-secondary" data-ccm="next-close">إغلاق</button></div></div>';
   }

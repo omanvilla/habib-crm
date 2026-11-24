@@ -9,7 +9,7 @@ const index=read('index.html'),home=read('crm-owner-home.js'),calls=read('crm-ca
 const fwd=read('db/changes/114-call-next-last-seen.forward.sql'),back=read('db/changes/114-call-next-last-seen.rollback.sql');
 
 test('index loads the quick property module right after the call module, versions moved on',()=>{
-  assert(index.includes('<script src="crm-calls-meetings.js?v=20261119-open1"><\\/script><script src="crm-quick-property.js?v=20261117-goal1"><\\/script>'));
+  assert(index.includes('<script src="crm-calls-meetings.js?v=20261124-study1"><\\/script><script src="crm-quick-property.js?v=20261117-goal1"><\\/script>'));
   assert(/crm-owner-home\.js\?v=202611(19|2\d)-/.test(index)&&/crm-owner-home\.css\?v=202611(1[89]|2\d)-/.test(index)&&index.includes('crm-calls-meetings.css?v=20261117-goal1'));
 });
 
@@ -17,7 +17,9 @@ test('home goals come from the branch target snapshot; staff never get the commi
   assert(home.includes("supa.rpc('crm_branch_target_snapshot')"));
   assert(home.includes('<section class="card coh-sec coh-goals" id="cohGoals" hidden></section>'));
   for(const label of ['زيارات تمت هالأسبوع','متابعات اليوم','عقارات جديدة هالأسبوع','حجوزات الشهر'])assert(home.includes(label),label);
-  assert(home.includes("(owner&&b.expected_commission!=null?chip('عمولة متوقعة الشهر'"));
+  assert(home.includes("owner&&b.expected_commission!=null?chip('عمولة متوقعة الشهر'"));
+  // 24 Nov: with two branches the month's deals and commission are drawn once for the company, the commission for the owner only
+  assert(home.includes("(owner&&list.some(b=>b.expected_commission!=null)?chip('عمولة متوقعة الشهر',sum('expected_commission'),top('expected_commission'),true):'')"));
   // visits and bookings are not repeated in the week summary once the goals are drawn
   assert(home.includes("concat(goals?[]:[['زيارات تمت',r.visits_done],['حجوزات الشهر',r.bookings_month]])"));
 });

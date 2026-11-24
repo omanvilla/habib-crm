@@ -427,11 +427,16 @@
     const owner=isOwner();
     const chip=(label,v,g,money)=>{const n=Number(v||0),t=Number(g||0),met=t>0&&n>=t;
       return '<span class="coh-goal'+(met?' met':'')+'"><b dir="ltr">'+(money?num(Math.round(n)):num(n))+'<small>/'+num(t)+'</small></b><small>'+esc(label)+'</small></span>';};
+    // 24 Nov 2026 (full check): the month's 3 deals and 5,400 are ONE target for the company (SQL138, decision 62), but they
+    // were repeated under each branch as if each branch owed them. With two branches they are shown once, summed, in «الشركة».
+    const one=list.length<2,sum=k=>list.reduce((n,b)=>n+Number(b[k]||0),0),top=k=>Math.max(0,...list.map(b=>Number((b.goals||{})[k]||0)));
     el.innerHTML='<h2 class="coh-h">الأهداف <small>الأسبوع من '+esc(goals.week_start||'')+'</small></h2>'+list.map(b=>{const g=b.goals||{};
       return '<div class="coh-goal-row">'+(list.length>1||owner?'<h3 class="coh-h3">'+esc(b.name||b.branch||'')+'</h3>':'')+'<div class="coh-goal-chips">'
         +chip('زيارات تمت هالأسبوع',b.viewings,g.viewings)+chip('متابعات اليوم',b.followups,g.followups)
-        +chip('عقارات جديدة هالأسبوع',b.new_properties,g.new_properties)+chip('صفقات الشهر',b.bookings,g.bookings)
-        +(owner&&b.expected_commission!=null?chip('عمولة متوقعة الشهر',b.expected_commission,g.expected_commission,true):'')+'</div></div>';}).join('');
+        +chip('عقارات جديدة هالأسبوع',b.new_properties,g.new_properties)+(one?chip('صفقات الشهر',b.bookings,g.bookings):'')
+        +(one&&owner&&b.expected_commission!=null?chip('عمولة متوقعة الشهر',b.expected_commission,g.expected_commission,true):'')+'</div></div>';}).join('')
+      +(one?'':'<div class="coh-goal-row"><h3 class="coh-h3">الشركة <small>هدف الشهر للفرعين مع بعض</small></h3><div class="coh-goal-chips">'+chip('صفقات الشهر',sum('bookings'),top('bookings'))
+        +(owner&&list.some(b=>b.expected_commission!=null)?chip('عمولة متوقعة الشهر',sum('expected_commission'),top('expected_commission'),true):'')+'</div></div>');
     el.hidden=false;
   }
   async function load(){
