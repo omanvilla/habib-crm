@@ -163,7 +163,7 @@ async function chatBlock(n: number, conv: any, drafts: any[], start: string) {
   const [msgs, visits] = await Promise.all([
     db.from("whatsapp_messages").select("direction,actor_type,body,transcript,message_type,message_timestamp")
       .eq("conversation_id", conv.id).lte("message_timestamp", new Date(Date.now()).toISOString()).order("message_timestamp", { ascending: false }).limit(45),
-    conv.client_id ? db.from("viewings").select("status,viewing_date,property_id,outcome").eq("client_id", conv.client_id).order("viewing_date", { ascending: false }).limit(5) : Promise.resolve({ data: [] }),
+    conv.client_id ? db.from("viewings").select("status,viewing_date,property_id,pipeline_outcome,outcome_note").eq("archived", false).eq("client_id", conv.client_id).order("viewing_date", { ascending: false }).limit(5) : Promise.resolve({ data: [] }),
   ]);
   const all = (msgs.data || []).reverse();
   // keep 10 messages before the first draft of the period, and everything after it
@@ -188,7 +188,7 @@ async function chatBlock(n: number, conv: any, drafts: any[], start: string) {
   });
   return [
     `## محادثة ${n} · ${ROUTE(conv.route_key)} · ${conv.name || "عميل"}`,
-    vs.length ? `الزيارات: ${vs.map((v: any) => `${v.status} ${String(v.viewing_date || "").slice(0, 10)} عقار ${id8(v.property_id)}${v.outcome ? ` (${short(v.outcome, 60)})` : ""}`).join(" · ")}` : "الزيارات: ما في زيارة مسجلة",
+    vs.length ? `الزيارات: ${vs.map((v: any) => `${v.status} ${String(v.viewing_date || "").slice(0, 10)} عقار ${id8(v.property_id)}${(v.outcome_note || v.pipeline_outcome) ? ` (${short(v.outcome_note || v.pipeline_outcome, 60)})` : ""}`).join(" · ")}` : "الزيارات: ما في زيارة مسجلة",
     "الرسائل:", ...lines, "مسودات العقل في فترة الفحص:", ...ds,
   ].join("\n");
 }
