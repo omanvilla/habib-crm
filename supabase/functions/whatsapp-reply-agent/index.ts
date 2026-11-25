@@ -650,7 +650,8 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   }
   // R120 (reply audit 23 Nov, 8930e472): an investor who asked for videos or ads of the project gets its reel before the invitation
   if (c.projectReel && out.category === "investor" && out.action === "none" && PROJECT_MEDIA_ASK.test(String(c.burstSaid || "")) && !texts.some((t) => /instagram\.com/.test(t))) {
-    texts = ["هذا فيديو عن المشروع", String(c.projectReel), ...texts]; out.guard_project_reel = true;
+    // (one message: the reply keeps at most 3, and «يناسبك ؟» was the one trimmed in the dry run)
+    texts = ["هذا فيديو عن المشروع\n" + String(c.projectReel), ...texts]; out.guard_project_reel = true;
   }
   // R122 (reply audit 23 Nov, سلطان الجابري 63d66ac1): «اقرب شقة عندنا … بـ250 ريال» to a tenant who said 150 ended with no question.
   // A nearest offer with nothing to answer gets «تقدر تزيد شوي ؟» when his budget was named, else «تناسبك ؟».
