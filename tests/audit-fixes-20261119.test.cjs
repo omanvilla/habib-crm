@@ -77,7 +77,7 @@ test('R120: an investor asking for videos or ads gets the project reel before th
  const inv=['بما انك حاليا في قطر الافضل نرتب لك اجتماع اونلاين مع المطور الأهلي صبور ونعرض لك الوحدات المتوفرة والتفاصيل','يناسبك ؟'];
  const reel='https://www.instagram.com/reel/DYRkEv2iDun/';
  const r=decide(inv,[IN('مبدأيا ممكن ترسل اذا معاك تصوير او اعلانات')],{category:'investor'},{projectReel:reel});
- assert.deepEqual(r.texts,['هذا فيديو عن المشروع\n'+reel,...inv]);
+ assert.deepEqual(r.texts,['هذا فيديو عن المشروع\n'+reel+'\n'+inv[0],inv[1]]);
  assert.equal(decide(inv,[IN('تمام')],{category:'investor'},{projectReel:reel}).out.guard_project_reel,undefined);
 });
 test('R122: a nearest offer with no question gets «تقدر تزيد شوي ؟» or «تناسبك ؟» (63d66ac1)',()=>{
