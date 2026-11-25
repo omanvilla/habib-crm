@@ -74,6 +74,8 @@ const THEIR_OFFICE = /(معنا|عندنا|معانا)\s*(في\s*)?(ال)?مكت
 const ASK_CONFIRM = /^(قصدك|تقصد(ين)?)\s[^\n]{0,90}؟\s*$/;
 const WE_SHOW = /(^|\s)عارض(ين|ه|ة)?\s+(لل?بيع\s+)?(فل[ةه]|فيلا|بيت|منزل|شق[ةه]|[اأ]رض)|(فل[ةه]|فيلا|بيت|منزل)\s*(ال)?معروض|معروض\s*عندكم/;
 const MY_OWN = /(^|\s)(عندي|بيتي|فلتي|[اأ]رضي|ملكي|عقاري)(\s|$)|[اأ](بي|بغى|با|ريد)\s*[اأ]عرض|(^|\s)نعرض/;
+const PROJECT_MEDIA_ASK = /تصوير|صور(?!ة\s*ملكي)|فيديو|فديو|[اإ]علان(ات)?|بروشور|كتيب|video|photo|picture|brochure/i;
+const MEET_ASK_CLIENT = /(نحدد|حدد|حددوا|نرتب)\s*(لي\s*)?(وقت|موعد)\s*(و\s*)?(نتقابل|نلتقي|نجتمع|اجي|أجي)|(ممكن|ابي|أبي|اريد|أريد|ودي)\s*(نتقابل|نلتقي|نجتمع|اقابلك|أقابلك|اقابلكم|أقابلكم)|(^|\s)(نتقابل|نجتمع)(\s|$|[؟?])/;
 const SILENT_TYPES =["revoke", "reaction", "system", "edit", "unsupported"];
 const COMMISSION_BUYER_LINES = ["ما عليك عمولة للمكتب", "العمولة على الطرف المفوض وهو المالك"];
 const COMMISSION_OWNER_LINES = ["بخصوص العمولة نحتاج اول شي نزور الموقع بعد ما ترسل لنا المستندات ونطلع على العقار", "وبعدها نتفق ان شاء الله على كل شي"];
@@ -340,7 +342,12 @@ function ownerDecisions(out: any, lines: string[], c: any) {
       // («شفتك مصور بيت في رميس فله»: Al Rumais has a villa and a rest house; the word «فله» picks the villa)
       const homes = /فيل|فل[ةه]|فلل|توين/.test(said) ? here.filter((x: any) => /villa|twin/i.test(String(x.type || "")) || String(x.type || "") === "house") : here;
       const p = here.length === 1 ? here[0] : homes.length === 1 ? homes[0] : null;
-      if (p && p.marketing && !SOLD_AD.test(String(p.marketing)) && !sentBefore(String(p.marketing).slice(0, 40))) {
+      // R124 (reply audit 23 Nov, Rashid Al Shibli ae454984: «في عندكم شقه … 2BHK» got the full rent ad of the Sultan Qaboos City
+      // flats): when the client said neither rent nor buy and the model did not know either, he is asked first
+      const PURPOSE_SAID = /[اإ]يجار|استئجار|[اأ]جار|مستأجر|للبيع|شراء|[اأ]شتري|نشتري|تمليك|تملك|rent|buy|purchase|sale|lease/i;
+      if (p && out.category !== "buyer" && out.category !== "tenant" && !PURPOSE_SAID.test(recentIn)) {
+        texts = ["للإيجار ولا للشراء ؟"]; out.guard_ask_purpose = true;
+      } else if (p && p.marketing && !SOLD_AD.test(String(p.marketing)) && !sentBefore(String(p.marketing).slice(0, 40))) {
         texts = [String(p.marketing), "متى يناسبك تزور ؟"];
         out.property_id = p.id; if (asOwner) out.category = "buyer";
         out.guard_named_available = true;
@@ -590,11 +597,14 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   // rows 1361-1400 (and 900, 970): a tenant asking for a house in Salalah («بيوت ارضي للايجار في صلاله») or Ibri got «حالياً ما
   // متوفر… اول ما يتوفر بتواصل معك», a promise for a place the office does not work in (R56). He gets R56's line instead.
   {
-    const FAR = /(^|\s|في|ف|ب)(صلال[هة]|ظفار|صحار|صحم|السويق|الخابور[هة]|شناص|لوى|البريمي|نزوى|بهلاء|ازكي|إزكي|سمائل|عبري|الرستاق|ابراء|إبراء|المضيبي|جعلان|الدقم|مسندم|خصب)|(في|ولاي[ةه]|مدين[ةه])\s+صور(\s|$|[؟?])/;
+    const FAR = /(^|\s|في|ف|ب)(صلال[هة]|ظفار|صحار|صحم|السويق|الخابور[هة]|شناص|لوى|البريمي|نزوى|بهلاء|ازكي|إزكي|سمائل|عبري|الرستاق|ابراء|إبراء|المضيبي|جعلان|الدقم|مسندم|خصب|بدي[ةه]|الغابي|الكامل|جعلان|صور\s+العفي)|(في|ولاي[ةه]|مدين[ةه])\s+صور(\s|$|[؟?])|\b(bidiy+a?h?|bidiya|al\s*ghabi|salalah|sohar|nizwa|ibri|sur|buraimi|duqm|rustaq|ibra)\b/i;
     const OURS = /مسقط|بركاء|بركا(\s|$)|المعبيل|السيب|بوشر|الخوض|العامرات|الموالح|الحيل|العذيب|الغبر|القرم|الانصب|الأنصب|الرميس|الصومحان|الشخاخيط|المنوم/;
     const said = String(c.burstSaid || "");
-    if (["buyer", "tenant"].includes(out.category) && out.action === "none" && FAR.test(said) && !OURS.test(said) && texts.some((t) => /اول\s*ما\s*يتوفر|ما\s*متوفر/.test(t))) {
-      texts = [...texts.filter((t) => /^\s*(وعليكم\s*السلام(\s*ورحمة\s*الله(\s*وبركاته)?)?|مرحبتين)\s*$/.test(t)), "نعتذر منك احنا حالياً نشتغل في مسقط وبركاء فقط"];
+    // R125 (reply audit 24 Nov, Ansila 61597a60: «a room in muscut bidiya» got a Sultan Qaboos City flat in English): Bidiya and
+    // the English names count, and an English client gets the same line in English, whatever the model offered
+    const en = !/[؀-ۿ]/.test(said);
+    if (["buyer", "tenant"].includes(out.category) && out.action === "none" && FAR.test(said) && !OURS.test(said) && (en || texts.some((t) => /اول\s*ما\s*يتوفر|ما\s*متوفر/.test(t)))) {
+      texts = en ? ["Sorry, we currently work in Muscat and Barka only"] : [...texts.filter((t) => /^\s*(وعليكم\s*السلام(\s*ورحمة\s*الله(\s*وبركاته)?)?|مرحبتين)\s*$/.test(t)), "نعتذر منك احنا حالياً نشتغل في مسقط وبركاء فقط"];
       out.guard_far_request = true;
     }
   }
@@ -637,6 +647,24 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     // trimming below dropped the offer line for it (live check of v106, Azza 4b7e6a19)
     const i = /^\s*وعليكم\s*السلام/.test(texts[0]) && texts.length > 1 ? 1 : 0;
     texts[i] = i === 0 && /^\s*وعليكم\s*السلام/.test(texts[0]) ? `${texts[0]}\nالحمدلله` : `الحمدلله\n${texts[i]}`; out.guard_how_are_you = true;
+  }
+  // R120 (reply audit 23 Nov, 8930e472): an investor who asked for videos or ads of the project gets its reel before the invitation
+  if (c.projectReel && out.category === "investor" && out.action === "none" && PROJECT_MEDIA_ASK.test(String(c.burstSaid || "")) && !texts.some((t) => /instagram\.com/.test(t))) {
+    texts = ["هذا فيديو عن المشروع", String(c.projectReel), ...texts]; out.guard_project_reel = true;
+  }
+  // R122 (reply audit 23 Nov, سلطان الجابري 63d66ac1): «اقرب شقة عندنا … بـ250 ريال» to a tenant who said 150 ended with no question.
+  // A nearest offer with nothing to answer gets «تقدر تزيد شوي ؟» when his budget was named, else «تناسبك ؟».
+  if (out.action === "none" && ["tenant", "buyer"].includes(out.category) && texts.some((t) => /(^|\n)\s*اقرب\s*(شي|شق[ةه]|فيل[اه]|فل[ةه]|بيت|خيار)/.test(t))
+    && !texts.some((t) => /[؟?]/.test(t))) {
+    texts.push(texts.some((t) => /بحدود|في\s*حدود/.test(t)) ? "تقدر تزيد شوي ؟" : "تناسبك ؟"); out.guard_nearest_question = true;
+  }
+  // R123 (reply audit 24 Nov, SGhulam a31871de: «If under construction then how can we view it ?» went to Ahmed as unknown): how to
+  // see a property whose visit method is «open» is answered from it
+  if (out.action === "handoff" && UNKNOWN_Q.test(String(out.handoff_reason || "")) && c.prop && c.prop.visit_method === "open" && !c.hardHandoff
+    && /how\s*(can|do|could)\s*(we|i)\s*(view|see|visit|check)|كيف\s*(ن|ا|أ)?(شوف|عاين|زور)|طريق[ةه]\s*(الزيار[ةه]|المعاين[ةه])/i.test(String(c.burstSaid || ""))) {
+    const en = !/[؀-ۿ]/.test(String(c.burstSaid || ""));
+    texts = en ? ["The house is open, you can visit it anytime", "When would you like to visit?"] : ["البيت مفتوح تقدر تشوفه على راحتك", "متى يناسبك تزور ؟"];
+    out.action = "none"; out.handoff_reason = null; out.guard_view_open = true;
   }
   // R116: «اسمك الكريم ؟ ومتى يناسبك تزور ؟» in one line: the other question first, the name question last on its own line
   {
@@ -1922,6 +1950,19 @@ Deno.serve(async (req) => {
     // decisions 16 and 46 (Ahmed 18 Nov 2026: «ما نلحقهم بس نرد»): investors are answered and their meetings booked, but no
     // follow-up of ours is set for them until 12 Feb 2027
     if (out.category === "investor" && dayM < "2027-02-12" && out.request) { out.request.followup_in_days = null; out.request.followup_note = null; }
+    // R121 (reply audit 23 Nov, امير عرابي ce6b1091: «نحدد وقت نتقابل» got a documents request): a client whose newest messages
+    // ask to meet is a meeting request (R45): the silent «اجتماع:» handoff below books it and Ahmed is alerted
+    {
+      let lo = -1; history.forEach((h: any, i: number) => { if (h.direction === "outbound") lo = i; });
+      const newest = history.slice(lo + 1).filter((h: any) => h.direction === "inbound").map((h: any) => String(h.transcript || h.body || "")).join(" ");
+      if (out.action !== "book_meeting" && out.category !== "ignore" && !HARD_HANDOFF.test(String(out.handoff_reason || "")) && MEET_ASK_CLIENT.test(newest)
+        && !/(عند|في)\s*(ال)?(بيت|فيل|فل[ةه]|عقار|موقع|ارض|أرض)/.test(newest)) { // (meeting at the property = a visit, not a meeting)
+        out.action = "book_meeting";
+        out.meeting = { place: out.meeting?.place || (out.category === "investor" ? "developer" : "office"), date: out.meeting?.date ?? null, time: out.meeting?.time ?? null };
+        if (!/^\s*(اجتماع|طلب اجتماع|طلب موعد)\s*:/.test(String(out.handoff_reason || ""))) out.handoff_reason = null;
+        out.guard_meet_ask = true;
+      }
+    }
     // R45 (reply audit 22 Nov, 2d32eee8): a yes («ان شاء الله», «تمام») to our meeting invitation is booked like the model's
     // book_meeting (silent «اجتماع:» below), before the under-57,000 check so that check still holds it
     if ((out.action === "none" || (out.action === "handoff" && !HARD_HANDOFF.test(String(out.handoff_reason || ""))))
@@ -2384,8 +2425,24 @@ Deno.serve(async (req) => {
         ? [lines.slice(0, -1).join("\n"), last] : [t];
     });
     // one visit question is enough
+    // R120 (reply audit 23 Nov, عبدالله in Qatar 8930e472: «ممكن ترسل اذا معاك تصوير او اعلانات» got the meeting invitation only):
+    // an investor asking for videos or ads of a project gets that project's newest reel (not sent in this chat) before the invitation
+    let projectReel: string | null = null;
+    if (out.category === "investor" && PROJECT_MEDIA_ASK.test(String(burstSaid || ""))) {
+      try {
+        const pr = await db.from("investment_projects").select("id,name,aliases").eq("company_id", msg.company_id).eq("archived", false);
+        const talk = history.slice(-20).map((h: any) => String(h.transcript || h.body || "")).join(" ");
+        const proj = (pr.data || []).find((p: any) => [p.name, ...(p.aliases || [])].some((w: any) => String(w || "").trim().length > 2 && talk.includes(String(w).trim())))
+          || ((pr.data || []).length && /هيثم|صبور|وادي\s*زها/.test(talk) ? (pr.data || []).find((p: any) => /هيثم/.test(String(p.name))) : null);
+        if (proj) {
+          const rr = await db.from("instagram_media_catalog").select("permalink").eq("project_id", proj.id).not("permalink", "is", null).order("published_at", { ascending: false }).limit(5);
+          projectReel = ((rr.data || []).map((x: any) => String(x.permalink)).find((u: string) => /^https:\/\/(www\.)?instagram\.com\//.test(u)
+            && !history.some((h: any) => h.direction === "outbound" && String(h.body || "").includes((u.match(IG_CODE) || [])[1] || u)))) || null;
+        }
+      } catch (_) { /* no reel: the reply stays as it is */ }
+    }
     // R74 to R79: Ahmed's decisions of 15 Nov 2026 (ownerDecisions above). The branch rule (R48) still runs after this.
-    texts = ownerDecisions(out, texts, { history, burstSaid, prop, visitedProp: !!prop && visitedIds.has(prop.id), visitedAny: !out.property_id && visitedIds.size > 0, visitedSome: visitedIds.size > 0,
+    texts = ownerDecisions(out, texts, { history, burstSaid, prop, projectReel, visitedProp: !!prop && visitedIds.has(prop.id), visitedAny: !out.property_id && visitedIds.size > 0, visitedSome: visitedIds.size > 0,
       saidVisited: history.some((h: any) => h.direction === "inbound" && SAID_VISITED.test(String(h.transcript || h.body || ""))),
       handoffOpen: !!conv.human_handoff_required, hardHandoff: HARD_HANDOFF.test(String(out.handoff_reason || "")),
       gone: goneRows, available: props, route: String(conv.route_key || ""), typeLabel: typeAr, msgType: msg.message_type,
