@@ -111,3 +111,9 @@ test('R126: the branch line goes without «اسمك الكريم ؟» (25 Nov, 3
  const r=btl({reply_messages:['عقارات العذيبة يتابعها رقم فرع مسقط 71770030 وبنرسلك منه','اسمك الكريم ؟'],category:'tenant'},'barka',null,branchOf);
  assert.deepEqual(r.lines,['عقارات العذيبة يتابعها رقم فرع مسقط 71770030 وبنرسلك منه']);
 });
+test('R127: a general question about market prices goes to Ahmed with no reply (26 Nov, e878fa6e)',()=>{
+ const r=decide(['حالياً ما عندنا بيت مستقل للايجار في بركاء عشان احدد لك متوسط الاسعار'],[IN('انتو عندكم كيف اغلبية السعار')],{category:'tenant'});
+ assert.equal(r.out.action,'handoff');assert.deepEqual(r.texts,[]);assert.match(r.out.handoff_reason,/^سؤال ما عندي جوابه:/);
+ // a price of a property we list is not this
+ assert.equal(decide(['الشقة غرفة وحدة 250 ريال بالشهر'],[IN('كيف الاسعار عندكم ؟')],{category:'tenant'}).out.action,'none');
+});

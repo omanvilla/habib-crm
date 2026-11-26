@@ -648,6 +648,13 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     const i = /^\s*وعليكم\s*السلام/.test(texts[0]) && texts.length > 1 ? 1 : 0;
     texts[i] = i === 0 && /^\s*وعليكم\s*السلام/.test(texts[0]) ? `${texts[0]}\nالحمدلله` : `الحمدلله\n${texts[i]}`; out.guard_how_are_you = true;
   }
+  // R127 (reply audit 26 Nov, معتصم e878fa6e: «انتو عندكم كيف اغلبية السعار» got «حالياً ما عندنا … عشان احدد لك متوسط الاسعار»):
+  // a general question about market prices has no written answer (R67 / R41): no reply, it goes to Ahmed
+  if (out.action === "none" && !c.hardHandoff && /(اغلبي[ةه]|غالبي[ةه]|متوسط|معدل|عموم)\s*(ال)?(اسعار|أسعار|سعار)|(ال)?(اسعار|أسعار)\s*(كيف|عموما|في\s*السوق)|(كيف|شو|ايش|وش)\s*(ال)?(اسعار|أسعار|سعار)\s*(ال)?(حين|حالي|السوق|عندكم)?\s*[؟?]?\s*$/.test(String(c.burstSaid || ""))
+    && !texts.some((t) => /\d/.test(t))) {
+    texts = []; out.action = "handoff"; out.handoff_reason = `سؤال ما عندي جوابه: سؤال عام عن الاسعار «${String(c.burstSaid || "").replace(/\s+/g, " ").trim().slice(0, 100)}»`;
+    out.guard_market_price = true;
+  }
   // R120 (reply audit 23 Nov, 8930e472): an investor who asked for videos or ads of the project gets its reel before the invitation
   if (c.projectReel && out.category === "investor" && out.action === "none" && PROJECT_MEDIA_ASK.test(String(c.burstSaid || "")) && !texts.some((t) => /instagram\.com/.test(t))) {
     // (inside the first message, not one of its own: the reply keeps at most 3, and «يناسبك ؟» was the one trimmed in the dry run)
