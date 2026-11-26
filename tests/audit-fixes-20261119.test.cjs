@@ -99,3 +99,6 @@ test('R121 and R124 are in the agent',()=>{
  assert(agent.includes('const MEET_ASK_CLIENT'));assert(agent.includes('out.guard_meet_ask = true'));
  assert(agent.includes('texts = ["للإيجار ولا للشراء ؟"]; out.guard_ask_purpose = true;'));
 });
+test('R126: the branch line goes without «اسمك الكريم ؟» (25 Nov, 3e0e55c5)',()=>{
+ assert(agent.includes('if (hit.length) lines = lines.filter((t: any) => !/^\s*اسمك\s*الكريم\s*[؟?]?\s*$/.test(String(t)))'));
+});

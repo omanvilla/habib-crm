@@ -799,6 +799,9 @@ function branchTransferLines(out: any, here: unknown, prop: any, branchOf: (k: a
   });
   const bt = out.branch_transfer;
   if (!hit.length && bt && ["muscat", "barka"].includes(bt.to) && bt.to !== here) lines = [...lines.slice(0, 2), make(bt.to, out.category === "seller", "")];
+  // R126 (reply audit 25 Nov, موسى السعدي 3e0e55c5, and M Elhaj 22 Nov): the branch line went with «اسمك الكريم ؟»; the other
+  // branch asks it there. The line goes alone (with a greeting if there is one).
+  if (hit.length) lines = lines.filter((t: any) => !/^\s*اسمك\s*الكريم\s*[؟?]?\s*$/.test(String(t))).map((t: any) => String(t).replace(/\n\s*اسمك\s*الكريم\s*[؟?]?\s*$/, ""));
   return hit.length ? { lines, ...hit[hit.length - 1] } : null;
 }
 const OUT_OF_AREA_LINES = ["نعتذر منك احنا حالياً نشتغل في مسقط وبركاء فقط", "اذا عندك عقار في مسقط ارسله على رقم مسقط 71770030 واذا في بركاء على رقم بركاء 92344273"];
