@@ -100,5 +100,14 @@ test('R121 and R124 are in the agent',()=>{
  assert(agent.includes('texts = ["للإيجار ولا للشراء ؟"]; out.guard_ask_purpose = true;'));
 });
 test('R126: the branch line goes without «اسمك الكريم ؟» (25 Nov, 3e0e55c5)',()=>{
- assert(agent.includes('if (hit.length) lines = lines.filter((t: any) => !/^\s*اسمك\s*الكريم\s*[؟?]?\s*$/.test(String(t)))'));
+ const src=[pickA('const BRANCH_OLD_RE','\n'),pickA('const BRANCH_NEW_RE','\n'),pickA('function transferArea','\n}\n'),pickA('function branchTransferLines','\n}\n')].join('\n')
+  .replace('(raw: unknown, branch: string)','(raw, branch)')
+  .replace('(out: any, here: unknown, prop: any, branchOf: (k: any) => { name: string; number: string } | null)','(out, here, prop, branchOf)')
+  .replace('const hit: { to: string; area: string }[] = []','const hit = []').replace('const req: string[] =','const req =')
+  .replace('(to: string, owner: boolean, named: unknown)','(to, owner, named)').replace('(t: any)','(t)')
+  .replace('branchOf(to)!;','branchOf(to);').replace(/n!\[/g,'n[');
+ const btl=new Function(src+';return branchTransferLines;')();
+ const branchOf=k=>k==='barka'?{name:'بركاء',number:'92344273'}:k==='muscat'?{name:'مسقط',number:'71770030'}:null;
+ const r=btl({reply_messages:['عقارات العذيبة يتابعها رقم فرع مسقط 71770030 وبنرسلك منه','اسمك الكريم ؟'],category:'tenant'},'barka',null,branchOf);
+ assert.deepEqual(r.lines,['عقارات العذيبة يتابعها رقم فرع مسقط 71770030 وبنرسلك منه']);
 });
