@@ -19,6 +19,7 @@ const db = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 const MODEL = Deno.env.get("REPLY_AUDIT_MODEL") || Deno.env.get("REPLY_COACH_MODEL") || Deno.env.get("REPLY_AGENT_MODEL") || Deno.env.get("OPENAI_MODEL") || "gpt-5.6-luna";
 const MAX_FINDINGS = 5, CHUNK = 10, MAX_CHATS = 70;
+const normAr = (v: unknown) => String(v ?? "").replace(/[ً-ْـ]/g, "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim().toLowerCase();
 const short = (v: unknown, n = 600) => { const s = String(v ?? "").replace(/\s+\n/g, "\n").trim(); return s.length > n ? s.slice(0, n) + "…" : s; };
 const id8 = (v: unknown) => String(v || "").slice(0, 8);
 
@@ -100,12 +101,13 @@ const SCHEMA = {
   type: "object", additionalProperties: false, required: ["chats"],
   properties: { chats: { type: "array", items: { type: "object", additionalProperties: false, required: ["chat", "problems"],
     properties: { chat: { type: "integer" }, problems: { type: "array", items: { type: "object", additionalProperties: false,
-      required: ["draft", "error_type", "certain", "before_fix", "customer_message", "explanation", "options", "rule_r", "pinned_rule", "known_mistake"],
+      required: ["draft", "error_type", "certain", "before_fix", "quote", "customer_message", "explanation", "options", "rule_r", "pinned_rule", "known_mistake"],
       properties: {
         draft: { type: "integer", description: "رقم مسودة العقل (#) اللي فيها الغلط" },
         error_type: { type: "string", enum: MODEL_TYPES },
         certain: { type: "boolean", description: "true بس إذا الغلط أكيد من المحادثة والقائمة، مو تخمين" },
         before_fix: { type: "boolean", description: "true إذا القاعدة اللي تغطي الغلط تاريخها بعد يوم الرد (يعني انصلح بعدين)" },
+        quote: { type: "string", description: "الكلمات الغلط أو المخترعة من رد العقل بالحرف (كلمتين لين ست)، أو فاضي" },
         customer_message: { type: "string", description: "رسالة العميل اللي رد عليها العقل غلط، نصها" },
         explanation: { type: "string", description: "سطرين بالعربي البسيط لأحمد: وش الغلط وليش" },
         options: { type: "array", items: { type: "string" }, description: "2 أو 3 ردود صحيحة بديلة، كل رد كامل، كل رسالة في سطر" },
@@ -119,7 +121,7 @@ const INSTRUCTIONS = (brain: string, knowledge: string, pinned: string, props: s
 لكل محادثة تشوف آخر الرسائل، وتحتها مسودات العقل المرقمة (#) في فترة الفحص: اللي انرسلت، واللي العقل قرر ما يرد فيها (ومعها سبب التحويل إذا حوّل).
 احكم على كل مسودة: هل الرد صح حسب قواعد المكتب تحت؟ رجّع بس الأغلاط الحقيقية. الرد الصح أو اللي فيه شك بسيط ما ترجعه. لا تخترع أغلاط عشان تملي.
 أنواع الأغلاط (error_type):
-- invented_info: سعر أو مساحة أو معلومة مو موجودة في قائمة العقارات أو معرفة المشاريع، أو تخالفها
+- invented_info: سعر أو مساحة أو معلومة مو موجودة في قائمة العقارات أو معرفة المشاريع، أو تخالفها. لازم تكتب في quote الكلمات المخترعة من الرد بالحرف، والكلمة الموجودة في نص الإعلان أو كابشن أي ريل مو مخترعة
 - sold_offered: عرض عقار حالته sold أو reserved أو withdrawn كأنه متوفر، أو قال «انباع» عن عقار متوفر
 - serious_not_handed: عميل زار ويتفاوض، أو مشتري جاد يبي يحجز أو يدفع عربون، والعقل رد عليه بدل ما يحوّل لأحمد بدون رد (R3 / R16)
 - call_not_handed: طلب اتصال واضح والعقل رد بدل التحويل (R12)
@@ -257,6 +259,9 @@ async function audit(companyId: string, opts: { hours?: number; dry?: boolean; t
       ...(reels[p.id] || []).slice(0, 4).map((r: any, i: number) => `  ريل ${i + 1}: ${r.permalink || ""}${r.caption ? ` · الكابشن: ${short(r.caption, i ? 200 : 900).replace(/\n+/g, " / ")}` : ""}`)].filter(Boolean).join("\n");
   }).join("\n");
   const instructions = INSTRUCTIONS(String(brainR.data?.content || ""), String(knowR.data?.content || ""), pinned, props);
+  // every word the agent may take from: ads, descriptions, visit lines, all reel captions in full, the project knowledge
+  const corpus = normAr([...(propsR.data || []).flatMap((p: any) => [p.title, p.public_details, p.description, p.visit_instructions]), ...(reelsR.data || []).map((r: any) => r.caption), knowR.data?.content].filter(Boolean).join(" "));
+  let notInvented = 0;
   const problems: any[] = [];
   const errors: string[] = [];
   let beforeFix = 0;
@@ -274,6 +279,15 @@ async function audit(companyId: string, opts: { hours?: number; dry?: boolean; t
           // the rule that covers it came after this reply: fixed since, not a mistake of today's agent
           const rs = String(p.rule_r || "").match(/R\d+/g) || [];
           if (p.before_fix === true || (rs.length && d && rs.every((r: string) => releasedAfter(r, d.created_at)))) { beforeFix++; continue; }
+          // 26 Nov (عبدالرحمن الحديدي 3ede0175: «فيلا جديدة» was called invented and the chat muted, but «جديدة» is in three reels
+          // of the Radwan villas): an invented fact must quote its words, and words found in any ad text, reel caption or the project
+          // knowledge are not invented. Such a problem is dropped, never a reason to mute a chat.
+          if (p.error_type === "invented_info") {
+            const q = normAr(p.quote);
+            if (!q || q.length < 3) { p.certain = false; }
+            // (a price or any figure must be found as written; short wordings without a figure may be found word by word)
+            else if (corpus.includes(q) || (!/\d/.test(q) && q.split(" ").length <= 3 && q.split(" ").filter((w: string) => w.length > 2).every((w: string) => corpus.includes(w)))) { notInvented++; continue; }
+          }
           problems.push({ ...p, conv: c.conv, draft: d });
         }
       }
@@ -333,7 +347,7 @@ async function audit(companyId: string, opts: { hours?: number; dry?: boolean; t
 
   const stats = { sent: sent.length, skipped: skipped.length, failed: failed.length, judged: judged.length, chats_judged: byConv.length, chats_total: convIds.length,
     unanswered: (unanswered.data || []).length, skipped_by_reason: skipped.reduce((a: any, d: any) => { a[d.error || "-"] = (a[d.error || "-"] || 0) + 1; return a; }, {}),
-    problems_found: problems.length, fixed_since: beforeFix, repeated_open: problems.length - fresh.length, dropped_types: dropped.map((g) => ({ type: g.type, count: g.ps.length })), errors };
+    problems_found: problems.length, fixed_since: beforeFix, not_invented: notInvented, repeated_open: problems.length - fresh.length, dropped_types: dropped.map((g) => ({ type: g.type, count: g.ps.length })), errors };
 
   const shift = new Date(end.getTime() + 4 * 3600000).getUTCHours() < 12 ? "الصبح" : "الظهر";
   const lineOf = (g: any, i: number) => `${i + 1}. ${g.critical ? "🔴" : "🟡"} ${g.label} · ${g.head.conv?.name || "عميل"}${g.ps.length > 1 ? ` (+${g.ps.length - 1} محادثة)` : ""}${g.critical ? " · وقفت العقل" : ""}${g.repeatRule || g.known ? " · تكرر رغم القاعدة" : ""}`;

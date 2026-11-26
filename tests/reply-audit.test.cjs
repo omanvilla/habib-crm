@@ -45,3 +45,9 @@ test('a reply sent before its rule went live is not reported (RELEASES)',()=>{
  assert(fn.includes('{ at: "2026-11-18T11:37:00Z", rules: ["R112", "R113", "R114", "R115"] }'));
  assert(fn.includes('rs.every((r: string) => releasedAfter(r, d.created_at))'));
 });
+test('an invented fact must quote its words, and words found in an ad, a caption or the knowledge are not invented (26 Nov, 3ede0175)',()=>{
+ assert(fn.includes('"quote", "customer_message"'));
+ assert(fn.includes('const corpus = normAr('));
+ assert(fn.includes('if (!q || q.length < 3) { p.certain = false; }'));
+ assert(fn.includes('notInvented++; continue;'));
+});

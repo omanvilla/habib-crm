@@ -99,3 +99,21 @@ test('R121 and R124 are in the agent',()=>{
  assert(agent.includes('const MEET_ASK_CLIENT'));assert(agent.includes('out.guard_meet_ask = true'));
  assert(agent.includes('texts = ["للإيجار ولا للشراء ؟"]; out.guard_ask_purpose = true;'));
 });
+test('R126: the branch line goes without «اسمك الكريم ؟» (25 Nov, 3e0e55c5)',()=>{
+ const src=[pickA('const BRANCH_OLD_RE','\n'),pickA('const BRANCH_NEW_RE','\n'),pickA('function transferArea','\n}\n'),pickA('function branchTransferLines','\n}\n')].join('\n')
+  .replace('(raw: unknown, branch: string)','(raw, branch)')
+  .replace('(out: any, here: unknown, prop: any, branchOf: (k: any) => { name: string; number: string } | null)','(out, here, prop, branchOf)')
+  .replace('const hit: { to: string; area: string }[] = []','const hit = []').replace('const req: string[] =','const req =')
+  .replace('(to: string, owner: boolean, named: unknown)','(to, owner, named)').replace('(t: any)','(t)')
+  .replace('branchOf(to)!;','branchOf(to);').replace(/n!\[/g,'n[');
+ const btl=new Function(src+';return branchTransferLines;')();
+ const branchOf=k=>k==='barka'?{name:'بركاء',number:'92344273'}:k==='muscat'?{name:'مسقط',number:'71770030'}:null;
+ const r=btl({reply_messages:['عقارات العذيبة يتابعها رقم فرع مسقط 71770030 وبنرسلك منه','اسمك الكريم ؟'],category:'tenant'},'barka',null,branchOf);
+ assert.deepEqual(r.lines,['عقارات العذيبة يتابعها رقم فرع مسقط 71770030 وبنرسلك منه']);
+});
+test('R127: a general question about market prices goes to Ahmed with no reply (26 Nov, e878fa6e)',()=>{
+ const r=decide(['حالياً ما عندنا بيت مستقل للايجار في بركاء عشان احدد لك متوسط الاسعار'],[IN('انتو عندكم كيف اغلبية السعار')],{category:'tenant'});
+ assert.equal(r.out.action,'handoff');assert.deepEqual(r.texts,[]);assert.match(r.out.handoff_reason,/^سؤال ما عندي جوابه:/);
+ // a price of a property we list is not this
+ assert.equal(decide(['الشقة غرفة وحدة 250 ريال بالشهر'],[IN('كيف الاسعار عندكم ؟')],{category:'tenant'}).out.action,'none');
+});
