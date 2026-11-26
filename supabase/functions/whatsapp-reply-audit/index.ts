@@ -45,6 +45,7 @@ export const RELEASES: { at: string; rules: string[] }[] = [
   { at: "2026-11-19T06:47:09Z", rules: ["R116", "R117"] }, // v103 6651f9b (first reply audit)
   { at: "2026-11-19T06:49:59Z", rules: ["R115"] }, // v104 e6f9cf9 (R115 with a visit question)
   { at: "2026-11-22T07:31:00Z", rules: ["R45", "R22", "R9", "R14", "R114"] }, // v106 94c4ac1 (reply audit 22 Nov guards)
+  { at: "2026-11-26T09:08:20Z", rules: ["R126", "R127"] }, // v112 25899bb (branch line alone, market price question)
   { at: "2026-11-25T07:56:30Z", rules: ["R120", "R121", "R122", "R123", "R124", "R125"] }, // v111 3cb9019 (reply audit 23-25 Nov)
   { at: "2026-11-23T02:39:15Z", rules: ["R118", "R38"] }, // v110 438bcfb (unsupported attachment asked again; «عارض… كم مطلوب» buyer) + SQL154 «انباعت وحدة منها»
 ];
