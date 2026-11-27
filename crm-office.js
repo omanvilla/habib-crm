@@ -1,5 +1,5 @@
 /* «المكتب» (27 Nov 2026, Ahmed: the AI-agents-office idea applied to the CRM, plus a real employee's performance).
- * One read: crm_office_snapshot() (SQL161).
+ * One read: crm_office_snapshot() (SQL161). SQL164: status 'soon' = the job never ran yet («ينتظر أول تشغيل»).
  *  - Owner / manager: the boss line, every automatic «employee» with a colour and its last job, and a card per staff member.
  *  - Agent: the page is called «أدائي» and shows only her own card. No money of any kind reaches this page.
  * Colours follow the pace of the goal: a monthly goal is compared with how much of the month has gone, a weekly one with
@@ -54,7 +54,7 @@
   }
 
   function workerCard(w){
-    const st=w.status==='green'?['g','شغال']:w.status==='yellow'?['y','متأخر شوي']:w.status==='red'?['r','فيه مشكلة']:['off','موقوف'];
+    const st=w.status==='green'?['g','شغال']:w.status==='yellow'?['y','متأخر شوي']:w.status==='red'?['r','فيه مشكلة']:w.status==='soon'?['off','ينتظر أول تشغيل']:['off','موقوف'];
     const last=w.last_output||w.last_run;
     return '<div class="of-w"><div class="of-e">'+esc(w.icon)+'</div><b>'+esc(w.name)+'</b>'
       +'<div class="of-s of-'+st[0]+'">'+DOT[st[0]]+' '+st[1]+'</div>'

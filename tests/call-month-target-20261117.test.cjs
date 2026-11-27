@@ -27,5 +27,5 @@ test('the owner sets the month in the call log; empty goes back to 10 × working
  assert(ui.includes("if(role()==='owner'&&callsToday&&callsToday.month)sums+="));
  assert(ui.includes("supa.rpc('crm_set_call_month_target',{p_month:muscatDay(0),p_target:n})"));
  assert(ui.includes("const raw=String(byId('ccmMonthTarget').value||'').trim(),n=raw===''?null:Math.round(Number(raw));"));
- assert(index.includes('crm-calls-meetings.js?v=20261127-hunt1'));
+ assert(index.includes('crm-calls-meetings.js?v=20261127-why1'));
 });
