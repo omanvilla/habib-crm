@@ -62,6 +62,6 @@ test('the follow-up reason is asked in a window that can hold the button, with t
   assert(base.includes(":prompt(reasonText);if(!reason||!reason.trim()||viewingClient!==client)return;"),'the client on screen must still be the one asked about');
   assert(voice.includes('window.crmAskText=function(o){'));
   assert(voice.includes("document.body.append(m);attach(box);box.focus();"));
-  assert(index.includes('crm-reply-approvals.css?v=20261118-extra1')&&index.includes('crm-voice-input.js?v=20261114-vk1'));
+  assert(index.includes('crm-reply-approvals.css?v=20261118-extra1')&&index.includes('crm-voice-input.js?v=20261127-ans1'));
   assert(((index.match(/app-base-v15\.html\?v=(\d{8})/)||[])[1]||'')>='20261118','the base page moved on with the WhatsApp buttons of 12 Nov');
 });

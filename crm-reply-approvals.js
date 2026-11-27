@@ -41,7 +41,7 @@
     const content=document.querySelector('.content');if(!content)return;
     const page=document.createElement('div');page.className='page';page.id='page-replies';
     page.innerHTML='<div class="page-header"><div><div class="page-title"><span>ردود تنتظر موافقتك</span></div><div class="page-sub" id="rpSub">جاري التحميل…</div></div></div>'
-      +'<div class="rp-tabs"><button type="button" class="rp-tab on" data-rp-tab="pending">تنتظر موافقتك <b id="rpCount">0</b></button><button type="button" class="rp-tab" data-rp-tab="rules">الردود المثبتة</button><button type="button" class="rp-tab" data-rp-tab="results">النتائج</button><button type="button" class="rp-tab" data-rp-tab="auto">أُرسلت تلقائياً</button>'
+      +'<div class="rp-tabs"><button type="button" class="rp-tab on" data-rp-tab="pending">تنتظر موافقتك <b id="rpCount">0</b></button><button type="button" class="rp-tab" data-rp-tab="rules">الردود المثبتة</button><button type="button" class="rp-tab" data-rp-tab="results">النتائج</button><button type="button" class="rp-tab" data-rp-tab="answers">أجوبتك المحفوظة <b id="rpAnsCount" hidden>0</b></button><button type="button" class="rp-tab" data-rp-tab="auto">أُرسلت تلقائياً</button>'
       +'<label class="rp-trials"><input type="checkbox" id="rpTrials"> عرض ردود التجربة</label></div><div id="rpList"></div>';
     content.append(page);
     const nav=document.querySelector('#sidebar .nav-area');
@@ -155,6 +155,45 @@
     const [s,v]=await Promise.all([supa.rpc('crm_reply_auto_send_get'),supa.from('whatsapp_reply_variants').select('rule_id,label,reply,active')]);
     state.autoSend=s.error?null:((s.data&&s.data.categories)||[]);
     state.variants=v.error?null:(v.data||[]);
+  }
+  // SQL160 (27 Nov 2026): a question the agent sent to Ahmed (R41) and that the office answered by hand waits here.
+  // «احفظ للعقار» / «احفظ عام» lets the agent answer it next time; «تجاهل» drops it. Nothing is deleted.
+  async function loadAnswers(){
+    const r=await supa.from('agent_saved_answers').select('id,property_id,question,answer,status,source_conversation_id,created_at,decided_at').in('status',['pending','active','paused']).order('created_at',{ascending:false}).limit(200);
+    if(r.error)throw r.error;state.answers=r.data||[];
+    const ids=[...new Set(state.answers.map(a=>a.property_id).filter(Boolean))];
+    state.answerProps={};
+    if(ids.length){const p=await supa.from('properties').select('id,type,area,price,listing_purpose').in('id',ids);(p.data||[]).forEach(x=>{state.answerProps[x.id]=x;});}
+    answersBadge();
+  }
+  function answersBadge(){const b=byId('rpAnsCount');if(!b)return;const n=(state.answers||[]).filter(a=>a.status==='pending').length;b.textContent=n;b.hidden=!n;}
+  const TYPE_AR={villa:'فيلا',apartment:'شقة',land:'أرض',house:'بيت',twin_villa:'توين فيلا',rest_house:'استراحة',shop:'محل',building:'بناية'};
+  function propLabel(id){const p=(state.answerProps||{})[id];if(!p)return '';return (TYPE_AR[String(p.type||'').toLowerCase()]||p.type||'عقار')+' '+(p.listing_purpose==='rent'?'للإيجار':'للبيع')+(p.area?' في '+p.area:'')+(p.price?' · '+Number(p.price).toLocaleString('en-US'):'');}
+  function answerCard(a){
+    const pl=a.property_id?propLabel(a.property_id):'',pending=a.status==='pending';
+    return '<article class="rp-card rp-answer" data-ans="'+esc(a.id)+'">'
+      +'<header><div><strong>'+(pending?'سؤال انحوّل لك ورديت عليه':a.status==='active'?'العقل يستخدمه':'موقوف')+'</strong> <small>'+esc(ago(a.created_at))+'</small></div>'
+      +'<div class="rp-chips"><span class="rp-chip">'+(a.property_id?esc(pl||'عقار'):'عام')+'</span></div></header>'
+      +'<label>السؤال</label><input class="fi rp-ans-q" value="'+esc(a.question)+'">'
+      +'<label>جوابك (عدّله لجملة كاملة يفهمها أي عميل)</label><textarea class="fta rp-ans-a" rows="3" dir="auto">'+esc(a.answer)+'</textarea>'
+      +'<div class="rp-actions">'
+      +(pending
+        ?(a.property_id?'<button type="button" class="btn-primary" data-rp="ans-save" data-scope="property">احفظ لهذا العقار</button>':'')
+          +'<button type="button" class="'+(a.property_id?'btn-secondary':'btn-primary')+'" data-rp="ans-save" data-scope="general">احفظ عام</button>'
+          +'<button type="button" class="btn-secondary" data-rp="ans-dismiss">تجاهل</button>'
+        :'<button type="button" class="btn-primary" data-rp="ans-save" data-scope="'+(a.property_id?'property':'general')+'">حفظ التعديل</button>'
+          +(a.status==='active'?'<button type="button" class="btn-secondary" data-rp="ans-pause">أوقفه</button>':'<button type="button" class="btn-secondary" data-rp="ans-resume">رجّعه</button>'))
+      +(a.source_conversation_id?'<button type="button" class="btn-secondary" data-rp="ans-open">فتح المحادثة</button>':'')+'</div>'
+      +'<div class="rp-error" role="alert"></div></article>';
+  }
+  async function answerAct(card,btn,action){
+    const err=card.querySelector('.rp-error');err.textContent='';btn.disabled=true;
+    try{
+      const r=await supa.rpc('crm_saved_answer_decide',{p_id:card.dataset.ans,p_action:action,p_scope:btn.dataset.scope||null,
+        p_question:action==='save'?card.querySelector('.rp-ans-q').value:null,p_answer:action==='save'?card.querySelector('.rp-ans-a').value:null});
+      if(r.error)throw r.error;
+      toast(action==='save'?'انحفظ، والعقل بيجاوب فيه':action==='dismiss'?'تم التجاهل':action==='pause'?'انوقف':'رجع يشتغل','success');refresh();
+    }catch(e){const m=String(e&&e.message||e);err.textContent=m.includes('empty_answer')?'اكتب الجواب أول.':m.includes('owner_only')?'لصاحب الشركة فقط.':'تعذر: '+m;btn.disabled=false;}
   }
   async function loadResults(){
     const r=await supa.rpc('crm_reply_variant_stats',{p_days:state.days});
@@ -371,6 +410,14 @@
       list.innerHTML=autoSendBox()+(state.rules.length?state.rules.map(ruleCard).join(''):'<div class="empty"><div class="empty-ico">📌</div><div class="empty-title">ما في ردود مثبتة لين الحين</div><div class="empty-desc">لما توافق على رد وتختار «ثبّت هذا الرد» يظهر هنا، والمحرك يستخدمه في المواقف المشابهة.</div></div>');
       return;
     }
+    if(state.tab==='answers'){
+      const rows=state.answers||[],pend=rows.filter(a=>a.status==='pending'),rest=rows.filter(a=>a.status!=='pending');
+      byId('rpSub').textContent=pend.length+' جواب ينتظر حفظك · '+rows.filter(a=>a.status==='active').length+' يستخدمه العقل';
+      list.innerHTML=(pend.length?'<h3 class="rp-section">تنتظر حفظك</h3>'+pend.map(answerCard).join(''):'')
+        +(rest.length?'<h3 class="rp-section">المحفوظة</h3>'+rest.map(answerCard).join(''):'')
+        +(rows.length?'':'<div class="empty"><div class="empty-ico">💬</div><div class="empty-title">ما في أجوبة لين الحين</div><div class="empty-desc">لما العقل يحوّل لك سؤال ما يعرف جوابه وترد على العميل، ردك يطلع هنا عشان تحفظه.</div></div>');
+      return;
+    }
     if(state.tab==='results'){
       byId('rpSub').textContent='أي صياغة تجيب نتيجة أكثر';
       list.innerHTML=coachHtml()+resultsHtml();
@@ -392,7 +439,7 @@
   }
   async function refresh(){
     if(!isOwnerNow()||state.loading)return;state.loading=true;
-    try{if(state.tab==='rules')await loadRules();else if(state.tab==='results')await loadResults();else if(state.tab==='auto')await loadAutoSent();else await loadDrafts();render();}
+    try{if(state.tab==='rules')await loadRules();else if(state.tab==='answers')await loadAnswers();else if(state.tab==='results')await loadResults();else if(state.tab==='auto')await loadAutoSent();else await loadDrafts();render();}
     catch(e){const l=byId('rpList');if(l)l.innerHTML='<div class="empty"><div class="empty-title">تعذر التحميل</div><div class="empty-desc">'+esc(e.message||e)+'</div></div>';}
     finally{state.loading=false;}
   }
@@ -531,6 +578,11 @@
     else if(a==='instr-close')card.querySelector('.rp-instr').hidden=true;
     else if(a==='instr-run')rewrite(card,b);
     else if(a==='rule-save')saveRule(card,b,false);
+    else if(a==='ans-save')answerAct(card,b,'save');
+    else if(a==='ans-dismiss'){if(confirm('تتجاهل هذا الجواب؟ العقل بيظل يحوّل لك هالسؤال.'))answerAct(card,b,'dismiss');}
+    else if(a==='ans-pause')answerAct(card,b,'pause');
+    else if(a==='ans-resume')answerAct(card,b,'resume');
+    else if(a==='ans-open'){const x=(state.answers||[]).find(y=>y.id===card.dataset.ans);if(x&&typeof openDashboardWhatsAppConversation==='function')openDashboardWhatsAppConversation(x.source_conversation_id);}
     else if(a==='rule-delete'){if(confirm('تحذف هذا الرد المثبت؟'))saveRule(card,b,true);}
   });
   document.addEventListener('change',e=>{

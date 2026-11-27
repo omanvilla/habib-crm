@@ -25,7 +25,7 @@
     '#dLostReasonNote','#dNotes','#dwLostWords','#dwNotes','#dpLegalNotes','#dpNotes',         // deals and deposits: the button only, the forms are unchanged
     '#tNotes','#evNotes','#oNotes','#exNotes',                                                 // tasks, calendar, owners, expenses
     '#waMsgArea','textarea[data-pf-text]',                                                     // WhatsApp message to a client, the price message to an owner
-    'textarea.rp-text','textarea.rp-rule-reply','textarea.rp-variant-reply','textarea.cfv-text','#ipNotes' // replies waiting for approval, pinned replies, follow-up wordings, investment projects
+    'textarea.rp-text','textarea.rp-rule-reply','textarea.rp-ans-a','textarea.rp-variant-reply','textarea.cfv-text','#ipNotes' // replies waiting for approval, pinned replies, follow-up wordings, investment projects
   ].join(',');
   let active=null;
   async function toB64(blob){const buf=new Uint8Array(await blob.arrayBuffer());let s='';for(let i=0;i<buf.length;i+=0x8000)s+=String.fromCharCode.apply(null,buf.subarray(i,i+0x8000));return btoa(s);}

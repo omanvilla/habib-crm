@@ -65,7 +65,7 @@ test('clients outside the best 20 are kept (skipped / over_cap) and the owner ca
   assert(out.includes('["approve", "reject", "promote"]'));
   assert(/eq\("status", "skipped"\)\.eq\("reason", "over_cap"\)/.test(out),'promote only moves over_cap rows');
   assert(ui.includes("eq('reason','over_cap')")&&ui.includes("data-rp=\"out-promote\"")&&ui.includes("outreachAct([card.dataset.out],'promote'"));
-  assert(index.includes('crm-reply-approvals.js?v=20261118-d36'));
+  assert(index.includes('crm-reply-approvals.js?v=20261127-ans1'));
 });
 test('«غير محدد» / «اي مكان» say nothing; «اي مكان في بركا» keeps بركا; بركا = بركاء',async()=>{
   const {cleanArea,scoreRequest}=await lib();

@@ -12,7 +12,7 @@ test('the module is loaded by the page, after the property modules, with the clo
   // 21 Nov 2026: crm-property-file.js (SQL153) loads after it, still before the page's own script
   assert(index.includes('<script src="crm-calls-meetings.js?v=20261124-study1"><\\/script><script src="crm-quick-property.js?v=20261117-goal1"><\\/script><script src="crm-visit-key.js?v=20261118-key2"><\\/script>'));
   assert(index.indexOf('crm-visit-key.js?v=')<index.indexOf('<script>window.APP_VERSION='));
-  assert.match(index,/crm-voice-input\.js\?v=20261114-vk1/);
+  assert.match(index,/crm-voice-input\.js\?v=20261127-ans1/);
   assert.equal(index.split('</script>').length-1,1,'only the page\'s own closing tag is unescaped');
 });
 test('the form section has the three boxes, and the list holds exactly the values the database accepts',()=>{
