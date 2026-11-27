@@ -34,3 +34,7 @@ test('office: a job that never ran shows «ينتظر أول تشغيل»', () =
   assert(read('crm-office.js').includes("w.status==='soon'?['off','ينتظر أول تشغيل']"));
   assert(read('index.html').includes('crm-office.js?v=20261127-soon1'));
 });
+
+test('the migration mirror is byte-identical', () => {
+  assert.strictEqual(read('supabase/migrations/20261127140000_audit_followups.sql'), sql);
+});
