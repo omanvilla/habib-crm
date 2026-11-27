@@ -9,8 +9,9 @@
 -- owner_line_client_visible=1; staff sees owner_line_client_visible=0, own_temp_client_visible=1 and 0 in
 -- owner_price_studies, crm_owner_notes, instagram_media_catalog (both branches are shared by Ahmed's SQL79), 0 in
 -- agent_saved_answers and saved_answer_rpc=owner_only (SQL160).
--- SQL161 office: owner office_workers=10, office_money=false; staff office_staff=1, office_workers=0,
--- office_other_people=0, office_money=false.
+-- SQL161 office: owner office_workers=12 (SQL162 added the hunter and referrals), office_money=false; staff office_staff=1,
+-- office_workers=0, office_other_people=0, office_money=false.
+-- SQL162: both read crm_hunt_leads (public market ads) and call_next works for both (call_next=ok).
 DO $chk$
 DECLARE
   co   uuid := (SELECT id FROM public.companies ORDER BY created_at LIMIT 1);
@@ -18,7 +19,7 @@ DECLARE
   stf  uuid := (SELECT id FROM public.profiles WHERE email = 'staff-check@habib-crm.test');
   tbls text[] := ARRAY['clients','properties','deals','viewings','client_requests','activities',
     'whatsapp_conversations','notifications','profiles','expenses','owners','owner_leads',
-    'owner_price_studies','investment_projects','instagram_media_catalog','crm_owner_notes','agent_saved_answers'];
+    'owner_price_studies','investment_projects','instagram_media_catalog','crm_owner_notes','agent_saved_answers','crm_hunt_leads'];
   -- SQL159: also checks properties.owner_net (denied to both directly) and the view's money rows (owner only)
   t text; n bigint; res jsonb := '{}'; one jsonb; who record; tmp uuid; priv uuid; ph text;
 BEGIN
@@ -76,6 +77,9 @@ BEGIN
       EXCEPTION WHEN OTHERS THEN one := one || jsonb_build_object('office_error', SQLERRM);
       END;
     END IF;
+    -- SQL162: «اتصل بعدهم» with the hunter's sellers
+    BEGIN PERFORM public.crm_call_next(30); one := one || '{"call_next":"ok"}';
+    EXCEPTION WHEN OTHERS THEN one := one || jsonb_build_object('call_next', SQLERRM); END;
     -- temporary data for the staff account, written through RLS as that account
     IF who.k = 'staff' THEN
       BEGIN
