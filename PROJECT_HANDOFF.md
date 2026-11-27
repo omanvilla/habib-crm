@@ -500,3 +500,11 @@
 
 ## 6 Nov 2026 — owner private line shelved
 Ahmed decided not to link +96890944469 (Meta holds the number in a portfolio we cannot see, error #3441038; support case 39735302326084565 left open). The `owner` route row was deleted from `company_lead_routes` (it had no conversations, events or credentials). SQL68 code/guards stay in place but are dormant: the owner card only renders when the row exists. Investors stay on the Muscat line as before. The owner's profile phone (90944469) is unchanged. Test WABA "Ahmed Habib" (+1 555-734-2702) created by a signup attempt remains in portfolio 862303320849933, unused.
+
+## 27 Nov 2026 — SQL159: staff can no longer read owner net / expected commission from the API
+- **Leak.** `properties` gave `authenticated` table-level SELECT, so an agent read `owner_net` / `expected_commission` of 48 properties straight from REST, although the screen hides them and `crm_properties_access` masks them for non-owners.
+- **Fix (SQL159, applied).** REVOKE table SELECT on `properties` from authenticated, GRANT SELECT on every other column. Writes keep table-level INSERT/UPDATE. The app already reads through `crm_properties_access` (`crmDataFrom`) and the edge functions use explicit columns or the service role. Same pattern as `deals`.
+- **Rule for later migrations:** a NEW column on `properties` is not readable by authenticated until `GRANT SELECT (col) ON public.properties TO authenticated;` (the view shows it anyway, it runs as its owner).
+- **Checked.** `tests/fixtures/test-accounts-rls.sql` (now also checks the money columns): owner sees 48 money rows in the view, staff 0; direct `properties.owner_net` denied to both; all other counts unchanged; an agent UPDATE on properties still works. Rollback: `db/changes/159-...rollback.sql`.
+- **Left as is:** `profiles.commission_rate` is readable by staff, but it is the default 10 for everyone and unused on screen; locking it would break the `profiles select('*')` at login, so not worth it now.
+- **Next (same thread):** Ahmed chose to move the functions, brain and docs to a new private repo `habib-crm-core` (he creates it; cloud sessions cannot). Live functions keep running (bundled at deploy). Before removing anything from this public repo, the list goes to Ahmed first.

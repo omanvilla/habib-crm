@@ -16,6 +16,7 @@ DECLARE
   tbls text[] := ARRAY['clients','properties','deals','viewings','client_requests','activities',
     'whatsapp_conversations','notifications','profiles','expenses','owners','owner_leads',
     'owner_price_studies','investment_projects','instagram_media_catalog','crm_owner_notes'];
+  -- SQL159: also checks properties.owner_net (denied to both directly) and the view's money rows (owner only)
   t text; n bigint; res jsonb := '{}'; one jsonb; who record; tmp uuid; priv uuid; ph text;
 BEGIN
   UPDATE public.profiles SET company_id = co, is_active = true,
@@ -63,6 +64,10 @@ BEGIN
       EXCEPTION WHEN OTHERS THEN one := one || jsonb_build_object('own_temp_client_error', SQLERRM);
       END;
     END IF;
+    BEGIN PERFORM owner_net FROM public.properties LIMIT 1; one := one || '{"properties_owner_net":"readable"}';
+    EXCEPTION WHEN insufficient_privilege THEN one := one || '{"properties_owner_net":"denied"}'; END;
+    SELECT count(*) INTO n FROM public.crm_properties_access WHERE owner_net IS NOT NULL OR expected_commission IS NOT NULL;
+    one := one || jsonb_build_object('view_money_rows', n);
     RESET ROLE;
     res := res || jsonb_build_object(who.k, one);
   END LOOP;
