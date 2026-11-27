@@ -18,7 +18,7 @@
 - **بموافقة أحمد («موافق على الكل»):** انحذف كرون `habib_whatsapp_followups_hourly` (jobid 1، موقف وما اشتغل أبداً)، و126 فرع قديم على GitHub (120 مدموج + 6 محتواها في main؛ الـ sha لكل واحد في `docs/deleted-branches-20261127.txt` لو احتجنا نرجعه)، و11 worktree قديم على اللابتوب (نظيفة)، و3 مهام سحابية موقفة: «تسعير آلي: الأراضي» و«تسعير آلي: العقارات الجاهزة» (نسخ اللابتوب القديمة) و«تنبيه التسعير: قبل الساعة 8». التذكيرات اللي اشتغلت مرة وخلصت مخفية أصلاً من صفحة المهام.
 - **فحص قبل وبعد:** كل صفحات الـ CRM الحية فتحت بدون «تعذر» ولا أخطاء كونسول، والكرون (34) صفر فشل.
 - **الجرد الكامل** (المهام السحابية، اللابتوب، الكرون مع الـ ids) في ذاكرة المشروع `automation-inventory.md`. `RemoteTrigger list` يرجع 20 بس ويتجاهل cursor، والحذف من `claude.ai/scheduled-task/<id>` ← القائمة جنب العنوان ← Delete.
-- **باقي ينتظر أحمد:** 11 فرع ما اندمجت بس محتواها انضاف لـ main بطريقة ثانية أو صار قديم (negotiation-hold، unit-groups، 7 codex من أكتوبر، followups-instruction-docs، visits-ai-results) + worktree `unit-groups`.
+- **بعدها بموافقة أحمد («نعم»):** انحذفت 11 فرع ما اندمجت بس محتواها انضاف لـ main بطريقة ثانية أو صار قديم (negotiation-hold، unit-groups، 7 codex من أكتوبر، followups-instruction-docs، visits-ai-results) + worktree `unit-groups`. الـ sha في نفس الملف. الباقي على GitHub: main + فروع ثريدات 26 و27 نوفمبر.
 
 ---
 
