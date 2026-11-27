@@ -54,6 +54,9 @@ whatsapp_conversations:[
 {id:uuid(1701),company_id:company,client_id:uuid(101),route_key:'muscat',assigned_to:muscat,customer_name:'عميل مسقط الاصطناعي',customer_wa_id:'96800000101',human_handoff_required:true,handoff_reason:'مشتري جاد: يسأل عن الحجز (اختبار)',handoff_updated_at:now,last_inbound_at:now,owner_alert_done_at:null,updated_at:now},
 {id:uuid(1702),company_id:company,client_id:uuid(103),route_key:'barka',assigned_to:barka,customer_name:'عميل بركاء الاصطناعي',customer_wa_id:'96800000103',human_handoff_required:true,handoff_reason:'طلب اتصال: يبي أحد يكلمه (اختبار)',handoff_updated_at:now,last_inbound_at:now,owner_alert_done_at:null,updated_at:now}],
 owners:[{id:uuid(901),company_id:company,added_by:muscat,name:'مالك مسقط الاصطناعي',phone:'+96800000011',owner_type:'owner',archived:false},{id:uuid(902),company_id:company,added_by:barka,name:'مالك بركاء الاصطناعي',phone:'+96800000012',owner_type:'owner',archived:false}],
+// SQL159 (27 Nov 2026): Ahmed's saved answers (owner-only table, like the real RLS): one waiting, one in use
+agent_saved_answers:[{id:uuid(1801),company_id:company,property_id:uuid(305),question:'هل الفيلا جديدة؟ عن فيلا حي عاصم',answer:'نعم',status:'pending',source_conversation_id:uuid(1702),created_at:relative(-1)+'T09:00:00Z'},
+{id:uuid(1802),company_id:company,property_id:null,question:'موقع المكتب',answer:'المكتب في مبنى اختبار، الطابق الثالث',status:'active',source_conversation_id:null,created_at:relative(-3)+'T09:00:00Z',decided_at:relative(-3)+'T10:00:00Z'}],
 // SQL123: one new-listing client kept outside the best 20 (owner-only table, like the real RLS)
 whatsapp_outreach_queue:[{id:uuid(1501),company_id:company,kind:'new_listing',status:'skipped',reason:'over_cap',dry_run:false,property_id:uuid(305),client_id:uuid(103),conversation_id:uuid(1601),route_key:'barka',summary:'قريب (نفس الولاية) · طلبه: فيلا في بركاء بحدود 80 الف',messages:['نزل عندنا فيلا في حي عاصم بـ 75 الف ممكن يناسب طلبك','لين الحين تبحث ؟'],created_at:now}],
 company_lead_routes:[{id:uuid(1301),company_id:company,route_key:'muscat',label:'مسقط',assigned_to:muscat,is_active:true},{id:uuid(1302),company_id:company,route_key:'barka',label:'بركاء',assigned_to:barka,is_active:true}],
@@ -85,6 +88,7 @@ function privateProperty(id){
 function allowed(row,table){
  if(!row)return false;
  if(table==='whatsapp_outreach_queue'&&profile.role!=='owner')return false;
+ if(table==='agent_saved_answers'&&profile.role!=='owner')return false;
  // SQL79/82/85 (11 Nov 2026, decision 6 of 18 Nov: «مفتوح للموظف مثل الحين»): staff read investors, their requests,
  // chats and the projects like any client; only the owner's private WhatsApp line (route 'owner') stays owner-only
  // (owner_line_is_private). Branch targets and performance still leave investment out (privateProperty, branchMember).
@@ -338,6 +342,14 @@ rpc:async(name,args={})=>{
  if(name==='crm_client_first_contacts'){
   const wanted=new Set(args.p_client_ids||[]),allowed=(await query('clients').select('*')).data||[];
   return {data:allowed.filter(c=>wanted.has(c.id)).map(c=>{const contacts=[...(db.whatsapp_messages||[]).map(m=>({...m,source:'whatsapp'})),...(db.instagram_messages||[]).map(m=>({...m,source:'instagram'}))].filter(m=>m.client_id===c.id&&m.direction==='inbound'&&m.message_timestamp&&(profile.role==='owner'||db.whatsapp_conversations.find(w=>w.id===m.conversation_id)?.route_key!=='owner')).sort((a,b)=>Date.parse(a.message_timestamp)-Date.parse(b.message_timestamp));return {client_id:c.id,first_contact_at:contacts[0]?.message_timestamp||null,first_contact_source:contacts[0]?.source||null};}),error:null};
+ }
+ if(name==='crm_saved_answer_decide'){
+  if(profile.role!=='owner')return {data:null,error:{message:'owner_only'}};
+  const row=(db.agent_saved_answers||[]).find(r=>r.id===args.p_id);if(!row)return {data:null,error:{message:'not_found'}};
+  const st={save:'active',resume:'active',pause:'paused',dismiss:'dismissed'}[args.p_action];if(!st)return {data:null,error:{message:'bad_action'}};
+  if(args.p_action==='save'&&!String(args.p_answer||row.answer).trim())return {data:null,error:{message:'empty_answer'}};
+  if(args.p_action==='save'){if(args.p_scope==='general')row.property_id=null;if(String(args.p_question||'').trim())row.question=args.p_question.trim();if(String(args.p_answer||'').trim())row.answer=args.p_answer.trim();row.decided_at=new Date().toISOString();}
+  row.status=st;return {data:{ok:true,status:st},error:null};
  }
  if(name==='normalize_property_marketing_link')return {data:marketingLinkKey(args.p_url),error:null};
  // SQL148: who wrote last (the real one reads whatsapp_messages; staff only see their branch chats)

@@ -7,7 +7,8 @@
 -- Account details live in tests/test-accounts.local.json (git-ignored). Run the DO block with execute_sql;
 -- the "error" TEST_ACCOUNTS_RESULT {...} is the result. Expected: owner sees every count of "all" and
 -- owner_line_client_visible=1; staff sees owner_line_client_visible=0, own_temp_client_visible=1 and 0 in
--- owner_price_studies, crm_owner_notes, instagram_media_catalog (both branches are shared by Ahmed's SQL79).
+-- owner_price_studies, crm_owner_notes, instagram_media_catalog (both branches are shared by Ahmed's SQL79), 0 in
+-- agent_saved_answers and saved_answer_rpc=owner_only (SQL159).
 DO $chk$
 DECLARE
   co   uuid := (SELECT id FROM public.companies ORDER BY created_at LIMIT 1);
@@ -15,7 +16,7 @@ DECLARE
   stf  uuid := (SELECT id FROM public.profiles WHERE email = 'staff-check@habib-crm.test');
   tbls text[] := ARRAY['clients','properties','deals','viewings','client_requests','activities',
     'whatsapp_conversations','notifications','profiles','expenses','owners','owner_leads',
-    'owner_price_studies','investment_projects','instagram_media_catalog','crm_owner_notes'];
+    'owner_price_studies','investment_projects','instagram_media_catalog','crm_owner_notes','agent_saved_answers'];
   t text; n bigint; res jsonb := '{}'; one jsonb; who record; tmp uuid; priv uuid; ph text;
 BEGIN
   UPDATE public.profiles SET company_id = co, is_active = true,
@@ -53,6 +54,14 @@ BEGIN
         END;
       END IF;
     END LOOP;
+    -- SQL159: only the owner decides on a saved answer
+    IF to_regproc('public.crm_saved_answer_decide') IS NOT NULL THEN
+      BEGIN
+        PERFORM public.crm_saved_answer_decide((SELECT id FROM public.agent_saved_answers LIMIT 1), 'pause');
+        one := one || jsonb_build_object('saved_answer_rpc', 'allowed');
+      EXCEPTION WHEN OTHERS THEN one := one || jsonb_build_object('saved_answer_rpc', SQLERRM);
+      END;
+    END IF;
     -- temporary data for the staff account, written through RLS as that account
     IF who.k = 'staff' THEN
       BEGIN

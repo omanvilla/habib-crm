@@ -1142,6 +1142,10 @@ async function mentionsProject(companyId: string, texts: string[]): Promise<bool
   return !!projectRe.re && texts.some((x) => projectRe.re!.test(x));
 }
 
+// SQL159: Ahmed's saved answers on this property, in his words (the agent answers from them instead of R41)
+const savedAnswersText = (p: any) => (p.savedAnswers || []).length
+  ? `\n  أجوبة أحمد المحفوظة عن هذا العقار (جاوب منها بنفس المعنى بدل التحويل): ${(p.savedAnswers as any[]).map((a) => `س: ${String(a.question).replace(/\s+/g, " ").slice(0, 200)} ج: ${String(a.answer).replace(/\s+/g, " ").slice(0, 400)}`).join(" / ")}`
+  : "";
 // Office titles carry owner names ("فيلا الرميس 59 سلطان"), so the agent only sees a neutral label.
 function propLine(p: any) {
   const name = `${typeAr(p.type)} ${p.listing_purpose === "rent" ? "للإيجار" : "للبيع"}`;
@@ -1155,7 +1159,7 @@ function propLine(p: any) {
   const nego = p.listing_purpose === "rent" ? "" : p.price_negotiable === "fixed" ? " | السعر: ثابت" : p.price_negotiable === "negotiable" ? " | السعر: قابل للتفاوض" : " | السعر: ما حدده أحمد";
   // SQL101 / R52 (Ahmed 14 Nov): electricity and water, said only when the office or the owner recorded them
   const util = `${p.electricity_connected === "yes" ? " | الكهرباء: موصلة" : p.electricity_connected === "no" ? " | الكهرباء: غير موصلة" : ""}${p.water_connected === "yes" ? " | الماء: موصل" : p.water_connected === "no" ? " | الماء: غير موصل" : ""}${p.utilities_note ? ` | الماي والكهرباء (جواب أحمد): ${String(p.utilities_note).replace(/\s+/g, " ").slice(0, 200)}` : ""}`;
-  return `- id=${p.id} | ${name} | ${bits}${terms}${rented}${nego}${util} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? " | اللوكيشن متوفر (action=send_location)" : " | اللوكيشن غير متوفر"} | الفرع: ${p.branch_key === "muscat" ? "مسقط (رقم 71770030)" : p.branch_key === "barka" ? "بركاء (رقم 92344273)" : "غير محدد"}${p.video ? ` | رابط الفيديو (ترسله إذا طلب فيديو): ${p.video}` : ""}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}${p.marketing ? `\n  وصف الإعلان: ${short(p.marketing, 1600)}` : ""}`;
+  return `- id=${p.id} | ${name} | ${bits}${terms}${rented}${nego}${util} | الزيارة: ${visit}${p.visit_instructions ? ` (${p.visit_instructions})` : ""}${p.map_url ? " | اللوكيشن متوفر (action=send_location)" : " | اللوكيشن غير متوفر"} | الفرع: ${p.branch_key === "muscat" ? "مسقط (رقم 71770030)" : p.branch_key === "barka" ? "بركاء (رقم 92344273)" : "غير محدد"}${p.video ? ` | رابط الفيديو (ترسله إذا طلب فيديو): ${p.video}` : ""}${p.public_details ? `\n  تفاصيل: ${short(p.public_details, 500).replace(/\n+/g, " / ")}` : ""}${p.marketing ? `\n  وصف الإعلان: ${short(p.marketing, 1600)}` : ""}${savedAnswersText(p)}`;
 }
 // The same neutral label (type, area, price) for visits, deals and properties no longer available: never the office title
 function neutralLabel(p: any) {
@@ -1521,6 +1525,19 @@ Deno.serve(async (req) => {
       const un = props.length ? await db.from("properties").select("id,utilities_note").in("id", props.map((p: any) => p.id)) : null;
       if (un && !un.error) for (const r of (un.data || []) as any[]) { const p: any = props.find((x: any) => x.id === r.id); if (p && r.utilities_note) p.utilities_note = r.utilities_note; }
     } catch (_) { /* no column yet */ }
+    // SQL159 (27 Nov 2026): Ahmed's saved answers. A question that went to him (R41) and that he answered by hand is kept
+    // once he taps «احفظ» in the CRM: on the property (shown on its line) or general (its own block). Read on its own:
+    // before the table exists the error is ignored and nothing changes.
+    let generalAnswers: any[] = [];
+    try {
+      const sa = await db.from("agent_saved_answers").select("id,property_id,question,answer").eq("company_id", msg.company_id).eq("status", "active")
+        .order("decided_at", { ascending: false }).limit(80);
+      if (sa && !sa.error) for (const r of (sa.data || []) as any[]) {
+        if (!r.property_id) { if (generalAnswers.length < 25) generalAnswers.push(r); continue; }
+        const p: any = props.find((x: any) => x.id === r.property_id);
+        if (p) (p.savedAnswers ||= []).length < 8 && p.savedAnswers.push(r);
+      }
+    } catch (_) { /* no table yet */ }
     // decision 42 (Ahmed 18 Nov 2026: «العقل يبلغه أكيد»): a sold / reserved notice that was skipped because the client wrote
     // after it was queued (kind property_sold, status skipped, reason sold_client_wrote_after, older rows client_wrote_after) is
     // said by the agent in its first reply, while the property is still gone (not in the available list). Then its reason
@@ -1874,6 +1891,8 @@ Deno.serve(async (req) => {
       "معلومات المستثمرين:",
       INVESTOR_KNOWLEDGE,
       "",
+      ...(generalAnswers.length ? ["أجوبة أحمد المحفوظة (عامة، مو عن عقار واحد). إذا العميل سأل نفس السؤال أو نفس معناه: جاوب بجواب أحمد بنفس المعنى وبأسلوبك القصير، بدون تحويل «سؤال ما عندي جوابه». لا تزيد عليه معلومة مو مكتوبة، ولا تستخدمه لسؤال ثاني يشبهه بس مو نفسه:",
+        ...generalAnswers.map((a: any) => `- س: ${String(a.question).replace(/\s+/g, " ").slice(0, 200)}\n  ج: ${String(a.answer).replace(/\s+/g, " ").slice(0, 400)}`), ""] : []),
       rulesR.data?.length ? "ردود مثبتة اعتمدها المدير:\n" + rulesR.data.map((r: any) => `- rule_id=${r.id} | الموقف: ${r.situation}\n  الرد: ${pickedVariant[r.id].reply}`).join("\n") : "ردود مثبتة: لا يوجد",
       "",
       ...(otherRoute ? [otherRoute, ""] : []),
