@@ -14,6 +14,9 @@
 //   queue_listing   {property_id}   a new listing to open requests that match it, asking first if they still search.
 //                   {price_drop}    SQL123 (18 Nov): scored, the best 20 only, never a unit of a group already offered;
 //                   {preview}       also when the price of an available property drops; preview writes nothing
+//   queue_listing_details (cron)    SQL166 (Ahmed 27 Nov): a client who got «نزل عندنا … لين الحين تبحث ؟» and wrote nothing for a
+//                                   whole day gets ONE second message with the property's details, like a person would write,
+//                                   then nothing more. Only while whatsapp_automation_runtime.new_listing_auto is on.
 //   send_approved   (cron)          sends approved rows
 //                   branch_transfer step F (decision 77, SQL140): the reply agent on the wrong number queued it
 //                                   (crm_branch_transfer_queue); it goes from the right number once the agent's line went
@@ -48,6 +51,8 @@ const TEMPLATES: Record<string, { category: string; body: string; example: strin
   property_unit_booked_ar_v1: { category: "MARKETING", body: "بخصوص {{1}} اللي سألت عنها في {{2}}\nانحجزت وحدة منها والمتبقي {{3}}\nتحب تشوفها ؟", example: ["الفيلا", "الصومحان الجنوبية", "الثانية والثالثة"] },
   visit_missed_rebook_ar_v1: { category: "UTILITY", body: "بخصوص موعد زيارتك {{1}}\nتحب نحدد لك موعد ثاني ؟", example: ["فيلا الشخاخيط"] },
   request_offer_match_ar_v1: { category: "MARKETING", body: "بخصوص طلبك {{1}}\nعندنا {{2}} تحب ارسلك تفاصيله ؟", example: ["فيلا في الرميس بحدود 60 الف", "فيلا في الرميس بـ 59 الف"] },
+  // SQL166 (Ahmed 27 Nov): the second message of a new listing, a day after the first one went unanswered
+  property_details_ar_v1: { category: "MARKETING", body: "هذي تفاصيل {{1}}\n{{2}}\nتحب نرتب لك زيارة ؟", example: ["الفيلا في الصومحان الجنوبية بـ 69 الف", "الارض 400 متر والبناء 300 متر و4 غرف نوم و6 حمامات"] },
 };
 const NOUN: Record<string, [string, string, string]> = { // label, "booked" verb, indefinite
   villa: ["الفيلا", "انحجزت", "فيلا"], twin_villa: ["الفيلا", "انحجزت", "توين فيلا"], townhouse: ["الفيلا", "انحجزت", "تاون هاوس"], house: ["البيت", "انحجز", "بيت"],
@@ -259,7 +264,12 @@ async function queueListing(propertyId: string, dry: boolean, preview = false, p
   if (tok) for (const m of ((await db.from("whatsapp_messages").select("client_id,body").eq("company_id", prop.company_id).eq("direction", "outbound")
     .ilike("body", `%${tok}%`).gte("message_timestamp", new Date(Date.now() - 150 * DAY).toISOString()).limit(5000)).data || []))
     if (!prop.price || priceMentioned(m.body, prop.price)) asked.add(m.client_id);
-  const busy = new Set<string>(((await db.from("whatsapp_outreach_queue").select("client_id").in("status", ["pending", "approved", "sent"]).gte("created_at", new Date(Date.now() - 7 * DAY).toISOString())).data || []).map((m: any) => m.client_id));
+  // SQL166 (Ahmed 27 Nov «أي زبون»): a new listing is news, so the weekly gap of the follow-ups no longer holds it back; only a
+  // client who got an office message in the last 2 days (or has a new listing waiting to go) is left for the next one
+  const busy = new Set<string>([
+    ...(((await db.from("whatsapp_outreach_queue").select("client_id").eq("status", "sent").gte("sent_at", new Date(Date.now() - 2 * DAY).toISOString())).data || []).map((m: any) => m.client_id)),
+    ...(((await db.from("whatsapp_outreach_queue").select("client_id").in("kind", ["new_listing", "new_listing_details"]).in("status", ["pending", "approved"]).neq("property_id", prop.id)).data || []).map((m: any) => m.client_id)),
+  ]);
   const open = (reqs.data || []).filter((r: any) => r.client_id && !already.has(r.client_id) && !asked.has(r.client_id) && !busy.has(r.client_id) && !["found", "stopped"].includes(r.search_status));
   const convs = await lastInbound([...new Set(open.map((r: any) => r.client_id as string))]);
   // the best request of each client
@@ -303,6 +313,59 @@ async function queueListing(propertyId: string, dry: boolean, preview = false, p
   const result = { property: prop.title, price_drop: priceDrop, matched: ranked.length, over_cap: extraRows.length, group_units: group.length };
   if (preview) return { ...result, would_queue: picked, extra: extraRows.map((x: any) => x.summary) };
   return { ...result, queued: await upsertRows(rows), kept_extra: await upsertRows(extraRows) };
+}
+
+// ---- new listing, step 2: the details a day later ---------------------------------------------------
+// SQL166 (Ahmed 27 Nov): «إذا ما رد ... بعد يوم كامل ... تجي رسالة فيها تفاصيل العقار، كنا نرسلها حال شخص عادي ... إذا ما رد عاد
+// خلاص». One per client and property (kind new_listing_details), never after the client wrote, never for a property that is gone.
+const NUM = (v: unknown) => { const n = Math.round(Number(v || 0)); return n > 0 ? n : 0; };
+function detailsLine(p: any) {
+  const parts: string[] = [];
+  if (NUM(p.land_size)) parts.push(`الارض ${NUM(p.land_size)} متر`);
+  if (NUM(p.built_size)) parts.push(`البناء ${NUM(p.built_size)} متر`);
+  if (NUM(p.bedrooms)) parts.push(`${NUM(p.bedrooms)} غرف نوم`);
+  if (NUM(p.bathrooms)) parts.push(`${NUM(p.bathrooms)} حمامات`);
+  return parts.join(" و");
+}
+async function autoOn(companyId: string) {
+  const r = await db.from("whatsapp_automation_runtime").select("new_listing_auto").eq("company_id", companyId).maybeSingle();
+  return !r.error && r.data?.new_listing_auto === true;
+}
+async function queueListingDetails(preview = false) {
+  const now = Date.now();
+  const sent = await db.from("whatsapp_outreach_queue").select("id,company_id,property_id,client_id,request_id,conversation_id,route_key,sent_at")
+    .eq("kind", "new_listing").eq("status", "sent").eq("dry_run", false)
+    .lte("sent_at", new Date(now - DAY).toISOString()).gte("sent_at", new Date(now - 3 * DAY).toISOString()).limit(300);
+  const out: any[] = [];
+  const rows: any[] = [];
+  for (const s of sent.data || []) {
+    if (!preview && !(await autoOn(s.company_id))) { out.push({ client: s.client_id, skip: "auto_off" }); continue; }
+    const dup = await db.from("whatsapp_outreach_queue").select("id").eq("kind", "new_listing_details").eq("property_id", s.property_id).eq("client_id", s.client_id).limit(1);
+    if ((dup.data || []).length) continue;
+    // the client wrote after the first message: the reply agent talks with him, nothing more from here
+    const wrote = await db.from("whatsapp_messages").select("id").eq("client_id", s.client_id).eq("direction", "inbound").gt("message_timestamp", s.sent_at).limit(1);
+    if ((wrote.data || []).length) { out.push({ client: s.client_id, skip: "client_wrote" }); continue; }
+    const p = await db.from("properties").select("id,type,area,wilayat,price,status,archived,land_size,built_size,bedrooms,bathrooms,public_details").eq("id", s.property_id).maybeSingle();
+    if (!p.data || p.data.status !== "available" || p.data.archived) { out.push({ client: s.client_id, skip: "property_gone" }); continue; }
+    const cl = await db.from("clients").select("archived,followup_suppressed").eq("id", s.client_id).maybeSingle();
+    if (!cl.data || cl.data.archived || cl.data.followup_suppressed) { out.push({ client: s.client_id, skip: "client_paused" }); continue; }
+    if (s.request_id) { const rq = await db.from("client_requests").select("status").eq("id", s.request_id).maybeSingle(); if (rq.data && rq.data.status !== "active") { out.push({ client: s.client_id, skip: "request_closed" }); continue; } }
+    if (await held(s.conversation_id)) { out.push({ client: s.client_id, skip: "chat_held" }); continue; }
+    const prop = p.data;
+    const noun = NOUN[prop.type]?.[0] || "العقار";
+    const label = `${noun} في ${prop.area || prop.wilayat || ""} بـ ${thousands(prop.price)}`.replace(/\s+/g, " ").trim();
+    const line = detailsLine(prop) || short(String(prop.public_details || "").split("\n").filter(Boolean).slice(1, 3).join(" "), 300);
+    if (!line) { out.push({ client: s.client_id, skip: "no_details" }); continue; }
+    // inside the 24 hours (rare: he did not write since, so only when he wrote just before) the full ad text may go as plain text
+    const full = String(prop.public_details || "").trim();
+    rows.push({ company_id: s.company_id, kind: "new_listing_details", property_id: s.property_id, request_id: s.request_id, client_id: s.client_id, conversation_id: s.conversation_id,
+      route_key: s.route_key, step: "details_after_day", template_name: "property_details_ar_v1", template_params: [label, line],
+      messages: [`هذي تفاصيل ${label}`, full && full.length <= 900 ? full : line, "تحب نرتب لك زيارة ؟"],
+      summary: short(`تفاصيل بعد يوم بدون رد · ${label}`, 200), dry_run: false, status: "approved", approved_at: new Date().toISOString(), reason: "auto_new_listing", scheduled_for: new Date().toISOString() });
+    out.push({ client: s.client_id, queue: label });
+  }
+  if (preview) return { checked: (sent.data || []).length, would_queue: rows.map((r) => ({ client: r.client_id, messages: r.template_params })), results: out };
+  return { checked: (sent.data || []).length, queued: await upsertRows(rows), results: out.filter((x) => x.skip) };
 }
 
 // ---- sending ---------------------------------------------------------------------------------------
@@ -364,7 +427,7 @@ async function sendRows(ids?: string[]) {
       for (const o of outs) if (o.id) await db.from("whatsapp_messages").insert({
         company_id: r.company_id, conversation_id: r.conversation_id, client_id: r.client_id, request_id: r.request_id || null, whatsapp_message_id: o.id, direction: "outbound",
         message_type: o.type, sender_wa_id: phoneId, recipient_wa_id: to, body: o.body, message_timestamp: now, delivery_status: "sent", actor_type: "automated", channel_source: "crm_outreach",
-        matched_property_id: r.kind === "new_listing" ? r.property_id : null,
+        matched_property_id: ["new_listing", "new_listing_details"].includes(r.kind) ? r.property_id : null,
         raw_payload: { source: `outreach_${r.kind}`, queue_id: r.id, property_id: r.property_id, template_name: service ? null : r.template_name },
       });
       await db.from("whatsapp_outreach_queue").update({ status: "sent", sent_at: now, send_mode: service ? "service" : "template", meta_message_id: outs[0]?.id || null, error: null }).eq("id", r.id);
@@ -425,6 +488,7 @@ Deno.serve(async (req) => {
         case "queue_requests": return json({ ok: true, ...(await queueRequests()) });
         case "queue_sold": return json({ ok: true, ...(await queueSold(String(body.property_id), body.dry_run !== false)) });
         case "queue_listing": return json({ ok: true, ...(await queueListing(String(body.property_id), body.dry_run !== false, body.preview === true, body.price_drop === true)) });
+        case "queue_listing_details": return json({ ok: true, ...(await queueListingDetails(body.preview === true)) });
         case "send_approved": return json({ ok: true, ...(await sendRows()) });
         case "templates": return json({ ok: true, ...(await templates(body.submit === true)) });
       }
