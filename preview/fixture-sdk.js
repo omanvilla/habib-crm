@@ -295,6 +295,22 @@ function fixtureExtraRpc(name,args){
    return ok({from:relative(-(days-1)),today,daily_target:10,people:callPeople().map((p,j)=>({user_id:p.id,name:p.full_name,
     days:list.map((d,i)=>{const wd=new Date(d+'T12:00:00Z').getUTCDay(),off=wd===5||wd===6;return {day:d,calls:off?0:(3+i+j)%11,target:off?0:10,note:off?null:(i===2?'اجتماع في المكتب':null),list:[]};})}))});
   }
+  // SQL161 office (27 Nov 2026): staff get only their own card and no workers; nothing about money
+  case 'crm_office_snapshot':{
+   if(!['owner','manager','agent'].includes(profile.role))return {data:null,error:{message:'not_authorized',code:'42501'}};
+   const boss=['owner','manager'].includes(profile.role),ago=m=>new Date(Date.now()-m*60000).toISOString();
+   const W=(key,name,icon,status,mins,did)=>({key,name,icon,status,last_run:ago(mins),last_output:ago(mins),did});
+   const people=profiles.filter(p=>p.role==='agent'&&p.is_active!==false&&(boss||p.id===profile.id)).map((p,i)=>({id:p.id,name:p.full_name,
+    last_login_at:ago(60*(5+i*30)),branches:[p.id===muscat?'muscat':'barka'],calls:{from:today.slice(0,8)+'01',to:today,calls:33+i*40,target:100,fixed:true},
+    tasks_done_30d:11+i*4,tasks_overdue:i?0:4,tasks_today:1,wa_replies_30d:1152-i*456,wa_clients_30d:236+i*16,reply_minutes:i?88:19,
+    visits_week:i?4:1,visits_goal:5,new_properties_week:i?2:0,new_properties_goal:2,bookings_month:1,bookings_goal:3}));
+   return ok({today,now,role:profile.role,waiting_conversations:boss?27:9,failed_jobs:[],staff:people,workers:boss?[
+    W('brain','العقل (يرد في واتساب)','💬','green',6,'60 رد اليوم'),W('audit','فاحص الردود','🧐','green',170,'6 ملاحظة آخر يوم'),
+    W('coach','مدرب الردود (أسبوعي)','🎓','green',8600,'تقرير كل سبت'),W('pricing','المسعّر','🏷️','green',40,'34 دراسة هالشهر'),
+    W('followups','متابعة بعد الزيارة','📅','green',10,'7 رسالة هالأسبوع'),W('outreach','رسائل العملاء القدامى','📣','yellow',200,'12 رسالة هالأسبوع'),
+    W('matcher','مطابقة عروض الملاك','🏠','green',120,'2256 مطابقة'),W('alerts','تنبيهات العقارات','🔔','green',9,null),
+    W('voice','مفرّغ الرسائل الصوتية','🎙️','green',5,null),W('instagram','متابع إنستغرام','📸','red',300,null)]:[]});
+  }
   case 'crm_visits_unasked':return ok([]);
   // synthetic studies (19 Nov 2026): three waiting for approval, one waiting for the owner, one sent from the phone
   case 'crm_price_studies_pending':{

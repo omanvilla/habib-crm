@@ -9,6 +9,8 @@
 -- owner_line_client_visible=1; staff sees owner_line_client_visible=0, own_temp_client_visible=1 and 0 in
 -- owner_price_studies, crm_owner_notes, instagram_media_catalog (both branches are shared by Ahmed's SQL79), 0 in
 -- agent_saved_answers and saved_answer_rpc=owner_only (SQL160).
+-- SQL161 office: owner office_workers=10, office_money=false; staff office_staff=1, office_workers=0,
+-- office_other_people=0, office_money=false.
 DO $chk$
 DECLARE
   co   uuid := (SELECT id FROM public.companies ORDER BY created_at LIMIT 1);
@@ -61,6 +63,17 @@ BEGIN
         PERFORM public.crm_saved_answer_decide((SELECT id FROM public.agent_saved_answers LIMIT 1), 'pause');
         one := one || jsonb_build_object('saved_answer_rpc', 'allowed');
       EXCEPTION WHEN OTHERS THEN one := one || jsonb_build_object('saved_answer_rpc', SQLERRM);
+      END;
+    END IF;
+    -- SQL161: the office page. Staff get only their own card and no automatic workers; no money key for anyone
+    IF to_regproc('public.crm_office_snapshot') IS NOT NULL THEN
+      DECLARE o jsonb;
+      BEGIN
+        o := public.crm_office_snapshot();
+        one := one || jsonb_build_object('office_staff', jsonb_array_length(o->'staff'), 'office_workers', jsonb_array_length(o->'workers'),
+          'office_other_people', (SELECT count(*) FROM jsonb_array_elements(o->'staff') x WHERE x->>'id' <> who.id::text),
+          'office_money', o::text ~ '(commission|owner_net|deal_value)');
+      EXCEPTION WHEN OTHERS THEN one := one || jsonb_build_object('office_error', SQLERRM);
       END;
     END IF;
     -- temporary data for the staff account, written through RLS as that account

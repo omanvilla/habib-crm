@@ -130,7 +130,7 @@
     ['اليوم',['dash','replies','daily','whatsapp','calendar','viewings']],
     ['العملاء والعقارات',['clients','properties','owners','instagram']],
     ['المبيعات',['deals','deposits']],
-    ['التقارير',['reports','expenses','activityLog']],
+    ['التقارير',['office','reports','expenses','activityLog']],
     ['الإدارة',['team','backup','settings','ai']]
   ];
   const RETIRED_NAV=['calendar','deposits','expenses','activityLog','backup'];
