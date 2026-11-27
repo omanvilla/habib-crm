@@ -249,3 +249,5 @@ REVOKE ALL ON FUNCTION crm_repair_private.missed_call_tasks() FROM PUBLIC, anon,
 SELECT cron.unschedule(jobid) FROM cron.job WHERE jobname = 'crm_missed_call_tasks';
 -- 8 AM - 3 PM Oman (04-11 UTC), Saturday to Thursday
 SELECT cron.schedule('crm_missed_call_tasks', '2 4-11 * * 0-4,6', $$ select crm_repair_private.missed_call_tasks(); $$);
+-- the two templates' Meta status, hourly (missed_call_ar_v1 / missed_call_evening_ar_v1 into whatsapp_template_registry)
+SELECT cron.schedule('missed_call_templates_refresh', '17 * * * *', $$ select net.http_post(url:='https://dmsckqjkcnsfmnzfjczz.supabase.co/functions/v1/missed-call', headers:=jsonb_build_object('content-type','application/json','x-crm-agent',(select decrypted_secret from vault.decrypted_secrets where name='crm_reply_agent')), body:='{"action":"templates","submit":false}'::jsonb, timeout_milliseconds:=60000); $$);

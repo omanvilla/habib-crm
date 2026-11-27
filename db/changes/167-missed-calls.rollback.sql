@@ -1,6 +1,6 @@
 -- Rollback of SQL167 (missed calls). Keeps public.crm_missed_calls (the call log is data: drop it only with Ahmed's yes).
 SET LOCAL lock_timeout = '10s';
-SELECT cron.unschedule(jobid) FROM cron.job WHERE jobname = 'crm_missed_call_tasks';
+SELECT cron.unschedule(jobid) FROM cron.job WHERE jobname IN ('crm_missed_call_tasks', 'missed_call_templates_refresh');
 DROP FUNCTION IF EXISTS crm_repair_private.missed_call_tasks();
 DROP FUNCTION IF EXISTS public.crm_missed_call_done(uuid, text, text, text, uuid, text);
 DROP FUNCTION IF EXISTS public.crm_missed_call_plan(text, text, boolean);
