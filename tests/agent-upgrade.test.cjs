@@ -229,15 +229,14 @@ test('14 Nov guards, batch 2: price talk before a visit, location before a time,
  r=await run(['عندنا شقة في الخوض بـ 45 الف'],{route:'muscat'});assert.deepEqual(r.texts,['عندنا شقة في الخوض بـ 45 الف'],'a listed property is not a project');
  r=await run(['فيلا في المعبيلة قريب من مدينة السلطان هيثم بـ 85 الف'],{route:'muscat'});assert.equal(r.texts[0].includes('85'),true);
 });
-test('14 Nov decisions: «حصلت» after «لين الحين تبحث ؟» closes the request with one «مبروك» line (SQL166); thanks, «المالك» and the allowed promises are written once',()=>{
+test('14 Nov decisions: «حصلت» after «لين الحين تبحث ؟» closes the request with no reply; thanks, «المالك» and the allowed promises are written once',()=>{
  const block=agent.slice(at('    let lastOutBody = "";'),at('    // the ad text goes once per conversation'));
  const run=(said,last='بخصوص طلبك فيلا في الرميس\nلين الحين تبحث ؟',o={})=>{
   const out={action:'none',...o};
   const r=new Function('out','texts','history','burstSaid','closedAfterBooking','thanksOnly','REASON_Q',block+'\nreturn {out,texts};')(out,['مبروك الله يبارك لك 🌷'],[{direction:'outbound',body:last},{direction:'inbound',body:said}],said,()=>false,()=>false,/الاسباب/);
   return r;
  };
- // SQL166 (Ahmed 27 Nov «نبارك له ونطلعه»): one «مبروك» line now, no longer silence
- for(const said of ['حصلت','خلاص حصلت بيت','اشتريت الحمدلله','لقيت واحد','حصل']){const r=run(said);assert.deepEqual(r.texts,['مبروك 🌷 الله يتمم لك على خير'],said);assert.equal(r.out.search_stopped,true,said);}
+ for(const said of ['حصلت','خلاص حصلت بيت','اشتريت الحمدلله','لقيت واحد','حصل']){const r=run(said);assert.deepEqual(r.texts,[],said);assert.equal(r.out.search_stopped,true,said);}
  for(const said of ['ما حصلت شي','لسا ما لقيت','اي ابحث','حصلت شي جديد ؟']){const r=run(said);assert.equal(r.out.search_stopped,undefined,said);assert.equal(r.texts.length,1,said);}
  assert.equal(run('حصلت','متى يناسبك تزور ؟').out.search_stopped,undefined,'only after our search question');
  assert.match(agent,/status: "cancelled", closed_reason: "العميل قال إنه حصل عقار ووقف البحث \(قفله العقل\)"/);

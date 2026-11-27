@@ -5,7 +5,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const read=f=>fs.readFileSync(f,'utf8');
 const lib=()=>import(url.pathToFileURL(path.resolve('supabase/functions/_shared/listing-match.mjs')).href);
 const sql=read('db/changes/166-new-listing-auto.forward.sql'),rb=read('db/changes/166-new-listing-auto.rollback.sql');
-const out=read('supabase/functions/whatsapp-outreach/index.ts'),agent=read('supabase/functions/whatsapp-reply-agent/index.ts');
+const out=read('supabase/functions/whatsapp-outreach/index.ts');
 const review=read('supabase/functions/whatsapp-visit-followup-auto/index.ts');
 const now=Date.parse('2026-11-27T08:00:00Z'),daysAgo=d=>new Date(now-d*86400000).toISOString();
 const villa={type:'villa',area:'الصومحان الجنوبيه',wilayat:'بركاء',price:69000};
@@ -40,13 +40,4 @@ test('step 2: once, a day after, only when the client wrote nothing, property st
 test('the review knows a kept new listing now goes by itself',()=>{
   assert(review.includes('SQL166، أحمد 27 نوفمبر: «على طول توصل له رسالة»'));
 });
-test('reply agent: «حصلت» = مبروك, «خلاص ما ابحث» = goodbye, a pause or a correction is not an end',()=>{
-  const grab=n=>{const m=agent.match(new RegExp(`const ${n} = (/.+/);`));assert(m,n);return eval(m[1]);};
-  const NO_LONGER_RE=grab('NO_LONGER_RE'),PAUSE_WORDS=grab('PAUSE_WORDS');
-  const noLonger=t=>NO_LONGER_RE.test(t)&&t.trim().length<=40&&!PAUSE_WORDS.test(t)&&!/(^|\s)(عن|ابي|ابغ|اريد|بس|لكن|ارض|فيلا|فل[ةه]|شق|بيت|منزل|استراح)/.test(t);
-  assert(agent.includes(String.raw`const noLonger = (t = "") => NO_LONGER_RE.test(t) && t.trim().length <= 40 && !PAUSE_WORDS.test(t) && !/(^|\s)(عن|ابي|ابغ|اريد|بس|لكن|ارض|فيلا|فل[ةه]|شق|بيت|منزل|استراح)/.test(t);`));
-  for(const t of ['خلاص ما ابحث','ما عاد ابحث','ما ادور','مب محتاج'])assert(noLonger(t),t);
-  for(const t of ['حاليا ما ابحث','ما ابحث الحين بعد شهرين','ما ابحث عن فيلا ابي ارض','ما ابحث بس اسأل'])assert(!noLonger(t),t);
-  assert(agent.includes('"مبروك 🌷 الله يتمم لك على خير"')&&agent.includes('"حياك الله 🌷 إذا احتجت شي مستقبلاً احنا موجودين"'));
-  assert(agent.includes('status: "cancelled", closed_reason'),'requests are closed, not deleted');
-});
+// the reply agent's part («حصلت» -> «مبروك») ships separately, after Ahmed's approval of the agent

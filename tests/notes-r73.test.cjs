@@ -84,12 +84,11 @@ const r50=agent.slice(agent.indexOf('    let lastOutBody = "";'),agent.indexOf('
 const answer=(said,last,texts,o)=>{const out={action:'none',...(o||{})};
  return new Function('out','texts','history','burstSaid','closedAfterBooking','thanksOnly','REASON_Q',r50+'\nreturn {out,texts};')(out,texts||['تحب تشوف خيارات ثانية ؟'],(o&&o.history)||[{direction:'outbound',body:last},{direction:'inbound',body:said}],said,()=>false,thanksOnly,/الاسباب|ليش\s*ما\s*ناسب/);};
 
-test('R50 after any follow-up of ours: a client who names what he found, or stopped buying, gets one line (SQL166) and his search ends',()=>{
+test('R50 after any follow-up of ours: a client who names what he found, or stopped buying, gets no reply and his search ends',()=>{
  const booked='السلام عليكم بخصوص فيلا الصومحان الجنوبية اللي سألت عنها انحجزت وحدة منها والمتبقي الثانية والثالثة تحب تشوفها ؟';
  const gone='السلام عليكم بخصوص فيلا الشخاخيط اللي سألتي عنها ما متوفره حالياً بس عندنا فيلا في الصومحان الجنوبية بـ 69 الف';
  for(const [said,last] of [['شكرًا وجدت خيار مناسب أكثر لي',booked],['وعليكم السلام بس خلاص جزاك الله خير اخذت بيت في سيب',booked],['وعليكم السلام.. خلاص اخوي حصلنا فيلا بقيمه أقل اشكرك',gone],['لا عزيزي حاليا متوقف عن الشراء',booked]]){
-  // SQL166: one line now; «مبروك» when he found, a warm goodbye when he only stopped
-  const r=answer(said,last);assert.deepEqual(r.texts,[/متوقف/.test(said)?'حياك الله 🌷 إذا احتجت شي مستقبلاً احنا موجودين':'مبروك 🌷 الله يتمم لك على خير'],said);assert.equal(r.out.search_stopped,true,said);}
+  const r=answer(said,last);assert.deepEqual(r.texts,[],said);assert.equal(r.out.search_stopped,true,said);}
  // not the end of a search: no property named, a question, a denial, or not after a follow-up of ours
  for(const [said,last] of [['حصلت رقمكم من صديق ارسل التفاصيل',gone],['حصلتوا شي ثاني ؟',gone],['لسا ما حصلت بيت',booked],['اخذت بيت في سيب','متى يناسبك تزور ؟'],['تمام ارسل التفاصيل',booked]]){
   const r=answer(said,last);assert.equal(r.out.search_stopped,undefined,said);assert.equal(r.texts.length,1,said);}

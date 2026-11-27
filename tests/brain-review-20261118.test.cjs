@@ -76,8 +76,8 @@ test('decisions 20, 21, 24, 27, 30, 69, 70: brain lines and code',()=>{
  assert(agent.includes('.replace(/^\\s*حياك(\\s*الله)?(\\s+|$)/, "").replace(/[ \\t]*[،,][ \\t]*(?!\\d)/g, " ")'));
  // 69, 70, 22, 25, 12
  assert(!brain.includes('اذا سنحت الفرصة نجلس مع بعض')&&brain.includes('عميل يبي يجلس مع أحمد يستشيره (قرار 69)'));
- assert(brain.includes('إذا قال حصل أو خلاص ما يبحث: سطر واحد «مبروك 🌷 الله يتمم لك على خير»'));
- assert(agent.includes('/لين الحين تبحث|نزل عندنا|هذي تفاصيل/.test(lastOutBody)'));
+ assert(brain.includes('إذا قال حصل: بدون رد ويوقف البحث (R50، قرار 70)'));
+ assert(agent.includes('/لين الحين تبحث|نزل عندنا/.test(lastOutBody)'));
  assert(!brain.includes('فيلا الرميس 59')&&!brain.includes('بركاء، المصنعة'));
  assert(!brain.includes('الموضوع المحول "اجتماع:" وهو يسأل عن المشروع أو يغيّر الموعد: رد عادي'));
  assert(!brain.includes('وبيرد عليك واحد من الفريق'));
