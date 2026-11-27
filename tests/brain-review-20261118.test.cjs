@@ -41,6 +41,9 @@ test('decisions 10 and 11: no meeting is booked over an unclarified Sultan Haith
  o=run([IN('ميزانيتي ٣٠ الف في مدينة السلطان هيثم'),OUT(INV),IN('تمام')]);assert.equal(o.guard_under_57,true,'a budget in Arabic digits');
  // once the office said it, or on the Barka number, or with no low figure: booked as before (R45)
  o=run([IN('شقق وادي زها اللي كانت بـ20,800'),OUT('المتوفر الحين في مدينة السلطان هيثم يبدأ من 57 الف\n\nيناسبك ؟'),IN('اوكي نرتب الاجتماع')]);assert.equal(o.action,'book_meeting');
+ // the office's line holds the low figure and the 57,000 together, then «next week we arrange a meeting» (62c755b3, 26 Nov)
+ o=run([IN('اكدر احصل فيلا بحدود ٥٠ الف ريال تملك'),OUT('المتوفر الحين في مدينة السلطان هيثم يبدأ من 57 الف'),OUT('بـ 50 الف ما عندنا فيلا تملك حر حالياً\n\nالمتوفر الحين في مدينة السلطان هيثم يبدأ من 57 الف وعند المطور تاون هاوس وفلل\n\n'+INV+' يناسبك ؟'),IN('ممكن عالاسبوع القادم باذن الله ونرتب اجتماع')],{meeting:{place:'online'}});
+ assert.equal(o.action,'book_meeting','told in the same line');assert.equal(o.guard_under_57,undefined);
  o=run([IN('شقق وادي زها اللي كانت بـ20,800'),OUT(INV),IN('ايوا')],{},'barka');assert.equal(o.action,'book_meeting');
  o=run([IN('الشراء بـ 50 الف يعطي إقامة ؟'),OUT(INV),IN('ايوا')]);assert.equal(o.action,'book_meeting','the residency figure is not a price');
  o=run([IN('عندي أرض 6000 م² ابي اعرضها في مدينة السلطان هيثم'),OUT(INV),IN('تمام')]);assert.equal(o.action,'book_meeting','a size is not a price');

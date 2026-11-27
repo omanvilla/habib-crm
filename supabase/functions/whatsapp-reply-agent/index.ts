@@ -1142,7 +1142,7 @@ async function mentionsProject(companyId: string, texts: string[]): Promise<bool
   return !!projectRe.re && texts.some((x) => projectRe.re!.test(x));
 }
 
-// SQL159: Ahmed's saved answers on this property, in his words (the agent answers from them instead of R41)
+// SQL160: Ahmed's saved answers on this property, in his words (the agent answers from them instead of R41)
 const savedAnswersText = (p: any) => (p.savedAnswers || []).length
   ? `\n  أجوبة أحمد المحفوظة عن هذا العقار (جاوب منها بنفس المعنى بدل التحويل): ${(p.savedAnswers as any[]).map((a) => `س: ${String(a.question).replace(/\s+/g, " ").slice(0, 200)} ج: ${String(a.answer).replace(/\s+/g, " ").slice(0, 400)}`).join(" / ")}`
   : "";
@@ -1525,7 +1525,7 @@ Deno.serve(async (req) => {
       const un = props.length ? await db.from("properties").select("id,utilities_note").in("id", props.map((p: any) => p.id)) : null;
       if (un && !un.error) for (const r of (un.data || []) as any[]) { const p: any = props.find((x: any) => x.id === r.id); if (p && r.utilities_note) p.utilities_note = r.utilities_note; }
     } catch (_) { /* no column yet */ }
-    // SQL159 (27 Nov 2026): Ahmed's saved answers. A question that went to him (R41) and that he answered by hand is kept
+    // SQL160 (27 Nov 2026): Ahmed's saved answers. A question that went to him (R41) and that he answered by hand is kept
     // once he taps «احفظ» in the CRM: on the property (shown on its line) or general (its own block). Read on its own:
     // before the table exists the error is ignored and nothing changes.
     let generalAnswers: any[] = [];
@@ -2020,7 +2020,9 @@ Deno.serve(async (req) => {
       });
       const rows = history.filter((h: any) => ["inbound", "outbound"].includes(h.direction));
       let lastLow = -1; rows.forEach((h: any, i: number) => { if (lowPrice(said(h))) lastLow = i; });
-      const told = lastLow >= 0 && rows.slice(lastLow + 1).some((h: any) => h.direction === "outbound" && /57/.test(wn(said(h))) && /يبد[اأ]|المتوفر|خلص/.test(said(h)));
+      // the office's own line can hold the low figure and the 57,000 together («بـ 50 الف ما عندنا … يبدأ من 57 الف»): it counts
+      // as told (محمد من العراق 62c755b3, 26 Nov: the guard cut the booking and only «يناسبك ؟» went)
+      const told = lastLow >= 0 && rows.slice(lastLow).some((h: any) => h.direction === "outbound" && /57/.test(wn(said(h))) && /يبد[اأ]|المتوفر|خلص/.test(said(h)));
       const project = HAITHAM.test(rows.map(said).join(" ")) || out.meeting?.place === "developer";
       if (lastLow >= 0 && !told && project) {
         out.action = "none"; out.handoff_reason = null; out.meeting = null;

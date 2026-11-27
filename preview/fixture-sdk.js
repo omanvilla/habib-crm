@@ -54,7 +54,7 @@ whatsapp_conversations:[
 {id:uuid(1701),company_id:company,client_id:uuid(101),route_key:'muscat',assigned_to:muscat,customer_name:'عميل مسقط الاصطناعي',customer_wa_id:'96800000101',human_handoff_required:true,handoff_reason:'مشتري جاد: يسأل عن الحجز (اختبار)',handoff_updated_at:now,last_inbound_at:now,owner_alert_done_at:null,updated_at:now},
 {id:uuid(1702),company_id:company,client_id:uuid(103),route_key:'barka',assigned_to:barka,customer_name:'عميل بركاء الاصطناعي',customer_wa_id:'96800000103',human_handoff_required:true,handoff_reason:'طلب اتصال: يبي أحد يكلمه (اختبار)',handoff_updated_at:now,last_inbound_at:now,owner_alert_done_at:null,updated_at:now}],
 owners:[{id:uuid(901),company_id:company,added_by:muscat,name:'مالك مسقط الاصطناعي',phone:'+96800000011',owner_type:'owner',archived:false},{id:uuid(902),company_id:company,added_by:barka,name:'مالك بركاء الاصطناعي',phone:'+96800000012',owner_type:'owner',archived:false}],
-// SQL159 (27 Nov 2026): Ahmed's saved answers (owner-only table, like the real RLS): one waiting, one in use
+// SQL160 (27 Nov 2026): Ahmed's saved answers (owner-only table, like the real RLS): one waiting, one in use
 agent_saved_answers:[{id:uuid(1801),company_id:company,property_id:uuid(305),question:'هل الفيلا جديدة؟ عن فيلا حي عاصم',answer:'نعم',status:'pending',source_conversation_id:uuid(1702),created_at:relative(-1)+'T09:00:00Z'},
 {id:uuid(1802),company_id:company,property_id:null,question:'موقع المكتب',answer:'المكتب في مبنى اختبار، الطابق الثالث',status:'active',source_conversation_id:null,created_at:relative(-3)+'T09:00:00Z',decided_at:relative(-3)+'T10:00:00Z'}],
 // SQL123: one new-listing client kept outside the best 20 (owner-only table, like the real RLS)

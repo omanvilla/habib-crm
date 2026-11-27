@@ -156,7 +156,7 @@
     state.autoSend=s.error?null:((s.data&&s.data.categories)||[]);
     state.variants=v.error?null:(v.data||[]);
   }
-  // SQL159 (27 Nov 2026): a question the agent sent to Ahmed (R41) and that the office answered by hand waits here.
+  // SQL160 (27 Nov 2026): a question the agent sent to Ahmed (R41) and that the office answered by hand waits here.
   // «احفظ للعقار» / «احفظ عام» lets the agent answer it next time; «تجاهل» drops it. Nothing is deleted.
   async function loadAnswers(){
     const r=await supa.from('agent_saved_answers').select('id,property_id,question,answer,status,source_conversation_id,created_at,decided_at').in('status',['pending','active','paused']).order('created_at',{ascending:false}).limit(200);

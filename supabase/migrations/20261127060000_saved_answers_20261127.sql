@@ -1,4 +1,4 @@
--- SQL159 (27 Nov 2026, thread «قلّل تحويلات العقل لأحمد بحفظ أجوبته»).
+-- SQL160 (27 Nov 2026, thread «قلّل تحويلات العقل لأحمد بحفظ أجوبته»).
 -- The reply agent hands Ahmed every question whose answer is not written (R41, «سؤال ما عندي جوابه:»): about 3 a day,
 -- and the same ones come back (units of the Sohman villa under construction, the zero-down offer for expats, what the
 -- Sultan Qaboos City flat includes, is the Rumais villa new, ...). Now Ahmed's answer is kept and the agent reuses it:
@@ -12,7 +12,7 @@
 --     dismiss, pause, resume. Nothing is ever deleted.
 --   * Reading is owner only (same as the pinned replies, SQL50). The agent reads with the service role.
 --   * Backfill: the R41 handoffs of 12 to 26 Nov that got a hand-written answer become pending rows for Ahmed to tap.
--- Rollback: 159-saved-answers.rollback.sql
+-- Rollback: 160-saved-answers.rollback.sql
 
 CREATE TABLE IF NOT EXISTS public.agent_saved_answers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

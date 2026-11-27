@@ -13,6 +13,24 @@
 
 ---
 
+## مسح السوق اليومي في السحابة لعمان ريل (27 نوفمبر 2026)
+
+- **الفحص:** من السحابة (WebFetch) عمان ريل ينفتح بإعلاناته، وبيوت (bayut.om) والسوق المفتوح (om.opensooq.com) يرفضون (4xx). نقل المسح كله للسحابة يحتاج خدمة مدفوعة (مثل Apify)، وأحمد اختار المجاني.
+- **قرار أحمد («عندك الصلاحيه سوي»):** مهمة سحابية يومية «مسح السوق اليومي السحابي (عمان ريل، بركاء)» (`trig_017drczRC4MNPo5DD7PAUTdQ`)، كل يوم 6:14 الصبح بتوقيت مسقط، كل تشغيل يفتح ثريد جديد في البروجكت. تكتب في «إعلانات السوق» و«إعلانات المباني» سطور «عمان ريل» بس: إضافة الجديد، تحديث «آخر رصد»، تغيّر السعر، و«اختفى» بس لو المسح غطى كل صفحات بركاء. ما تحذف ولا تلمس مصدر ثاني ولا تبويب ثاني.
+- **مهمة اللابتوب «مسح السوق اليومي (بركاء)» ما انلمست:** تكمل بيوت والسوق المفتوح لما ينفتح اللابتوب. لو مسحت عمان ريل بعد، ما في تكرار لأن الإعلان يتعرّف بالمصدر ورقم الإعلان. مجلدها (`.claude`) ما ينقرا من هنا، فما انشال منها عمان ريل.
+- **تنبيه:** إعدادات بيئة المهمة ما تنطبق (المهمة تاخذ إعدادات البروجكت)، فممكن curl ما يوصل الموقع وتستخدم WebFetch (صفحات الموقع JS، فرقم الهاتف والإحداثيات ممكن ما يطلعون).
+
+---
+
+## فحص أول ردود حقيقية بعد العقل v112 (27 نوفمبر 2026)
+
+- **الفحص (قراءة بس):** من نشر v112 (26 نوفمبر 09:08Z) انرسل 26 رد لـ 11 عميل وتخطى 10. R126 اشتغل (ام مصطفى، سطر فرع بركاء بدون «اسمك الكريم ؟»)، وأرقام الإقامة مطابقة لـ knowledge.ts، واللوكيشن وصل. R127 ما جاه سؤال يختبره.
+- **الغلط (محمد من العراق `62c755b3`):** حاجز «أقل من 57» (قرار 10 و11) حسب سطر المكتب نفسه «بـ 50 الف ما عندنا … يبدأ من 57 الف» كأنه سعر منخفض جديد، فلغى طلب الاجتماع، وبعد شيل السطر المكرر انرسل «يناسبك ؟» بروحه وما وصل أحمد «اجتماع:». **الإصلاح:** `told` يبدأ من نفس السطر (`rows.slice(lastLow)`)، واختبار في `tests/brain-review-20261118.test.cjs` (يفشل بدون الإصلاح). تجربة بدون إرسال على نفس الرسالة: `book_meeting` ساكت، «اجتماع: محمد اونلاين …».
+- **النشر (أحمد: «عندك الصلاحيه سوي» وكرت «انشر whatsapp-reply-agent الحين»، 27 نوفمبر 04:23Z):** `whatsapp-reply-agent` v113 → `383c668` (commit الدمج في main، PR #78). كان v112 → `25899bb`. نسخة التجربة `whatsapp-reply-agent-dryrun` v116 → `1b0b202`.
+- **ملاحظات مفتوحة لأحمد (ما انصلحت):** (1) العقل قال «البيت اللي في الصورة فيلا جاهزه» وهو ما عرف العقار؛ (2) ريل `DgKTpoDoaeK` («بيت في بركاء بـ 20 الف») مو في الكتالوج وسأل عنه 3 عملاء، ننتظر أحمد يقول هل هو حقه؛ (3) رابط ريل الصومحان انرسل بروحه بدون سطر ولا سؤال لأم مصطفى.
+
+---
+
 ## 000000000000) فحص أحمد للـ CRM (18 نوفمبر 2026) — SQL124 و125 و126 و`price-study` v10 **منشورة ومدموجة في `main` (`fc087f6`)**
 
 **طلب أحمد:** 5 نواقص من فحصه (التسعير الآلي، إغلاق المهام، قائمة اقتراح إغلاق، المشترين الواقفين، العقود). موافقة دائمة على الدمج والنشر، **إلا الإغلاق أو الحذف أو الأرشفة لبيانات موجودة: القائمة أول وينتظر موافقته.** «عملاء يحتاجونك الحين» و`listing_match` ما انلمسوا.
@@ -482,3 +500,11 @@
 
 ## 6 Nov 2026 — owner private line shelved
 Ahmed decided not to link +96890944469 (Meta holds the number in a portfolio we cannot see, error #3441038; support case 39735302326084565 left open). The `owner` route row was deleted from `company_lead_routes` (it had no conversations, events or credentials). SQL68 code/guards stay in place but are dormant: the owner card only renders when the row exists. Investors stay on the Muscat line as before. The owner's profile phone (90944469) is unchanged. Test WABA "Ahmed Habib" (+1 555-734-2702) created by a signup attempt remains in portfolio 862303320849933, unused.
+
+## 27 Nov 2026 — SQL159: staff can no longer read owner net / expected commission from the API
+- **Leak.** `properties` gave `authenticated` table-level SELECT, so an agent read `owner_net` / `expected_commission` of 48 properties straight from REST, although the screen hides them and `crm_properties_access` masks them for non-owners.
+- **Fix (SQL159, applied).** REVOKE table SELECT on `properties` from authenticated, GRANT SELECT on every other column. Writes keep table-level INSERT/UPDATE. The app already reads through `crm_properties_access` (`crmDataFrom`) and the edge functions use explicit columns or the service role. Same pattern as `deals`.
+- **Rule for later migrations:** a NEW column on `properties` is not readable by authenticated until `GRANT SELECT (col) ON public.properties TO authenticated;` (the view shows it anyway, it runs as its owner).
+- **Checked.** `tests/fixtures/test-accounts-rls.sql` (now also checks the money columns): owner sees 48 money rows in the view, staff 0; direct `properties.owner_net` denied to both; all other counts unchanged; an agent UPDATE on properties still works. Rollback: `db/changes/159-...rollback.sql`.
+- **Left as is:** `profiles.commission_rate` is readable by staff, but it is the default 10 for everyone and unused on screen; locking it would break the `profiles select('*')` at login, so not worth it now.
+- **Next (same thread):** Ahmed chose to move the functions, brain and docs to a new private repo `habib-crm-core` (he creates it; cloud sessions cannot). Live functions keep running (bundled at deploy). Before removing anything from this public repo, the list goes to Ahmed first.
