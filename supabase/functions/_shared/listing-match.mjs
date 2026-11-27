@@ -7,7 +7,9 @@
 //   budget   price within the budget and at least 80 percent of it 25, cheaper than that 15, up to 15 percent over 10
 //   recency  the client's last message: 14 days 20, 45 days 12, 120 days 5. A request without a budget needs a message in
 //            the last 60 days (the request's updated_at is touched by bulk repairs, so it says nothing).
-export const LISTING_CAP = 20;
+// SQL166 (27 Nov 2026, Ahmed: «أي زبون كان موجود معانا ... على طول توصل له رسالة»): every matching buyer, not the best 20.
+// 200 is only a safety stop against a broken match (a normal listing matches 5-40 clients after the rules below).
+export const LISTING_CAP = 200;
 const DAY = 86400000;
 
 // «الصومحان الجنوبية»، «صومحان الجنوبيه» and «بركاء الصومحان الجنوبية» are one area (same rule as SQL97 unit_area_key)
@@ -55,6 +57,9 @@ export function scoreRequest(prop, r, lastInboundAt, now = Date.now()) {
   if (pArea && pArea !== pWil && wanted.some((a) => a !== pWil && (a.includes(pArea) || pArea.includes(a)))) level = "exact";
   else if (pWil && [...wanted, rWil].some((a) => a && (a === pWil || a.includes(pWil) || pWil.includes(a)))) level = "near";
   if (!level) return null;
+  // SQL166: «قريب» (same wilayat) only for a client who did not name another area: «فيلا في بركاء» gets the Somhan villa,
+  // «فيلا في الرميس» does not (Ahmed: «بالمواصفات اللي يبحث عنها»)
+  if (level === "near" && wanted.some((a) => a !== pWil && !a.includes(pWil) && !pWil.includes(a))) return null;
 
   const types = [...(Array.isArray(r.property_types) ? r.property_types : []), r.property_type].filter(Boolean).map(String);
   const words = TYPE_WORDS[prop.type] || [];

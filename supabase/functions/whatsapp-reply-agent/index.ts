@@ -2365,6 +2365,12 @@ Deno.serve(async (req) => {
     for (const h of history) if (h.direction === "outbound") lastOutBody = String(h.body || "");
     const FOUND_RE = /(^|\s)(حصل|حصلت|حصلنا|لقيت|لقينا|اشتريت|اشترينا|شريت|شرينا|وقفت\s*البحث)(\s|$|[.!،,])/;
     const NOT_FOUND_RE = /(^|\s)(ما|مب|مو|لسا|لسه|بعدني|بعدنا|لا)\s+(حصل|لقي)/;
+    // SQL166: «خلاص ما ابحث» / «ما عاد ابحث» after «لين الحين تبحث ؟» also ends the search; «حالياً ما ابحث» / «ما ابحث الحين بعد
+    // شهرين» is a pause, not an end, and is left to the model
+    const NO_LONGER_RE = /(^|\s)(خلاص\s*ما|ما\s*عاد|ما|مب|مو)\s*([اأ]بحث|[اأ]دور|نبحث|ندور|محتاج|[اأ]حتاج)(\s|$|[.!،,])/;
+    const PAUSE_WORDS = /بعد|شهر|سن[ةه]|فتر[ةه]|حالي|الحين|مؤقت|لين|الين|اول|ظروف/;
+    // and only a short answer that names nothing else: «ما ابحث عن فيلا ابي ارض» is a correction of the request, not an end
+    const noLonger = (t = "") => NO_LONGER_RE.test(t) && t.trim().length <= 40 && !PAUSE_WORDS.test(t) && !/(^|\s)(عن|ابي|ابغ|اريد|بس|لكن|ارض|فيلا|فل[ةه]|شق|بيت|منزل|استراح)/.test(t);
     // 15 Nov 2026 (dry run on 124 chats: «وجدت خيار مناسب», «اخذت بيت في سيب», «حصلنا فيلا بقيمه أقل», «حاليا متوقف عن
     // الشراء» came as answers to our other follow-ups, «انحجزت وحدة منها…» and «ما متوفره حالياً بس عندنا…», and the requests
     // stayed open): the same R50 after any follow-up of ours, but only when the client names what he found (a property word)
@@ -2373,8 +2379,12 @@ Deno.serve(async (req) => {
     const FOUND_THING_RE = /(^|\s)((حصل(ت|نا)?|لقي(ت|نا)|اشتري(ت|نا)|شري(ت|نا)|وجد(ت|نا)|[اأ]خذ(ت|نا)|خذي(ت|نا))\s*(لي\s*|لنا\s*)?(خيار|بيت|فيلا|فل[ةه]|شق[ةه]|[اأ]رض|منزل|عقار)|(متوقف(ين)?|وقف(ت|نا))\s*(عن\s*)?(ال)?(شراء|بحث))/;
     if (!NOT_FOUND_RE.test(burstSaid) && !/[؟?]/.test(burstSaid) && out.action !== "handoff"
       // decision 70 (Ahmed 18 Nov 2026): a bare «حصلت» after «نزل عندنا … ممكن يناسب طلبك» is the same R50 (no «الله يسعدك»)
-      && ((/لين الحين تبحث|نزل عندنا/.test(lastOutBody) && FOUND_RE.test(burstSaid)) || (FOLLOWUP_SAID.test(lastOutBody) && FOUND_THING_RE.test(burstSaid)))) {
-      texts = []; out.action = "none"; out.search_stopped = true;
+      && ((/لين الحين تبحث|نزل عندنا|هذي تفاصيل/.test(lastOutBody) && (FOUND_RE.test(burstSaid) || noLonger(burstSaid))) || (FOLLOWUP_SAID.test(lastOutBody) && FOUND_THING_RE.test(burstSaid)))) {
+      // SQL166 (Ahmed 27 Nov «نبارك له ونطلعه»): one short line now, in place of decision 70's silence. Found = «مبروك»; stopped
+      // without finding = a warm goodbye. His active requests still close below (search_stopped), never deleted.
+      const foundIt = /(^|\s)(حصل|لقي|اشتري|شري|وجد|[اأ]خذ)/.test(burstSaid);
+      texts = [foundIt ? "مبروك 🌷 الله يتمم لك على خير" : "حياك الله 🌷 إذا احتجت شي مستقبلاً احنا موجودين"];
+      out.action = "none"; out.search_stopped = true; out.guard_search_stopped_reply = true;
     }
     // R71 (Ahmed 14 Nov 2026): she booked or bought, we congratulated, and she only closes the talk: no reply, no draft, the search ends
     if (closedAfterBooking(history)) { texts = []; out.action = "none"; out.handoff_reason = null; out.search_stopped = true; out.guard_closed_after_booking = true; }
