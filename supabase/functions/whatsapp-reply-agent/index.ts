@@ -2001,7 +2001,9 @@ Deno.serve(async (req) => {
       });
       const rows = history.filter((h: any) => ["inbound", "outbound"].includes(h.direction));
       let lastLow = -1; rows.forEach((h: any, i: number) => { if (lowPrice(said(h))) lastLow = i; });
-      const told = lastLow >= 0 && rows.slice(lastLow + 1).some((h: any) => h.direction === "outbound" && /57/.test(wn(said(h))) && /يبد[اأ]|المتوفر|خلص/.test(said(h)));
+      // the office's own line can hold the low figure and the 57,000 together («بـ 50 الف ما عندنا … يبدأ من 57 الف»): it counts
+      // as told (محمد من العراق 62c755b3, 26 Nov: the guard cut the booking and only «يناسبك ؟» went)
+      const told = lastLow >= 0 && rows.slice(lastLow).some((h: any) => h.direction === "outbound" && /57/.test(wn(said(h))) && /يبد[اأ]|المتوفر|خلص/.test(said(h)));
       const project = HAITHAM.test(rows.map(said).join(" ")) || out.meeting?.place === "developer";
       if (lastLow >= 0 && !told && project) {
         out.action = "none"; out.handoff_reason = null; out.meeting = null;
