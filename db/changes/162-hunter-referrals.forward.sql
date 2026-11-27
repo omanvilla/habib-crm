@@ -1,6 +1,6 @@
 -- SQL162 (27 Nov 2026, Ahmed: «نعم نروح على نصيحتك»): the first two hires of the company office.
---   1. «صائد العقارات» (property hunter): the daily cloud check of the market sheet hands the newest Barka ads to
---      crm_repair_private.hunt_add(rows). It keeps only direct sellers (a person, not an office, and a number that is not
+--   1. «صائد العقارات» (property hunter): a daily cloud scheduled task hands the newest Barka ads to
+--      crm_repair_private.hunt_add(rows) (cloud scheduled task «صائد العقارات (يومي)», Sunday-Thursday 10:43). It keeps only direct sellers (a person, not an office, and a number that is not
 --      on many ads) of ready villas / houses at 55,000-70,000 OMR whose number is not already an owner offer in the CRM, and
 --      stores them in public.crm_hunt_leads. They appear in Maram's «اتصل بعدهم» list (crm_call_next) until somebody calls
 --      the number, or 21 days pass without a new ad. Nothing is sent to anybody: a call list only.
@@ -192,8 +192,11 @@ SET search_path TO ''
 AS $function$
 DECLARE
   today date := (now() AT TIME ZONE 'Asia/Muscat')::date;
-  x record; who uuid; boss uuid; agent uuid; t uuid; n int := 0;
+  x record; who uuid; boss uuid; agent uuid; t uuid; n int := 0; room int;
 BEGIN
+  -- at most p_max a day, also when the job runs twice on the same day
+  room := greatest(0, least(coalesce(p_max, 3), 10) - (SELECT count(*) FROM crm_repair_private.referral_asks WHERE asked_on = today));
+  IF room = 0 THEN RETURN 0; END IF;
   FOR x IN
     WITH d AS (
       SELECT dl.id deal_id, dl.company_id, coalesce(dl.commission_received_at, dl.closed_at, dl.updated_at) done_at, dl.client_id,
@@ -220,7 +223,7 @@ BEGIN
        AND NOT EXISTS (SELECT 1 FROM crm_repair_private.referral_asks a
                         WHERE a.company_id = one.company_id AND a.phone8 = one.p8 AND a.asked_on > today - one.every_days)
      ORDER BY one.done_at DESC
-     LIMIT greatest(0, least(coalesce(p_max, 3), 10))
+     LIMIT room
   LOOP
     SELECT p.id INTO boss FROM public.profiles p WHERE p.company_id = x.company_id AND p.role = 'owner' AND p.is_active ORDER BY p.created_at LIMIT 1;
     SELECT lr.assigned_to INTO agent FROM public.company_lead_routes lr JOIN public.profiles p ON p.id = lr.assigned_to AND p.is_active
@@ -341,8 +344,8 @@ BEGIN
       (8, 'alerts', 'تنبيهات العقارات', '🔔', ARRAY['crm_property_alerts_run', 'crm_expire_listing_agreements_daily', 'agreement_ending_whatsapp'], interval '30 hours'),
       (9, 'voice', 'مفرّغ الرسائل الصوتية', '🎙️', ARRAY['whatsapp_transcribe_voice_notes'], interval '2 hours'),
       (10, 'instagram', 'متابع إنستغرام', '📸', ARRAY['habib_instagram_media_discovery'], interval '2 hours'),
-      -- SQL162: the hunter runs in the daily cloud check of the market sheet (no cron), the referrals in a cron
-      (11, 'hunter', 'صائد العقارات', '🎯', ARRAY[]::text[], interval '50 hours'),
+      -- SQL162: the hunter runs in a cloud scheduled task (no cron), the referrals in a cron
+      (11, 'hunter', 'صائد العقارات', '🎯', ARRAY[]::text[], interval '80 hours'),
       (12, 'referrals', 'مسؤول الإحالات', '🤝', ARRAY['crm_referral_tasks_daily'], interval '4 days')
     ), runs AS (
       SELECT d.key, max(l.start_time) last_run,
