@@ -47,6 +47,7 @@
     return ' · آخر دخول: '+(d===day?'اليوم ':d===muscatDay(-1)?'أمس ':esc(fmtDay(d))+' ')+esc(fmtTime(t));};
 
   /* «اتصل بعدهم» (17 Nov 2026, Ahmed, SQL114 crm_call_next): open owner offers nobody called in the last 30 days, newest first.
+   * SQL164 (27 Nov): owners who answered the price study, then owners who never answered «your study is ready», come first with a reason (x.why).
    * «اتصل» dials from the phone; «سجّل الاتصال» opens the call window with the number and name filled. */
   let nextList=null;
   function nextDlg(){
@@ -65,10 +66,11 @@
       /* SQL162: «صائد العقارات» adds direct sellers from the market ads (hunt_id), with a link to the ad */
       const ad=x.hunt_id?' · <b>بائع مباشر من إعلان</b>'+(/^https:\/\//.test(x.link||'')?' <a href="'+esc(x.link)+'" target="_blank" rel="noopener">الإعلان</a>':''):'';
       return '<li class="ccm-next"><div><strong dir="auto">'+esc(x.name||(x.hunt_id?'معلن':'مالك'))+'</strong> <bdi dir="ltr">'+esc(x.phone||'')+'</bdi><br><small>'+esc(what)+ad
+        +(x.why?' · <b class="ccm-why">'+esc(x.why)+'</b>':'')
         +(x.study_days!=null?' · <b>انرسلت له الدراسة من '+esc(x.study_days)+' يوم وما رد</b>':'')+(x.last_called_at?' · آخر اتصال '+esc(fmtDay(String(x.last_called_at).slice(0,10))):' · ما انتصل فيه')+'</small></div>'
         +'<div class="ccm-next-act">'+(tel?'<a class="btn-secondary crm-wa-small" href="tel:'+esc(tel)+'">اتصل</a>':'')
         +'<button type="button" class="btn-primary crm-wa-small" data-ccm="next-log" data-i="'+i+'">سجّل الاتصال</button></div></li>';}).join('');
-    d.innerHTML='<div class="ccm-form"><h3>اتصل بعدهم <small>عروض ملاك ما انتصل فيها آخر 30 يوم، وملاك ما ردوا على الدراسة من أسبوع، وبائعين مباشرين لقاهم صائد العقارات في الإعلانات</small></h3>'
+    d.innerHTML='<div class="ccm-form"><h3>اتصل بعدهم <small>أول شي الملاك اللي ردوا على الدراسة، وبعدهم اللي ما ردوا على رسالة الدراسة، وبعدها عروض ملاك ما انتصل فيها آخر 30 يوم، وبائعين مباشرين لقاهم صائد العقارات</small></h3>'
       +(rows?'<ul class="ccm-days">'+rows+'</ul>':'<p class="ccm-note">ما في أحد في القائمة الحين</p>')
       +'<div class="ccm-actions"><button type="button" class="btn-secondary" data-ccm="next-close">إغلاق</button></div></div>';
   }

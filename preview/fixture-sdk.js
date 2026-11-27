@@ -309,7 +309,8 @@ function fixtureExtraRpc(name,args){
     W('coach','مدرب الردود (أسبوعي)','🎓','green',8600,'تقرير كل سبت'),W('pricing','المسعّر','🏷️','green',40,'34 دراسة هالشهر'),
     W('followups','متابعة بعد الزيارة','📅','green',10,'7 رسالة هالأسبوع'),W('outreach','رسائل العملاء القدامى','📣','yellow',200,'12 رسالة هالأسبوع'),
     W('matcher','مطابقة عروض الملاك','🏠','green',120,'2256 مطابقة'),W('alerts','تنبيهات العقارات','🔔','green',9,null),
-    W('voice','مفرّغ الرسائل الصوتية','🎙️','green',5,null),W('instagram','متابع إنستغرام','📸','red',300,null)]:[]});
+    W('voice','مفرّغ الرسائل الصوتية','🎙️','green',5,null),W('instagram','متابع إنستغرام','📸','red',300,null),
+    {key:'referrals',name:'مسؤول الإحالات',icon:'🤝',status:'soon',last_run:null,last_output:null,did:'0 طلب إحالة هالشهر'}]:[]});
   }
   case 'crm_visits_unasked':return ok([]);
   // synthetic studies (19 Nov 2026): three waiting for approval, one waiting for the owner, one sent from the phone
@@ -345,7 +346,7 @@ function fixtureExtraRpc(name,args){
   case 'get_public_company_name':return ok(db.companies[0].name);
   // SQL114 (17 Nov 2026)
   case 'crm_mark_seen':profile.last_login_at=new Date().toISOString();return ok(null);
-  case 'crm_call_next':return ok(clients.filter(c=>c.is_seller&&allowed(c,'clients')).map((c,i)=>({lead_id:uuid(1800+i),client_id:c.id,name:c.name,phone:c.phone,kind:'villa',area:c.preferred_area,wilayat:c.lead_route==='barka'?'بركاء':'السيب',price:75000,status:'open',created_at:relative(-i-1)+'T09:00:00Z',last_called_at:null})).concat([{hunt_id:uuid(1900),name:'بائع تجريبي',phone:'96890000001',kind:'villa',area:'الصومحان',wilayat:'بركاء',price:63500,status:'hunt',link:'https://omanreal.com/p/TEST',source:'عمان ريل',created_at:relative(0)+'T08:00:00Z',last_called_at:null}]));
+  case 'crm_call_next':return ok(clients.filter(c=>c.is_seller&&allowed(c,'clients')).map((c,i)=>({lead_id:uuid(1800+i),client_id:c.id,name:c.name,phone:c.phone,kind:'villa',area:c.preferred_area,wilayat:c.lead_route==='barka'?'بركاء':'السيب',price:75000,status:i===0?'studied':'open',created_at:relative(-i-1)+'T09:00:00Z',last_called_at:null,prio:i===0?1:i===1?2:4,why:i===0?'وافق على سعر الدراسة: اتصل وسجّل العقار':i===1?'انرسلت له رسالة «دراسة سعر عقارك جاهزة» من 8 يوم وما رد':null})).concat([{hunt_id:uuid(1900),name:'بائع تجريبي',phone:'96890000001',kind:'villa',area:'الصومحان',wilayat:'بركاء',price:63500,status:'hunt',link:'https://omanreal.com/p/TEST',source:'عمان ريل',created_at:relative(0)+'T08:00:00Z',last_called_at:null}]));
  }
  return null;
 }

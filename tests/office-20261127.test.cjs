@@ -14,7 +14,7 @@ test('mirrored, owner/manager/agent only, staff limited to themselves, workers f
  assert(!/'(expected_commission|collected_commission|commission|owner_net|deal_value)'/.test(out),'no money key leaves the function');
 });
 test('the page is wired, grouped under reports, and colours follow the pace',()=>{
- assert(index.includes('crm-office.js?v=20261127-office1')&&index.includes('crm-office.css?v=20261127-office1'));
+ assert(index.includes('crm-office.js?v=20261127-soon1')&&index.includes('crm-office.css?v=20261127-office1'));
  assert(nav.includes("['التقارير',['office','reports','expenses','activityLog']]"));
  assert(ui.includes("supa.rpc('crm_office_snapshot')")&&!/commission|owner_net/.test(ui));
  const win={addEventListener(){},};const ctx={window:win,document:{getElementById:()=>null,querySelector:()=>null,addEventListener(){}},Date,Math,Number,String,Promise};

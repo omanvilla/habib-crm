@@ -28,6 +28,6 @@ test('office: two new desks, still no money; rollback restores the old functions
 });
 
 test('call list shows the hunter sellers with the ad link and logs them as advertisers',()=>{
- assert(index.includes('crm-calls-meetings.js?v=20261127-hunt1'));
+ assert(index.includes('crm-calls-meetings.js?v=20261127-why1'));
  assert(calls.includes("x.hunt_id?'advertiser':'owner'")&&calls.includes('بائع مباشر من إعلان')&&calls.includes("/^https:\\/\\//.test(x.link||'')"));
 });
