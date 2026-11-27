@@ -9,7 +9,7 @@ const index=read('index.html'),home=read('crm-owner-home.js'),calls=read('crm-ca
 const fwd=read('db/changes/114-call-next-last-seen.forward.sql'),back=read('db/changes/114-call-next-last-seen.rollback.sql');
 
 test('index loads the quick property module right after the call module, versions moved on',()=>{
-  assert(index.includes('<script src="crm-calls-meetings.js?v=20261124-study1"><\\/script><script src="crm-quick-property.js?v=20261117-goal1"><\\/script>'));
+  assert(index.includes('<script src="crm-calls-meetings.js?v=20261127-hunt1"><\\/script><script src="crm-quick-property.js?v=20261117-goal1"><\\/script>'));
   assert(/crm-owner-home\.js\?v=202611(19|2\d)-/.test(index)&&/crm-owner-home\.css\?v=202611(1[89]|2\d)-/.test(index)&&index.includes('crm-calls-meetings.css?v=20261117-goal1'));
 });
 
