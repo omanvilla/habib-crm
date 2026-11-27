@@ -238,6 +238,8 @@ test('a second open deal card is refused in Arabic, not the raw 23505 text (12 N
   assert.equal(f({message:'other'}),'other');
   assert(base.includes("showToast('خطأ: '+crmDealSaveError(err),'error')"));
   assert(read('crm-deal-workflow.js').includes("window.crmDealSaveError?window.crmDealSaveError(e):e.message"));
-  assert(base.includes(".is('merged_into_deal_id',null).order('id')),"),'reports leave merged cards out');
+  // 27 Nov 2026: the reports read crm_deals_access, which leaves merged cards out itself and has no merged_into_deal_id
+  // column; filtering on it there failed with 42703 and the reports page never loaded
+  assert(!base.includes(".is('merged_into_deal_id',null)"),'reports do not filter on a column the view lacks');
   assert(index.includes('crm-deal-workflow.js?v=20261112-fix1'));
 });

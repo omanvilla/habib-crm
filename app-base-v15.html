@@ -4717,7 +4717,8 @@ async function loadReports(){
  try{
  const [clients,deals,properties]=await Promise.all([
  crmReadAll(()=>supa.from('clients').select('*',{count:'exact'}).neq('archived',true).order('id')),
- crmReadAll(()=>(typeof crmDataFrom==='function'?crmDataFrom('deals'):crmDataFrom('deals')).select('*, agent:profiles!deals_agent_id_fkey(full_name), property:properties(title,type,area)',{count:'exact'}).is('merged_into_deal_id',null).order('id')),
+ // 27 Nov 2026: crm_deals_access already leaves merged cards out and has no merged_into_deal_id column, so filtering on it broke the reports page (42703) since 19 Nov
+ crmReadAll(()=>(typeof crmDataFrom==='function'?crmDataFrom('deals'):crmDataFrom('deals')).select('*, agent:profiles!deals_agent_id_fkey(full_name), property:properties(title,type,area)',{count:'exact'}).order('id')),
  crmReadAll(()=>(typeof crmDataFrom==='function'?crmDataFrom('properties'):crmDataFrom('properties')).select('*',{count:'exact'}).neq('archived',true).order('id'))]);
  if(seq!==reportLoadSeq||!crmSessionCurrent(generation,user))return;
  const range=getPeriodRange({deals,clients,properties}),previous=getPreviousPeriodRange({deals,clients,properties});
