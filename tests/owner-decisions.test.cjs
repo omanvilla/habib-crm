@@ -198,6 +198,8 @@ test('R130 (Sana 28 Nov): on the way or arrived after asking for the location ge
  assert.equal(r.out.action,'send_location');assert.equal(r.out.coming_alert,undefined);
  r=decide(['تمام'],[IN('ممكن الموقع'),OUT('متى بتروح ؟ عشان ارسلك اللوكيشن على طول'),IN('انا قريب')],{},{prop:{id:'TEST_PROP',map_url:MAP,visit_method:'lockbox'}});
  assert.equal(r.out.action,'send_lockbox');
+ r=decide(['وعليكم السلام','ان شاء الله برسلك الموقع'],[IN('اريد لوكيشن هذا البيت')],{action:'handoff',handoff_reason:'معاينة تحتاج تنسيق: فيلا الرميس'},{prop:{id:'TEST_PROP',map_url:MAP,visit_method:null}});
+ assert.equal(r.out.action,'handoff');assert.deepEqual(r.texts,['وعليكم السلام','متى بتروح ؟ عشان ارسلك اللوكيشن على طول']);
  // left alone: sent before, owner lives there, a seller, no word of coming, a day he cannot
  r=decide(['تمام'],[IN('ممكن الموقع'),OUT(MAP),IN('وصلت')],{},{prop:{id:'TEST_PROP',map_url:MAP,visit_method:'open'}});assert.equal(r.out.action,'none');
  r=decide(['تمام'],[IN('ممكن الموقع'),OUT('متى يناسبك تزور ؟'),IN('وصلت')],{},{prop:{id:'TEST_PROP',map_url:MAP,visit_method:'owner_lives'}});assert.equal(r.out.action,'none');

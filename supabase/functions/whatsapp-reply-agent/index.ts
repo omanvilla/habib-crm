@@ -504,7 +504,10 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     if (!["open", "lockbox"].includes(String(c.prop.visit_method || ""))) out.coming_alert = true;
   }
   // R130: «برسلك الموقع» with nothing going out and nobody told to send it (no handoff) is a promise nobody keeps: it goes
-  if (out.action === "none" && texts.some((t) => t.length <= 200 && PROMISED_LOC.test(t))) {
+  // (dry run on Sana's first message: a visit-coordination handoff also wrote «ان شاء الله برسلك الموقع»; the handoff stays so
+  // Ahmed knows, the promise becomes the question, and her next «بعد شوي» or «وصلت» gets the location from the rule above)
+  const coordHandoff = out.action === "handoff" && /^\s*(طلب\s*)?معاين[ةه]\s*تحتاج\s*تنسيق/.test(String(out.handoff_reason || ""));
+  if ((out.action === "none" || coordHandoff) && texts.some((t) => t.length <= 200 && PROMISED_LOC.test(t))) {
     texts = texts.filter((t) => !(t.length <= 200 && PROMISED_LOC.test(t)));
     // he asked for the location: the question tells him it goes as soon as he says when he goes (R11 still wants the time)
     if (LOCATION_ASK.test(String(c.burstSaid || ""))) texts = [...texts.filter((t) => !(t.length <= 200 && (VISIT_Q.test(t) || /متى\s*يناسب/.test(t)))), LOC_WHEN_Q];
