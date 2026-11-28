@@ -6,7 +6,7 @@ const idx = fs.readFileSync(require('node:path').join(__dirname, '../supabase/fu
 const re = (name) => { const m = idx.match(new RegExp(`const ${name} = (\\/.+\\/[a-z]*);`)); assert.ok(m, name); return eval(m[1]); };
 test('R130 words: on the way, arrived, waiting for the location', () => {
   const NOW = re('COMING_NOW');
-  for (const s of ['بعد شويا نروح', 'احنا وصلنا رميس', 'انتظر اللوكيشن', 'في الطريق', 'انا قريب', 'وين اللوكيشن', 'الحين جايين']) assert.ok(NOW.test(s), s);
+  for (const s of ['بعد شويا نروح', 'احنا وصلنا رميس', 'انتظر اللوكيشن', 'في الطريق', 'انا قريب', 'وين اللوكيشن', 'الحين جايين', 'اليوم', 'حاليا ف بركاء']) assert.ok(NOW.test(s), s);
   for (const s of ['بكره العصر ان شاء الله', 'تمام', 'كم السعر', 'ابي شي قريب من المدرسة']) assert.ok(!NOW.test(s), s);
 });
 test('R130 promise words', () => {
