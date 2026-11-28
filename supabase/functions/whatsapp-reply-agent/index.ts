@@ -534,6 +534,15 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     texts = []; out.action = "handoff"; out.guard_which_twice = true;
     out.handoff_reason = `ما عرفنا: العميل أرسل العقار وما قدرنا نحدده وكتب «${String(c.burstSaid || "").replace(/\s+/g, " ").trim().slice(0, 120)}»`;
   }
+  // R129 (28 Nov 2026, Ahmed's card): «كم تبعد من العاصمة» / «هل قريب هالموقع ؟» went to Ahmed with no reply (R41). A question
+  // about the surroundings, not the property itself, gets the visit invitation instead. The office's own place is left out.
+  const AREA_Q = /(كم\s*(تبعد|يبعد|بعيد[ةه]?|المساف[ةه])|(قريب[ةه]?|بعيد[ةه]?)\s*(من|عن|هالموقع|الموقع)|هل\s*(هو|هي)?\s*قريب|كم\s*دقيق)/;
+  if (out.action === "handoff" && /^سؤال ما عندي جوابه:/.test(String(out.handoff_reason || "")) && AREA_Q.test(String(c.burstSaid || ""))
+    && !/المكتب|مكتبكم/.test(String(c.burstSaid || "")) && ["buyer", "tenant", "broker"].includes(out.category)) {
+    const visitTimeKnown = c.history.slice(-8).some((h: any) => h.direction === "outbound" && /اللوكيشن|maps\.|goo\.gl/.test(String(h.body || "")));
+    texts = [...texts.filter((t) => !VISIT_Q.test(t)), "الافضل تشوف المنطقة بنفسك لما تزور عشان تتأكد اذا تناسبك", ...(visitTimeKnown ? [] : ["متى يناسبك تزور ؟"])];
+    out.action = "none"; out.handoff_reason = null; out.guard_area_question = true;
+  }
   // 247f8277 «بكم تعرض البيت للبيع ؟» as a first message was answered as an owner («ارسل تفاصيل البيت كاملة والسعر اللي في
   // بالك»). «بكم تعرضون / بكم معروض» is a buyer asking our price: he is asked which property, as for any unnamed one.
   const ASK_OUR_PRICE = /بكم\s*(تعرض(ون)?|معروض[هة]?|عارضين|تبيع(ون)?)\s*(ال)?(بيت|فيلا|فل[ةه]|شق[ةه]|[اأ]رض|منزل|عقار)/;
