@@ -21,7 +21,7 @@ test('R74: the location goes to a client who needs it to judge the area, once, a
  r=decide(['ان شاء الله برسلك الموقع','متى يناسبك تزور ؟'],chat);assert.deepEqual(r.texts,D.AREA_LINES);
  // not twice, not without the reason, not for an owner, not without a map
  r=decide(['تمام'],[...chat,OUT(MAP),IN('اشوف الموقع يناسبني او لا')]);assert.equal(r.out.action,'none');
- r=decide(['ان شاء الله برسلك الموقع','متى يناسبك تزور ؟'],[IN('ممكن الموقع')]);assert.equal(r.out.action,'none');assert.equal(r.texts.length,2);
+ r=decide(['ان شاء الله برسلك الموقع','متى يناسبك تزور ؟'],[IN('ممكن الموقع')]);assert.equal(r.out.action,'none');assert.deepEqual(r.texts,['متى بتروح ؟ عشان ارسلك اللوكيشن على طول'],'R130: no promise without the location');
  r=decide(['x'],chat,{category:'seller'});assert.equal(r.out.action,'none');
  r=decide(['x'],chat,{},{prop:{id:'TEST_PROP',map_url:null}});assert.equal(r.out.action,'none');
  assert(agent.includes('if (sentIds.length && prop && !review && !out.location_for_area && ["send_location", "send_owner_number", "send_lockbox"].includes(out.action)) {'));
@@ -150,7 +150,7 @@ test('ninth dry-run batch: an ad that mentions a commission is not a question; d
  const del=(t)=>({direction:'inbound',body:null,message_type:t});
  r=decide(['اسمك الكريم ؟','ارسل الملكية اذا ما عليك امر'],[del('revoke'),del('revoke'),del('reaction')]);assert.deepEqual(r.texts,[]);assert.equal(r.out.guard_nothing_said,true);
  r=decide(['مرحبتين تفضل'],[del('revoke'),{direction:'inbound',body:'مرحبا',message_type:'text'}]);assert.equal(r.texts.length,1);
- r=decide(['ان شاء الله برسلك الموقع','متى يناسبك تزور ؟ واسمك الكريم ؟'],[IN('ممكن الموقع')]);assert.deepEqual(r.texts,['ان شاء الله برسلك الموقع','متى يناسبك تزور ؟']);
+ r=decide(['ان شاء الله برسلك الموقع','متى يناسبك تزور ؟ واسمك الكريم ؟'],[IN('ممكن الموقع')]);assert.deepEqual(r.texts,['متى بتروح ؟ عشان ارسلك اللوكيشن على طول'],'R130');
 });
 test('a deleted message that is not in the history gets no answer either',()=>{
  let r=decide(['اسمك الكريم ؟','ارسل الملكية اذا ما عليك امر'],[OUT('اسمك الكريم ؟')],{},{msgType:'revoke'});assert.deepEqual(r.texts,[]);assert.equal(r.out.guard_nothing_said,true);
@@ -184,4 +184,23 @@ test('tenth batch C: the client office wording',()=>{
 test('eleventh dry-run batch: «اشوف البيت من الخارج» gets the location like R74',()=>{
  assert.equal(D.locationForArea('أنا اريد أشوف البيت من الخارج لان من سكان الحيل الشماليه'),true);
  assert.equal(D.locationForArea('ابي اشوف البيت من داخل'),false);
+});
+
+test('R130 (Sana 28 Nov): on the way or arrived after asking for the location gets it now, visit recorded at this time',()=>{
+ const q=[OUT('ان شاء الله برسلك موقع فيلا الرميس بـ64 الف'),OUT('متى يناسبك تزور ؟')];
+ let r=decide(['تمام ان شاء الله','ان شاء الله برسلك الموقع'],[IN('اريد لوكيشن هذا البيت'),...q,IN('بعد شويا نروح')],{action:'handoff',handoff_reason:'معاينة تحتاج تنسيق: فيلا الرميس'},{prop:{id:'TEST_PROP',map_url:MAP,visit_method:null}});
+ assert.equal(r.out.action,'send_location');assert.equal(r.out.guard_location_now,true);assert.equal(r.out.coming_alert,true);assert.equal(r.out.viewing_time,null);
+ assert(!r.texts.some((t)=>/برسلك/.test(t)),'no promise beside the location');
+ r=decide([],[IN('اريد لوكيشن هذا البيت'),...q,IN('احنا وصلنا رميس'),IN('انتظر اللوكيشن')],{action:'handoff',handoff_reason:'معاينة تحتاج تنسيق'},{prop:{id:'TEST_PROP',map_url:MAP,visit_method:null}});
+ assert.equal(r.out.action,'send_location');assert.deepEqual(r.texts,['تفضل هذا الموقع']);
+ // an open house: no alert; a lockbox: the lockbox goes
+ r=decide(['تمام'],[IN('ممكن الموقع'),OUT('متى بتروح ؟ عشان ارسلك اللوكيشن على طول'),IN('الحين جايين')],{},{prop:{id:'TEST_PROP',map_url:MAP,visit_method:'open'}});
+ assert.equal(r.out.action,'send_location');assert.equal(r.out.coming_alert,undefined);
+ r=decide(['تمام'],[IN('ممكن الموقع'),OUT('متى بتروح ؟ عشان ارسلك اللوكيشن على طول'),IN('انا قريب')],{},{prop:{id:'TEST_PROP',map_url:MAP,visit_method:'lockbox'}});
+ assert.equal(r.out.action,'send_lockbox');
+ // left alone: sent before, owner lives there, a seller, no word of coming, a day he cannot
+ r=decide(['تمام'],[IN('ممكن الموقع'),OUT(MAP),IN('وصلت')],{},{prop:{id:'TEST_PROP',map_url:MAP,visit_method:'open'}});assert.equal(r.out.action,'none');
+ r=decide(['تمام'],[IN('ممكن الموقع'),OUT('متى يناسبك تزور ؟'),IN('وصلت')],{},{prop:{id:'TEST_PROP',map_url:MAP,visit_method:'owner_lives'}});assert.equal(r.out.action,'none');
+ r=decide(['تمام'],[IN('ممكن الموقع'),OUT('متى يناسبك تزور ؟'),IN('وصلت')],{category:'seller'});assert.equal(r.out.action,'none');
+ r=decide(['تمام'],[IN('ممكن الموقع'),OUT('متى يناسبك تزور ؟'),IN('بكره العصر')],{},{prop:{id:'TEST_PROP',map_url:MAP,visit_method:null}});assert.notEqual(r.out.guard_location_now,true);
 });
