@@ -652,3 +652,9 @@ Ahmed decided not to link +96890944469 (Meta holds the number in a portfolio we 
 - Gap found (not changed, waits for Ahmed): the owner documents follow-up (SQL155/158, R119) only covers offers with `doc_grade IS NULL`, so a C-graded owner is never reminded to send the deed/kroki.
 - DB speed: «~2 s» is the probe's cold first pass (`cold_ms`, a full scan of whatsapp_messages in a fresh cron session). Real API requests over the night: p50 30–155 ms, p90 220–630 ms per hour; only the 27 Nov 11:00 Muscat incident hit p90 ~6 s. Warm probe since SQL169: 52–78 ms. No real slowness.
 - Checks: RLS fixture as expected (new line `price_queue_rpc=denied` for owner and staff), node tests 1101 pass / 0 fail, preview /after/owner/ and /after/muscat/ load with no «تعذر تحميل» and no money text.
+
+## 28 Nov 2026 — Ahmed «نعم للكل»: Arabi Mall duplicate closed, SQL171 documents reminder for C owners
+- Task `69b9f35f` («دراسة سعر: محل في عرابي مول») closed (`done = true`, note added, nothing deleted): duplicate of `92c98967`, same chat and offer.
+- SQL171: `crm_repair_private.owner_docs_queue()` (R119) now also takes offers graded C with no inbound image/document/video since `doc_graded_at`, except grade notes about renting (تأجير/ايجار). For C offers the owner's silence counts from the later of our ask and the grade. Same text, steps, hours and holds as SQL158; muted chats and offers from buyer requests stay out.
+- Dry run inside a rolled-back block: one row would queue today, the Mawaleh/Mabaila land owner (Muscat number, step 1). The Rumais villa and Mabaila 8 villa chats are muted (office took them), so no reminder there.
+- Checks: node tests 1104 pass / 0 fail; no grants or pages changed.
