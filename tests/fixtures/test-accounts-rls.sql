@@ -13,6 +13,7 @@
 -- office_workers=0, office_other_people=0, office_money=false.
 -- SQL162: both read crm_hunt_leads (public market ads) and call_next works for both (call_next=ok).
 -- SQL167: both read crm_missed_calls (Maram calls them back); missed_call_rpc=denied for both (only the phones' function writes).
+-- SQL170: price_queue_rpc=denied for both (the cloud pricing reads it as the service role).
 DO $chk$
 DECLARE
   co   uuid := (SELECT id FROM public.companies ORDER BY created_at LIMIT 1);
@@ -86,6 +87,9 @@ BEGIN
       BEGIN PERFORM public.crm_missed_call_plan('x', '+96899999999', false); one := one || '{"missed_call_rpc":"allowed"}';
       EXCEPTION WHEN insufficient_privilege THEN one := one || '{"missed_call_rpc":"denied"}'; END;
     END IF;
+    -- SQL170: the pricing queue (owner names, prices, waiting_docs) is the service role's only
+    BEGIN PERFORM * FROM public.crm_price_study_queue(); one := one || '{"price_queue_rpc":"allowed"}';
+    EXCEPTION WHEN insufficient_privilege THEN one := one || '{"price_queue_rpc":"denied"}'; END;
     -- temporary data for the staff account, written through RLS as that account
     IF who.k = 'staff' THEN
       BEGIN
