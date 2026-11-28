@@ -12,7 +12,10 @@ const server=http.createServer((req,res)=>{
  if(url.pathname==='/preview/fixture-sdk.js'){res.setHeader('Content-Type','text/javascript;charset=utf-8');res.end(fs.readFileSync(path.join(root,'preview/fixture-sdk.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'preview/instagram-fixture.js'),'utf8'));return;}
  if(parts.length<2||!['before','after'].includes(parts[0])||!['owner','muscat','barka','manager','viewer'].includes(parts[1])){res.writeHead(404);res.end();return;}
  const file=parts.slice(2).join('/')||'index.html';
- if(!files.has(file)){res.writeHead(404);res.end();return;}
+ // «after» serves the current repo files like preview/serve.ps1 (the fixed list above predates ~30 newer modules,
+ // so pages such as the office, projects and price studies never loaded here). «before» stays on the list (git baseline).
+ const current=parts[0]==='after'&&!file.includes('..')&&/^[\w\-./]+\.(html|js|css|mjs)$/.test(file)&&!/^(tests|scripts|db|supabase\/migrations)\//.test(file)&&fs.existsSync(path.join(root,file))&&fs.statSync(path.join(root,file)).isFile();
+ if(!files.has(file)&&!current){res.writeHead(404);res.end();return;}
  try{
   let body=content(file,parts[0]==='before');
   if(file==='app-base-v15.html'){
