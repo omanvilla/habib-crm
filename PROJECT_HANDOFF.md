@@ -639,3 +639,8 @@ Ahmed decided not to link +96890944469 (Meta holds the number in a portfolio we 
 - Private repo `habib-crm-core`: cloud sessions get 403 on `user/repos`, so Ahmed has to create it and install the Claude app on it; the move itself is a separate job.
 - `crm_repair_private` backups: the audit's "~30 empty backup tables" was wrong. Exact counts: only `audit26_expenses_before` is empty; the other ~35 hold 1–2,720 old rollback rows each, ≈7 MB of a 246 MB DB (limit 500 MB). No space or speed gain, so nothing was dropped. The six empty tables that look unused (`deal_commission_receipts`, `deal_workflow_context`, `hunt_runs`, `referral_asks`, `reservation_change_context`) are live features referenced by functions.
 - Full check after: 16 live pages ok with no console errors (15 s apart), RLS fixture as expected, cron failures only during the 27 Nov 07:15Z incident (plus the old speed alert, fixed by SQL169), agent dry runs on 8 recent messages.
+
+## 2026-11-28: Nasser al-Mushaifri's two Rumais villas (data only, no code)
+- Owner added (owners: «ناصر المشيفري (أبو بدر)», +96897277105) and two properties: «فيلا الرميس 64 ناصر (الصغيرة)» 682fc939-… (300/290, net 61k, price 64k) and «فيلا الرميس 72 ناصر (الكبيرة)» a9324852-… (377/311, net 69k, price 72k). expected_commission 2000 each, floor = price − 1000. Agreement 29/11 → 29/12/2026.
+- Both are status `not_available` on purpose: an insert/update to `available` fires trg_queue_property_outreach (new-listing alert). Flip to `available` only after Ahmed approves price and text.
+- Open: owner said on 25 Nov not to market the small villa (possible reservation); rooms/baths, deed and kroki still missing. Plan doc: https://claude.ai/artifact/8XuC6FRyRp6ng3ZGTr2a3c
