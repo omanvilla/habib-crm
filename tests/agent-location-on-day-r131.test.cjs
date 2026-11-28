@@ -35,6 +35,9 @@ test('R131: another day is sent without noting today',()=>{
  const r2=decide(['تمام'],[OUT('متى يناسبك تزور ؟'),IN('بكره ان شاء الله')],{viewing_date:'2026-11-29'});
  assert.equal(r2.out.no_location_visit,undefined,'a day the model resolved is noted');
 });
+test('R131: «ما يناسبني إلا الخميس» is a day, not a refusal',()=>{
+ assert.equal(decide(['تمام'],[OUT('متى يناسبك تزور ؟'),IN('ما يناسبني الا الخميس')]).out.action,'send_location');
+});
 test('R131: left alone',()=>{
  const base=[OUT('متى يناسبك تزور ؟'),IN('بكره ان شاء الله')];
  assert.equal(decide(['تمام'],base,null,{prop:{...PROP,visit_method:null}}).out.action,'none','method not set');

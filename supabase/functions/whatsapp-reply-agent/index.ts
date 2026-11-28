@@ -509,6 +509,8 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   // («اليوم العصر», «الويكند الجاي», «من ارجع من الدوام»). When the day is not sure, one soft line asks him to say it, for his
   // own sake (the visit is noted and nobody else visits at the same time). The visit is recorded only for a day we know.
   const saidR131 = String(c.burstSaid || "");
+  // «ما يناسبني إلا الخميس» names the one day that works: the «ما … إلا» part is no refusal (Codex on PR #110)
+  const notR131 = saidR131.replace(/ما\s*(يناسب[ء-ي]*|[اأ]قدر|بقدر|اقدر|اروح|[اأ]فضى|فاضي)\s*(الا|إلا)\s/g, " ");
   const DAY_VAGUE = /ويكند|نهاي[ةه]\s*(ال)?[اأ]سبوع|ال[اأ]سبوع\s*(الجاي|القادم|الياي)|بعدين|(^|\s)يمكن(\s|$)|احتمال|[اأ]قرب\s*فرص|من\s*[اأ]رجع|بعد\s*(ال)?دوام|[اأ]خلص\s*(من\s*)?(ال)?دوام|[اأ]ول\s*ما\s*([اأ]فضى|[اأ]فضا|[اأ]تفرغ|يصير)|وقت\s*فراغ|[اأ]يام\s*الجاي|خلال\s*(ال)?[اأ]يام/;
   const DAY_SURE = /(^|[\s،,.])(ا?ليوم|بكر[ةه]?|باكر|الليل[ةه]|السبت|ال[اأ]حد|ال[اإ]ثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمع[ةه]|(ال|بال|في\s*ال)?(عصر|مغرب|صبح|صباح|ظهر|ضحى|عشا|عشاء|مسا|مساء))($|[\s،,.؟?!])|يوم\s*[0-9٠-٩]|[0-9٠-٩]{1,2}\s*\/\s*[0-9٠-٩]{1,2}/;
   const TODAY_R131 = /(^|[\s،,.])(ا?ليوم|الليل[ةه]|(ال|بال)?(عصر|مغرب|ظهر|مسا|مساء))($|[\s،,.؟?!])/;
@@ -519,7 +521,7 @@ function ownerDecisions(out: any, lines: string[], c: any) {
   const coordR131 = out.action === "handoff" && /^\s*(طلب\s*)?معاين[ةه]\s*تحتاج\s*تنسيق/.test(String(out.handoff_reason || ""));
   if ((out.action === "none" || coordR131) && ["buyer", "tenant"].includes(out.category) && !c.hardHandoff && !out.location_for_area
     && c.prop?.map_url && String(c.prop.visit_method || "") === "open" && (!c.prop.status || c.prop.status === "available") && !sentBefore(String(c.prop.map_url))
-    && !DAY_NOT.test(saidR131) && !/ما\s*(ناسب|يناسبني|عجب|ابي|ابغى|اريد)|مب\s*مناسب|خلاص\s*(لقيت|اشتريت)/.test(saidR131)
+    && !DAY_NOT.test(notR131) && !/ما\s*(ناسب|يناسبني|عجب|ابي|ابغى|اريد)|مب\s*مناسب|خلاص\s*(لقيت|اشتريت)/.test(notR131)
     && (DAY_SURE.test(saidR131) || DAY_VAGUE.test(saidR131)) && visitTalk
     && !texts.some((t) => t.length <= 200 && /ما\s*متوفر|انباع|انحجز/.test(t))) {
     const vague = DAY_VAGUE.test(saidR131) || !DAY_SURE.test(saidR131);
