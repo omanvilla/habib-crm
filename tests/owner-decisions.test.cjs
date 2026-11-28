@@ -24,7 +24,7 @@ test('R74: the location goes to a client who needs it to judge the area, once, a
  r=decide(['ان شاء الله برسلك الموقع','متى يناسبك تزور ؟'],[IN('ممكن الموقع')]);assert.equal(r.out.action,'none');assert.deepEqual(r.texts,['متى بتروح ؟ عشان ارسلك اللوكيشن على طول'],'R130: no promise without the location');
  r=decide(['x'],chat,{category:'seller'});assert.equal(r.out.action,'none');
  r=decide(['x'],chat,{},{prop:{id:'TEST_PROP',map_url:null}});assert.equal(r.out.action,'none');
- assert(agent.includes('if (sentIds.length && prop && !review && !out.location_for_area && ["send_location", "send_owner_number", "send_lockbox"].includes(out.action)) {'));
+ assert(agent.includes('if (sentIds.length && prop && !review && !out.location_for_area && !out.no_location_visit && ["send_location", "send_owner_number", "send_lockbox"].includes(out.action)) {'));
 });
 test('R75: a request for the inside video gets the reel marked «من الداخل», and nothing of ours is said about a video',()=>{
  for(const s of ['ممكن ترسلي فيديو من داخل البيت','شي مقطع فيديو من داخل !','اقصد من الداخل الفيديو','ف الفيديو ذاكر تواصلو معي ف الواتساب وبرسلكم الفيديو للفه من داخل ع طول'])assert(D.INSIDE_VIDEO_ASK.test(s),s);

@@ -503,6 +503,35 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     out.viewing_date = null; out.viewing_time = null; out.handoff_reason = null; out.guard_location_now = true;
     if (!["open", "lockbox"].includes(String(c.prop.visit_method || ""))) out.coming_alert = true;
   }
+  // R131 (Ahmed 28 Nov 2026, after five clients who named a day got «برسلك الموقع» and nothing: «ايوه اسوي، بس اهم شيء نتاكد
+  // اي يوم بالضبط هو بيروح يشوف… رساله عاديه… ما تحسسه انه قاسين نضغط عليه… نحسس انه في هذا الشيء عن مصلحته»): an open house
+  // (nobody needed to let him in) gets its location as soon as the client says when he goes, even a day ahead or a vague time
+  // («اليوم العصر», «الويكند الجاي», «من ارجع من الدوام»). When the day is not sure, one soft line asks him to say it, for his
+  // own sake (the visit is noted and nobody else visits at the same time). The visit is recorded only for a day we know.
+  const saidR131 = String(c.burstSaid || "");
+  // «ما يناسبني إلا الخميس» names the one day that works: the «ما … إلا» part is no refusal (Codex on PR #110)
+  const notR131 = saidR131.replace(/ما\s*(يناسب[ء-ي]*|[اأ]قدر|بقدر|اقدر|اروح|[اأ]فضى|فاضي)\s*(الا|إلا)\s/g, " ");
+  const DAY_VAGUE = /ويكند|نهاي[ةه]\s*(ال)?[اأ]سبوع|ال[اأ]سبوع\s*(الجاي|القادم|الياي)|بعدين|(^|\s)يمكن(\s|$)|احتمال|[اأ]قرب\s*فرص|من\s*[اأ]رجع|بعد\s*(ال)?دوام|[اأ]خلص\s*(من\s*)?(ال)?دوام|[اأ]ول\s*ما\s*([اأ]فضى|[اأ]فضا|[اأ]تفرغ|يصير)|وقت\s*فراغ|[اأ]يام\s*الجاي|خلال\s*(ال)?[اأ]يام/;
+  const DAY_SURE = /(^|[\s،,.])(ا?ليوم|بكر[ةه]?|باكر|الليل[ةه]|السبت|ال[اأ]حد|ال[اإ]ثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمع[ةه]|(ال|بال|في\s*ال)?(عصر|مغرب|صبح|صباح|ظهر|ضحى|عشا|عشاء|مسا|مساء))($|[\s،,.؟?!])|يوم\s*[0-9٠-٩]|[0-9٠-٩]{1,2}\s*\/\s*[0-9٠-٩]{1,2}/;
+  const TODAY_R131 = /(^|[\s،,.])(ا?ليوم|الليل[ةه]|(ال|بال)?(عصر|مغرب|ظهر|مسا|مساء))($|[\s،,.؟?!])/;
+  const OTHER_DAY_R131 = /بكر[ةه]?|باكر|السبت|ال[اأ]حد|ال[اإ]ثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمع[ةه]|يوم\s*[0-9٠-٩]|[0-9٠-٩]{1,2}\s*\/\s*[0-9٠-٩]{1,2}/;
+  const VISIT_VERB = /[اأ]زور|نزور|بزور|بنزور|[اأ]شوف(ها|ه)?|نشوف|بشوف|بجي|نجي|بنجي|[اأ]جي|بمر|نمر|[اأ]مر(\s|$)|[اأ]طوف|نطوف|بطوف|[اأ]روح|نروح|بروح|زيار[ةه]|معاين|[اأ]عاين/;
+  const lastOutsR131 = c.history.filter((h: any) => h.direction === "outbound").slice(-3).map(body).join(" ");
+  const visitTalk = VISIT_Q.test(lastOutsR131) || /متى\s*يناسب|تزور|زيار[ةه]|معاين|الموقع|اللوكيشن/.test(lastOutsR131) || VISIT_VERB.test(saidR131) || LOCATION_ASK.test(saidR131 + " " + recentIn);
+  const coordR131 = out.action === "handoff" && /^\s*(طلب\s*)?معاين[ةه]\s*تحتاج\s*تنسيق/.test(String(out.handoff_reason || ""));
+  if ((out.action === "none" || coordR131) && ["buyer", "tenant"].includes(out.category) && !c.hardHandoff && !out.location_for_area
+    && c.prop?.map_url && String(c.prop.visit_method || "") === "open" && (!c.prop.status || c.prop.status === "available") && !sentBefore(String(c.prop.map_url))
+    && !DAY_NOT.test(notR131) && !/ما\s*(ناسب|يناسبني|عجب|ابي|ابغى|اريد)|مب\s*مناسب|خلاص\s*(لقيت|اشتريت)/.test(notR131)
+    && (DAY_SURE.test(saidR131) || DAY_VAGUE.test(saidR131)) && visitTalk
+    && !texts.some((t) => t.length <= 200 && /ما\s*متوفر|انباع|انحجز/.test(t))) {
+    const vague = DAY_VAGUE.test(saidR131) || !DAY_SURE.test(saidR131);
+    texts = texts.filter((t) => !(t.length <= 200 && (LOCATION_HELD.test(t) || PROMISED_LOC.test(t) || VISIT_Q.test(t) || /متى\s*يناسب|الساع[ةه]\s*كم|كم\s*الساع|خبرني|خذ\s*راحتك|تمام\s*ان\s*شاء\s*الله\s*$/.test(t)))).slice(0, 1);
+    texts.push("تفضل هذا الموقع، الفيلا مفتوحة تقدر تشوفها على راحتك");
+    if (vague) texts.push("واذا تأكدت من اليوم خبرني عشان اسجل لك الزيارة واتأكد ما في احد ثاني يزورها بنفس الوقت 🌷");
+    out.action = "send_location"; out.handoff_reason = null; out.guard_location_on_day = true;
+    // a day ahead or an unsure one: no visit is noted at today's hour (the visit extractor notes the day he gives)
+    if (vague || (OTHER_DAY_R131.test(saidR131) && !out.viewing_date) || (!TODAY_R131.test(saidR131) && !out.viewing_date)) out.no_location_visit = true;
+  }
   // R130: «برسلك الموقع» with nothing going out and nobody told to send it (no handoff) is a promise nobody keeps: it goes
   // (dry run on Sana's first message: a visit-coordination handoff also wrote «ان شاء الله برسلك الموقع»; the handoff stays so
   // Ahmed knows, the promise becomes the question, and her next «بعد شوي» or «وصلت» gets the location from the rule above)
@@ -2282,7 +2311,7 @@ Deno.serve(async (req) => {
       const TIME_SAID = /ا?ليوم|الحين|الان|الآن|بكر|باكر|بعد|العصر|الصبح|الصباح|المغرب|الظهر|الليل|المسا|الساع|طالع|جاي|في الطريق|وصلت|وصلنا|السبت|ال[اأ]حد|ال[اإ]ثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمعة|[0-9٠-٩]/;
       const recentIn = history.filter((h: any) => h.direction === "inbound").slice(-6).map((h: any) => String(h.transcript || h.body || "")).join(" ");
       const booked = visits.some((v: any) => (!prop || v.property_id === prop.id) && ["scheduled", "confirmed", "postponed"].includes(v.status));
-      if (!out.viewing_date && !out.viewing_time && !booked && !TIME_SAID.test(recentIn)) {
+      if (!out.viewing_date && !out.viewing_time && !booked && !TIME_SAID.test(recentIn) && !out.guard_location_on_day) {
         out.action = "none"; out.guard_location_before_time = true;
         texts = texts.filter((t) => !/تقدر\s*تشوف|مفتوح|المفتاح|الرمز/.test(t));
         if (!texts.some((t) => /(تزور|تزورون|تزورين)\s*؟/.test(t))) texts = [...texts.slice(0, 1), "ان شاء الله برسلك الموقع", "متى يناسبك تزور ؟"];
@@ -2965,7 +2994,7 @@ Deno.serve(async (req) => {
 
     // a location (or the owner's number) went out: the client is going to see the property, so the visit is recorded even when
     // his time was vague ("الحين", "العصر") and the question after 1.5 h can follow (8 Nov, Ahmed)
-    if (sentIds.length && prop && !review && !out.location_for_area && ["send_location", "send_owner_number", "send_lockbox"].includes(out.action)) {
+    if (sentIds.length && prop && !review && !out.location_for_area && !out.no_location_visit && ["send_location", "send_owner_number", "send_lockbox"].includes(out.action)) {
       try {
         const todayM = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Muscat" }).format(new Date());
         const nowM = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Muscat", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());

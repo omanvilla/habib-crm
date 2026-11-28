@@ -22,7 +22,9 @@ test('R11: the location asked with the day goes now (401f1402 «امر ليوم�
  assert.deepEqual(decide(['اذا تأكدت من الوقت يوم الخميس خبرني عشان ارسل لك الموقع'],[IN('اريد اعرف الموقع اول حاجه يمكن السبت')],null,{prop:RUMAIS}).texts,['تفضل هذا الموقع']);
  // not when the day does not work, not without a location ask, not for a house the owner lives in, not when it went already
  assert.equal(decide(['تمام'],[IN('ارسل الموقع بس اليوم ما اقدر')],null,{prop:RUMAIS}).out.action,'none');
- assert.equal(decide(['تمام'],[IN('بمر اليوم')],null,{prop:RUMAIS}).out.action,'none');
+ // R131 (28 Nov): an open house gets its location once he says when he goes, even without asking for it
+ assert.equal(decide(['تمام'],[IN('بمر اليوم')],null,{prop:RUMAIS}).out.action,'send_location');
+ assert.equal(decide(['تمام'],[IN('بمر اليوم')],null,{prop:{...RUMAIS,visit_method:'lockbox'}}).out.action,'none');
  assert.equal(decide(['تمام'],[IN('ارسل الموقع بجي بكره')],null,{prop:{...RUMAIS,visit_method:'owner_lives'}}).out.action,'none');
  assert.equal(decide(['تمام'],[OUT(RUMAIS.map_url),IN('ارسل الموقع بجي بكره')],null,{prop:RUMAIS}).out.action,'none');
  // «اليوم» inside another word is no day
