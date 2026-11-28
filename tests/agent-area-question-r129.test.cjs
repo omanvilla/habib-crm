@@ -8,3 +8,8 @@ test('R129 exception to R41 for area questions', () => {
   // R41 itself (questions about the property) stays
   assert.match(brain, /سؤال من العميل جوابه مو مكتوب قدامك أبداً \(R41/);
 });
+test('R129 code guard turns a silent area-question handoff into the visit invitation', () => {
+  const idx = fs.readFileSync(require('node:path').join(__dirname, '../supabase/functions/whatsapp-reply-agent/index.ts'), 'utf8');
+  assert.match(idx, /out\.guard_area_question = true/);
+  assert.match(idx, /!\/المكتب\|مكتبكم\/\.test/);
+});
