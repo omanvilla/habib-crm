@@ -628,3 +628,8 @@ Ahmed decided not to link +96890944469 (Meta holds the number in a portfolio we 
 
 ## 28 Nov 2026 — SQL169: speed alert judges the warm pass
 - Ahmed «نعم» (weekly check item 1). `db_speed_probe()` now runs the probe twice: pass 1 → new column `db_speed_probes.cold_ms`, pass 2 → `ms` (feeds `crm_db_speed_alert` / `db_speed_summary`). First live call: cold 1596 ms, warm 55 ms. A real CPU starvation slows warm queries too, so it is still caught.
+
+## 28 Nov 2026 — R129: area/distance questions get a visit invitation (waits for Ahmed)
+- Weekly check found 4 silent handoffs this week; the reel ones are by design (asked once already). The remaining case: «كم تبعد من العاصمة» / «هل قريب هالموقع ؟» went to Ahmed with no reply (R41).
+- brain.ts R129 line + index.ts `guard_area_question` (the prompt line alone lost to R41 in dry runs): a «سؤال ما عندي جوابه:» handoff whose message asks about distance/nearness (not about the office) → «الافضل تشوف المنطقة بنفسك لما تزور عشان تتأكد اذا تناسبك» + «متى يناسبك تزور ؟» (left out when a location was already sent), action none.
+- Dry-run copy v121 → 868e92a. 10 real messages: both area questions answered, office-distance question still handed off, other 7 unchanged in substance. Live agent still 436c36b: deploy only with Ahmed's OK.
