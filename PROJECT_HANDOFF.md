@@ -625,3 +625,6 @@ Ahmed decided not to link +96890944469 (Meta holds the number in a portfolio we 
 - Ahmed set up MacroDroid on both office phones (Barka + Muscat): daily pings arrived 7:04 / 7:11 Muscat; a test call from Barka reached the function (his own number is ignored by design). Templates missed_call_ar_v1 + missed_call_evening_ar_v1 APPROVED UTILITY on both numbers.
 - Ahmed chose «شغّل الحين»; `missed_call_auto = true` since 28 Nov 7:26 Muscat (he ran the UPDATE in the SQL editor: the connector's confirm box for writes on settings never reaches him; give him the one line instead of working around it).
 - Not yet seen: a real customer missed call end to end, and forwarding (**61) confirmed on the Muscat phone. A WhatsApp link preview also hits the function (user agent WhatsApp, no number → ignored).
+
+## 28 Nov 2026 — SQL169: speed alert judges the warm pass
+- Ahmed «نعم» (weekly check item 1). `db_speed_probe()` now runs the probe twice: pass 1 → new column `db_speed_probes.cold_ms`, pass 2 → `ms` (feeds `crm_db_speed_alert` / `db_speed_summary`). First live call: cold 1596 ms, warm 55 ms. A real CPU starvation slows warm queries too, so it is still caught.
