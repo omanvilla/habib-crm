@@ -484,6 +484,36 @@ function ownerDecisions(out: any, lines: string[], c: any) {
     if (!texts.length) texts = ["تفضل هذا الموقع"];
     out.action = "send_location"; out.guard_location_day = true;
   }
+  // R130 (Ahmed 28 Nov 2026, Sana 95505576: «اريد لوكيشن هذا البيت», «بعد شويا نروح», «احنا وصلنا رميس», «انتظر اللوكيشن»; the
+  // agent wrote «برسلك الموقع» twice and handed off because the visit method was not set, and she waited at the area): strict
+  // rule. A client who is on his way, near, has arrived or is waiting for the location, or who asks for it after we promised it,
+  // gets the location now and the visit is recorded at this time. Ahmed is alerted when nobody can open the house alone.
+  const lastOutsR130 = c.history.filter((h: any) => h.direction === "outbound").slice(-3).map(body).join(" ");
+  const saidR130 = String(c.burstSaid || "");
+  const LOC_WHEN_Q = "متى بتروح ؟ عشان ارسلك اللوكيشن على طول";
+  const PROMISED_LOC = /(برسل|ارسل|أرسل|نرسل|بنرسل|برسلك|ارسلك)\s*(لك|ل[كج])?\s*(ال)?(موقع|لوكيشن|اللوكيشن)|برسلك\s*الموقع/;
+  const COMING_NOW = /(^|[\s،,.])(وصلت|وصلنا|واصل|واصلين|واصله|واصلة|([اأ]نا|احنا|صرت|صرنا)\s*قريب(ه|ة|ين)?|قريبين|بالطريق|في\s*الطريق|ع\s*الطريق|على\s*الطريق|جاي|جايه|جاية|جايين|نروح|بنروح|رايح|رايحين|طالع|طالعين|متحرك|متحركين|بعد\s*شوي[اهة]?|الحين|ال[اآ]ن|ا?ليوم|حالي[اًا]*\s*(ف|في|ب)\s*[ء-ي]+|عند\s*(ال)?(بيت|فيلا|فل[ةه]|موقع|منطق[ةه]))($|[\s،,.؟?!])|انتظر\s*(ال)?(لوكيشن|موقع)|وين\s*(ال)?(لوكيشن|موقع)/;
+  if (out.action !== "send_location" && out.action !== "send_lockbox" && out.action !== "send_owner_number" && ["buyer", "tenant"].includes(out.category)
+    && c.prop?.map_url && c.prop.visit_method !== "owner_lives" && !sentBefore(String(c.prop.map_url)) && !DAY_NOT.test(saidR130)
+    && ((COMING_NOW.test(saidR130) && (LOCATION_ASK.test(saidR130 + " " + recentIn) || PROMISED_LOC.test(lastOutsR130) || /تزور|زيار[ةه]|معاين|لوكيشن/.test(lastOutsR130)))
+      || (LOCATION_ASK.test(saidR130) && PROMISED_LOC.test(lastOutsR130)))) {
+    texts = texts.filter((t) => !(t.length <= 200 && (LOCATION_HELD.test(t) || PROMISED_LOC.test(t) || /متى\s*يناسب|الساع[ةه]\s*كم|كم\s*الساع/.test(t))));
+    if (!texts.length || !texts.some((t) => /موقع|لوكيشن/.test(t))) texts = ["تفضل هذا الموقع", ...texts.filter((t) => !/تفضل\s*هذا\s*الموقع/.test(t))].slice(0, 2);
+    out.action = c.prop.visit_method === "lockbox" ? "send_lockbox" : "send_location";
+    out.viewing_date = null; out.viewing_time = null; out.handoff_reason = null; out.guard_location_now = true;
+    if (!["open", "lockbox"].includes(String(c.prop.visit_method || ""))) out.coming_alert = true;
+  }
+  // R130: «برسلك الموقع» with nothing going out and nobody told to send it (no handoff) is a promise nobody keeps: it goes
+  // (dry run on Sana's first message: a visit-coordination handoff also wrote «ان شاء الله برسلك الموقع»; the handoff stays so
+  // Ahmed knows, the promise becomes the question, and her next «بعد شوي» or «وصلت» gets the location from the rule above)
+  const coordHandoff = out.action === "handoff" && /^\s*(طلب\s*)?معاين[ةه]\s*تحتاج\s*تنسيق/.test(String(out.handoff_reason || ""));
+  if ((out.action === "none" || coordHandoff) && texts.some((t) => t.length <= 200 && PROMISED_LOC.test(t))) {
+    texts = texts.filter((t) => !(t.length <= 200 && PROMISED_LOC.test(t)));
+    // he asked for the location: the question tells him it goes as soon as he says when he goes (R11 still wants the time)
+    if (LOCATION_ASK.test(String(c.burstSaid || ""))) texts = [...texts.filter((t) => !(t.length <= 200 && (VISIT_Q.test(t) || /متى\s*يناسب/.test(t)))), LOC_WHEN_Q];
+    else if (!texts.some((t) => VISIT_Q.test(t) || /متى\s*يناسب/.test(t))) texts.push("متى يناسبك تزور ؟");
+    out.guard_no_empty_promise = true;
+  }
   // 007be129 «هذا هو» at the door, e06229f1 «أنا موجود حالياً في الفيلا. جالس أشوفها»: «وايش انطباعك بعد ما شفتها ؟» went to a
   // client who had only arrived. The opinion is asked once he has seen it; now he gets «حياك الله خذ راحتك».
   const OPINION_Q = /انطباع(ك|ج|كم)|كيف\s*(شفت|لقيت)(ها|ه|يها|يه)?|(ايش|وش)\s*ر[اأ]ي(ك|ج)\s*(فيها|فيه|بعد)/;
@@ -2947,6 +2977,15 @@ Deno.serve(async (req) => {
           if (w.error) console.error("[reply-agent] location visit", w.error.message);
         }
       } catch (e) { console.error("[reply-agent] location visit", String((e as any)?.message || e)); }
+    }
+    // R130: the client is going now to a house nobody can open alone (method not set, or arranged by us): Ahmed knows at once
+    if (out.coming_alert && sentIds.length && prop && !review) {
+      try {
+        const text = [`🚗 عميل رايح الحين للعقار وانرسل له اللوكيشن · ${conv.route_key === "barka" ? "بركاء" : conv.route_key === "muscat" ? "مسقط" : ""}`, `العقار: ${prop.title || prop.internal_name || neutralLabel(prop)}`,
+          `الاسم: ${client.name || conv.customer_name || "عميل"}`, `الرقم: +${to}`, "طريقة الدخول مب مسجلة: نسّق له فتح البيت"].join("\n");
+        await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-owner-hot-alert`, { method: "POST", headers: { "Content-Type": "application/json", "x-crm-agent": secret },
+          body: JSON.stringify({ action: "notify_owner", company_id: msg.company_id, route_key: conv.route_key, text, event_key: `coming_now:${conv.id}:${prop.id}` }) });
+      } catch (e) { console.error("[reply-agent] coming alert", String((e as any)?.message || e)); }
     }
     // keep the CRM up to date
     const convPatch: any = { ai_summary: short(out.crm_note, 1500), last_automation_action: { scenario: "reply_agent_v1", action: out.action, at: now, category: out.category, source: out.source }, updated_at: now };
