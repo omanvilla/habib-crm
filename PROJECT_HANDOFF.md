@@ -666,3 +666,9 @@ Ahmed decided not to link +96890944469 (Meta holds the number in a portfolio we 
 - Code: `ownerDecisions` (COMING_NOW, PROMISED_LOC, guard_location_now, coming_alert, guard_no_empty_promise) + alert after the visit block. Tests: `tests/agent-location-now-r130.test.cjs`, new case in `tests/owner-decisions.test.cjs`; full suite 1108 pass, 0 fail.
 - Dry run (`whatsapp-reply-agent-dryrun` v124 at afc18e6, inline, nothing sent): Sana's 3 messages → question / location / location; «حاليا ف بركاء», «اليوم», «وين الموقع» → location; detail requests and «5 غرف» unchanged.
 - To publish: pin `whatsapp-reply-agent` to the merge commit (only after Ahmed says yes). Small villa still has no `visit_method` (ask Ahmed where the key is).
+
+## R131: لوكيشن الفلل المفتوحة أول ما العميل يحدد اليوم (28 نوفمبر 2026، PR #110)
+- أحمد: «ايوه اسوي… نتاكد اي يوم بالضبط… رساله عاديه… ما نضغط عليه… نحسس انه عن مصلحته».
+- فيلا مفتوحة (visit_method=open) + العميل قال متى يروح (يوم واضح أو وقت مب أكيد) → اللوكيشن على طول. لو اليوم مب أكيد يضاف: «واذا تأكدت من اليوم خبرني عشان اسجل لك الزيارة واتأكد ما في احد ثاني يزورها بنفس الوقت 🌷»، وما تنسجل زيارة على ساعة اليوم (`out.no_location_visit`).
+- قبلها بنفس اليوم: أرسلت اللوكيشن يدوي لـ 6 عملاء (whatsapp_reply_drafts.analysis.manual_by = ahmed_request_20261128).
+- dryrun v126 → 8523520. النشر على العقل الحي ينتظر موافقة أحمد.
